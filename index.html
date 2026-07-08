@@ -52,7 +52,6 @@
     .header { text-align: center; margin-bottom: 20px; margin-top: 10px; }
     .header .emoji { font-size: clamp(30px, 8vw, 40px); margin-bottom: 6px; }
     .header h1 { font-size: clamp(20px, 5vw, 24px); font-weight: 700; letter-spacing: -0.5px; }
-    .header p { margin-top: 4px; color: rgba(255, 255, 255, 0.55); font-size: clamp(12px, 3.5vw, 14px); }
 
     .row { display: flex; gap: 8px; width: 100%; }
 
@@ -183,7 +182,7 @@
       display: flex; 
       flex-direction: column; 
       gap: 6px; 
-      max-height: 200px;
+      max-height: 160px;
       overflow-y: auto;
       padding-right: 4px;
     }
@@ -209,10 +208,33 @@
       display: grid; 
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
       gap: 6px 12px; 
+      margin-bottom: 16px;
     }
     .legend-item { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
     .legend-item .l-label { font-weight: 600; }
     .legend-item .l-range { color: rgba(255, 255, 255, 0.35); font-variant-numeric: tabular-nums; }
+
+    .instruction-box {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .instruction-box summary {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      outline: none;
+    }
+    .instruction-box p {
+      margin-top: 8px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.45);
+      line-height: 1.4;
+      white-space: pre-line;
+    }
 
     .hidden { display: none !important; }
   </style>
@@ -220,22 +242,21 @@
 <body>
 <div class="card">
   <select class="lang-switcher" id="langSwitcher" onchange="changeLanguage()">
-    <option value="ru">🇷🇺 RU</option>
     <option value="en">🇺🇸 EN</option>
+    <option value="ru">🇷🇺 RU</option>
     <option value="fr">🇫🇷 FR</option>
     <option value="de">🇩🇪 DE</option>
   </select>
 
   <div class="header">
     <div class="emoji">🌡️</div>
-    <h1 id="tTitle">Горячо — Холодно</h1>
-    <p id="tSubtitle">Помощник ведущего</p>
+    <h1 id="tTitle">Hot or Cold</h1>
   </div>
 
   <div class="info-bar">
-    <span class="confirmed" id="tConfirmed">Число загадано ✓</span>
+    <span class="confirmed" id="tConfirmed">Number generated ✓</span>
     <span class="attempts" id="attemptsLabel"></span>
-    <button class="btn-reset" onclick="resetGame()" id="tNewGame">Новая игра</button>
+    <button class="btn-reset" onclick="resetGame()" id="tNewGame">New Game</button>
   </div>
 
   <div class="feedback-panel hidden" id="feedbackPanel">
@@ -243,92 +264,105 @@
   </div>
 
   <div class="final-box hidden" id="finalBox">
-    <p id="tFinalWarning">20 попыток использовано — последний шанс!</p>
+    <p id="tFinalWarning">20 attempts used — last chance!</p>
     <div class="row">
       <input type="number" id="finalInput" min="1" max="1000" placeholder="" pattern="[0-9]*" inputmode="numeric" />
-      <button class="btn-yellow" onclick="submitFinal()" id="tFinalSubmit">Ответ</button>
+      <button class="btn-yellow" onclick="submitFinal()" id="tFinalSubmit">Submit</button>
     </div>
   </div>
 
   <div class="result-box hidden" id="resultBox"></div>
 
   <div class="guess-section" id="guessSection">
-    <p id="tEnterGuess">Введите попытку угадывающего</p>
+    <p id="tEnterGuess">Enter a number</p>
     <div class="row">
       <input type="number" id="guessInput" min="1" max="1000" placeholder="" pattern="[0-9]*" inputmode="numeric" />
-      <button class="btn" onclick="handleGuess()" id="tSubmitGuess">Проверить</button>
+      <button class="btn" onclick="handleGuess()" id="tSubmitGuess">Check</button>
     </div>
   </div>
 
   <div class="history-section hidden" id="historySection">
-    <div class="history-title" id="tHistoryTitle">История попыток</div>
+    <div class="history-title" id="tHistoryTitle">Guess History</div>
     <div class="history-list" id="historyList"></div>
   </div>
 
   <div class="legend">
-    <div class="legend-title" id="tLegendTitle">Шкала расстояний</div>
+    <div class="legend-title" id="tLegendTitle">Thermal Scale</div>
     <div class="legend-grid" id="legendGrid"></div>
+    
+    <details class="instruction-box">
+      <summary id="tInsTitle">Rules 📋</summary>
+      <p id="tInsBody">Loading...</p>
+    </details>
   </div>
 </div>
 
 <script>
   const i18n = {
-    ru: {
-      title: "Горячо — Холодно", subtitle: "Помощник ведущего", docTitle: "Горячо — Холодно | 🌡️",
-      confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", newGame: "Новая игра",
-      enterGuess: "Введите попытку угадывающего", placeholder: "Число от 1 до 1000...", submitGuess: "Проверить",
-      finalWarning: "20 попыток использовано — последний шанс!", finalPlaceholder: "Финальный ответ...", finalSubmit: "Ответ",
-      resultWin: "🎉 Победа! Число угадано!", resultLose: "❌ Неверно. Загаданное число было: ",
-      historyTitle: "История попыток", legendTitle: "Шкала расстояний",
-      labels: ["🧊 Очень холодно", "❄️ Холодно", "🌬️ Прохладно", "🌤️ Тепло", "☀️ Жарко", "🔥 Горячо", "🌋 Очень горячо", "💥 Кипяток", "🎯 Угадал!"],
-      finalInput: "Финальный ответ..."
-    },
     en: {
-      title: "Hot or Cold", subtitle: "Host Assistant", docTitle: "Hot or Cold | 🌡️",
-      confirmed: "Number is set ✓", attemptsPrefix: "Attempts: ", newGame: "New Game",
-      enterGuess: "Enter the guesser's attempt", placeholder: "Number 1–1000...", submitGuess: "Check",
-      finalWarning: "20 attempts used — last chance!", finalPlaceholder: "Final answer...", finalSubmit: "Submit",
+      title: "Hot or Cold", docTitle: "Hot or Cold | 🌡️",
+      confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", newGame: "New Game",
+      enterGuess: "Enter a number", placeholder: "Number 1–1000...", submitGuess: "Check",
+      finalWarning: "20 attempts used — last chance!", finalSubmit: "Submit",
       resultWin: "🎉 Victory! Number is guessed!", resultLose: "❌ Wrong. The secret number was: ",
       historyTitle: "Guess History", legendTitle: "Distance Scale",
-      labels: ["🧊 Very Cold", "❄️ Cold", "🌬️ Cool", "🌤️ Warm", "☀️ Hot", "🔥 Very Hot", "🌋 Scorching", "💥 Boiling", "🎯 Got It!"],
+      insTitle: "How to play? 📋",
+      insBody: "Guess the secret number (from 1 to 1000) in 20 attempts.\n\nThe thermometer tracks the distance (difference) between your guess and the secret number.\n\nExample: the secret number is 350, you enter 900 — the distance is 550 steps. The thermometer will show: 🧊 Very cold.\n\nThe smaller this distance, the higher the thermometer temperature.\n\nGood luck!",
+      labels: ["🧊 Very cold", "❄️ Cold", "🌬️ Chilly", "🌤️ Warm", "☀️ Hot", "🔥 Very hot", "💥 Blast", "🌋 Lava", "🎯 Bullseye!"],
       finalInput: "Final answer..."
     },
+    ru: {
+      title: "Горячо — Холодно", docTitle: "Горячо — Холодно | 🌡️",
+      confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", newGame: "Новая игра",
+      enterGuess: "Введите число", placeholder: "Число от 1 до 1000...", submitGuess: "Проверить",
+      finalWarning: "20 попыток использовано — последний шанс!", finalSubmit: "Ответ",
+      resultWin: "🎉 Победа! Число угадано!", resultLose: "❌ Неверно. Загаданное число было: ",
+      historyTitle: "История попыток", legendTitle: "Шкала расстояний",
+      insTitle: "Как играть? 📋",
+      insBody: "Отгадайте секретное число (от 1 до 1000) за 20 попыток.\n\nГрадусник измеряет расстояние (разницу) между вашим вариантом и секретным числом.\n\nНапример: секретное число 350, вы вводите 900 — расстояние 550 шагов. Градусник покажет: 🧊 Очень холодно.\n\nЧем меньше это расстояние, тем выше температура градусника.\n\nУдачи!",
+      labels: ["🧊 Очень холодно", "❄️ Холодно", "🌬️ Прохладно", "🌤️ Тепло", "☀️ Жарко", "🔥 Горячо", "💥 Очень горячо", "🌋 Лава", "🎯 В точку!"],
+      finalInput: "Финальный ответ..."
+    },
     fr: {
-      title: "Chaud ou Froid", subtitle: "Assistant de l'Hôte", docTitle: "Chaud ou Froid | 🌡️",
+      title: "Chaud ou Froid", docTitle: "Chaud ou Froid | 🌡️",
       confirmed: "Nombre défini ✓", attemptsPrefix: "Essais: ", newGame: "Nouveau Jeu",
-      enterGuess: "Entrez la tentative du devineur", placeholder: "Nombre 1–1000...", submitGuess: "Vérifier",
-      finalWarning: "20 tentatives utilisées — dernière chance!", finalPlaceholder: "Réponse finale...", finalSubmit: "Valider",
+      enterGuess: "Entrez un nombre", placeholder: "Nombre 1–1000...", submitGuess: "Vérifier",
+      finalWarning: "20 tentatives utilisées — dernière chance!", finalSubmit: "Valider",
       resultWin: "🎉 Victoire! Le nombre est deviné!", resultLose: "❌ Incorrect. Le nombre secret était: ",
       historyTitle: "Historique", legendTitle: "Échelle de Distance",
-      labels: ["🧊 Très Froid", "❄️ Froid", "🌬️ Frais", "🌤️ Tiède", "☀️ Chaud", "🔥 Très Chaud", "🌋 Brûlant", "💥 Bouillant", "🎯 Gagné!"],
+      insTitle: "Comment jouer? 📋",
+      insBody: "Devinez le nombre secret (de 1 à 1000) en 20 tentatives.\n\nLe thermomètre mesure la distance (différence) entre votre supposition et le nombre secret.\n\nExemple: le nombre secret est 350, you entrez 900 — la distance is de 550 étapes. Le thermomètre affichera: 🧊 Très froid.\n\nPlus cette distance est petite, plus la température du thermomètre est élevée.\n\nBonne chance!",
+      labels: ["🧊 Très froid", "❄️ Froid", "🌬️ Frais", "🌤️ Tiède", "☀️ Chaud", "🔥 Très chaud", "💥 Explosion", "🌋 Lave", "🎯 Dans le mille!"],
       finalInput: "Réponse finale..."
     },
     de: {
-      title: "Heiß oder Kalt", subtitle: "Spielleiter-Assistent", docTitle: "Heiß oder Kalt | 🌡️",
+      title: "Heiß oder Kalt", docTitle: "Heiß oder Kalt | 🌡️",
       confirmed: "Zahl gesetzt ✓", attemptsPrefix: "Versuche: ", newGame: "Neues Spiel",
-      enterGuess: "Geben Sie den Rateversuch ein", placeholder: "Zahl 1–1000...", submitGuess: "Prüfen",
-      finalWarning: "20 Versuche verbraucht — letzte Chance!", finalPlaceholder: "Letzte Antwort...", finalSubmit: "Absenden",
+      enterGuess: "Geben Sie eine Zahl ein", placeholder: "Zahl 1–1000...", submitGuess: "Prüfen",
+      finalWarning: "20 Versuche verbraucht — letzte Chance!", finalSubmit: "Absenden",
       resultWin: "🎉 Sieg! Zahl wurde erraten!", resultLose: "❌ Falsch. Die Geheimzahl war: ",
       historyTitle: "Verlauf", legendTitle: "Entfernungsskala",
-      labels: ["🧊 Sehr Kalt", "❄️ Kalt", "🌬️ Kühl", "🌤️ Warm", "☀️ Heiß", "🔥 Sehr Heiß", "🌋 Glühend", "💥 Kochend", "🎯 Erraten!"],
+      insTitle: "Spielanleitung 📋",
+      insBody: "Errate die Geheimzahl (von 1 bis 1000) in 20 Versuchen.\n\nDas Thermometer misst den Abstand (Differenz) zwischen deinem Tipp und der Geheimzahl.\n\nBeispiel: Die Geheimzahl ist 350, du gibst 900 ein — der Abstand beträgt 550 Schritte. Das Thermometer zeigt: 🧊 Sehr kalt.\n\nJe kleiner dieser Abstand ist, desto höher ist die Temperatur des Thermometers.\n\nViel Glück!",
+      labels: ["🧊 Sehr kalt", "❄️ Kalt", "🌬️ Kühl", "🌤️ Warm", "☀️ Heiß", "🔥 Sehr heiß", "💥 Explosion", "🌋 Lava", "🎯 Volltreffer!"],
       finalInput: "Letzte Antwort..."
     }
   };
 
   const FEEDBACK_META = [
-    { min: 501, max: Infinity, color: "#3B82F6", bg: "rgba(59, 130, 246, 0.15)", labelIndex: 0 },
-    { min: 201, max: 500,      color: "#60A5FA", bg: "rgba(96, 165, 250, 0.15)", labelIndex: 1 },
-    { min: 101, max: 200,      color: "#93C5FD", bg: "rgba(147, 197, 253, 0.15)", labelIndex: 2 },
-    { min: 51,  max: 100,      color: "#F59E0B", bg: "rgba(245, 158, 11, 0.15)", labelIndex: 3 },
-    { min: 21,  max: 50,       color: "#F97316", bg: "rgba(249, 115, 22, 0.15)", labelIndex: 4 },
-    { min: 11,  max: 20,       color: "#EF4444", bg: "rgba(239, 68, 68, 0.15)", labelIndex: 5 },
-    { min: 4,   max: 10,       color: "#DC2626", bg: "rgba(220, 38, 38, 0.15)", labelIndex: 6 },
-    { min: 1,   max: 3,        color: "#9F1239", bg: "rgba(159, 18, 57, 0.15)", labelIndex: 7 },
-    { min: 0,   max: 0,        color: "#16A34A", bg: "rgba(22, 163, 74, 0.15)", labelIndex: 8 },
+    { min: 501, max: 1000,     color: "#93C5FD", bg: "rgba(147, 197, 253, 0.15)", labelIndex: 0 }, // Ледяной голубой
+    { min: 201, max: 500,      color: "#38BDF8", bg: "rgba(56, 189, 248, 0.15)",  labelIndex: 1 }, // Яркий небесный
+    { min: 101, max: 200,      color: "#2DD4BF", bg: "rgba(45, 212, 191, 0.15)",  labelIndex: 2 }, // Мятно-бирюзовый
+    { min: 51,  max: 100,      color: "#FBBF24", bg: "rgba(251, 191, 36, 0.15)",  labelIndex: 3 }, // Солнечный желтый
+    { min: 21,  max: 50,       color: "#FB923C", bg: "rgba(251, 146, 60, 0.15)",  labelIndex: 4 }, // Насыщенный оранжевый
+    { min: 11,  max: 20,       color: "#F87171", bg: "rgba(248, 113, 113, 0.15)", labelIndex: 5 }, // Кораллово-красный
+    { min: 4,   max: 10,       color: "#FB7185", bg: "rgba(251, 113, 133, 0.15)", labelIndex: 6 }, // Сочный малиновый
+    { min: 1,   max: 3,        color: "#FF3333", bg: "rgba(255, 51, 51, 0.18)",   labelIndex: 7 }, // Неоново-алый (Лава)
+    { min: 0,   max: 0,        color: "#4ADE80", bg: "rgba(74, 222, 128, 0.15)",  labelIndex: 8 }, // Сочный зеленый
   ];
 
   const MAX_GUESSES = 20;
-  let currentLang = localStorage.getItem('hc_lang') || 'ru';
+  let currentLang = localStorage.getItem('hc_lang') || 'en';
 
   function changeLanguage() {
     currentLang = document.getElementById('langSwitcher').value;
@@ -341,7 +375,6 @@
     
     document.getElementById('docTitle').textContent = t.docTitle;
     document.getElementById('tTitle').textContent = t.title;
-    document.getElementById('tSubtitle').textContent = t.subtitle;
     document.getElementById('tConfirmed').textContent = t.confirmed;
     document.getElementById('tNewGame').textContent = t.newGame;
     document.getElementById('tFinalWarning').textContent = t.finalWarning;
@@ -350,6 +383,8 @@
     document.getElementById('tSubmitGuess').textContent = t.submitGuess;
     document.getElementById('tHistoryTitle').textContent = t.historyTitle;
     document.getElementById('tLegendTitle').textContent = t.legendTitle;
+    document.getElementById('tInsTitle').textContent = t.insTitle;
+    document.getElementById('tInsBody').textContent = t.insBody;
 
     document.getElementById('guessInput').placeholder = t.placeholder;
     document.getElementById('finalInput').placeholder = t.finalInput;
@@ -364,7 +399,7 @@
   }
 
   function getFeedback(distance) {
-    return FEEDBACK_META.find(f => distance >= f.min && distance <= f.max);
+    return FEEDBACK_META.find(f => distance >= f.min && distance <= f.max) || FEEDBACK_META[0];
   }
 
   function getFbText(meta) {
@@ -489,7 +524,7 @@
     FEEDBACK_META.slice(0, 8).forEach(meta => {
       const item = document.createElement('div');
       item.className = 'legend-item';
-      const range = meta.max === Infinity ? `≥${meta.min}` : `${meta.min}–${meta.max}`;
+      const range = `${meta.min}–${meta.max}`;
       const labelText = labels[meta.labelIndex];
       item.innerHTML = `<span class="l-label" style="color:${meta.color}">${labelText}</span><span class="l-range">${range}</span>`;
       grid.appendChild(item);
