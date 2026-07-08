@@ -1,0 +1,354 @@
+
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Горячо — Холодно</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e3a5f 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      padding: 20px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 520px;
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.12);
+      padding: 32px 28px;
+      color: #fff;
+    }
+
+    .header { text-align: center; margin-bottom: 28px; }
+    .header .emoji { font-size: 40px; margin-bottom: 8px; }
+    .header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+    .header p { margin-top: 6px; color: rgba(255,255,255,0.55); font-size: 14px; }
+
+    .row { display: flex; gap: 10px; }
+
+    input[type=number] {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      font-size: 16px;
+      outline: none;
+      -moz-appearance: textfield;
+      caret-color: #fff;
+    }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+    .btn {
+      padding: 12px 20px;
+      border-radius: 12px;
+      border: none;
+      background: #6366f1;
+      color: #fff;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #4f46e5; }
+
+    .btn-yellow {
+      padding: 11px 18px;
+      border-radius: 10px;
+      border: none;
+      background: #fbbf24;
+      color: #1c1917;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-yellow:hover { background: #f59e0b; }
+
+    .btn-reset {
+      background: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.6);
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .info-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 10px 16px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 12px;
+    }
+    .info-bar .confirmed { font-size: 13px; color: rgba(255,255,255,0.6); }
+    .info-bar .attempts { font-size: 13px; font-weight: 600; color: #a5f3fc; }
+    .info-bar .attempts.low { color: #f87171; }
+
+    .feedback-panel {
+      border-radius: 16px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      text-align: center;
+      animation: pop 0.3s ease;
+    }
+    .feedback-panel .fb-label { font-size: 28px; }
+
+    @keyframes pop {
+      0% { transform: scale(0.95); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .final-box {
+      background: rgba(251,191,36,0.1);
+      border: 1px solid #fbbf24;
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 20px;
+    }
+    .final-box p {
+      text-align: center;
+      font-size: 14px;
+      color: #fde68a;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .final-box input[type=number] {
+      border: 1px solid rgba(251,191,36,0.4);
+      background: rgba(255,255,255,0.08);
+    }
+
+    .result-box {
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .result-win { background: rgba(22,163,74,0.2); border: 1px solid #16a34a; color: #86efac; }
+    .result-lose { background: rgba(239,68,68,0.2); border: 1px solid #ef4444; color: #fca5a5; }
+
+    .guess-section { margin-bottom: 20px; }
+    .guess-section p { margin-bottom: 10px; font-size: 14px; color: rgba(255,255,255,0.65); font-weight: 500; }
+
+    .history-section { margin-bottom: 20px; }
+    .history-title {
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+    .history-list { display: flex; flex-direction: column; gap: 6px; }
+    .history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.06);
+    }
+    .history-item .h-num { color: rgba(255,255,255,0.5); font-size: 13px; }
+    .history-item .h-guess { font-weight: 700; font-size: 17px; }
+    .history-item .h-label { font-size: 13px; font-weight: 600; }
+
+    .legend { margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 18px; }
+    .legend-title { font-size: 12px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; }
+    .legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; }
+    .legend-item { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+    .legend-item .l-range { color: rgba(255,255,255,0.35); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="emoji">🌡️</div>
+    <h1>Горячо — Холодно</h1>
+    <p>Помощник ведущего</p>
+  </div>
+
+  <div class="info-bar">
+    <span class="confirmed">Число загадано ✓</span>
+    <span class="attempts" id="attemptsLabel">Попыток: 20 / 20</span>
+    <button class="btn-reset" onclick="resetGame()">Новая игра</button>
+  </div>
+
+  <div class="feedback-panel hidden" id="feedbackPanel">
+    <div class="fb-label" id="feedbackLabel"></div>
+  </div>
+
+  <div class="final-box hidden" id="finalBox">
+    <p>20 попыток использовано — последний шанс!</p>
+    <div class="row">
+      <input type="number" id="finalInput" min="1" max="1000" placeholder="Финальный ответ..." />
+      <button class="btn-yellow" onclick="submitFinal()">Ответ</button>
+    </div>
+  </div>
+
+  <div class="result-box hidden" id="resultBox"></div>
+
+  <div class="guess-section" id="guessSection">
+    <p>Введите попытку угадывающего</p>
+    <div class="row">
+      <input type="number" id="guessInput" min="1" max="1000" placeholder="Число от 1 до 1000..." />
+      <button class="btn" onclick="handleGuess()">Проверить</button>
+    </div>
+  </div>
+
+  <div class="history-section hidden" id="historySection">
+    <div class="history-title">История попыток</div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-title">Шкала</div>
+    <div class="legend-grid" id="legendGrid"></div>
+  </div>
+</div>
+
+<script>
+  const FEEDBACK = [
+    { label: "🧊 Очень холодно", min: 501, max: Infinity, color: "#3B82F6", bg: "#EFF6FF" },
+    { label: "❄️ Холодно",       min: 201, max: 500,      color: "#60A5FA", bg: "#DBEAFE" },
+    { label: "🌬️ Прохладно",     min: 101, max: 200,      color: "#93C5FD", bg: "#EFF6FF" },
+    { label: "🌤️ Тепло",         min: 51,  max: 100,      color: "#F59E0B", bg: "#FEF3C7" },
+    { label: "☀️ Жарко",         min: 21,  max: 50,       color: "#F97316", bg: "#FFF7ED" },
+    { label: "🔥 Горячо",        min: 11,  max: 20,       color: "#EF4444", bg: "#FEE2E2" },
+    { label: "🌋 Очень горячо",  min: 4,   max: 10,       color: "#DC2626", bg: "#FFF1F2" },
+    { label: "💥 Кипяток",       min: 1,   max: 3,        color: "#9F1239", bg: "#FFF1F2" },
+    { label: "🎯 Угадал!",       min: 0,   max: 0,        color: "#16A34A", bg: "#F0FDF4" },
+  ];
+
+  const MAX_GUESSES = 20;
+
+  function getFeedback(distance) {
+    return FEEDBACK.find(f => distance >= f.min && distance <= f.max);
+  }
+
+  // Build legend
+  document.getElementById('legendGrid').innerHTML = '';
+  FEEDBACK.slice(0, 8).forEach(f => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    const range = f.max === Infinity ? `≥${f.min}` : `${f.min}–${f.max}`;
+    item.innerHTML = `<span style="color:${f.color};font-weight:700">${f.label}</span><span class="l-range">${range}</span>`;
+    document.getElementById('legendGrid').appendChild(item);
+  });
+
+  let secret = Math.floor(Math.random() * 1000) + 1;
+  let history = [];
+  let gameOver = false;
+
+  document.getElementById('guessInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleGuess(); });
+  document.getElementById('finalInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitFinal(); });
+
+  function handleGuess() {
+    if (gameOver) return;
+    const guess = parseInt(document.getElementById('guessInput').value);
+    if (isNaN(guess) || guess < 1 || guess > 1000) return;
+
+    const distance = Math.abs(guess - secret);
+    const fb = getFeedback(distance);
+    history.push({ guess, distance, fb });
+    document.getElementById('guessInput').value = '';
+
+    showFeedback(fb);
+    renderHistory();
+    updateAttemptsLabel();
+
+    if (distance === 0) {
+      gameOver = true;
+      showResult('win');
+    } else if (history.length >= MAX_GUESSES) {
+      gameOver = true;
+      document.getElementById('guessSection').classList.add('hidden');
+      document.getElementById('finalBox').classList.remove('hidden');
+    }
+  }
+
+  function submitFinal() {
+    const g = parseInt(document.getElementById('finalInput').value);
+    if (isNaN(g)) return;
+    document.getElementById('finalBox').classList.add('hidden');
+    showResult(g === secret ? 'win' : 'lose');
+  }
+
+  function showFeedback(fb) {
+    const panel = document.getElementById('feedbackPanel');
+    panel.style.background = fb.bg;
+    panel.style.border = `2px solid ${fb.color}`;
+    panel.classList.remove('hidden');
+    document.getElementById('feedbackLabel').textContent = fb.label;
+  }
+
+  function showResult(type) {
+    const box = document.getElementById('resultBox');
+    box.className = 'result-box ' + (type === 'win' ? 'result-win' : 'result-lose');
+    box.textContent = type === 'win'
+      ? '🎉 Победа! Число угадано!'
+      : `❌ Неверно. Загаданное число было: ${secret}`;
+    box.classList.remove('hidden');
+    document.getElementById('guessSection').classList.add('hidden');
+  }
+
+  function renderHistory() {
+    const section = document.getElementById('historySection');
+    const list = document.getElementById('historyList');
+    section.classList.remove('hidden');
+    list.innerHTML = '';
+    history.forEach((h, i) => {
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      item.style.borderLeft = `3px solid ${h.fb.color}`;
+      item.innerHTML = `
+        <span class="h-num">#${i + 1}</span>
+        <span class="h-guess">${h.guess}</span>
+        <span class="h-label" style="color:${h.fb.color}">${h.fb.label}</span>
+      `;
+      list.appendChild(item);
+    });
+  }
+
+  function updateAttemptsLabel() {
+    const left = MAX_GUESSES - history.length;
+    const label = document.getElementById('attemptsLabel');
+    label.textContent = `Попыток: ${left} / ${MAX_GUESSES}`;
+    label.className = 'attempts' + (left <= 3 ? ' low' : '');
+  }
+
+  function resetGame() {
+    secret = Math.floor(Math.random() * 1000) + 1;
+    history = [];
+    gameOver = false;
+    document.getElementById('feedbackPanel').classList.add('hidden');
+    document.getElementById('finalBox').classList.add('hidden');
+    document.getElementById('resultBox').classList.add('hidden');
+    document.getElementById('historySection').classList.add('hidden');
+    document.getElementById('guessSection').classList.remove('hidden');
+    document.getElementById('guessInput').value = '';
+    document.getElementById('finalInput').value = '';
+    updateAttemptsLabel();
+  }
+</script>
+</body>
+</html>
