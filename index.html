@@ -392,6 +392,9 @@
       margin-bottom: 12px;
     }
     .legend-title { font-size: 12px; color: rgba(255, 255, 255, 0.35); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; text-align: center; }
+
+    .legend-bar { display: none; }
+
     .legend-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 210px));
@@ -401,6 +404,33 @@
     .legend-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; }
     .legend-item .l-label { font-weight: 600; }
     .legend-item .l-range { color: rgba(255, 255, 255, 0.4); font-variant-numeric: tabular-nums; }
+
+    @media (min-width: 860px) {
+      .legend-bar {
+        display: flex;
+        height: 10px;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 16px;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+      }
+      .legend-bar span { flex: 1; }
+
+      .legend-grid {
+        grid-template-columns: repeat(8, 1fr);
+        justify-content: stretch;
+        gap: 4px;
+      }
+      .legend-item {
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        text-align: center;
+        gap: 3px;
+      }
+      .legend-item .l-label { font-size: 11.5px; line-height: 1.25; }
+      .legend-item .l-range { font-size: 11px; }
+    }
 
     .instruction-box {
       background: rgba(255, 255, 255, 0.03);
@@ -546,6 +576,7 @@
     <div class="legend">
       <div class="legend-panel">
         <div class="legend-title" id="tLegendTitle">Distance Scale</div>
+        <div class="legend-bar" id="legendBar"></div>
         <div class="legend-grid" id="legendGrid"></div>
       </div>
 
@@ -1103,7 +1134,9 @@
 
   function buildLegend() {
     const grid = document.getElementById('legendGrid');
+    const bar = document.getElementById('legendBar');
     grid.innerHTML = '';
+    bar.innerHTML = '';
     const labels = t().labels;
     FEEDBACK_META.slice(0, 8).forEach(meta => {
       const item = document.createElement('div');
@@ -1111,6 +1144,10 @@
       item.innerHTML = '<span class="l-label" style="color:' + meta.color + '">' + labels[meta.labelIndex] +
                        '</span><span class="l-range">' + meta.rangeSign + '</span>';
       grid.appendChild(item);
+
+      const seg = document.createElement('span');
+      seg.style.background = meta.color;
+      bar.appendChild(seg);
     });
   }
 
