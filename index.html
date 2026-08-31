@@ -24,14 +24,16 @@
 
     html {
       min-height: 100%;
-      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e3a5f 100%);
-      background-attachment: fixed;
+      background: #1e1b4b;
+      overscroll-behavior: none;
     }
 
     body {
+      position: relative;
       min-height: 100vh;
       min-height: 100dvh;
       background: transparent;
+      overscroll-behavior: none;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -40,6 +42,15 @@
                calc(12px + env(safe-area-inset-right))
                calc(12px + env(safe-area-inset-bottom))
                calc(12px + env(safe-area-inset-left));
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      top: -30vh; bottom: -30vh; left: 0; right: 0;
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e3a5f 100%);
+      z-index: -1;
+      pointer-events: none;
     }
 
     .card {
