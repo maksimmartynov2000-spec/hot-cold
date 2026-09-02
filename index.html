@@ -913,7 +913,13 @@
 
   function useToken(p) {
     if (mode !== 'duel' || D.roundOver || D.matchOver) return;
-    if (p !== D.cur || D.armed) return;
+    if (p !== D.cur) return;
+    if (D.armed) {
+      D.armed = false;
+      D.tokens[p]++;
+      renderAll();
+      return;
+    }
     if (D.tokens[p] <= 0) return;
     if (history.length === 0) return;   // нельзя первым ходом раунда
     D.tokens[p]--;
@@ -1093,10 +1099,11 @@
       pipsEl.style.color = P_COLORS[p];
 
       const btn = document.getElementById('ptoken' + p);
-      const canUse = !D.roundOver && !D.matchOver && D.cur === p && !D.armed &&
-                     D.tokens[p] > 0 && history.length > 0;
+      const isArmedByMe = D.armed && D.cur === p;
+      const canArm = !D.armed && D.tokens[p] > 0 && history.length > 0;
+      const canUse = !D.roundOver && !D.matchOver && D.cur === p && (isArmedByMe || canArm);
       btn.disabled = !canUse;
-      btn.classList.toggle('armed', D.armed && D.cur === p);
+      btn.classList.toggle('armed', isArmedByMe);
       const count = D.tokens[p] > 1 ? ' ×' + D.tokens[p] : '';
       btn.textContent = (D.armed && D.cur === p) ? L.tokenArmed
                         : (D.tokens[p] === 0 ? L.tokenSpent : L.tokenBtn + count);
