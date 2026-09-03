@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#1e1b4b" />
+  <meta name="theme-color" content="#10142c" />
 
   <title id="docTitle">Hot or Cold</title>
 
@@ -28,8 +28,8 @@
 
     body {
       min-height: 100%;
-      background-color: #1e3a5f;
-      background-image: linear-gradient(160deg, #1e1b4b 0%, #312e81 55%, #1e3a5f 100%);
+      background-color: #0b1220;
+      background-image: linear-gradient(160deg, #10142c 0%, #1a2142 45%, #0b1220 100%);
       background-repeat: no-repeat;
       background-size: 100% 100%;
       overscroll-behavior: none;
@@ -188,6 +188,7 @@
 
     /* ---------- Настройка дуэли ---------- */
     .setup-field { margin-bottom: 14px; }
+    .setup-hint { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 6px; line-height: 1.4; }
     .setup-field label {
       display: block;
       font-size: 12px;
@@ -224,19 +225,34 @@
     .pcard {
       padding: 12px;
       border-radius: 14px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid transparent;
-      opacity: 0.45;
-      transition: opacity 0.2s, transform 0.2s, background 0.2s, border-color 0.2s;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: transform 0.2s, background 0.2s, border-color 0.2s, box-shadow 0.2s;
     }
-    .pcard.active { opacity: 1; transform: scale(1.02); }
+    .pcard.active {
+      transform: scale(1.02);
+      background: rgba(255, 255, 255, 0.09);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+    }
     .pcard .p-name {
+      display: flex;
+      align-items: center;
+      gap: 7px;
       font-weight: 700;
       font-size: 15px;
       margin-bottom: 8px;
+      color: #fff;
       word-break: break-word;
     }
-    .pcard .p-pips { font-size: 13px; letter-spacing: 2px; margin-bottom: 10px; }
+    .pcard .p-name .p-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 7px currentColor;
+    }
+    .pcard .p-pips { font-size: 13px; letter-spacing: 2px; margin-bottom: 10px; opacity: 0.65; transition: opacity 0.2s; }
+    .pcard.active .p-pips { opacity: 1; }
     .pcard .p-wins-label {
       font-size: 11px;
       color: rgba(255,255,255,0.4);
@@ -287,6 +303,53 @@
       border: 1px solid transparent;
     }
 
+    .record-line {
+      text-align: center;
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      margin: -6px 0 16px;
+    }
+    .record-line strong { color: #fde68a; font-weight: 700; }
+
+    .thermo-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 2px 0 16px;
+    }
+    .thermo-tube {
+      width: 16px;
+      height: 92px;
+      border-radius: 8px 8px 3px 3px;
+      background: rgba(255,255,255,0.07);
+      border: 2px solid rgba(255,255,255,0.3);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: -13px;
+      z-index: 1;
+    }
+    .thermo-fill {
+      position: absolute;
+      bottom: 0; left: 0; width: 100%;
+      height: 6%;
+      background: #93C5FD;
+      border-radius: 5px 5px 0 0;
+      transition: height 0.6s cubic-bezier(.4,0,.2,1), background-color 0.6s ease;
+    }
+    .thermo-bulb {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #93C5FD;
+      border: 2px solid rgba(255,255,255,0.3);
+      transition: background-color 0.6s ease;
+    }
+    .thermo-bulb.pulse { animation: thermoPulse 0.7s ease 2; }
+    @keyframes thermoPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.55); }
+      50% { box-shadow: 0 0 0 9px rgba(255,255,255,0); }
+    }
+
     .feedback-panel {
       border-radius: 16px;
       padding: 14px 16px;
@@ -303,6 +366,8 @@
     @media (prefers-reduced-motion: reduce) {
       .feedback-panel { animation: none; }
       .pcard.active { transform: none; }
+      .thermo-fill, .thermo-bulb { transition: none; }
+      .thermo-bulb.pulse { animation: none; }
     }
 
     .final-box {
@@ -476,42 +541,56 @@
   <!-- ЭКРАН 1: выбор режима -->
   <div id="screenMode">
     <div class="mode-list">
-      <button class="mode-btn solo" onclick="chooseSolo()">
+      <button class="mode-btn solo" onclick="openSetup('solo')">
         <div class="m-title" id="tModeSolo">Single player</div>
       </button>
-      <button class="mode-btn duel" onclick="showScreen('setup')">
+      <button class="mode-btn duel" onclick="openSetup('duel')">
         <div class="m-title" id="tModeDuel">Play with a friend</div>
       </button>
     </div>
   </div>
 
-  <!-- ЭКРАН 2: настройка дуэли -->
+  <!-- ЭКРАН 2: настройка -->
   <div id="screenSetup" class="hidden">
     <div class="setup-field">
-      <label id="tLblP1">Player 1</label>
-      <input type="text" id="nameP1" maxlength="14" />
+      <label id="tLblRange">Range</label>
+      <select class="field" id="rangeMax" onchange="buildAttemptsOptions()"></select>
     </div>
-    <div class="setup-field">
-      <label id="tLblP2">Player 2</label>
-      <input type="text" id="nameP2" maxlength="14" />
+
+    <div class="setup-field" id="attemptsField">
+      <label id="tLblAttempts">Attempts</label>
+      <select class="field" id="attemptsCount"></select>
+      <div class="setup-hint" id="attemptsHint"></div>
     </div>
-    <div class="setup-field">
-      <label id="tLblWins">Play until how many wins</label>
-      <select class="field" id="winsNeeded">
-        <option value="1">1</option>
-        <option value="3" selected>3</option>
-        <option value="5">5</option>
-        <option value="7">7</option>
-        <option value="9">9</option>
-      </select>
+
+    <div id="duelOnlyFields">
+      <div class="setup-field">
+        <label id="tLblP1">Player 1</label>
+        <input type="text" id="nameP1" maxlength="14" />
+      </div>
+      <div class="setup-field">
+        <label id="tLblP2">Player 2</label>
+        <input type="text" id="nameP2" maxlength="14" />
+      </div>
+      <div class="setup-field">
+        <label id="tLblWins">Play until how many wins</label>
+        <select class="field" id="winsNeeded">
+          <option value="1">1</option>
+          <option value="3" selected>3</option>
+          <option value="5">5</option>
+          <option value="7">7</option>
+          <option value="9">9</option>
+        </select>
+      </div>
+      <div class="setup-field">
+        <label id="tLblHandicap">Handicap</label>
+        <select class="field" id="handicap"></select>
+      </div>
     </div>
-    <div class="setup-field">
-      <label id="tLblHandicap">Handicap</label>
-      <select class="field" id="handicap"></select>
-    </div>
+
     <div class="setup-row">
       <button class="btn-ghost" onclick="showScreen('mode')" id="tBack">Back</button>
-      <button class="btn btn-block" onclick="startMatch()" id="tStartMatch">Start match</button>
+      <button class="btn btn-block" onclick="startFromSetup()" id="tStartMatch">Start match</button>
     </div>
   </div>
 
@@ -541,7 +620,14 @@
           <button class="btn-reset" onclick="quitToMenu()" id="tMenu">Menu</button>
         </div>
 
+        <div class="record-line hidden" id="recordLine"></div>
+
         <div class="turn-banner hidden" id="turnBanner"></div>
+
+        <div class="thermo-wrap hidden" id="thermoWrap">
+          <div class="thermo-tube"><div class="thermo-fill" id="thermoFill"></div></div>
+          <div class="thermo-bulb" id="thermoBulb"></div>
+        </div>
 
         <div class="feedback-panel hidden" id="feedbackPanel">
           <div class="fb-label" id="feedbackLabel"></div>
@@ -593,114 +679,168 @@
     en: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", newGame: "New Game", menu: "Menu",
-      enterGuess: "Enter a number", placeholder: "Number 1–1000...", submitGuess: "Check",
+      enterGuess: "Enter a number", placeholderTpl: "Number 1–{n}...", submitGuess: "Check",
       finalWarning: "Attempts used — last chance!", finalSubmit: "Submit", finalInput: "Final answer...",
       resultWin: "🎉 Victory! Number is guessed!", resultLose: "❌ Wrong. The secret number was: ",
       historyTitle: "Guess History", legendTitle: "Distance Scale",
       insTitle: "How to play? 📋",
-      insBody: "Guess the secret number (from 1 to 1000) in 10 attempts.\n\nThe thermometer tracks the distance (difference) between your guess and the secret number.\n\nExample: the secret number is 350, you enter 900 — the distance is 550 steps. The thermometer will show: 🧊 Very cold.\n\nThe smaller this distance, the higher the thermometer temperature.\n\nGood luck!",
+      insBody: "Guess the secret number (from 1 to {n}) in {a} attempts.\n\nThe thermometer tracks the distance (difference) between your guess and the secret number.\n\nExample: the secret number is 350, you enter 900 — the distance is 550 steps. The thermometer will show: 🧊 Very cold.\n\nThe smaller this distance, the higher the thermometer temperature.\n\nGood luck!",
       labels: ["🧊 Very cold", "❄️ Cold", "🌬️ Chilly", "🌤️ Warm", "☀️ Hot", "🔥 Very hot", "💥 Burning", "🌋 Lava", "🎯 Bullseye!"],
 
       modeSolo: "Single player",
       modeDuel: "Play with a friend",
       lblP1: "Player 1", lblP2: "Player 2", defP1: "Player 1", defP2: "Player 2",
       lblWins: "Play until how many wins", lblHandicap: "Head start",
+      lblRange: "Range", lblAttempts: "Attempts",
+      minAttemptsHint: "Minimum {m} — the binary-search floor (⌈log₂ range⌉).",
       hcNone: "None", hcTokens: "2 tokens", hcFirst: "always goes first",
-      back: "Back", startMatch: "Start match",
+      back: "Back", startMatch: "Start match", startGame: "Start game",
       winsLabel: "Wins", tokenBtn: "⚡ Double move", tokenArmed: "⚡ Double move active", tokenSpent: "⚡ Token spent",
       turnOf: "Turn: ", roundLabel: "Round ",
       roundWin: " wins the round!", matchWin: " wins the match!",
       secretWas: "Number: ", nextRound: "Next round", newMatch: "New match", toMenu: "Menu",
+      recordLabel: "Best for this range: ", newRecord: "🏆 New record!",
       insDuelTitle: "Duel rules 📋",
-      insDuelBody: "One number for both players, from 1 to 1000.\n\nTake turns. Guesses are unlimited, both of you see every move.\n\nFirst to name the number wins the round.\n\n⚡ — two guesses in a row. One per round, not on the first move. Unused, it expires.\n\nThe next round starts with the other player."
+      insDuelBody: "One number for both players, from 1 to {n}.\n\nTake turns. Guesses are unlimited, both of you see every move.\n\nFirst to name the number wins the round.\n\n⚡ — two guesses in a row. One per round, not on the first move. Unused, it expires.\n\nThe next round starts with the other player."
     },
     ru: {
       title: "Горячо — Холодно", docTitle: "Горячо — Холодно",
       confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", newGame: "Новая игра", menu: "Меню",
-      enterGuess: "Введите число", placeholder: "Число от 1 до 1000...", submitGuess: "Проверить",
+      enterGuess: "Введите число", placeholderTpl: "Число от 1 до {n}...", submitGuess: "Проверить",
       finalWarning: "Попытки закончились — последний шанс!", finalSubmit: "Ответ", finalInput: "Финальный ответ...",
       resultWin: "🎉 Победа! Число угадано!", resultLose: "❌ Неверно. Загаданное число было: ",
       historyTitle: "История попыток", legendTitle: "Шкала расстояний",
       insTitle: "Как играть? 📋",
-      insBody: "Отгадайте секретное число (от 1 до 1000) за 10 попыток.\n\nГрадусник измеряет расстояние (разницу) между вашим вариантом и секретным числом.\n\nНапример: секретное число 350, вы вводите 900 — расстояние 550 шагов. Градусник покажет: 🧊 Очень холодно.\n\nЧем меньше это расстояние, тем выше температура градусника.\n\nУдачи!",
+      insBody: "Отгадайте секретное число (от 1 до {n}) за {a} попыток.\n\nГрадусник измеряет расстояние (разницу) между вашим вариантом и секретным числом.\n\nНапример: секретное число 350, вы вводите 900 — расстояние 550 шагов. Градусник покажет: 🧊 Очень холодно.\n\nЧем меньше это расстояние, тем выше температура градусника.\n\nУдачи!",
       labels: ["🧊 Очень холодно", "❄️ Холодно", "🌬️ Прохладно", "🌤️ Тепло", "☀️ Жарко", "🔥 Горячо", "💥 Очень горячо", "🌋 Лава", "🎯 В точку!"],
 
       modeSolo: "Одиночная игра",
       modeDuel: "Игра с другом",
       lblP1: "Игрок 1", lblP2: "Игрок 2", defP1: "Игрок 1", defP2: "Игрок 2",
       lblWins: "Играем до скольки побед", lblHandicap: "Фора",
+      lblRange: "Диапазон", lblAttempts: "Попыток",
+      minAttemptsHint: "Минимум {m} — это ⌈log₂ диапазона⌉, порог бинарного поиска.",
       hcNone: "Нет", hcTokens: "2 жетона", hcFirst: "всегда ходит первым",
-      back: "Назад", startMatch: "Начать матч",
+      back: "Назад", startMatch: "Начать матч", startGame: "Начать игру",
       winsLabel: "Побед", tokenBtn: "⚡ Двойной ход", tokenArmed: "⚡ Двойной ход активен", tokenSpent: "⚡ Жетон потрачен",
       turnOf: "Ходит: ", roundLabel: "Раунд ",
       roundWin: " выигрывает раунд!", matchWin: " выигрывает матч!",
       secretWas: "Число: ", nextRound: "Следующий раунд", newMatch: "Новый матч", toMenu: "В меню",
+      recordLabel: "Рекорд для этого диапазона: ", newRecord: "🏆 Новый рекорд!",
       insDuelTitle: "Правила дуэли 📋",
-      insDuelBody: "Число одно на двоих, от 1 до 1000.\n\nХодите по очереди. Попыток сколько угодно, все ходы видны обоим.\n\nКто первым назовёт число — выигрывает раунд.\n\n⚡ — две попытки подряд. Одна на раунд, кроме первого хода. Не потратили — сгорает.\n\nСледующий раунд начинает другой игрок."
+      insDuelBody: "Число одно на двоих, от 1 до {n}.\n\nХодите по очереди. Попыток сколько угодно, все ходы видны обоим.\n\nКто первым назовёт число — выигрывает раунд.\n\n⚡ — две попытки подряд. Одна на раунд, кроме первого хода. Не потратили — сгорает.\n\nСледующий раунд начинает другой игрок."
     },
     fr: {
       title: "Chaud ou Froid", docTitle: "Chaud ou Froid",
       confirmed: "Nombre généré ✓", attemptsPrefix: "Essais: ", newGame: "Nouvelle partie", menu: "Menu",
-      enterGuess: "Entrez un nombre", placeholder: "Nombre 1–1000...", submitGuess: "Vérifier",
+      enterGuess: "Entrez un nombre", placeholderTpl: "Nombre 1–{n}...", submitGuess: "Vérifier",
       finalWarning: "Tentatives épuisées — dernière chance !", finalSubmit: "Valider", finalInput: "Réponse finale...",
       resultWin: "🎉 Victoire ! Le nombre a été deviné !", resultLose: "❌ Incorrect. Le nombre secret était : ",
       historyTitle: "Historique des tentatives", legendTitle: "Échelle de distance",
       insTitle: "Comment jouer ? 📋",
-      insBody: "Devinez le nombre secret (de 1 à 1000) en 10 tentatives.\n\nLe thermomètre mesure la distance (la différence) entre votre proposition et le nombre secret.\n\nExemple : le nombre secret est 350, vous entrez 900 — la distance est de 550 pas. Le thermomètre affichera : 🧊 Très froid.\n\nPlus cette distance est petite, plus la température du thermomètre est élevée.\n\nBonne chance !",
+      insBody: "Devinez le nombre secret (de 1 à {n}) en {a} tentatives.\n\nLe thermomètre mesure la distance (la différence) entre votre proposition et le nombre secret.\n\nExemple : le nombre secret est 350, vous entrez 900 — la distance est de 550 pas. Le thermomètre affichera : 🧊 Très froid.\n\nPlus cette distance est petite, plus la température du thermomètre est élevée.\n\nBonne chance !",
       labels: ["🧊 Très froid", "❄️ Froid", "🌬️ Frais", "🌤️ Tiède", "☀️ Chaud", "🔥 Très chaud", "💥 Brûlant", "🌋 Lave", "🎯 Dans le mille !"],
 
       modeSolo: "Partie solo",
       modeDuel: "Jouer à deux",
       lblP1: "Joueur 1", lblP2: "Joueur 2", defP1: "Joueur 1", defP2: "Joueur 2",
       lblWins: "Jusqu'à combien de victoires", lblHandicap: "Avantage",
+      lblRange: "Plage", lblAttempts: "Essais",
+      minAttemptsHint: "Minimum {m} — le seuil de la recherche dichotomique (⌈log₂ plage⌉).",
       hcNone: "Aucun", hcTokens: "2 jetons", hcFirst: "commence toujours",
-      back: "Retour", startMatch: "Commencer le match",
+      back: "Retour", startMatch: "Commencer le match", startGame: "Commencer la partie",
       winsLabel: "Victoires", tokenBtn: "⚡ Double tour", tokenArmed: "⚡ Double tour activé", tokenSpent: "⚡ Jeton utilisé",
       turnOf: "Au tour de : ", roundLabel: "Manche ",
       roundWin: " remporte la manche !", matchWin: " remporte le match !",
       secretWas: "Nombre : ", nextRound: "Manche suivante", newMatch: "Nouveau match", toMenu: "Menu",
+      recordLabel: "Meilleur score pour cette plage : ", newRecord: "🏆 Nouveau record !",
       insDuelTitle: "Règles du duel 📋",
-      insDuelBody: "Un seul nombre pour les deux joueurs, de 1 à 1000.\n\nChacun son tour. Tentatives illimitées, tout est visible par les deux.\n\nLe premier qui nomme le nombre remporte la manche.\n\n⚡ — deux tentatives d'affilée. Un par manche, sauf au premier coup. Non utilisé, il est perdu.\n\nLa manche suivante commence par l'autre joueur."
+      insDuelBody: "Un seul nombre pour les deux joueurs, de 1 à {n}.\n\nChacun son tour. Tentatives illimitées, tout est visible par les deux.\n\nLe premier qui nomme le nombre remporte la manche.\n\n⚡ — deux tentatives d'affilée. Un par manche, sauf au premier coup. Non utilisé, il est perdu.\n\nLa manche suivante commence par l'autre joueur."
     },
     de: {
       title: "Heiß oder Kalt", docTitle: "Heiß oder Kalt",
       confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", newGame: "Neues Spiel", menu: "Menü",
-      enterGuess: "Gib eine Zahl ein", placeholder: "Zahl 1–1000...", submitGuess: "Prüfen",
+      enterGuess: "Gib eine Zahl ein", placeholderTpl: "Zahl 1–{n}...", submitGuess: "Prüfen",
       finalWarning: "Versuche aufgebraucht — letzte Chance!", finalSubmit: "Bestätigen", finalInput: "Letzte Antwort...",
       resultWin: "🎉 Gewonnen! Die Zahl wurde erraten!", resultLose: "❌ Falsch. Die Geheimzahl war: ",
       historyTitle: "Rateverlauf", legendTitle: "Entfernungsskala",
       insTitle: "Spielanleitung 📋",
-      insBody: "Errate die Geheimzahl (von 1 bis 1000) in 10 Versuchen.\n\nDas Thermometer misst den Abstand (die Differenz) zwischen deinem Tipp und der Geheimzahl.\n\nBeispiel: Die Geheimzahl ist 350, du gibst 900 ein — der Abstand beträgt 550 Schritte. Das Thermometer zeigt: 🧊 Sehr kalt.\n\nJe kleiner dieser Abstand ist, desto höher ist die Temperatur.\n\nViel Glück!",
+      insBody: "Errate die Geheimzahl (von 1 bis {n}) in {a} Versuchen.\n\nDas Thermometer misst den Abstand (die Differenz) zwischen deinem Tipp und der Geheimzahl.\n\nBeispiel: Die Geheimzahl ist 350, du gibst 900 ein — der Abstand beträgt 550 Schritte. Das Thermometer zeigt: 🧊 Sehr kalt.\n\nJe kleiner dieser Abstand ist, desto höher ist die Temperatur.\n\nViel Glück!",
       labels: ["🧊 Sehr kalt", "❄️ Kalt", "🌬️ Kühl", "🌤️ Warm", "☀️ Heiß", "🔥 Sehr heiß", "💥 Glühend", "🌋 Lava", "🎯 Volltreffer!"],
 
       modeSolo: "Einzelspiel",
       modeDuel: "Zu zweit spielen",
       lblP1: "Spieler 1", lblP2: "Spieler 2", defP1: "Spieler 1", defP2: "Spieler 2",
       lblWins: "Bis wie viele Siege", lblHandicap: "Vorsprung",
+      lblRange: "Bereich", lblAttempts: "Versuche",
+      minAttemptsHint: "Minimum {m} — die Binärsuche-Untergrenze (⌈log₂ Bereich⌉).",
       hcNone: "Keins", hcTokens: "2 Marken", hcFirst: "beginnt immer",
-      back: "Zurück", startMatch: "Match starten",
+      back: "Zurück", startMatch: "Match starten", startGame: "Spiel starten",
       winsLabel: "Siege", tokenBtn: "⚡ Doppelzug", tokenArmed: "⚡ Doppelzug aktiv", tokenSpent: "⚡ Marke verbraucht",
       turnOf: "Am Zug: ", roundLabel: "Runde ",
       roundWin: " gewinnt die Runde!", matchWin: " gewinnt das Match!",
       secretWas: "Zahl: ", nextRound: "Nächste Runde", newMatch: "Neues Match", toMenu: "Menü",
+      recordLabel: "Bestwert für diesen Bereich: ", newRecord: "🏆 Neuer Rekord!",
       insDuelTitle: "Duell-Regeln 📋",
-      insDuelBody: "Eine Zahl für beide Spieler, von 1 bis 1000.\n\nAbwechselnd am Zug. Unbegrenzte Versuche, beide sehen alles.\n\nWer die Zahl zuerst nennt, gewinnt die Runde.\n\n⚡ — zwei Tipps hintereinander. Einer pro Runde, nicht im ersten Zug. Ungenutzt verfällt er.\n\nDie nächste Runde beginnt der andere Spieler."
+      insDuelBody: "Eine Zahl für beide Spieler, von 1 bis {n}.\n\nAbwechselnd am Zug. Unbegrenzte Versuche, beide sehen alles.\n\nWer die Zahl zuerst nennt, gewinnt die Runde.\n\n⚡ — zwei Tipps hintereinander. Einer pro Runde, nicht im ersten Zug. Ungenutzt verfällt er.\n\nDie nächste Runde beginnt der andere Spieler."
     }
   };
 
-  const FEEDBACK_META = [
-    { min: 501, max: 1000, color: "#93C5FD", bg: "rgba(147, 197, 253, 0.15)", labelIndex: 0, rangeSign: "501–1000" },
-    { min: 201, max: 500,  color: "#38BDF8", bg: "rgba(56, 189, 248, 0.15)",  labelIndex: 1, rangeSign: "201–500" },
-    { min: 101, max: 200,  color: "#2DD4BF", bg: "rgba(45, 212, 191, 0.15)",  labelIndex: 2, rangeSign: "101–200" },
-    { min: 51,  max: 100,  color: "#FBBF24", bg: "rgba(251, 191, 36, 0.15)",  labelIndex: 3, rangeSign: "51–100" },
-    { min: 21,  max: 50,   color: "#FB923C", bg: "rgba(251, 146, 60, 0.15)",  labelIndex: 4, rangeSign: "21–50" },
-    { min: 11,  max: 20,   color: "#F87171", bg: "rgba(248, 113, 113, 0.15)", labelIndex: 5, rangeSign: "11–20" },
-    { min: 4,   max: 10,   color: "#FF5733", bg: "rgba(255, 87, 51, 0.18)",   labelIndex: 6, rangeSign: "4–10" },
-    { min: 1,   max: 3,    color: "#FF4500", bg: "rgba(255, 69, 0, 0.2)",     labelIndex: 7, rangeSign: "1–3" },
-    { min: 0,   max: 0,    color: "#4ADE80", bg: "rgba(74, 222, 128, 0.15)",  labelIndex: 8, rangeSign: "0" },
+  // Восемь цветов шкалы — фиксированы, не зависят от диапазона (это исходная,
+  // одобренная палитра). Меняются только числовые границы каждого пояса.
+  const TIER_COLORS = [
+    { color: "#93C5FD", bg: "rgba(147, 197, 253, 0.15)" }, // очень холодно
+    { color: "#38BDF8", bg: "rgba(56, 189, 248, 0.15)" },  // холодно
+    { color: "#2DD4BF", bg: "rgba(45, 212, 191, 0.15)" },  // прохладно
+    { color: "#FBBF24", bg: "rgba(251, 191, 36, 0.15)" },  // тепло
+    { color: "#FB923C", bg: "rgba(251, 146, 60, 0.15)" },  // жарко
+    { color: "#F87171", bg: "rgba(248, 113, 113, 0.15)" }, // очень горячо
+    { color: "#FF5733", bg: "rgba(255, 87, 51, 0.18)" },   // очень-очень горячо
+    { color: "#FF4500", bg: "rgba(255, 69, 0, 0.2)" },     // лава
   ];
+  const BULLSEYE_TIER = { color: "#4ADE80", bg: "rgba(74, 222, 128, 0.15)" };
 
-  const MAX_GUESSES = 10;
+  // Верхние границы 8 поясов (от самого холодного к самому горячему) для
+  // каждого диапазона. 1000 — эталон, остальные — та же логарифмическая форма,
+  // пересчитанная под свой диапазон (см. ответ в чате).
+  const RANGE_TIER_UPPER = {
+    10:      [9, 7, 6, 5, 4, 3, 2, 1],
+    100:     [99, 64, 32, 16, 8, 4, 2, 1],
+    1000:    [1000, 500, 200, 100, 50, 20, 10, 3],
+    10000:   [10000, 5000, 2000, 1000, 500, 200, 100, 30],
+    1000000: [1000000, 500000, 200000, 100000, 50000, 20000, 10000, 3000],
+  };
+  const RANGE_PRESETS = [10, 100, 1000, 10000, 1000000];
+
+  function buildFeedbackMeta(rangeMax) {
+    const U = RANGE_TIER_UPPER[rangeMax] || RANGE_TIER_UPPER[1000];
+    const meta = [];
+    for (let i = 0; i < 8; i++) {
+      const max = U[i];
+      const min = (i === 7) ? 1 : U[i + 1] + 1;
+      meta.push({
+        min, max, labelIndex: i,
+        color: TIER_COLORS[i].color, bg: TIER_COLORS[i].bg,
+        rangeSign: (min === max) ? String(min) : (min + '–' + max)
+      });
+    }
+    meta.push({ min: 0, max: 0, labelIndex: 8, rangeSign: "0",
+                color: BULLSEYE_TIER.color, bg: BULLSEYE_TIER.bg });
+    return meta;
+  }
+
+  function minAttempts(rangeMax) {
+    return Math.max(1, Math.ceil(Math.log2(rangeMax)));
+  }
+
+  function formatNum(n) {
+    try { return n.toLocaleString(currentLang === 'en' ? 'en-US' : currentLang); }
+    catch (e) { return String(n); }
+  }
+
+  let RANGE_MAX = 1000;
+  let MAX_GUESSES = 10;
+  let FEEDBACK_META = buildFeedbackMeta(RANGE_MAX);
   const P_COLORS = ["#6366f1", "#fbbf24"];
 
   let currentLang = localStorage.getItem('hc_lang') || 'en';
@@ -712,6 +852,7 @@
   let history = [];
   let gameOver = false;
   let gameOverType = null;
+  let lastWinIsRecord = false;
 
   // ---------- состояние дуэли ----------
   const D = {
@@ -787,14 +928,20 @@
 
     document.getElementById('nameP1').placeholder = L.defP1;
     document.getElementById('nameP2').placeholder = L.defP2;
-    document.getElementById('guessInput').placeholder = L.placeholder;
+    document.getElementById('guessInput').placeholder = L.placeholderTpl.replace('{n}', formatNum(RANGE_MAX));
     document.getElementById('finalInput').placeholder = L.finalInput;
 
     const duel = mode === 'duel';
     document.getElementById('tInsTitle').textContent = duel ? L.insDuelTitle : L.insTitle;
-    document.getElementById('tInsBody').textContent = duel ? L.insDuelBody : L.insBody;
+    document.getElementById('tInsBody').textContent = (duel ? L.insDuelBody : L.insBody)
+      .replace(/\{n\}/g, formatNum(RANGE_MAX))
+      .replace(/\{a\}/g, MAX_GUESSES);
+
+    document.getElementById('tLblRange').textContent = L.lblRange;
+    document.getElementById('tLblAttempts').textContent = L.lblAttempts;
 
     buildHandicapOptions();
+    buildRangeOptions();
     buildLegend();
     renderAll();
   }
@@ -808,7 +955,6 @@
     document.getElementById('card').classList.toggle('wide', name === 'game' && mode === 'duel');
     document.querySelector('.header').classList.toggle('compact', name === 'game');
     document.querySelector('.legend').classList.toggle('hidden', name !== 'game');
-    if (name === 'setup') buildHandicapOptions();
   }
 
   function quitToMenu() {
@@ -818,19 +964,81 @@
     showScreen('mode');
   }
 
+  // ================= ОБЩАЯ НАСТРОЙКА (диапазон/попытки/дуэль) =================
+  function openSetup(m) {
+    mode = m;
+    const L = t();
+    document.getElementById('duelOnlyFields').classList.toggle('hidden', m !== 'duel');
+    document.getElementById('attemptsField').classList.toggle('hidden', m !== 'solo');
+    document.getElementById('tStartMatch').textContent = (m === 'duel') ? L.startMatch : L.startGame;
+    buildRangeOptions();
+    if (m === 'duel') buildHandicapOptions();
+    showScreen('setup');
+  }
+
+  function buildRangeOptions() {
+    const sel = document.getElementById('rangeMax');
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '';
+    RANGE_PRESETS.forEach(n => {
+      const o = document.createElement('option');
+      o.value = n;
+      o.textContent = '1–' + formatNum(n);
+      sel.appendChild(o);
+    });
+    sel.value = RANGE_PRESETS.includes(parseInt(prev)) ? prev : '1000';
+    buildAttemptsOptions();
+  }
+
+  function buildAttemptsOptions() {
+    const rangeSel = document.getElementById('rangeMax');
+    const rangeMax = parseInt(rangeSel && rangeSel.value) || 1000;
+    const min = minAttempts(rangeMax);
+    const sel = document.getElementById('attemptsCount');
+    const prev = sel.value;
+    const options = [min, min + 1, min + 2, min + 3, min + 5, min + 8, min + 12];
+    sel.innerHTML = '';
+    options.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      sel.appendChild(o);
+    });
+    sel.value = options.includes(parseInt(prev)) ? prev : String(min);
+    const hint = document.getElementById('attemptsHint');
+    if (hint) hint.textContent = t().minAttemptsHint.replace('{m}', min);
+  }
+
+  function applyRangeToInputs() {
+    ['guessInput', 'finalInput'].forEach(id => {
+      const el = document.getElementById(id);
+      el.min = 1; el.max = RANGE_MAX;
+    });
+  }
+
+  function startFromSetup() {
+    RANGE_MAX = parseInt(document.getElementById('rangeMax').value) || 1000;
+    if (mode === 'solo') {
+      MAX_GUESSES = parseInt(document.getElementById('attemptsCount').value) || minAttempts(RANGE_MAX);
+    }
+    FEEDBACK_META = buildFeedbackMeta(RANGE_MAX);
+    applyRangeToInputs();
+    if (mode === 'duel') startMatch(); else startSolo();
+  }
+
   // ================= ОДИНОЧНАЯ ИГРА =================
-  function chooseSolo() {
-    mode = 'solo';
+  function startSolo() {
     resetSolo();
     applyTranslations();
     showScreen('game');
   }
 
   function resetSolo() {
-    secret = Math.floor(Math.random() * 1000) + 1;
+    secret = Math.floor(Math.random() * RANGE_MAX) + 1;
     history = [];
     gameOver = false;
     gameOverType = null;
+    lastWinIsRecord = false;
     document.getElementById('finalInput').value = '';
     document.getElementById('guessInput').value = '';
     renderAll();
@@ -841,7 +1049,7 @@
     if (gameOver) return;
     const input = document.getElementById('guessInput');
     const guess = parseInt(input.value);
-    if (isNaN(guess) || guess < 1 || guess > 1000) return;
+    if (isNaN(guess) || guess < 1 || guess > RANGE_MAX) return;
 
     const distance = Math.abs(guess - secret);
     const meta = getFeedback(distance);
@@ -851,6 +1059,7 @@
     if (distance === 0) {
       gameOver = true;
       gameOverType = 'win';
+      lastWinIsRecord = maybeSaveRecord(RANGE_MAX, history.length);
     } else if (history.length >= MAX_GUESSES) {
       gameOver = true;
       gameOverType = 'lose_waiting';
@@ -862,8 +1071,31 @@
     const input = document.getElementById('finalInput');
     const g = parseInt(input.value);
     if (isNaN(g)) return;
-    gameOverType = (g === secret) ? 'win' : 'lose';
+    const win = (g === secret);
+    gameOverType = win ? 'win' : 'lose';
+    lastWinIsRecord = win ? maybeSaveRecord(RANGE_MAX, history.length + 1) : false;
     renderAll();
+  }
+
+  // ================= РЕКОРДЫ (только одиночная игра) =================
+  function recordKey(rangeMax) { return 'hc_record_' + rangeMax; }
+
+  function getRecord(rangeMax) {
+    try {
+      const v = localStorage.getItem(recordKey(rangeMax));
+      return v ? parseInt(v) : null;
+    } catch (e) { return null; }
+  }
+
+  function maybeSaveRecord(rangeMax, guesses) {
+    try {
+      const cur = getRecord(rangeMax);
+      if (cur === null || guesses < cur) {
+        localStorage.setItem(recordKey(rangeMax), String(guesses));
+        return true;
+      }
+    } catch (e) {}
+    return false;
   }
 
   // ================= ДУЭЛЬ =================
@@ -884,7 +1116,7 @@
   }
 
   function startRound() {
-    secret = Math.floor(Math.random() * 1000) + 1;
+    secret = Math.floor(Math.random() * RANGE_MAX) + 1;
     history = [];
     D.tokens = [1, 1];
     if (D.handicap === 1) D.tokens[0] = 2;
@@ -931,7 +1163,7 @@
     if (D.roundOver || D.matchOver) return;
     const input = document.getElementById('guessInput');
     const guess = parseInt(input.value);
-    if (isNaN(guess) || guess < 1 || guess > 1000) return;
+    if (isNaN(guess) || guess < 1 || guess > RANGE_MAX) return;
 
     const distance = Math.abs(guess - secret);
     const meta = getFeedback(distance);
@@ -969,6 +1201,7 @@
     document.getElementById('historyList').classList.toggle('tall', duel);
 
     renderFeedback();
+    renderThermo();
     renderStatus();
     renderResult();
     renderHistory();
@@ -986,6 +1219,40 @@
     const label = document.getElementById('feedbackLabel');
     label.textContent = getFbText(last.meta);
     label.style.color = last.meta.color;
+  }
+
+  function renderThermo() {
+    const wrap = document.getElementById('thermoWrap');
+    if (mode !== 'solo') { wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+
+    const fill = document.getElementById('thermoFill');
+    const bulb = document.getElementById('thermoBulb');
+    const last = history[history.length - 1];
+
+    let pct, color;
+    if (!last) {
+      pct = 6;
+      color = TIER_COLORS[0].color;
+    } else if (last.distance === 0) {
+      pct = 100;
+      color = BULLSEYE_TIER.color;
+    } else {
+      pct = Math.round(((last.meta.labelIndex + 1) / 9) * 100);
+      color = last.meta.color;
+    }
+
+    fill.style.height = pct + '%';
+    fill.style.background = color;
+    bulb.style.background = color;
+
+    if (last && last.distance === 0) {
+      bulb.classList.remove('pulse');
+      void bulb.offsetWidth; // перезапуск анимации при повторной победе
+      bulb.classList.add('pulse');
+    } else {
+      bulb.classList.remove('pulse');
+    }
   }
 
   function renderStatus() {
@@ -1007,6 +1274,7 @@
       }
       document.getElementById('finalBox').classList.add('hidden');
       document.getElementById('guessSection').classList.toggle('hidden', D.roundOver);
+      document.getElementById('recordLine').classList.add('hidden');
     } else {
       banner.classList.add('hidden');
       const left = MAX_GUESSES - history.length;
@@ -1014,6 +1282,15 @@
       attempts.className = 'attempts' + (left <= 3 ? ' low' : '');
       document.getElementById('finalBox').classList.toggle('hidden', gameOverType !== 'lose_waiting');
       document.getElementById('guessSection').classList.toggle('hidden', gameOver);
+
+      const recLine = document.getElementById('recordLine');
+      const rec = getRecord(RANGE_MAX);
+      if (rec === null) {
+        recLine.classList.add('hidden');
+      } else {
+        recLine.classList.remove('hidden');
+        recLine.innerHTML = L.recordLabel + '<strong>' + rec + '</strong>';
+      }
     }
   }
 
@@ -1068,11 +1345,20 @@
       const title = document.createElement('div');
       title.className = 'r-title';
       title.textContent = gameOverType === 'win' ? L.resultWin : (L.resultLose + secret);
+      box.appendChild(title);
+
+      if (gameOverType === 'win' && lastWinIsRecord) {
+        const rec = document.createElement('div');
+        rec.className = 'r-secret';
+        rec.textContent = L.newRecord;
+        box.appendChild(rec);
+      }
+
       const actions = document.createElement('div');
       actions.className = 'r-actions';
       actions.innerHTML = '<button class="btn" onclick="resetSolo()">' + L.newGame + '</button>' +
                           '<button class="btn-ghost" onclick="quitToMenu()">' + L.toMenu + '</button>';
-      box.appendChild(title); box.appendChild(actions);
+      box.appendChild(actions);
       box.classList.remove('hidden');
     } else {
       box.classList.add('hidden');
@@ -1084,13 +1370,10 @@
     for (let p = 0; p < 2; p++) {
       const card = document.getElementById('pcard' + p);
       card.style.borderColor = P_COLORS[p];
-      card.style.background = (D.cur === p && !D.roundOver)
-        ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)';
       card.classList.toggle('active', D.cur === p && !D.roundOver);
 
       const nameEl = document.getElementById('pname' + p);
-      nameEl.textContent = D.names[p];
-      nameEl.style.color = P_COLORS[p];
+      nameEl.innerHTML = '<span class="p-dot" style="background:' + P_COLORS[p] + ';color:' + P_COLORS[p] + '"></span>' + escapeHtml(D.names[p]);
 
       let pips = '';
       for (let i = 0; i < D.winsNeeded; i++) pips += (i < D.wins[p] ? '●' : '○');
