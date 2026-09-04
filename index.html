@@ -219,6 +219,15 @@
         gap: 20px;
         align-items: start;
       }
+      .thermo-wrap { margin: 10px 0 22px; }
+      .thermo-tube {
+        width: 24px;
+        height: 140px;
+        border-radius: 12px 12px 0 0;
+      }
+      .thermo-tube::before { left: 4px; width: 4px; top: 6px; bottom: 6px; }
+      .thermo-bulb { width: 54px; height: 54px; margin-top: -6px; }
+      .thermo-bulb::after { top: 11px; left: 14px; width: 13px; height: 8px; }
     }
 
     .pcard {
@@ -1265,7 +1274,6 @@
 
   function renderThermo() {
     const wrap = document.getElementById('thermoWrap');
-    if (mode !== 'solo') { wrap.classList.add('hidden'); return; }
     wrap.classList.remove('hidden');
 
     const fill = document.getElementById('thermoFill');
