@@ -188,7 +188,6 @@
 
     /* ---------- Настройка дуэли ---------- */
     .setup-field { margin-bottom: 14px; }
-    .setup-hint { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 6px; line-height: 1.4; }
     .setup-field label {
       display: block;
       font-size: 12px;
@@ -560,7 +559,6 @@
     <div class="setup-field" id="attemptsField">
       <label id="tLblAttempts">Attempts</label>
       <select class="field" id="attemptsCount"></select>
-      <div class="setup-hint" id="attemptsHint"></div>
     </div>
 
     <div id="duelOnlyFields">
@@ -692,7 +690,6 @@
       lblP1: "Player 1", lblP2: "Player 2", defP1: "Player 1", defP2: "Player 2",
       lblWins: "Play until how many wins", lblHandicap: "Head start",
       lblRange: "Range", lblAttempts: "Attempts",
-      minAttemptsHint: "Minimum {m} — the binary-search floor (⌈log₂ range⌉).",
       hcNone: "None", hcTokens: "2 tokens", hcFirst: "always goes first",
       back: "Back", startMatch: "Start match", startGame: "Start game",
       winsLabel: "Wins", tokenBtn: "⚡ Double move", tokenArmed: "⚡ Double move active", tokenSpent: "⚡ Token spent",
@@ -719,7 +716,6 @@
       lblP1: "Игрок 1", lblP2: "Игрок 2", defP1: "Игрок 1", defP2: "Игрок 2",
       lblWins: "Играем до скольки побед", lblHandicap: "Фора",
       lblRange: "Диапазон", lblAttempts: "Попыток",
-      minAttemptsHint: "Минимум {m} — это ⌈log₂ диапазона⌉, порог бинарного поиска.",
       hcNone: "Нет", hcTokens: "2 жетона", hcFirst: "всегда ходит первым",
       back: "Назад", startMatch: "Начать матч", startGame: "Начать игру",
       winsLabel: "Побед", tokenBtn: "⚡ Двойной ход", tokenArmed: "⚡ Двойной ход активен", tokenSpent: "⚡ Жетон потрачен",
@@ -746,7 +742,6 @@
       lblP1: "Joueur 1", lblP2: "Joueur 2", defP1: "Joueur 1", defP2: "Joueur 2",
       lblWins: "Jusqu'à combien de victoires", lblHandicap: "Avantage",
       lblRange: "Plage", lblAttempts: "Essais",
-      minAttemptsHint: "Minimum {m} — le seuil de la recherche dichotomique (⌈log₂ plage⌉).",
       hcNone: "Aucun", hcTokens: "2 jetons", hcFirst: "commence toujours",
       back: "Retour", startMatch: "Commencer le match", startGame: "Commencer la partie",
       winsLabel: "Victoires", tokenBtn: "⚡ Double tour", tokenArmed: "⚡ Double tour activé", tokenSpent: "⚡ Jeton utilisé",
@@ -773,7 +768,6 @@
       lblP1: "Spieler 1", lblP2: "Spieler 2", defP1: "Spieler 1", defP2: "Spieler 2",
       lblWins: "Bis wie viele Siege", lblHandicap: "Vorsprung",
       lblRange: "Bereich", lblAttempts: "Versuche",
-      minAttemptsHint: "Minimum {m} — die Binärsuche-Untergrenze (⌈log₂ Bereich⌉).",
       hcNone: "Keins", hcTokens: "2 Marken", hcFirst: "beginnt immer",
       back: "Zurück", startMatch: "Match starten", startGame: "Spiel starten",
       winsLabel: "Siege", tokenBtn: "⚡ Doppelzug", tokenArmed: "⚡ Doppelzug aktiv", tokenSpent: "⚡ Marke verbraucht",
@@ -807,10 +801,8 @@
     10:      [9, 7, 6, 5, 4, 3, 2, 1],
     100:     [99, 64, 32, 16, 8, 4, 2, 1],
     1000:    [1000, 500, 200, 100, 50, 20, 10, 3],
-    10000:   [10000, 5000, 2000, 1000, 500, 200, 100, 30],
-    1000000: [1000000, 500000, 200000, 100000, 50000, 20000, 10000, 3000],
   };
-  const RANGE_PRESETS = [10, 100, 1000, 10000, 1000000];
+  const RANGE_PRESETS = [10, 100, 1000];
 
   function buildFeedbackMeta(rangeMax) {
     const U = RANGE_TIER_UPPER[rangeMax] || RANGE_TIER_UPPER[1000];
@@ -1005,8 +997,6 @@
       sel.appendChild(o);
     });
     sel.value = options.includes(parseInt(prev)) ? prev : String(min);
-    const hint = document.getElementById('attemptsHint');
-    if (hint) hint.textContent = t().minAttemptsHint.replace('{m}', min);
   }
 
   function applyRangeToInputs() {
