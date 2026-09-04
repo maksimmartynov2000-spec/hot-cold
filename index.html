@@ -314,39 +314,72 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      margin: 2px 0 16px;
+      margin: 6px 0 18px;
     }
     .thermo-tube {
-      width: 16px;
-      height: 92px;
-      border-radius: 8px 8px 3px 3px;
-      background: rgba(255,255,255,0.07);
-      border: 2px solid rgba(255,255,255,0.3);
       position: relative;
+      width: 18px;
+      height: 104px;
+      border-radius: 9px 9px 0 0;
+      background: rgba(255,255,255,0.07);
+      border: 2px solid rgba(255,255,255,0.32);
+      border-bottom: none;
       overflow: hidden;
-      margin-bottom: -13px;
       z-index: 1;
+    }
+    .thermo-tube::before {
+      /* стеклянный блик слева по всей трубке */
+      content: "";
+      position: absolute;
+      top: 4px; bottom: 4px; left: 3px;
+      width: 3px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.28);
+      z-index: 3;
+      pointer-events: none;
     }
     .thermo-fill {
       position: absolute;
       bottom: 0; left: 0; width: 100%;
-      height: 6%;
+      height: 8%;
       background: #93C5FD;
-      border-radius: 5px 5px 0 0;
-      transition: height 0.6s cubic-bezier(.4,0,.2,1), background-color 0.6s ease;
+      transition: height 0.65s cubic-bezier(.4,0,.2,1), background-color 0.6s ease;
+      z-index: 1;
+    }
+    .thermo-fill::after {
+      /* мениск — светлая полоска на поверхности ртути */
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: rgba(255,255,255,0.45);
     }
     .thermo-bulb {
-      width: 30px;
-      height: 30px;
+      position: relative;
+      width: 40px;
+      height: 40px;
+      margin-top: -5px;
       border-radius: 50%;
       background: #93C5FD;
-      border: 2px solid rgba(255,255,255,0.3);
-      transition: background-color 0.6s ease;
+      border: 2px solid rgba(255,255,255,0.32);
+      box-shadow: 0 0 18px 2px rgba(147,197,253,0.35);
+      transition: background-color 0.6s ease, box-shadow 0.6s ease;
+      z-index: 2;
     }
-    .thermo-bulb.pulse { animation: thermoPulse 0.7s ease 2; }
+    .thermo-bulb::after {
+      /* блик-отражение на стекле колбы */
+      content: "";
+      position: absolute;
+      top: 8px; left: 10px;
+      width: 9px; height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.55);
+      transform: rotate(-25deg);
+    }
+    .thermo-bulb.pulse { animation: thermoPulse 0.8s ease 2; }
     @keyframes thermoPulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.55); }
-      50% { box-shadow: 0 0 0 9px rgba(255,255,255,0); }
+      0%, 100% { box-shadow: 0 0 18px 2px rgba(255,255,255,0.4); }
+      50% { box-shadow: 0 0 0 14px rgba(255,255,255,0); }
     }
 
     .feedback-panel {
@@ -1222,7 +1255,7 @@
 
     let pct, color;
     if (!last) {
-      pct = 6;
+      pct = 8;
       color = TIER_COLORS[0].color;
     } else if (last.distance === 0) {
       pct = 100;
@@ -1235,6 +1268,7 @@
     fill.style.height = pct + '%';
     fill.style.background = color;
     bulb.style.background = color;
+    bulb.style.boxShadow = '0 0 18px 2px ' + color + '59';
 
     if (last && last.distance === 0) {
       bulb.classList.remove('pulse');
