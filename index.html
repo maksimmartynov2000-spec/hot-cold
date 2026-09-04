@@ -302,13 +302,7 @@
       border: 1px solid transparent;
     }
 
-    .record-line {
-      text-align: center;
-      font-size: 12px;
-      color: rgba(255,255,255,0.5);
-      margin: -6px 0 16px;
-    }
-    .record-line strong { color: #fde68a; font-weight: 700; }
+    .confirmed strong { color: #fde68a; font-weight: 700; }
 
     .thermo-wrap {
       display: flex;
@@ -402,6 +396,30 @@
       .thermo-bulb.pulse { animation: none; }
     }
 
+    /* Компактная раскладка одиночной игры на телефоне — чтобы всё помещалось
+       на экран без прокрутки. На широких экранах (≥860px) не действует. */
+    @media (max-width: 859px) {
+      .card.solo-game .header { display: none; }
+
+      .card.solo-game .info-bar { margin-bottom: 10px; }
+
+      .card.solo-game .thermo-wrap { margin: 0 0 4px; }
+
+      .card.solo-game .feedback-panel {
+        background: none !important;
+        border: none !important;
+        padding: 0 0 8px;
+        margin-bottom: 8px;
+        animation: none;
+      }
+      .card.solo-game .feedback-panel .fb-label { font-size: 16px; }
+
+      .card.solo-game .guess-section { margin-bottom: 10px; }
+      .card.solo-game .guess-section p { margin-bottom: 5px; }
+
+      .card.solo-game .history-list { max-height: 96px; }
+    }
+
     .final-box {
       background: rgba(251, 191, 36, 0.1);
       border: 1px solid #fbbf24;
@@ -481,14 +499,8 @@
     .history-item .h-label { font-size: 13px; font-weight: 600; text-align: right; word-break: break-word; }
 
     .legend { margin-top: 20px; }
-    .legend-panel {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      border-radius: 14px;
-      padding: 14px 16px;
-      margin-bottom: 12px;
-    }
-    .legend-title { font-size: 12px; color: rgba(255, 255, 255, 0.35); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; text-align: center; }
+    #scaleBox { margin-bottom: 10px; }
+    .legend-body { margin-top: 10px; }
 
     .legend-bar { display: none; }
 
@@ -651,8 +663,6 @@
           <button class="btn-reset" onclick="quitToMenu()" id="tMenu">Menu</button>
         </div>
 
-        <div class="record-line hidden" id="recordLine"></div>
-
         <div class="turn-banner hidden" id="turnBanner"></div>
 
         <div class="thermo-wrap hidden" id="thermoWrap">
@@ -691,11 +701,13 @@
     </div>
 
     <div class="legend">
-      <div class="legend-panel">
-        <div class="legend-title" id="tLegendTitle">Distance Scale</div>
-        <div class="legend-bar" id="legendBar"></div>
-        <div class="legend-grid" id="legendGrid"></div>
-      </div>
+      <details class="instruction-box" id="scaleBox">
+        <summary id="tLegendTitle">Distance Scale</summary>
+        <div class="legend-body">
+          <div class="legend-bar" id="legendBar"></div>
+          <div class="legend-grid" id="legendGrid"></div>
+        </div>
+      </details>
 
       <details class="instruction-box" id="rulesBox">
         <summary id="tInsTitle">Rules 📋</summary>
@@ -713,7 +725,7 @@
       enterGuess: "Enter a number", placeholderTpl: "Number 1–{n}...", submitGuess: "Check",
       finalWarning: "Attempts used — last chance!", finalSubmit: "Submit", finalInput: "Final answer...",
       resultWin: "🎉 Victory! Number is guessed!", resultLose: "❌ Wrong. The secret number was: ",
-      historyTitle: "Guess History", legendTitle: "Distance Scale",
+      historyTitle: "Guess History", legendTitle: "📊 Distance Scale",
       insTitle: "How to play? 📋",
       insBody: "Guess the secret number (from 1 to {n}) in {a} attempts.\n\nThe thermometer tracks the distance (difference) between your guess and the secret number.\n\nExample: the secret number is 350, you enter 900 — the distance is 550 steps. The thermometer will show: 🧊 Very cold.\n\nThe smaller this distance, the higher the thermometer temperature.\n\nGood luck!",
       labels: ["🧊 Very cold", "❄️ Cold", "🌬️ Chilly", "🌤️ Warm", "☀️ Hot", "🔥 Very hot", "💥 Burning", "🌋 Lava", "🎯 Bullseye!"],
@@ -739,7 +751,7 @@
       enterGuess: "Введите число", placeholderTpl: "Число от 1 до {n}...", submitGuess: "Проверить",
       finalWarning: "Попытки закончились — последний шанс!", finalSubmit: "Ответ", finalInput: "Финальный ответ...",
       resultWin: "🎉 Победа! Число угадано!", resultLose: "❌ Неверно. Загаданное число было: ",
-      historyTitle: "История попыток", legendTitle: "Шкала расстояний",
+      historyTitle: "История попыток", legendTitle: "📊 Шкала расстояний",
       insTitle: "Как играть? 📋",
       insBody: "Отгадайте секретное число (от 1 до {n}) за {a} попыток.\n\nГрадусник измеряет расстояние (разницу) между вашим вариантом и секретным числом.\n\nНапример: секретное число 350, вы вводите 900 — расстояние 550 шагов. Градусник покажет: 🧊 Очень холодно.\n\nЧем меньше это расстояние, тем выше температура градусника.\n\nУдачи!",
       labels: ["🧊 Очень холодно", "❄️ Холодно", "🌬️ Прохладно", "🌤️ Тепло", "☀️ Жарко", "🔥 Горячо", "💥 Очень горячо", "🌋 Лава", "🎯 В точку!"],
@@ -765,7 +777,7 @@
       enterGuess: "Entrez un nombre", placeholderTpl: "Nombre 1–{n}...", submitGuess: "Vérifier",
       finalWarning: "Tentatives épuisées — dernière chance !", finalSubmit: "Valider", finalInput: "Réponse finale...",
       resultWin: "🎉 Victoire ! Le nombre a été deviné !", resultLose: "❌ Incorrect. Le nombre secret était : ",
-      historyTitle: "Historique des tentatives", legendTitle: "Échelle de distance",
+      historyTitle: "Historique des tentatives", legendTitle: "📊 Échelle de distance",
       insTitle: "Comment jouer ? 📋",
       insBody: "Devinez le nombre secret (de 1 à {n}) en {a} tentatives.\n\nLe thermomètre mesure la distance (la différence) entre votre proposition et le nombre secret.\n\nExemple : le nombre secret est 350, vous entrez 900 — la distance est de 550 pas. Le thermomètre affichera : 🧊 Très froid.\n\nPlus cette distance est petite, plus la température du thermomètre est élevée.\n\nBonne chance !",
       labels: ["🧊 Très froid", "❄️ Froid", "🌬️ Frais", "🌤️ Tiède", "☀️ Chaud", "🔥 Très chaud", "💥 Brûlant", "🌋 Lave", "🎯 Dans le mille !"],
@@ -791,7 +803,7 @@
       enterGuess: "Gib eine Zahl ein", placeholderTpl: "Zahl 1–{n}...", submitGuess: "Prüfen",
       finalWarning: "Versuche aufgebraucht — letzte Chance!", finalSubmit: "Bestätigen", finalInput: "Letzte Antwort...",
       resultWin: "🎉 Gewonnen! Die Zahl wurde erraten!", resultLose: "❌ Falsch. Die Geheimzahl war: ",
-      historyTitle: "Rateverlauf", legendTitle: "Entfernungsskala",
+      historyTitle: "Rateverlauf", legendTitle: "📊 Entfernungsskala",
       insTitle: "Spielanleitung 📋",
       insBody: "Errate die Geheimzahl (von 1 bis {n}) in {a} Versuchen.\n\nDas Thermometer misst den Abstand (die Differenz) zwischen deinem Tipp und der Geheimzahl.\n\nBeispiel: Die Geheimzahl ist 350, du gibst 900 ein — der Abstand beträgt 550 Schritte. Das Thermometer zeigt: 🧊 Sehr kalt.\n\nJe kleiner dieser Abstand ist, desto höher ist die Temperatur.\n\nViel Glück!",
       labels: ["🧊 Sehr kalt", "❄️ Kalt", "🌬️ Kühl", "🌤️ Warm", "☀️ Heiß", "🔥 Sehr heiß", "💥 Glühend", "🌋 Lava", "🎯 Volltreffer!"],
@@ -978,6 +990,7 @@
     document.getElementById('screenSetup').classList.toggle('hidden', name !== 'setup');
     document.getElementById('screenGame').classList.toggle('hidden', name !== 'game');
     document.getElementById('card').classList.toggle('wide', name === 'game' && mode === 'duel');
+    document.getElementById('card').classList.toggle('solo-game', name === 'game' && mode === 'solo');
     document.querySelector('.header').classList.toggle('compact', name === 'game');
     document.querySelector('.legend').classList.toggle('hidden', name !== 'game');
   }
@@ -1284,8 +1297,10 @@
     const duel = mode === 'duel';
     const attempts = document.getElementById('attemptsLabel');
     const banner = document.getElementById('turnBanner');
+    const confirmed = document.getElementById('tConfirmed');
 
     if (duel) {
+      confirmed.textContent = L.confirmed;
       attempts.textContent = L.roundLabel + D.round;
       attempts.className = 'attempts';
       if (D.roundOver) { banner.classList.add('hidden'); }
@@ -1298,7 +1313,6 @@
       }
       document.getElementById('finalBox').classList.add('hidden');
       document.getElementById('guessSection').classList.toggle('hidden', D.roundOver);
-      document.getElementById('recordLine').classList.add('hidden');
     } else {
       banner.classList.add('hidden');
       const left = MAX_GUESSES - history.length;
@@ -1307,14 +1321,8 @@
       document.getElementById('finalBox').classList.toggle('hidden', gameOverType !== 'lose_waiting');
       document.getElementById('guessSection').classList.toggle('hidden', gameOver);
 
-      const recLine = document.getElementById('recordLine');
       const rec = getRecord(RANGE_MAX);
-      if (rec === null) {
-        recLine.classList.add('hidden');
-      } else {
-        recLine.classList.remove('hidden');
-        recLine.innerHTML = L.recordLabel + '<strong>' + rec + '</strong>';
-      }
+      confirmed.innerHTML = (rec === null) ? L.confirmed : (L.recordLabel + '<strong>' + rec + '</strong>');
     }
   }
 
@@ -1466,7 +1474,9 @@
   }
 
   function syncRulesOpen() {
-    document.getElementById('rulesBox').open = window.innerWidth >= 860;
+    const open = window.innerWidth >= 860;
+    document.getElementById('rulesBox').open = open;
+    document.getElementById('scaleBox').open = open;
   }
 
   // ================= ИНИЦИАЛИЗАЦИЯ =================
