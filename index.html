@@ -637,7 +637,7 @@
         <div class="m-title" id="tModeDuel">Play with a friend</div>
       </button>
       <button class="mode-btn run" onclick="openRunEntry()">
-        <div class="m-title">🏃 Забег (общий рейтинг)</div>
+        <div class="m-title">🏃 Игра на рейтинг</div>
         <div class="m-sub">Раунды подряд, сложность растёт — держись как можно дольше</div>
       </button>
     </div>
@@ -787,9 +787,9 @@
   <div id="screenRunHub" class="hidden">
     <div id="runHubMessage"></div>
     <p>Вы вошли как <strong id="runHubUser"></strong></p>
-    <button class="btn btn-block" onclick="startRun()">🏃 Начать забег</button>
+    <button class="btn btn-block" onclick="startRun()">🏃 Начать игру на рейтинг</button>
     <div class="lb-wrap">
-      <div class="lb-title">🏆 Топ забегов</div>
+      <div class="lb-title">🏆 Топ игроков</div>
       <div id="runLeaderboardList" class="lb-list"></div>
     </div>
     <div class="setup-row" style="margin-top:12px">
@@ -1827,7 +1827,7 @@
     const finalScore = RUN.totalScore;
     const roundsSurvived = RUN.round - 1;
     RUN = null;
-    let resultHtml = '<div class="lb-title">Забег окончен</div>' +
+    let resultHtml = '<div class="lb-title">Игра окончена</div>' +
       '<p>Раундов пройдено: ' + roundsSurvived + '</p>' +
       '<p>Итоговый счёт: <strong>' + finalScore + '</strong></p>';
     const auth = runAuth();
