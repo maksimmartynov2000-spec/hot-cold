@@ -1449,10 +1449,19 @@
           '<div id="lbList" class="lb-list"></div>';
         box.appendChild(lbWrap);
         renderLeaderboard(RANGE_MAX, document.getElementById('lbList'));
-        document.getElementById('lbSubmitBtn').onclick = () => {
+        document.getElementById('lbSubmitBtn').onclick = async () => {
           const nick = (document.getElementById('lbNick').value || '').trim().slice(0, 20) || 'Игрок';
           localStorage.setItem('hc_nick', nick);
-          submitScore(nick, attemptsUsed, RANGE_MAX).then(() => renderLeaderboard(RANGE_MAX, document.getElementById('lbList')));
+          const btn = document.getElementById('lbSubmitBtn');
+          btn.disabled = true;
+          const res = await submitScore(nick, attemptsUsed, RANGE_MAX);
+          btn.disabled = false;
+          const list = document.getElementById('lbList');
+          if (!res.ok) {
+            list.innerHTML = '<div class="lb-title" style="color:#f87171">Не удалось отправить: ' + escapeHtml(res.error || '') + '</div>';
+            return;
+          }
+          renderLeaderboard(RANGE_MAX, list);
         };
       }
 
@@ -1574,8 +1583,14 @@
   }
 
   async function submitScore(nickname, attempts, rangeMax) {
-    if (!sb) return;
-    try { await sb.from('scores').insert({ nickname, attempts, range_max: rangeMax }); } catch (e) {}
+    if (!sb) return { ok: false, error: 'Supabase client not initialized' };
+    try {
+      const { error } = await sb.from('scores').insert({ nickname, attempts, range_max: rangeMax });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: String(e && e.message ? e.message : e) };
+    }
   }
 
   async function renderLeaderboard(rangeMax, containerEl) {
