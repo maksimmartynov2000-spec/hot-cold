@@ -637,7 +637,7 @@
         <div class="m-title" id="tModeDuel">Play with a friend</div>
       </button>
       <button class="mode-btn run" onclick="openRunEntry()">
-        <div class="m-title">🏃 Забег (общий рейтинг)</div>
+        <div class="m-title">🏃 Игра на рейтинг</div>
         <div class="m-sub">Раунды подряд, сложность растёт — держись как можно дольше</div>
       </button>
     </div>
@@ -765,8 +765,24 @@
     </div>
   </div>
 
-  <!-- ЭКРАН: вход в Забег -->
+  <!-- ЭКРАН: выбор вход/регистрация -->
+  <div id="screenAuthChoice" class="hidden">
+    <div class="mode-list">
+      <button class="mode-btn solo" onclick="showRunAuth('login')">
+        <div class="m-title">Войти</div>
+        <div class="m-sub">У меня уже есть имя и PIN</div>
+      </button>
+      <button class="mode-btn run" onclick="showRunAuth('register')">
+        <div class="m-title">Зарегистрироваться</div>
+        <div class="m-sub">Я здесь впервые, придумаю имя и PIN</div>
+      </button>
+    </div>
+    <button class="btn-ghost btn-block" style="margin-top:12px" onclick="showScreen('mode')">Назад</button>
+  </div>
+
+  <!-- ЭКРАН: форма входа или регистрации -->
   <div id="screenAuth" class="hidden">
+    <div class="lb-title" id="runAuthTitle" style="font-size:15px;margin-bottom:10px"></div>
     <div class="setup-field">
       <label>Имя</label>
       <input type="text" id="runUsername" maxlength="20" placeholder="Ваше имя" />
@@ -777,19 +793,18 @@
     </div>
     <div id="runAuthError" class="lb-title hidden" style="color:#f87171"></div>
     <div class="setup-row">
-      <button class="btn-ghost" onclick="showScreen('mode')">Назад</button>
-      <button class="btn btn-block" onclick="runLogin()">Войти</button>
+      <button class="btn-ghost" onclick="showScreen('authChoice')">Назад</button>
+      <button class="btn btn-block" id="runAuthSubmitBtn" onclick="runAuthSubmit()"></button>
     </div>
-    <button class="btn-ghost btn-block" style="margin-top:8px" onclick="runRegister()">Впервые здесь? Зарегистрироваться этим именем и PIN</button>
   </div>
 
   <!-- ЭКРАН: хаб Забега (старт/результат/топ) -->
   <div id="screenRunHub" class="hidden">
     <div id="runHubMessage"></div>
     <p>Вы вошли как <strong id="runHubUser"></strong></p>
-    <button class="btn btn-block" onclick="startRun()">🏃 Начать забег</button>
+    <button class="btn btn-block" onclick="startRun()">🏃 Начать игру на рейтинг</button>
     <div class="lb-wrap">
-      <div class="lb-title">🏆 Топ забегов</div>
+      <div class="lb-title">🏆 Топ игроков</div>
       <div id="runLeaderboardList" class="lb-list"></div>
     </div>
     <div class="setup-row" style="margin-top:12px">
@@ -803,7 +818,7 @@
     <div class="info-bar">
       <span id="runRoundLabel"></span>
       <span id="runScoreLabel"></span>
-      <button class="btn-reset" onclick="showScreen('runHub')">Меню</button>
+      <button class="btn-reset" onclick="RUN = null; openRunHub()">Прервать</button>
     </div>
     <p>Диапазон: <span id="runRangeLabel"></span></p>
     <p id="runAttemptsLabel"></p>
@@ -1088,6 +1103,7 @@
     document.getElementById('screenMode').classList.toggle('hidden', name !== 'mode');
     document.getElementById('screenSetup').classList.toggle('hidden', name !== 'setup');
     document.getElementById('screenGame').classList.toggle('hidden', name !== 'game');
+    document.getElementById('screenAuthChoice').classList.toggle('hidden', name !== 'authChoice');
     document.getElementById('screenAuth').classList.toggle('hidden', name !== 'auth');
     document.getElementById('screenRunHub').classList.toggle('hidden', name !== 'runHub');
     document.getElementById('screenRunGame').classList.toggle('hidden', name !== 'runGame');
@@ -1685,53 +1701,94 @@
     localStorage.removeItem('hc_run_pin');
   }
 
+  let runAuthMode = 'login';
+
   function openRunEntry() {
-    if (runAuth()) openRunHub(); else showRunAuthScreen();
+    if (runAuth()) openRunHub(); else showScreen('authChoice');
   }
 
-  function showRunAuthScreen(errorMsg) {
+  // Открывает форму заново: поля чистые, ошибок нет
+  function showRunAuth(mode) {
+    runAuthMode = mode;
     document.getElementById('runUsername').value = '';
     document.getElementById('runPin').value = '';
-    const err = document.getElementById('runAuthError');
-    if (errorMsg) { err.textContent = errorMsg; err.classList.remove('hidden'); }
-    else { err.classList.add('hidden'); }
+    document.getElementById('runAuthTitle').textContent =
+      mode === 'register' ? 'Регистрация — придумайте имя и PIN' : 'Вход — введите своё имя и PIN';
+    document.getElementById('runAuthSubmitBtn').textContent =
+      mode === 'register' ? 'Зарегистрироваться' : 'Войти';
+    runAuthError('');
     showScreen('auth');
   }
 
+  // Показывает/прячет ошибку, НЕ трогая введённые поля
+  function runAuthError(msg) {
+    const err = document.getElementById('runAuthError');
+    if (msg) { err.textContent = msg; err.classList.remove('hidden'); }
+    else { err.textContent = ''; err.classList.add('hidden'); }
+  }
+
+  function runAuthSubmit() {
+    return runAuthMode === 'register' ? runRegister() : runLogin();
+  }
+
+  function runAuthReadForm() {
+    return {
+      username: (document.getElementById('runUsername').value || '').trim(),
+      pin: (document.getElementById('runPin').value || '').trim()
+    };
+  }
+
+  function runAuthErrorText(message) {
+    const m = String(message || '');
+    if (m.indexOf('invalid_username') >= 0) return 'Имя должно быть от 2 до 20 символов';
+    if (m.indexOf('invalid_pin') >= 0) return 'PIN — ровно 4 цифры';
+    return 'Ошибка сервера: ' + m;
+  }
+
   async function runRegister() {
-    const username = (document.getElementById('runUsername').value || '').trim();
-    const pin = (document.getElementById('runPin').value || '').trim();
-    if (username.length < 2 || username.length > 20) return showRunAuthScreen('Имя должно быть от 2 до 20 символов');
-    if (!/^[0-9]{4}$/.test(pin)) return showRunAuthScreen('PIN — ровно 4 цифры');
-    if (!sb) return showRunAuthScreen('Нет соединения с сервером');
+    const { username, pin } = runAuthReadForm();
+    if (username.length < 2 || username.length > 20) return runAuthError('Имя должно быть от 2 до 20 символов');
+    if (!/^[0-9]{4}$/.test(pin)) return runAuthError('PIN — ровно 4 цифры');
+    if (!sb) return runAuthError('Нет соединения с сервером');
+    const btn = document.getElementById('runAuthSubmitBtn');
+    btn.disabled = true;
     try {
       const { data, error } = await sb.rpc('register_student', { p_username: username, p_pin: pin });
-      if (error) return showRunAuthScreen('Ошибка: ' + error.message);
-      if (data === false) return showRunAuthScreen('Это имя уже занято, выберите другое');
+      if (error) return runAuthError(runAuthErrorText(error.message));
+      if (data === false) return runAuthError('Это имя уже занято, придумайте другое');
       localStorage.setItem('hc_run_user', username);
       localStorage.setItem('hc_run_pin', pin);
       openRunHub();
-    } catch (e) { showRunAuthScreen('Ошибка соединения'); }
+    } catch (e) {
+      runAuthError('Нет связи с сервером, попробуйте ещё раз');
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   async function runLogin() {
-    const username = (document.getElementById('runUsername').value || '').trim();
-    const pin = (document.getElementById('runPin').value || '').trim();
-    if (!username || !pin) return showRunAuthScreen('Заполните имя и PIN');
-    if (!sb) return showRunAuthScreen('Нет соединения с сервером');
+    const { username, pin } = runAuthReadForm();
+    if (!username || !pin) return runAuthError('Заполните имя и PIN');
+    if (!sb) return runAuthError('Нет соединения с сервером');
+    const btn = document.getElementById('runAuthSubmitBtn');
+    btn.disabled = true;
     try {
       const { data, error } = await sb.rpc('login_student', { p_username: username, p_pin: pin });
-      if (error) return showRunAuthScreen('Ошибка: ' + error.message);
-      if (data !== true) return showRunAuthScreen('Неверное имя или PIN');
+      if (error) return runAuthError(runAuthErrorText(error.message));
+      if (data !== true) return runAuthError('Неверное имя или PIN');
       localStorage.setItem('hc_run_user', username);
       localStorage.setItem('hc_run_pin', pin);
       openRunHub();
-    } catch (e) { showRunAuthScreen('Ошибка соединения'); }
+    } catch (e) {
+      runAuthError('Нет связи с сервером, попробуйте ещё раз');
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   async function openRunHub(message) {
     const auth = runAuth();
-    if (!auth) return showRunAuthScreen();
+    if (!auth) return showScreen('authChoice');
     document.getElementById('runHubUser').textContent = auth.username;
     document.getElementById('runHubMessage').innerHTML = message || '';
     await renderRunLeaderboard();
@@ -1760,7 +1817,10 @@
 
   function runAttemptsForRound(n, range) {
     const buffer = Math.max(0, RUN_CONFIG.buffer_start - (n - 1) * RUN_CONFIG.buffer_shrink);
-    return minAttempts(range) + buffer;
+    // потолок: попыток всегда заметно меньше, чем чисел в диапазоне,
+    // иначе на маленьких диапазонах раунд проходится тупым перебором
+    const cap = Math.max(2, Math.ceil(range * 0.6));
+    return Math.min(minAttempts(range) + buffer, cap);
   }
 
   function runFeedbackText(distance, range) {
@@ -1779,10 +1839,12 @@
   }
 
   function startRunRound() {
+    if (!RUN) return;
     const range = runRangeForRound(RUN.round);
     RUN.range = range;
     RUN.attemptsAllowed = runAttemptsForRound(RUN.round, range);
     RUN.attemptsUsed = 0;
+    RUN.locked = false;
     RUN.secret = Math.floor(Math.random() * range) + 1;
     const input = document.getElementById('runGuessInput');
     input.value = '';
@@ -1800,7 +1862,8 @@
   }
 
   function handleRunGuess() {
-    if (!RUN) return;
+    // locked — пауза между раундами: иначе можно доугадывать уже угаданное число и копить очки
+    if (!RUN || RUN.locked) return;
     const input = document.getElementById('runGuessInput');
     const guess = parseInt(input.value);
     if (isNaN(guess) || guess < 1 || guess > RUN.range) return;
@@ -1811,6 +1874,7 @@
     if (distance === 0) {
       const roundPoints = Math.round(100 * RUN.round * (minAttempts(RUN.range) / RUN.attemptsUsed));
       RUN.totalScore += roundPoints;
+      RUN.locked = true;
       document.getElementById('runFeedback').textContent = '🎯 Точно! +' + roundPoints + ' очков';
       document.getElementById('runScoreLabel').textContent = 'Очки: ' + RUN.totalScore;
       RUN.round++;
@@ -1826,8 +1890,10 @@
   async function endRun() {
     const finalScore = RUN.totalScore;
     const roundsSurvived = RUN.round - 1;
+    const secretWas = RUN.secret;
     RUN = null;
-    let resultHtml = '<div class="lb-title">Забег окончен</div>' +
+    let resultHtml = '<div class="lb-title">Игра окончена</div>' +
+      '<p>Загаданное число было: <strong>' + secretWas + '</strong></p>' +
       '<p>Раундов пройдено: ' + roundsSurvived + '</p>' +
       '<p>Итоговый счёт: <strong>' + finalScore + '</strong></p>';
     const auth = runAuth();
@@ -1836,10 +1902,14 @@
         const { data, error } = await sb.rpc('submit_run_score', {
           p_username: auth.username, p_pin: auth.pin, p_score: finalScore, p_rounds: roundsSurvived
         });
-        if (!error && data && data.length && data[0].is_best) {
+        if (error) {
+          resultHtml += '<p style="color:#f87171">Результат не сохранился: ' + escapeHtml(error.message) + '</p>';
+        } else if (data && data.length && data[0].is_best) {
           resultHtml += '<p>🏆 Новый личный рекорд!</p>';
         }
-      } catch (e) {}
+      } catch (e) {
+        resultHtml += '<p style="color:#f87171">Результат не сохранился: нет связи с сервером</p>';
+      }
     }
     openRunHub(resultHtml);
   }
@@ -1848,7 +1918,7 @@
   document.getElementById('guessInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleGuess(); });
   document.getElementById('finalInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitFinal(); });
   document.getElementById('runGuessInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleRunGuess(); });
-  document.getElementById('runPin').addEventListener('keydown', e => { if (e.key === 'Enter') runLogin(); });
+  document.getElementById('runPin').addEventListener('keydown', e => { if (e.key === 'Enter') runAuthSubmit(); });
   window.addEventListener('resize', syncRulesOpen);
 
   document.getElementById('langSwitcher').value = currentLang;
