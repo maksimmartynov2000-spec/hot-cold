@@ -17,7 +17,7 @@ create or replace function register_student(p_username text, p_pin text)
 returns boolean
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = public, extensions, pg_temp
 as $$
 begin
   if length(trim(p_username)) < 2 or length(trim(p_username)) > 20 then
@@ -37,7 +37,7 @@ create or replace function login_student(p_username text, p_pin text)
 returns boolean
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = public, extensions, pg_temp
 as $$
 declare h text;
 begin
@@ -51,7 +51,7 @@ create or replace function submit_run_score(p_username text, p_pin text, p_score
 returns table(is_best boolean, best_score int)
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = public, extensions, pg_temp
 as $$
 declare h text; cur_best int; uname text;
 begin
