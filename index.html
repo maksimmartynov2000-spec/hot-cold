@@ -581,10 +581,39 @@
     .hidden { display: none !important; }
 
     :focus-visible { outline: 2px solid #a5f3fc; outline-offset: 2px; }
+
+    #updateBanner {
+      cursor: pointer;
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      color: #fbbf24;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .lb-wrap { margin-top: 14px; }
+    .lb-list { margin-top: 8px; }
+    .lb-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 6px;
+    }
+    .lb-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      padding: 4px 2px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
   </style>
 </head>
 <body>
 <div class="card" id="card">
+  <div id="updateBanner" class="hidden"></div>
   <select class="lang-switcher" id="langSwitcher" onchange="changeLanguage()">
     <option value="en">🇺🇸 EN</option>
     <option value="ru">🇷🇺 RU</option>
@@ -732,6 +761,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
   const i18n = {
     en: {
@@ -1405,6 +1435,27 @@
       actions.innerHTML = '<button class="btn" onclick="resetSolo()">' + L.newGame + '</button>' +
                           '<button class="btn-ghost" onclick="quitToMenu()">' + L.toMenu + '</button>';
       box.appendChild(actions);
+
+      if (gameOverType === 'win' && sb) {
+        const attemptsUsed = history.length;
+        const savedNick = localStorage.getItem('hc_nick') || '';
+        const lbWrap = document.createElement('div');
+        lbWrap.className = 'lb-wrap';
+        lbWrap.innerHTML =
+          '<div class="row">' +
+            '<input type="text" id="lbNick" maxlength="20" placeholder="Ваше имя" value="' + escapeHtml(savedNick) + '" />' +
+            '<button class="btn-yellow" id="lbSubmitBtn">В топ 🏆</button>' +
+          '</div>' +
+          '<div id="lbList" class="lb-list"></div>';
+        box.appendChild(lbWrap);
+        renderLeaderboard(RANGE_MAX, document.getElementById('lbList'));
+        document.getElementById('lbSubmitBtn').onclick = () => {
+          const nick = (document.getElementById('lbNick').value || '').trim().slice(0, 20) || 'Игрок';
+          localStorage.setItem('hc_nick', nick);
+          submitScore(nick, attemptsUsed, RANGE_MAX).then(() => renderLeaderboard(RANGE_MAX, document.getElementById('lbList')));
+        };
+      }
+
       box.classList.remove('hidden');
     } else {
       box.classList.add('hidden');
@@ -1493,6 +1544,57 @@
     document.getElementById('scaleBox').open = open;
   }
 
+  // ================= SUPABASE: обновления и таблица рекордов =================
+  const SUPABASE_URL = "https://fzakcsvyceqsnowvkxfu.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_F-68zKeUGcA9i3bgqKtr6w_TElrOvg5";
+  const APP_VERSION = "1"; // повышайте вручную в Supabase (game_config.app_version) после каждого реального обновления кода
+
+  let sb = null;
+  try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch (e) {}
+
+  async function checkRemoteConfig() {
+    if (!sb) return;
+    try {
+      const { data, error } = await sb.from('game_config').select('app_version, announcement').eq('id', 1).single();
+      if (error || !data) return;
+      const banner = document.getElementById('updateBanner');
+      if (data.app_version && String(data.app_version) !== APP_VERSION) {
+        banner.textContent = '🔄 Доступна новая версия игры — нажмите, чтобы обновить';
+        banner.onclick = () => location.reload();
+        banner.classList.remove('hidden');
+      } else if (data.announcement && localStorage.getItem('hc_ann_seen') !== data.announcement) {
+        banner.textContent = data.announcement;
+        banner.onclick = () => {
+          localStorage.setItem('hc_ann_seen', data.announcement);
+          banner.classList.add('hidden');
+        };
+        banner.classList.remove('hidden');
+      }
+    } catch (e) {}
+  }
+
+  async function submitScore(nickname, attempts, rangeMax) {
+    if (!sb) return;
+    try { await sb.from('scores').insert({ nickname, attempts, range_max: rangeMax }); } catch (e) {}
+  }
+
+  async function renderLeaderboard(rangeMax, containerEl) {
+    if (!sb || !containerEl) return;
+    containerEl.innerHTML = '';
+    try {
+      const { data, error } = await sb.from('scores').select('nickname, attempts')
+        .eq('range_max', rangeMax)
+        .order('attempts', { ascending: true })
+        .order('created_at', { ascending: true })
+        .limit(10);
+      if (error || !data || !data.length) return;
+      containerEl.innerHTML =
+        '<div class="lb-title">🏆 Топ по диапазону 1–' + formatNum(rangeMax) + '</div>' +
+        data.map((r, i) => '<div class="lb-row"><span>' + (i + 1) + '. ' + escapeHtml(r.nickname) +
+          '</span><span>' + r.attempts + '</span></div>').join('');
+    } catch (e) {}
+  }
+
   // ================= ИНИЦИАЛИЗАЦИЯ =================
   document.getElementById('guessInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleGuess(); });
   document.getElementById('finalInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitFinal(); });
@@ -1503,6 +1605,9 @@
   applyTranslations();
   showScreen('mode');
   syncRulesOpen();
+
+  checkRemoteConfig();
+  setInterval(checkRemoteConfig, 60000);
 </script>
 </body>
 </html>
