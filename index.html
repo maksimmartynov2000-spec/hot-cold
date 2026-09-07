@@ -2242,11 +2242,18 @@
   // ================= ЗАБЕГ: сама игра =================
   let RUN = null;
 
+  // Диапазон округляется до круглого числа: «от 1 до 250» читается и держится в голове,
+  // «от 1 до 234» — нет. Шаг округления растёт вместе с числом.
+  function roundRangeValue(v) {
+    const step = v < 100 ? 10 : v < 500 ? 50 : v < 1000 ? 100 : v < 5000 ? 500 : 1000;
+    return Math.max(10, Math.round(v / step) * step);
+  }
+
   // Диапазон растёт до потолка и дальше не увеличивается: «угадай число до полумиллиона»
   // формально проходимо, но играть в это на телефоне невозможно
   function runRangeForRound(n) {
-    const grown = Math.round(RUN_CONFIG.start_range * Math.pow(RUN_CONFIG.growth, n - 1));
-    return Math.max(2, Math.min(grown, RUN_CONFIG.range_cap));
+    const grown = RUN_CONFIG.start_range * Math.pow(RUN_CONFIG.growth, n - 1);
+    return roundRangeValue(Math.min(grown, RUN_CONFIG.range_cap));
   }
 
   // Сложность после потолка идёт от точности: с каждым раундом на попытку меньше.
