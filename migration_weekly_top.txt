@@ -1,0 +1,62 @@
+-- 1. История всех игр (раньше хранился только личный рекорд)
+create table if not exists runs (
+  id bigint generated always as identity primary key,
+  username text not null,
+  score int not null,
+  rounds int not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists runs_created_idx on runs (created_at desc);
+alter table runs enable row level security;
+-- политик нет специально: напрямую ни читать, ни писать нельзя, только через функции ниже
+
+-- 2. Сохранение результата теперь ещё и пишет игру в историю
+create or replace function submit_run_score(p_username text, p_pin text, p_score int, p_rounds int)
+returns table(is_best boolean, best_score int)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare h text; cur_best int; uname text;
+begin
+  select username, pin_hash, best_run_score into uname, h, cur_best
+  from students where username_lower = lower(trim(p_username));
+  if h is null or h <> crypt(p_pin, h) then
+    raise exception 'auth_failed';
+  end if;
+
+  insert into runs(username, score, rounds) values (uname, p_score, p_rounds);
+
+  if p_score > cur_best then
+    update students set best_run_score = p_score, best_run_rounds = p_rounds where username = uname;
+    return query select true, p_score;
+  else
+    return query select false, cur_best;
+  end if;
+end;
+$$;
+
+-- 3. Топ за последние 7 дней
+create or replace function run_leaderboard_weekly()
+returns table(username text, best_run_score int, best_run_rounds int)
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  select r.username,
+         max(r.score)::int,
+         (array_agg(r.rounds order by r.score desc))[1]::int
+  from runs r
+  where r.created_at >= now() - interval '7 days'
+  group by r.username
+  order by 2 desc
+  limit 10;
+$$;
+
+grant execute on function run_leaderboard_weekly() to anon;
+
+-- 4. Новая кривая сложности: диапазон упирается в потолок, дальше забираем по попытке за раунд
+update game_config
+set run_config = '{"start_range":10,"growth":2.2,"range_cap":2000,"buffer_start":5,"buffer_shrink":1,"squeeze_start":8,"min_attempts":3}'::jsonb,
+    updated_at = now()
+where id = 1;
