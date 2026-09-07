@@ -853,7 +853,7 @@
     </div>
 
     <div class="legend">
-      <details class="instruction-box" id="scaleBox">
+      <details class="instruction-box" id="scaleBox" open>
         <summary id="tLegendTitle">Distance Scale</summary>
         <div class="legend-body">
           <div class="legend-bar" id="legendBar"></div>
@@ -1954,10 +1954,6 @@
     });
   }
 
-  function syncRulesOpen() {
-    document.getElementById('scaleBox').open = window.innerWidth >= 860;
-  }
-
   // ================= SUPABASE: обновления и таблица рекордов =================
   const SUPABASE_URL = "https://fzakcsvyceqsnowvkxfu.supabase.co";
   const SUPABASE_KEY = "sb_publishable_F-68zKeUGcA9i3bgqKtr6w_TElrOvg5";
@@ -2286,13 +2282,11 @@
   document.getElementById('guessInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleGuess(); });
   document.getElementById('finalInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitFinal(); });
   document.getElementById('runPin').addEventListener('keydown', e => { if (e.key === 'Enter') runAuthSubmit(); });
-  window.addEventListener('resize', syncRulesOpen);
 
   document.getElementById('langSwitcher').value = currentLang;
   document.getElementById('winsNeeded').value = '3';
   applyTranslations();
   showScreen('mode');
-  syncRulesOpen();
 
   checkRemoteConfig();
   setInterval(checkRemoteConfig, 60000);
