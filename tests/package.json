@@ -1,0 +1,11 @@
+{
+  "name": "hot-cold-tests",
+  "private": true,
+  "scripts": {
+    "test": "node run.js",
+    "offline": "node offline.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.40.0"
+  }
+}

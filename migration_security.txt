@@ -1,0 +1,129 @@
+-- ЗАЩИТА ОТ НЕДОБРОСОВЕСТНЫХ ИГРОКОВ
+-- 1. блокировка перебора PIN
+-- 2. отсев невозможных результатов
+-- 3. ограничение массовой регистрации
+
+-- 1. Счётчик неудачных попыток и блокировка
+alter table students add column if not exists failed_logins int not null default 0;
+alter table students add column if not exists locked_until timestamptz;
+
+-- Общая проверка PIN со счётчиком: используется и при входе, и при отправке результата,
+-- иначе перебор можно было бы вести через отправку результатов в обход входа
+create or replace function check_student_pin(p_username text, p_pin text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare h text; uname text; locked timestamptz; fails int;
+begin
+  select username, pin_hash, locked_until, failed_logins
+    into uname, h, locked, fails
+  from students where username_lower = lower(trim(p_username));
+
+  if h is null then
+    return null;                         -- такого имени нет
+  end if;
+
+  if locked is not null and locked > now() then
+    raise exception 'locked_out';        -- аккаунт временно закрыт
+  end if;
+
+  if h = crypt(p_pin, h) then
+    if fails <> 0 or locked is not null then
+      update students set failed_logins = 0, locked_until = null where username = uname;
+    end if;
+    return uname;                        -- всё верно
+  end if;
+
+  -- неверный PIN: считаем попытки, после пятой закрываем на 5 минут
+  update students
+  set failed_logins = failed_logins + 1,
+      locked_until = case when failed_logins + 1 >= 5 then now() + interval '5 minutes' else null end
+  where username = uname;
+  return null;
+end;
+$$;
+
+create or replace function login_student(p_username text, p_pin text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+begin
+  return check_student_pin(p_username, p_pin) is not null;
+end;
+$$;
+
+-- 2. Отсев невозможных результатов.
+-- Максимум за раунд = 100 × номер раунда × минимум попыток (не больше 11 при потолке 2000),
+-- то есть за N раундов физически нельзя набрать больше 550 × N × (N+1) —
+-- это при угадывании каждого числа с первой попытки.
+-- Правдоподобный, но выдуманный результат так не отсечь: полная защита требует,
+-- чтобы игру считал сервер. Здесь закрыт только грубый случай «отправил миллиард».
+create or replace function submit_run_score(p_username text, p_pin text, p_score int, p_rounds int)
+returns table(is_best boolean, best_score int)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare cur_best int; uname text;
+begin
+  uname := check_student_pin(p_username, p_pin);
+  if uname is null then
+    raise exception 'auth_failed';
+  end if;
+
+  if p_rounds < 0 or p_rounds > 200 or p_score < 0 then
+    raise exception 'implausible_score';
+  end if;
+  if p_score > 550 * (p_rounds + 1) * (p_rounds + 2) then
+    raise exception 'implausible_score';
+  end if;
+
+  select best_run_score into cur_best from students where username = uname;
+  insert into runs(username, score, rounds) values (uname, p_score, p_rounds);
+
+  if p_score > cur_best then
+    update students set best_run_score = p_score, best_run_rounds = p_rounds where username = uname;
+    return query select true, p_score;
+  else
+    return query select false, cur_best;
+  end if;
+end;
+$$;
+
+-- 3. Не больше 20 новых аккаунтов в час на всю игру — от массовой накрутки топа
+create or replace function register_student(p_username text, p_pin text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+begin
+  if length(trim(p_username)) < 2 or length(trim(p_username)) > 20 then
+    raise exception 'invalid_username';
+  end if;
+  if p_pin !~ '^[0-9]{4}$' then
+    raise exception 'invalid_pin';
+  end if;
+  if (select count(*) from students where created_at >= now() - interval '1 hour') >= 20 then
+    raise exception 'too_many_signups';
+  end if;
+
+  insert into students(username, pin_hash) values (trim(p_username), crypt(p_pin, gen_salt('bf')));
+  return true;
+exception when unique_violation then
+  return false;
+end;
+$$;
+
+grant execute on function login_student(text, text) to anon;
+grant execute on function register_student(text, text) to anon;
+grant execute on function submit_run_score(text, text, int, int) to anon;
+revoke execute on function check_student_pin(text, text) from public, anon;
+
+-- 4. Таблица рекордов режима «Тренировка» больше не используется:
+-- она была открыта на запись кому угодно и дублировала рейтинг
+drop table if exists scores;
