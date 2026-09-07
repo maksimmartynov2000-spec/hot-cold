@@ -709,6 +709,31 @@
       color: rgba(255, 255, 255, 0.4);
       padding: 10px 2px;
     }
+    .lb-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .lb-head .lb-title { margin-bottom: 0; }
+    .lb-tabs { display: flex; gap: 4px; }
+    .lb-tab {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.5);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .lb-tab.active {
+      background: rgba(74, 222, 128, 0.15);
+      border-color: #4ade80;
+      color: #4ade80;
+    }
   </style>
 </head>
 <body>
@@ -901,7 +926,13 @@
     <div id="runHubMessage"></div>
     <button class="btn btn-block" id="tRunStart" onclick="startRun()"></button>
     <div class="lb-wrap">
-      <div class="lb-title" id="tRunTop"></div>
+      <div class="lb-head">
+        <div class="lb-title" id="tRunTop"></div>
+        <div class="lb-tabs">
+          <button class="lb-tab" id="tRunTopWeek" onclick="setLeaderboardScope('week')"></button>
+          <button class="lb-tab" id="tRunTopAll" onclick="setLeaderboardScope('all')"></button>
+        </div>
+      </div>
       <div id="runLeaderboardList" class="lb-list"></div>
     </div>
     <div class="run-hub-actions">
@@ -988,6 +1019,8 @@
         noScores: "No results yet — be the first",
         logoutAsk: "Log out of {name}? Your result stays in the leaderboard — log back in with the same name and PIN.",
         cancel: "Cancel",
+        topWeek: "This week",
+        topAll: "All time",
         insTitle: "Rating game 📋",
         insBody: "Rounds run back to back. Clear a round — the next one has a wider range and fewer attempts.\n\nMiss, and the game ends and your score goes to the shared leaderboard.\n\nPoints per round: the further you get and the fewer attempts you spend, the more you earn.\n\nOnly your best game counts in the ranking."
       }
@@ -1056,6 +1089,8 @@
         noScores: "Результатов пока нет — будьте первым",
         logoutAsk: "Выйти из аккаунта {name}? Результат останется в топе — вернуться можно по тому же имени и PIN.",
         cancel: "Отмена",
+        topWeek: "За неделю",
+        topAll: "За всё время",
         insTitle: "Игра на рейтинг 📋",
         insBody: "Раунды идут подряд. Прошли раунд — в следующем диапазон больше, а попыток меньше.\n\nОшиблись — игра закончена, результат уходит в общий рейтинг.\n\nОчки за раунд: чем дальше зашли и чем меньше попыток потратили, тем больше.\n\nВ рейтинге учитывается только ваша лучшая игра."
       }
@@ -1124,6 +1159,8 @@
         noScores: "Pas encore de résultats — soyez le premier",
         logoutAsk: "Se déconnecter de {name} ? Le résultat reste au classement — reconnectez-vous avec le même nom et PIN.",
         cancel: "Annuler",
+        topWeek: "Cette semaine",
+        topAll: "Depuis toujours",
         insTitle: "Partie classée 📋",
         insBody: "Les manches s'enchaînent. Manche réussie — la suivante a une plage plus large et moins de tentatives.\n\nUne erreur et la partie s'arrête : le score part au classement commun.\n\nPoints par manche : plus vous allez loin et moins vous utilisez de tentatives, plus vous gagnez.\n\nSeule votre meilleure partie compte au classement."
       }
@@ -1192,6 +1229,8 @@
         noScores: "Noch keine Ergebnisse — sei der Erste",
         logoutAsk: "Von {name} abmelden? Das Ergebnis bleibt in der Rangliste — melde dich mit demselben Namen und PIN wieder an.",
         cancel: "Abbrechen",
+        topWeek: "Diese Woche",
+        topAll: "Insgesamt",
         insTitle: "Ranglisten-Spiel 📋",
         insBody: "Die Runden laufen nacheinander. Runde geschafft — die nächste hat einen größeren Bereich und weniger Versuche.\n\nEin Fehler und das Spiel endet, das Ergebnis geht in die gemeinsame Rangliste.\n\nPunkte pro Runde: je weiter du kommst und je weniger Versuche du brauchst, desto mehr.\n\nIn der Rangliste zählt nur dein bestes Spiel."
       }
@@ -1390,6 +1429,8 @@
     document.getElementById('runUsername').placeholder = L.run.namePh;
     document.getElementById('tRunStart').textContent = L.run.start;
     document.getElementById('tRunTop').textContent = L.run.top;
+    document.getElementById('tRunTopWeek').textContent = L.run.topWeek;
+    document.getElementById('tRunTopAll').textContent = L.run.topAll;
     document.getElementById('tRunToMenu').textContent = L.run.toMenu;
     if (mode === 'run') document.getElementById('tMenu').textContent = L.run.abort;
     if (screen === 'auth') {
@@ -1963,7 +2004,10 @@
   try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch (e) {}
 
   // Параметры сложности «Забега» — можно менять в Supabase (game_config.run_config), без деплоя
-  let RUN_CONFIG = { start_range: 10, growth: 1.6, buffer_start: 6, buffer_shrink: 1 };
+  let RUN_CONFIG = {
+    start_range: 10, growth: 2.2, range_cap: 2000,
+    buffer_start: 5, buffer_shrink: 1, squeeze_start: 8, min_attempts: 3
+  };
 
   async function checkRemoteConfig() {
     if (!sb) return;
@@ -2156,14 +2200,31 @@
     showScreen('runHub');
   }
 
+  // 'week' — топ за последние 7 дней, 'all' — за всё время.
+  // Недельный по умолчанию: вечный топ застывает, и у тех, кто пришёл позже, пропадает смысл стараться
+  let leaderboardScope = 'week';
+
+  function setLeaderboardScope(scope) {
+    leaderboardScope = scope;
+    renderRunLeaderboard();
+  }
+
   async function renderRunLeaderboard() {
     const el = document.getElementById('runLeaderboardList');
     if (!sb || !el) return;
     const L = t();
     const auth = runAuth();
+    document.getElementById('tRunTopWeek').classList.toggle('active', leaderboardScope === 'week');
+    document.getElementById('tRunTopAll').classList.toggle('active', leaderboardScope !== 'week');
     el.innerHTML = '';
     try {
-      const { data, error } = await sb.rpc('run_leaderboard');
+      let { data, error } = leaderboardScope === 'week'
+        ? await sb.rpc('run_leaderboard_weekly')
+        : await sb.rpc('run_leaderboard');
+      // пока миграция с недельным топом не применена — показываем общий, а не пустоту
+      if (error && leaderboardScope === 'week') {
+        ({ data, error } = await sb.rpc('run_leaderboard'));
+      }
       if (error) return;
       if (!data || !data.length) {
         el.innerHTML = '<div class="lb-empty">' + L.run.noScores + '</div>';
@@ -2181,16 +2242,24 @@
   // ================= ЗАБЕГ: сама игра =================
   let RUN = null;
 
+  // Диапазон растёт до потолка и дальше не увеличивается: «угадай число до полумиллиона»
+  // формально проходимо, но играть в это на телефоне невозможно
   function runRangeForRound(n) {
-    return Math.max(2, Math.round(RUN_CONFIG.start_range * Math.pow(RUN_CONFIG.growth, n - 1)));
+    const grown = Math.round(RUN_CONFIG.start_range * Math.pow(RUN_CONFIG.growth, n - 1));
+    return Math.max(2, Math.min(grown, RUN_CONFIG.range_cap));
   }
 
+  // Сложность после потолка идёт от точности: с каждым раундом на попытку меньше.
+  // Без этого игра не заканчивается — по градуснику с девятью поясами игрок получает
+  // за ход около трёх бит, а попыток выдаётся из расчёта одного бита за ход, то есть вдвое больше нужного.
   function runAttemptsForRound(n, range) {
     const buffer = Math.max(0, RUN_CONFIG.buffer_start - (n - 1) * RUN_CONFIG.buffer_shrink);
+    const squeeze = Math.max(0, n - RUN_CONFIG.squeeze_start);
     // потолок: попыток всегда заметно меньше, чем чисел в диапазоне,
     // иначе на маленьких диапазонах раунд проходится тупым перебором
     const cap = Math.max(2, Math.ceil(range * 0.6));
-    return Math.min(minAttempts(range) + buffer, cap);
+    const allowed = Math.min(minAttempts(range) + buffer, cap) - squeeze;
+    return Math.max(RUN_CONFIG.min_attempts, allowed);
   }
 
   // Режим на рейтинг играется на том же экране, что и одиночная игра:
