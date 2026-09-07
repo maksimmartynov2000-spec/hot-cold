@@ -610,6 +610,49 @@
       padding: 4px 2px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
+
+    /* ---------- Хаб режима на рейтинг ---------- */
+    .run-result {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 16px 14px;
+      margin-bottom: 20px;
+      text-align: center;
+      line-height: 1.7;
+    }
+    .run-result .rr-title {
+      font-size: 17px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .run-result p { margin: 0; font-size: 14px; }
+    .run-result .rr-best { margin-top: 10px; font-size: 15px; font-weight: 700; color: #fbbf24; }
+    .run-result .rr-error { margin-top: 10px; font-size: 13px; color: #f87171; }
+
+    .run-greeting {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.55);
+      text-align: center;
+      margin: 0 0 14px;
+    }
+    #screenRunHub .lb-wrap { margin-top: 28px; }
+    #screenRunHub .lb-list { margin-top: 10px; }
+    #screenRunHub .lb-row { padding: 9px 4px; font-size: 14px; }
+    #screenRunHub .lb-row:last-child { border-bottom: none; }
+    .run-hub-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 28px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .run-hub-actions .btn-ghost { flex: 1; }
+    .lb-empty {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.4);
+      padding: 10px 2px;
+    }
   </style>
 </head>
 <body>
@@ -795,13 +838,13 @@
   <!-- ЭКРАН: хаб режима на рейтинг (старт/результат/топ) -->
   <div id="screenRunHub" class="hidden">
     <div id="runHubMessage"></div>
-    <p><span id="tRunYouAre"></span><strong id="runHubUser"></strong></p>
+    <p class="run-greeting"><span id="tRunYouAre"></span><strong id="runHubUser"></strong></p>
     <button class="btn btn-block" id="tRunStart" onclick="startRun()"></button>
     <div class="lb-wrap">
       <div class="lb-title" id="tRunTop"></div>
       <div id="runLeaderboardList" class="lb-list"></div>
     </div>
-    <div class="setup-row" style="margin-top:12px">
+    <div class="run-hub-actions">
       <button class="btn-ghost" id="tRunLogout" onclick="runLogout(); showScreen('mode')"></button>
       <button class="btn-ghost" id="tRunToMenu" onclick="showScreen('mode')"></button>
     </div>
@@ -872,6 +915,7 @@
         roundsDone: "Rounds cleared: ",
         finalScore: "Final score: ",
         newBest: "🏆 New personal best!",
+        noScores: "No results yet — be the first",
         insTitle: "Rating game 📋",
         insBody: "Rounds run back to back. Clear a round — the next one has a wider range and fewer attempts.\n\nMiss, and the game ends and your score goes to the shared leaderboard.\n\nPoints per round: the further you get and the fewer attempts you spend, the more you earn.\n\nOnly your best game counts in the ranking."
       }
@@ -937,6 +981,7 @@
         roundsDone: "Раундов пройдено: ",
         finalScore: "Итоговый счёт: ",
         newBest: "🏆 Новый личный рекорд!",
+        noScores: "Результатов пока нет — будьте первым",
         insTitle: "Игра на рейтинг 📋",
         insBody: "Раунды идут подряд. Прошли раунд — в следующем диапазон больше, а попыток меньше.\n\nОшиблись — игра закончена, результат уходит в общий рейтинг.\n\nОчки за раунд: чем дальше зашли и чем меньше попыток потратили, тем больше.\n\nВ рейтинге учитывается только ваша лучшая игра."
       }
@@ -1002,6 +1047,7 @@
         roundsDone: "Manches réussies : ",
         finalScore: "Score final : ",
         newBest: "🏆 Nouveau record personnel !",
+        noScores: "Pas encore de résultats — soyez le premier",
         insTitle: "Partie classée 📋",
         insBody: "Les manches s'enchaînent. Manche réussie — la suivante a une plage plus large et moins de tentatives.\n\nUne erreur et la partie s'arrête : le score part au classement commun.\n\nPoints par manche : plus vous allez loin et moins vous utilisez de tentatives, plus vous gagnez.\n\nSeule votre meilleure partie compte au classement."
       }
@@ -1067,6 +1113,7 @@
         roundsDone: "Geschaffte Runden: ",
         finalScore: "Endpunktzahl: ",
         newBest: "🏆 Neuer persönlicher Rekord!",
+        noScores: "Noch keine Ergebnisse — sei der Erste",
         insTitle: "Ranglisten-Spiel 📋",
         insBody: "Die Runden laufen nacheinander. Runde geschafft — die nächste hat einen größeren Bereich und weniger Versuche.\n\nEin Fehler und das Spiel endet, das Ergebnis geht in die gemeinsame Rangliste.\n\nPunkte pro Runde: je weiter du kommst und je weniger Versuche du brauchst, desto mehr.\n\nIn der Rangliste zählt nur dein bestes Spiel."
       }
@@ -1989,13 +2036,22 @@
   async function renderRunLeaderboard() {
     const el = document.getElementById('runLeaderboardList');
     if (!sb || !el) return;
+    const L = t();
+    const auth = runAuth();
     el.innerHTML = '';
     try {
       const { data, error } = await sb.rpc('run_leaderboard');
-      if (error || !data || !data.length) return;
-      el.innerHTML = data.map((r, i) =>
-        '<div class="lb-row"><span>' + (i + 1) + '. ' + escapeHtml(r.username) + '</span><span>' + r.best_run_score + '</span></div>'
-      ).join('');
+      if (error) return;
+      if (!data || !data.length) {
+        el.innerHTML = '<div class="lb-empty">' + L.run.noScores + '</div>';
+        return;
+      }
+      el.innerHTML = data.map((r, i) => {
+        const isMe = auth && String(r.username).toLowerCase() === auth.username.toLowerCase();
+        const style = isMe ? ' style="color:#fbbf24;font-weight:700"' : '';
+        return '<div class="lb-row"' + style + '><span>' + (i + 1) + '. ' + escapeHtml(r.username) +
+               '</span><span>' + formatNum(r.best_run_score) + '</span></div>';
+      }).join('');
     } catch (e) {}
   }
 
@@ -2075,9 +2131,9 @@
     const roundsSurvived = RUN.round - 1;
     const secretWas = secret;
     RUN = null;
-    let resultHtml = '<div class="lb-title">' + L.run.over + '</div>' +
+    let resultHtml = '<div class="rr-title">' + L.run.over + '</div>' +
       '<p>' + L.run.secretWas + '<strong>' + secretWas + '</strong></p>' +
-      '<p>' + L.run.roundsDone + roundsSurvived + '</p>' +
+      '<p>' + L.run.roundsDone + '<strong>' + roundsSurvived + '</strong></p>' +
       '<p>' + L.run.finalScore + '<strong>' + finalScore + '</strong></p>';
     const auth = runAuth();
     if (auth && sb) {
@@ -2086,14 +2142,15 @@
           p_username: auth.username, p_pin: auth.pin, p_score: finalScore, p_rounds: roundsSurvived
         });
         if (error) {
-          resultHtml += '<p style="color:#f87171">' + L.run.errNoSave + escapeHtml(error.message) + '</p>';
+          resultHtml += '<p class="rr-error">' + L.run.errNoSave + escapeHtml(error.message) + '</p>';
         } else if (data && data.length && data[0].is_best) {
-          resultHtml += '<p>' + L.run.newBest + '</p>';
+          resultHtml += '<p class="rr-best">' + L.run.newBest + '</p>';
         }
       } catch (e) {
-        resultHtml += '<p style="color:#f87171">' + L.run.errNoSave + L.run.errNoConn + '</p>';
+        resultHtml += '<p class="rr-error">' + L.run.errNoSave + L.run.errNoConn + '</p>';
       }
     }
+    resultHtml = '<div class="run-result">' + resultHtml + '</div>';
     mode = null;
     openRunHub(resultHtml);
   }
