@@ -85,6 +85,17 @@
       font-family: inherit;
       cursor: pointer;
     }
+    .own-best { color: rgba(255, 255, 255, 0.45); font-weight: 600; }
+    .icon-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 4px 7px;
+      font-size: 13px;
+      line-height: 1.2;
+      cursor: pointer;
+      font-family: inherit;
+    }
     .account-chip .chip-name {
       overflow: hidden;
       text-overflow: ellipsis;
@@ -686,6 +697,7 @@
     .run-result p { margin: 0; font-size: 14px; }
     .run-result .rr-best { margin-top: 10px; font-size: 15px; font-weight: 700; color: #fbbf24; }
     .run-result .rr-error { margin-top: 10px; font-size: 13px; color: #f87171; }
+    .run-result #shareBtn { margin-top: 14px; }
 
     .run-greeting {
       font-size: 13px;
@@ -744,6 +756,7 @@
     <button class="account-chip hidden" id="accountChip" onclick="openLogoutModal()">
       <span>👤</span><span class="chip-name" id="accountChipName"></span>
     </button>
+    <button class="icon-btn" id="soundBtn" onclick="toggleSound()" aria-label="Звук"></button>
     <select class="lang-switcher" id="langSwitcher" onchange="changeLanguage()">
       <option value="en">🇺🇸 EN</option>
       <option value="ru">🇷🇺 RU</option>
@@ -974,7 +987,7 @@
       back: "Back", startMatch: "Start game", startGame: "Start game",
       winsLabel: "Wins", tokenBtn: "⚡ Extra move", tokenArmed: "⚡ Extra move active", tokenSpent: "⚡ Token spent",
       turnOf: "Turn: ", roundLabel: "Round ",
-      roundWin: " wins the round!", matchWin: " wins the match!",
+      roundWin: " wins the round!", matchWin: " wins the game!",
       secretWas: "Number: ", nextRound: "Next round", newMatch: "New Game", toMenu: "Menu",
       recordLabel: "Best for this range: ", newRecord: "🏆 New record!",
       run: {
@@ -1020,6 +1033,11 @@
         errImplausible: "The server rejected this result.",
         topWeek: "This week",
         topAll: "All time",
+        best: "Your best: ",
+        share: "Share result",
+        shareCopied: "Copied to clipboard",
+        shareText: "I scored {score} in {rounds} rounds of Hot or Cold!",
+        sound: "Sound",
       }
     },
     ru: {
@@ -1040,7 +1058,7 @@
       back: "Назад", startMatch: "Начать игру", startGame: "Начать игру",
       winsLabel: "Побед", tokenBtn: "⚡ Дополнительный ход", tokenArmed: "⚡ Дополнительный ход активен", tokenSpent: "⚡ Жетон потрачен",
       turnOf: "Ходит: ", roundLabel: "Раунд ",
-      roundWin: " выигрывает раунд!", matchWin: " выигрывает матч!",
+      roundWin: " выигрывает раунд!", matchWin: " выигрывает игру!",
       secretWas: "Число: ", nextRound: "Следующий раунд", newMatch: "Новая игра", toMenu: "В меню",
       recordLabel: "Рекорд для этого диапазона: ", newRecord: "🏆 Новый рекорд!",
       run: {
@@ -1086,6 +1104,11 @@
         errImplausible: "Сервер не принял такой результат.",
         topWeek: "За неделю",
         topAll: "За всё время",
+        best: "Твой рекорд: ",
+        share: "Поделиться",
+        shareCopied: "Скопировано",
+        shareText: "Я набрал {score} очков за {rounds} раундов в «Горячо — Холодно»!",
+        sound: "Звук",
       }
     },
     fr: {
@@ -1106,7 +1129,7 @@
       back: "Retour", startMatch: "Commencer la partie", startGame: "Commencer la partie",
       winsLabel: "Victoires", tokenBtn: "⚡ Tour supplémentaire", tokenArmed: "⚡ Tour supplémentaire activé", tokenSpent: "⚡ Jeton utilisé",
       turnOf: "Au tour de : ", roundLabel: "Manche ",
-      roundWin: " remporte la manche !", matchWin: " remporte le match !",
+      roundWin: " remporte la manche !", matchWin: " remporte la partie !",
       secretWas: "Nombre : ", nextRound: "Manche suivante", newMatch: "Nouvelle partie", toMenu: "Menu",
       recordLabel: "Meilleur score pour cette plage : ", newRecord: "🏆 Nouveau record !",
       run: {
@@ -1152,6 +1175,11 @@
         errImplausible: "Le serveur a refusé ce résultat.",
         topWeek: "Cette semaine",
         topAll: "Depuis toujours",
+        best: "Ton record : ",
+        share: "Partager",
+        shareCopied: "Copié",
+        shareText: "J'ai marqué {score} points en {rounds} manches à Chaud ou Froid !",
+        sound: "Son",
       }
     },
     de: {
@@ -1172,7 +1200,7 @@
       back: "Zurück", startMatch: "Spiel starten", startGame: "Spiel starten",
       winsLabel: "Siege", tokenBtn: "⚡ Extrazug", tokenArmed: "⚡ Extrazug aktiv", tokenSpent: "⚡ Marke verbraucht",
       turnOf: "Am Zug: ", roundLabel: "Runde ",
-      roundWin: " gewinnt die Runde!", matchWin: " gewinnt das Match!",
+      roundWin: " gewinnt die Runde!", matchWin: " gewinnt das Spiel!",
       secretWas: "Zahl: ", nextRound: "Nächste Runde", newMatch: "Neues Spiel", toMenu: "Menü",
       recordLabel: "Bestwert für diesen Bereich: ", newRecord: "🏆 Neuer Rekord!",
       run: {
@@ -1218,6 +1246,11 @@
         errImplausible: "Der Server hat dieses Ergebnis abgelehnt.",
         topWeek: "Diese Woche",
         topAll: "Insgesamt",
+        best: "Dein Rekord: ",
+        share: "Teilen",
+        shareCopied: "Kopiert",
+        shareText: "Ich habe {score} Punkte in {rounds} Runden bei Heiß oder Kalt geschafft!",
+        sound: "Ton",
       }
     }
   };
@@ -1418,6 +1451,7 @@
     document.getElementById('tRunTopAll').textContent = L.run.topAll;
     document.getElementById('tRunToMenu').textContent = L.run.toMenu;
     if (mode === 'run') document.getElementById('tMenu').textContent = L.run.abort;
+    renderSoundBtn();
     if (screen === 'auth') {
       document.getElementById('runAuthTitle').textContent =
         runAuthMode === 'register' ? L.run.registerTitle : L.run.loginTitle;
@@ -1561,6 +1595,7 @@
     history.push({ guess, distance, meta, p: null });
     input.value = '';
 
+    soundForGuess(meta);
     if (distance === 0) {
       gameOver = true;
       gameOverType = 'win';
@@ -1673,6 +1708,7 @@
     const distance = Math.abs(guess - secret);
     const meta = getFeedback(distance);
     history.push({ guess, distance, meta, p: D.cur });
+    soundForGuess(meta);
     input.value = '';
 
     const usedDouble = D.armed;
@@ -1790,8 +1826,11 @@
       document.getElementById('guessSection').classList.toggle('hidden', gameOver);
 
       if (mode === 'run') {
+        const best = runBest();
         confirmed.innerHTML = L.run.round + '<strong>' + RUN.round + '</strong>&nbsp;&nbsp;' +
-                              L.run.score + '<strong>' + RUN.totalScore + '</strong>';
+                              L.run.score + '<strong>' + RUN.totalScore + '</strong>' +
+                              (best ? '&nbsp;&nbsp;<span class="own-best">' + L.run.best +
+                                      formatNum(best) + '</span>' : '');
       } else {
         const rec = getRecord(RANGE_MAX);
         confirmed.innerHTML = (rec === null) ? L.confirmed : (L.recordLabel + '<strong>' + rec + '</strong>');
@@ -1949,6 +1988,71 @@
       seg.style.background = meta.color;
       bar.appendChild(seg);
     });
+  }
+
+  // ================= ЗВУК И ВИБРАЦИЯ =================
+  // Тон синтезируется на лету: никаких файлов, ничего не грузится, работает офлайн.
+  // Чем ближе к числу, тем выше нота — подсказка на слух, а не только глазами.
+  let soundOn = localStorage.getItem('hc_sound') !== '0';
+  let audioCtx = null;
+
+  function renderSoundBtn() {
+    const btn = document.getElementById('soundBtn');
+    btn.textContent = soundOn ? '🔊' : '🔇';
+    btn.setAttribute('aria-label', t().run.sound);
+  }
+
+  function toggleSound() {
+    soundOn = !soundOn;
+    try { localStorage.setItem('hc_sound', soundOn ? '1' : '0'); } catch (e) {}
+    renderSoundBtn();
+    if (soundOn) playTone(660, 0.12);
+  }
+
+  function playTone(freq, seconds, delay) {
+    if (!soundOn) return;
+    try {
+      // Контекст создаём при первом касании: iOS не даёт звучать без действия игрока
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const start = audioCtx.currentTime + (delay || 0);
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + seconds);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(start);
+      osc.stop(start + seconds + 0.02);
+    } catch (e) {}
+  }
+
+  function buzz(pattern) {
+    if (!soundOn) return;
+    // На iPhone вибрации нет — Safari не поддерживает этот API, на Android работает
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+  }
+
+  // Пентатоника по поясам: от «очень холодно» к «лаве» нота ползёт вверх
+  const TIER_NOTES = [196, 220, 262, 294, 330, 392, 440, 523];
+
+  function soundForGuess(meta) {
+    if (!meta) return;
+    if (meta.labelIndex === 8) {
+      playTone(659, 0.12);            // попал: короткий восходящий аккорд
+      playTone(880, 0.18, 0.1);
+      buzz(40);
+    } else {
+      playTone(TIER_NOTES[meta.labelIndex] || 220, 0.14);
+    }
+  }
+
+  function soundGameOver() {
+    playTone(330, 0.18);
+    playTone(196, 0.32, 0.16);
+    buzz([60, 50, 120]);
   }
 
   // ================= SUPABASE: обновления и таблица рекордов =================
@@ -2131,6 +2235,19 @@
     showScreen('runHub');
   }
 
+  // Личный рекорд знаем из двух бесплатных источников: ответа сервера при отправке
+  // результата и собственной строки в общем топе. Отдельный запрос ради него не нужен.
+  function runBest() {
+    const v = parseInt(localStorage.getItem('hc_run_best'));
+    return isNaN(v) ? 0 : v;
+  }
+
+  function rememberRunBest(value) {
+    if (typeof value === 'number' && value > runBest()) {
+      try { localStorage.setItem('hc_run_best', String(value)); } catch (e) {}
+    }
+  }
+
   // 'week' — топ за последние 7 дней, 'all' — за всё время.
   // Недельный по умолчанию: вечный топ застывает, и у тех, кто пришёл позже, пропадает смысл стараться
   let leaderboardScope = 'week';
@@ -2163,11 +2280,34 @@
       }
       el.innerHTML = data.map((r, i) => {
         const isMe = auth && String(r.username).toLowerCase() === auth.username.toLowerCase();
+        if (isMe && leaderboardScope !== 'week') rememberRunBest(r.best_run_score);
         const style = isMe ? ' style="color:#fbbf24;font-weight:700"' : '';
         return '<div class="lb-row"' + style + '><span>' + (i + 1) + '. ' + escapeHtml(r.username) +
                '</span><span>' + formatNum(r.best_run_score) + '</span></div>';
       }).join('');
     } catch (e) {}
+  }
+
+  // Поделиться результатом: системное окно «Поделиться» там, где оно есть
+  // (в Safari на iPhone работает), иначе просто копируем в буфер
+  async function shareRunResult(score, rounds) {
+    const L = t();
+    const link = location.origin + location.pathname;
+    const text = L.run.shareText.replace('{score}', formatNum(score)).replace('{rounds}', rounds);
+    const btn = document.getElementById('shareBtn');
+    try {
+      if (navigator.share) {
+        await navigator.share({ text: text, url: link });
+        return;
+      }
+      await navigator.clipboard.writeText(text + ' ' + link);
+      if (btn) {
+        btn.textContent = L.run.shareCopied;
+        setTimeout(() => { if (btn) btn.textContent = L.run.share; }, 2000);
+      }
+    } catch (e) {
+      // отказ игрока в системном окне — не ошибка, молчим
+    }
   }
 
   // ================= ЗАБЕГ: сама игра =================
@@ -2233,8 +2373,10 @@
     if (isNaN(guess) || guess < 1 || guess > RANGE_MAX) return;
 
     const distance = Math.abs(guess - secret);
-    history.push({ guess, distance, meta: getFeedback(distance), p: null });
+    const meta = getFeedback(distance);
+    history.push({ guess, distance, meta, p: null });
     input.value = '';
+    soundForGuess(meta);
 
     if (distance === 0) {
       const roundPoints = Math.round(100 * RUN.round * (minAttempts(RANGE_MAX) / history.length));
@@ -2248,6 +2390,7 @@
       setTimeout(startRunRound, 900);
     } else if (history.length >= MAX_GUESSES) {
       gameOver = true;
+      soundGameOver();
       renderAll();
       endRun();
     } else {
@@ -2273,14 +2416,18 @@
         });
         if (error) {
           resultHtml += '<p class="rr-error">' + L.run.errNoSave + escapeHtml(runAuthErrorText(error.message)) + '</p>';
-        } else if (data && data.length && data[0].is_best) {
-          resultHtml += '<p class="rr-best">' + L.run.newBest + '</p>';
+        } else if (data && data.length) {
+          rememberRunBest(data[0].best_score);
+          if (data[0].is_best) resultHtml += '<p class="rr-best">' + L.run.newBest + '</p>';
         }
       } catch (e) {
         resultHtml += '<p class="rr-error">' + L.run.errNoSave + L.run.errNoConn + '</p>';
       }
     }
-    resultHtml = '<div class="run-result">' + resultHtml + '</div>';
+    resultHtml = '<div class="run-result">' + resultHtml +
+      '<button class="btn-ghost" id="shareBtn" onclick="shareRunResult(' +
+      finalScore + ',' + roundsSurvived + ')">' + L.run.share + '</button>' +
+      '</div>';
     mode = null;
     openRunHub(resultHtml);
   }
