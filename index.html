@@ -637,7 +637,7 @@
         <div class="m-title" id="tModeDuel">Play with a friend</div>
       </button>
       <button class="mode-btn run" onclick="openRunEntry()">
-        <div class="m-title">Игра на рейтинг</div>
+        <div class="m-title" id="tModeRun"></div>
       </button>
     </div>
   </div>
@@ -708,7 +708,7 @@
         <div class="info-bar" id="infoBar">
           <span class="confirmed" id="tConfirmed">Number generated ✓</span>
           <span class="attempts" id="attemptsLabel"></span>
-          <button class="btn-reset" onclick="quitToMenu()" id="tMenu">Menu</button>
+          <button class="btn-reset" onclick="leaveGame()" id="tMenu">Menu</button>
         </div>
 
         <div class="turn-banner hidden" id="turnBanner"></div>
@@ -768,64 +768,48 @@
   <div id="screenAuthChoice" class="hidden">
     <div class="mode-list">
       <button class="mode-btn solo" onclick="showRunAuth('login')">
-        <div class="m-title">Войти</div>
-        <div class="m-sub">У меня уже есть имя и PIN</div>
+        <div class="m-title" id="tRunChoiceLogin"></div>
+        <div class="m-sub" id="tRunChoiceLoginSub"></div>
       </button>
       <button class="mode-btn run" onclick="showRunAuth('register')">
-        <div class="m-title">Зарегистрироваться</div>
-        <div class="m-sub">Я здесь впервые, придумаю имя и PIN</div>
+        <div class="m-title" id="tRunChoiceRegister"></div>
+        <div class="m-sub" id="tRunChoiceRegisterSub"></div>
       </button>
     </div>
-    <button class="btn-ghost btn-block" style="margin-top:12px" onclick="showScreen('mode')">Назад</button>
+    <button class="btn-ghost btn-block" style="margin-top:12px" id="tRunChoiceBack" onclick="showScreen('mode')"></button>
   </div>
 
   <!-- ЭКРАН: форма входа или регистрации -->
   <div id="screenAuth" class="hidden">
     <div class="lb-title" id="runAuthTitle" style="font-size:15px;margin-bottom:10px"></div>
     <div class="setup-field">
-      <label>Имя</label>
-      <input type="text" id="runUsername" maxlength="20" placeholder="Ваше имя" />
+      <label id="tRunName"></label>
+      <input type="text" id="runUsername" maxlength="20" />
     </div>
     <div class="setup-field">
-      <label>PIN (4 цифры)</label>
+      <label id="tRunPin"></label>
       <input type="text" id="runPin" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="1234" />
     </div>
     <div id="runAuthError" class="lb-title hidden" style="color:#f87171"></div>
     <div class="setup-row">
-      <button class="btn-ghost" onclick="showScreen('authChoice')">Назад</button>
+      <button class="btn-ghost" id="tRunAuthBack" onclick="showScreen('authChoice')"></button>
       <button class="btn btn-block" id="runAuthSubmitBtn" onclick="runAuthSubmit()"></button>
     </div>
   </div>
 
-  <!-- ЭКРАН: хаб Забега (старт/результат/топ) -->
+  <!-- ЭКРАН: хаб режима на рейтинг (старт/результат/топ) -->
   <div id="screenRunHub" class="hidden">
     <div id="runHubMessage"></div>
-    <p>Вы вошли как <strong id="runHubUser"></strong></p>
-    <button class="btn btn-block" onclick="startRun()">🏃 Начать игру на рейтинг</button>
+    <p><span id="tRunYouAre"></span><strong id="runHubUser"></strong></p>
+    <button class="btn btn-block" id="tRunStart" onclick="startRun()"></button>
     <div class="lb-wrap">
-      <div class="lb-title">🏆 Топ игроков</div>
+      <div class="lb-title" id="tRunTop"></div>
       <div id="runLeaderboardList" class="lb-list"></div>
     </div>
     <div class="setup-row" style="margin-top:12px">
-      <button class="btn-ghost" onclick="runLogout(); showScreen('mode')">Выйти из аккаунта</button>
-      <button class="btn-ghost" onclick="showScreen('mode')">В меню</button>
+      <button class="btn-ghost" id="tRunLogout" onclick="runLogout(); showScreen('mode')"></button>
+      <button class="btn-ghost" id="tRunToMenu" onclick="showScreen('mode')"></button>
     </div>
-  </div>
-
-  <!-- ЭКРАН: сам забег -->
-  <div id="screenRunGame" class="hidden">
-    <div class="info-bar">
-      <span id="runRoundLabel"></span>
-      <span id="runScoreLabel"></span>
-      <button class="btn-reset" onclick="RUN = null; openRunHub()">Прервать</button>
-    </div>
-    <p>Диапазон: <span id="runRangeLabel"></span></p>
-    <p id="runAttemptsLabel"></p>
-    <div class="row">
-      <input type="number" id="runGuessInput" min="1" placeholder="Число..." />
-      <button class="btn" onclick="handleRunGuess()">Проверить</button>
-    </div>
-    <p id="runFeedback" style="min-height:20px;font-weight:700"></p>
   </div>
 </div>
 
@@ -856,7 +840,46 @@
       secretWas: "Number: ", nextRound: "Next round", newMatch: "New match", toMenu: "Menu",
       recordLabel: "Best for this range: ", newRecord: "🏆 New record!",
       insDuelTitle: "Duel rules 📋",
-      insDuelBody: "One number for both players, from 1 to {n}.\n\nTake turns. Guesses are unlimited, both of you see every move.\n\nFirst to name the number wins the round.\n\n⚡ — two guesses in a row. One per round, not on the first move. Unused, it expires.\n\nThe next round starts with the other player."
+      insDuelBody: "One number for both players, from 1 to {n}.\n\nTake turns. Guesses are unlimited, both of you see every move.\n\nFirst to name the number wins the round.\n\n⚡ — two guesses in a row. One per round, not on the first move. Unused, it expires.\n\nThe next round starts with the other player.",
+      run: {
+        mode: "Rating game",
+        choiceLogin: "Log in",
+        choiceLoginSub: "I already have a name and PIN",
+        choiceRegister: "Sign up",
+        choiceRegisterSub: "First time here, I'll pick a name and PIN",
+        loginTitle: "Log in — enter your name and PIN",
+        registerTitle: "Sign up — pick a name and PIN",
+        loginBtn: "Log in",
+        registerBtn: "Sign up",
+        name: "Name",
+        pin: "PIN (4 digits)",
+        namePh: "Your name",
+        errName: "Name must be 2 to 20 characters",
+        errPin: "PIN — exactly 4 digits",
+        errFill: "Fill in name and PIN",
+        errNoConn: "No connection to the server",
+        errTaken: "That name is taken, pick another one",
+        errBadLogin: "Wrong name or PIN",
+        errServer: "Server error: ",
+        errNoSave: "Result not saved: ",
+        youAre: "Signed in as ",
+        start: "Start rating game",
+        top: "🏆 Top players",
+        logout: "Log out",
+        toMenu: "Menu",
+        back: "Back",
+        abort: "Quit",
+        round: "Round ",
+        score: "Score: ",
+        plus: " points",
+        over: "Game over",
+        secretWas: "The number was: ",
+        roundsDone: "Rounds cleared: ",
+        finalScore: "Final score: ",
+        newBest: "🏆 New personal best!",
+        insTitle: "Rating game 📋",
+        insBody: "Rounds run back to back. Clear a round — the next one has a wider range and fewer attempts.\n\nMiss, and the game ends and your score goes to the shared leaderboard.\n\nPoints per round: the further you get and the fewer attempts you spend, the more you earn.\n\nOnly your best game counts in the ranking."
+      }
     },
     ru: {
       title: "Горячо — Холодно", docTitle: "Горячо — Холодно",
@@ -882,7 +905,46 @@
       secretWas: "Число: ", nextRound: "Следующий раунд", newMatch: "Новый матч", toMenu: "В меню",
       recordLabel: "Рекорд для этого диапазона: ", newRecord: "🏆 Новый рекорд!",
       insDuelTitle: "Правила дуэли 📋",
-      insDuelBody: "Число одно на двоих, от 1 до {n}.\n\nХодите по очереди. Попыток сколько угодно, все ходы видны обоим.\n\nКто первым назовёт число — выигрывает раунд.\n\n⚡ — две попытки подряд. Одна на раунд, кроме первого хода. Не потратили — сгорает.\n\nСледующий раунд начинает другой игрок."
+      insDuelBody: "Число одно на двоих, от 1 до {n}.\n\nХодите по очереди. Попыток сколько угодно, все ходы видны обоим.\n\nКто первым назовёт число — выигрывает раунд.\n\n⚡ — две попытки подряд. Одна на раунд, кроме первого хода. Не потратили — сгорает.\n\nСледующий раунд начинает другой игрок.",
+      run: {
+        mode: "Игра на рейтинг",
+        choiceLogin: "Войти",
+        choiceLoginSub: "У меня уже есть имя и PIN",
+        choiceRegister: "Зарегистрироваться",
+        choiceRegisterSub: "Я здесь впервые, придумаю имя и PIN",
+        loginTitle: "Вход — введите своё имя и PIN",
+        registerTitle: "Регистрация — придумайте имя и PIN",
+        loginBtn: "Войти",
+        registerBtn: "Зарегистрироваться",
+        name: "Имя",
+        pin: "PIN (4 цифры)",
+        namePh: "Ваше имя",
+        errName: "Имя должно быть от 2 до 20 символов",
+        errPin: "PIN — ровно 4 цифры",
+        errFill: "Заполните имя и PIN",
+        errNoConn: "Нет связи с сервером",
+        errTaken: "Это имя уже занято, придумайте другое",
+        errBadLogin: "Неверное имя или PIN",
+        errServer: "Ошибка сервера: ",
+        errNoSave: "Результат не сохранился: ",
+        youAre: "Вы вошли как ",
+        start: "Начать игру на рейтинг",
+        top: "🏆 Топ игроков",
+        logout: "Выйти",
+        toMenu: "В меню",
+        back: "Назад",
+        abort: "Прервать",
+        round: "Раунд ",
+        score: "Очки: ",
+        plus: " очков",
+        over: "Игра окончена",
+        secretWas: "Загаданное число было: ",
+        roundsDone: "Раундов пройдено: ",
+        finalScore: "Итоговый счёт: ",
+        newBest: "🏆 Новый личный рекорд!",
+        insTitle: "Игра на рейтинг 📋",
+        insBody: "Раунды идут подряд. Прошли раунд — в следующем диапазон больше, а попыток меньше.\n\nОшиблись — игра закончена, результат уходит в общий рейтинг.\n\nОчки за раунд: чем дальше зашли и чем меньше попыток потратили, тем больше.\n\nВ рейтинге учитывается только ваша лучшая игра."
+      }
     },
     fr: {
       title: "Chaud ou Froid", docTitle: "Chaud ou Froid",
@@ -908,7 +970,46 @@
       secretWas: "Nombre : ", nextRound: "Manche suivante", newMatch: "Nouveau match", toMenu: "Menu",
       recordLabel: "Meilleur score pour cette plage : ", newRecord: "🏆 Nouveau record !",
       insDuelTitle: "Règles du duel 📋",
-      insDuelBody: "Un seul nombre pour les deux joueurs, de 1 à {n}.\n\nChacun son tour. Tentatives illimitées, tout est visible par les deux.\n\nLe premier qui nomme le nombre remporte la manche.\n\n⚡ — deux tentatives d'affilée. Un par manche, sauf au premier coup. Non utilisé, il est perdu.\n\nLa manche suivante commence par l'autre joueur."
+      insDuelBody: "Un seul nombre pour les deux joueurs, de 1 à {n}.\n\nChacun son tour. Tentatives illimitées, tout est visible par les deux.\n\nLe premier qui nomme le nombre remporte la manche.\n\n⚡ — deux tentatives d'affilée. Un par manche, sauf au premier coup. Non utilisé, il est perdu.\n\nLa manche suivante commence par l'autre joueur.",
+      run: {
+        mode: "Partie classée",
+        choiceLogin: "Se connecter",
+        choiceLoginSub: "J'ai déjà un nom et un code PIN",
+        choiceRegister: "S'inscrire",
+        choiceRegisterSub: "C'est ma première fois, je choisis un nom et un PIN",
+        loginTitle: "Connexion — saisissez votre nom et votre PIN",
+        registerTitle: "Inscription — choisissez un nom et un PIN",
+        loginBtn: "Se connecter",
+        registerBtn: "S'inscrire",
+        name: "Nom",
+        pin: "PIN (4 chiffres)",
+        namePh: "Votre nom",
+        errName: "Le nom doit faire entre 2 et 20 caractères",
+        errPin: "PIN — exactement 4 chiffres",
+        errFill: "Remplissez le nom et le PIN",
+        errNoConn: "Pas de connexion au serveur",
+        errTaken: "Ce nom est déjà pris, choisissez-en un autre",
+        errBadLogin: "Nom ou PIN incorrect",
+        errServer: "Erreur serveur : ",
+        errNoSave: "Résultat non enregistré : ",
+        youAre: "Connecté en tant que ",
+        start: "Commencer la partie classée",
+        top: "🏆 Meilleurs joueurs",
+        logout: "Se déconnecter",
+        toMenu: "Menu",
+        back: "Retour",
+        abort: "Abandonner",
+        round: "Manche ",
+        score: "Points : ",
+        plus: " points",
+        over: "Partie terminée",
+        secretWas: "Le nombre était : ",
+        roundsDone: "Manches réussies : ",
+        finalScore: "Score final : ",
+        newBest: "🏆 Nouveau record personnel !",
+        insTitle: "Partie classée 📋",
+        insBody: "Les manches s'enchaînent. Manche réussie — la suivante a une plage plus large et moins de tentatives.\n\nUne erreur et la partie s'arrête : le score part au classement commun.\n\nPoints par manche : plus vous allez loin et moins vous utilisez de tentatives, plus vous gagnez.\n\nSeule votre meilleure partie compte au classement."
+      }
     },
     de: {
       title: "Heiß oder Kalt", docTitle: "Heiß oder Kalt",
@@ -934,7 +1035,46 @@
       secretWas: "Zahl: ", nextRound: "Nächste Runde", newMatch: "Neues Match", toMenu: "Menü",
       recordLabel: "Bestwert für diesen Bereich: ", newRecord: "🏆 Neuer Rekord!",
       insDuelTitle: "Duell-Regeln 📋",
-      insDuelBody: "Eine Zahl für beide Spieler, von 1 bis {n}.\n\nAbwechselnd am Zug. Unbegrenzte Versuche, beide sehen alles.\n\nWer die Zahl zuerst nennt, gewinnt die Runde.\n\n⚡ — zwei Tipps hintereinander. Einer pro Runde, nicht im ersten Zug. Ungenutzt verfällt er.\n\nDie nächste Runde beginnt der andere Spieler."
+      insDuelBody: "Eine Zahl für beide Spieler, von 1 bis {n}.\n\nAbwechselnd am Zug. Unbegrenzte Versuche, beide sehen alles.\n\nWer die Zahl zuerst nennt, gewinnt die Runde.\n\n⚡ — zwei Tipps hintereinander. Einer pro Runde, nicht im ersten Zug. Ungenutzt verfällt er.\n\nDie nächste Runde beginnt der andere Spieler.",
+      run: {
+        mode: "Ranglisten-Spiel",
+        choiceLogin: "Anmelden",
+        choiceLoginSub: "Ich habe schon Name und PIN",
+        choiceRegister: "Registrieren",
+        choiceRegisterSub: "Ich bin neu hier und wähle Name und PIN",
+        loginTitle: "Anmeldung — Name und PIN eingeben",
+        registerTitle: "Registrierung — Name und PIN wählen",
+        loginBtn: "Anmelden",
+        registerBtn: "Registrieren",
+        name: "Name",
+        pin: "PIN (4 Ziffern)",
+        namePh: "Dein Name",
+        errName: "Der Name muss 2 bis 20 Zeichen lang sein",
+        errPin: "PIN — genau 4 Ziffern",
+        errFill: "Name und PIN ausfüllen",
+        errNoConn: "Keine Verbindung zum Server",
+        errTaken: "Dieser Name ist vergeben, wähle einen anderen",
+        errBadLogin: "Falscher Name oder PIN",
+        errServer: "Serverfehler: ",
+        errNoSave: "Ergebnis nicht gespeichert: ",
+        youAre: "Angemeldet als ",
+        start: "Ranglisten-Spiel starten",
+        top: "🏆 Top-Spieler",
+        logout: "Abmelden",
+        toMenu: "Menü",
+        back: "Zurück",
+        abort: "Abbrechen",
+        round: "Runde ",
+        score: "Punkte: ",
+        plus: " Punkte",
+        over: "Spiel beendet",
+        secretWas: "Die Zahl war: ",
+        roundsDone: "Geschaffte Runden: ",
+        finalScore: "Endpunktzahl: ",
+        newBest: "🏆 Neuer persönlicher Rekord!",
+        insTitle: "Ranglisten-Spiel 📋",
+        insBody: "Die Runden laufen nacheinander. Runde geschafft — die nächste hat einen größeren Bereich und weniger Versuche.\n\nEin Fehler und das Spiel endet, das Ergebnis geht in die gemeinsame Rangliste.\n\nPunkte pro Runde: je weiter du kommst und je weniger Versuche du brauchst, desto mehr.\n\nIn der Rangliste zählt nur dein bestes Spiel."
+      }
     }
   };
 
@@ -962,8 +1102,23 @@
   };
   const RANGE_PRESETS = [10, 100, 1000];
 
+  // Для произвольного диапазона (режим на рейтинг) таблицы поясов нет — считаем её:
+  // логарифмический шаг, но не мельче, чем «на один шаг холоднее», иначе на маленьких
+  // диапазонах пояса схлопываются. Для 10 это даёт ровно ручную таблицу.
+  function generateTierUpper(rangeMax) {
+    const maxDistance = Math.max(1, rangeMax - 1);
+    const U = [];
+    for (let i = 0; i < 8; i++) {
+      U.push(Math.max(Math.round(maxDistance * Math.pow(0.45, i)), 8 - i));
+    }
+    for (let i = 1; i < 8; i++) {
+      if (U[i] >= U[i - 1]) U[i] = Math.max(1, U[i - 1] - 1);
+    }
+    return U;
+  }
+
   function buildFeedbackMeta(rangeMax) {
-    const U = RANGE_TIER_UPPER[rangeMax] || RANGE_TIER_UPPER[1000];
+    const U = RANGE_TIER_UPPER[rangeMax] || generateTierUpper(rangeMax);
     const meta = [];
     for (let i = 0; i < 8; i++) {
       const max = U[i];
@@ -1081,9 +1236,36 @@
     document.getElementById('guessInput').placeholder = L.placeholderTpl.replace('{n}', formatNum(RANGE_MAX));
     document.getElementById('finalInput').placeholder = L.finalInput;
 
+    // экраны режима на рейтинг
+    document.getElementById('tModeRun').textContent = L.run.mode;
+    document.getElementById('tRunChoiceLogin').textContent = L.run.choiceLogin;
+    document.getElementById('tRunChoiceLoginSub').textContent = L.run.choiceLoginSub;
+    document.getElementById('tRunChoiceRegister').textContent = L.run.choiceRegister;
+    document.getElementById('tRunChoiceRegisterSub').textContent = L.run.choiceRegisterSub;
+    document.getElementById('tRunChoiceBack').textContent = L.run.back;
+    document.getElementById('tRunAuthBack').textContent = L.run.back;
+    document.getElementById('tRunName').textContent = L.run.name;
+    document.getElementById('tRunPin').textContent = L.run.pin;
+    document.getElementById('runUsername').placeholder = L.run.namePh;
+    document.getElementById('tRunYouAre').textContent = L.run.youAre;
+    document.getElementById('tRunStart').textContent = L.run.start;
+    document.getElementById('tRunTop').textContent = L.run.top;
+    document.getElementById('tRunLogout').textContent = L.run.logout;
+    document.getElementById('tRunToMenu').textContent = L.run.toMenu;
+    if (mode === 'run') document.getElementById('tMenu').textContent = L.run.abort;
+    if (screen === 'auth') {
+      document.getElementById('runAuthTitle').textContent =
+        runAuthMode === 'register' ? L.run.registerTitle : L.run.loginTitle;
+      document.getElementById('runAuthSubmitBtn').textContent =
+        runAuthMode === 'register' ? L.run.registerBtn : L.run.loginBtn;
+    }
+
     const duel = mode === 'duel';
-    document.getElementById('tInsTitle').textContent = duel ? L.insDuelTitle : L.insTitle;
-    document.getElementById('tInsBody').textContent = (duel ? L.insDuelBody : L.insBody)
+    const run = mode === 'run';
+    document.getElementById('tInsTitle').textContent =
+      run ? L.run.insTitle : (duel ? L.insDuelTitle : L.insTitle);
+    document.getElementById('tInsBody').textContent =
+      (run ? L.run.insBody : (duel ? L.insDuelBody : L.insBody))
       .replace(/\{n\}/g, formatNum(RANGE_MAX))
       .replace(/\{a\}/g, MAX_GUESSES);
 
@@ -1105,10 +1287,9 @@
     document.getElementById('screenAuthChoice').classList.toggle('hidden', name !== 'authChoice');
     document.getElementById('screenAuth').classList.toggle('hidden', name !== 'auth');
     document.getElementById('screenRunHub').classList.toggle('hidden', name !== 'runHub');
-    document.getElementById('screenRunGame').classList.toggle('hidden', name !== 'runGame');
     document.getElementById('card').classList.toggle('wide', name === 'game' && mode === 'duel');
-    document.getElementById('card').classList.toggle('solo-game', name === 'game' && mode === 'solo');
-    document.querySelector('.header').classList.toggle('compact', name === 'game' || name === 'runGame');
+    document.getElementById('card').classList.toggle('solo-game', name === 'game' && mode !== 'duel');
+    document.querySelector('.header').classList.toggle('compact', name === 'game');
     document.querySelector('.legend').classList.toggle('hidden', name !== 'game');
   }
 
@@ -1117,6 +1298,19 @@
     D.matchOver = false;
     applyTranslations();
     showScreen('mode');
+  }
+
+  // Выход с игрового экрана: в режиме на рейтинг это отказ от текущей игры —
+  // возвращаемся в хаб режима, а не в главное меню
+  function leaveGame() {
+    if (mode === 'run') {
+      RUN = null;
+      mode = null;
+      applyTranslations();
+      openRunHub();
+      return;
+    }
+    quitToMenu();
   }
 
   // ================= ОБЩАЯ НАСТРОЙКА (диапазон/попытки/дуэль) =================
@@ -1199,6 +1393,7 @@
 
   function handleGuess() {
     if (mode === 'duel') return duelGuess();
+    if (mode === 'run') return runGuess();
     if (gameOver) return;
     const input = document.getElementById('guessInput');
     const guess = parseInt(input.value);
@@ -1434,11 +1629,16 @@
       const left = MAX_GUESSES - history.length;
       attempts.textContent = L.attemptsPrefix + left + ' / ' + MAX_GUESSES;
       attempts.className = 'attempts' + (left <= 3 ? ' low' : '');
-      document.getElementById('finalBox').classList.toggle('hidden', gameOverType !== 'lose_waiting');
+      document.getElementById('finalBox').classList.toggle('hidden', mode === 'run' || gameOverType !== 'lose_waiting');
       document.getElementById('guessSection').classList.toggle('hidden', gameOver);
 
-      const rec = getRecord(RANGE_MAX);
-      confirmed.innerHTML = (rec === null) ? L.confirmed : (L.recordLabel + '<strong>' + rec + '</strong>');
+      if (mode === 'run') {
+        confirmed.innerHTML = L.run.round + '<strong>' + RUN.round + '</strong>&nbsp;&nbsp;' +
+                              L.run.score + '<strong>' + RUN.totalScore + '</strong>';
+      } else {
+        const rec = getRecord(RANGE_MAX);
+        confirmed.innerHTML = (rec === null) ? L.confirmed : (L.recordLabel + '<strong>' + rec + '</strong>');
+      }
     }
   }
 
@@ -1446,6 +1646,10 @@
     const box = document.getElementById('resultBox');
     const L = t();
     box.innerHTML = '';
+
+    // В режиме на рейтинг итогов внутри раунда нет: победа сразу ведёт
+    // в следующий раунд, проигрыш — на экран с результатом всей игры
+    if (mode === 'run') { box.classList.add('hidden'); return; }
 
     if (mode === 'duel') {
       if (!D.roundOver) { box.classList.add('hidden'); return; }
@@ -1707,14 +1911,15 @@
   }
 
   // Открывает форму заново: поля чистые, ошибок нет
-  function showRunAuth(mode) {
-    runAuthMode = mode;
+  function showRunAuth(authMode) {
+    const L = t();
+    runAuthMode = authMode;
     document.getElementById('runUsername').value = '';
     document.getElementById('runPin').value = '';
     document.getElementById('runAuthTitle').textContent =
-      mode === 'register' ? 'Регистрация — придумайте имя и PIN' : 'Вход — введите своё имя и PIN';
+      authMode === 'register' ? L.run.registerTitle : L.run.loginTitle;
     document.getElementById('runAuthSubmitBtn').textContent =
-      mode === 'register' ? 'Зарегистрироваться' : 'Войти';
+      authMode === 'register' ? L.run.registerBtn : L.run.loginBtn;
     runAuthError('');
     showScreen('auth');
   }
@@ -1738,48 +1943,51 @@
   }
 
   function runAuthErrorText(message) {
+    const L = t();
     const m = String(message || '');
-    if (m.indexOf('invalid_username') >= 0) return 'Имя должно быть от 2 до 20 символов';
-    if (m.indexOf('invalid_pin') >= 0) return 'PIN — ровно 4 цифры';
-    return 'Ошибка сервера: ' + m;
+    if (m.indexOf('invalid_username') >= 0) return L.run.errName;
+    if (m.indexOf('invalid_pin') >= 0) return L.run.errPin;
+    return L.run.errServer + m;
   }
 
   async function runRegister() {
+    const L = t();
     const { username, pin } = runAuthReadForm();
-    if (username.length < 2 || username.length > 20) return runAuthError('Имя должно быть от 2 до 20 символов');
-    if (!/^[0-9]{4}$/.test(pin)) return runAuthError('PIN — ровно 4 цифры');
-    if (!sb) return runAuthError('Нет соединения с сервером');
+    if (username.length < 2 || username.length > 20) return runAuthError(L.run.errName);
+    if (!/^[0-9]{4}$/.test(pin)) return runAuthError(L.run.errPin);
+    if (!sb) return runAuthError(L.run.errNoConn);
     const btn = document.getElementById('runAuthSubmitBtn');
     btn.disabled = true;
     try {
       const { data, error } = await sb.rpc('register_student', { p_username: username, p_pin: pin });
       if (error) return runAuthError(runAuthErrorText(error.message));
-      if (data === false) return runAuthError('Это имя уже занято, придумайте другое');
+      if (data === false) return runAuthError(L.run.errTaken);
       localStorage.setItem('hc_run_user', username);
       localStorage.setItem('hc_run_pin', pin);
       openRunHub();
     } catch (e) {
-      runAuthError('Нет связи с сервером, попробуйте ещё раз');
+      runAuthError(L.run.errNoConn);
     } finally {
       btn.disabled = false;
     }
   }
 
   async function runLogin() {
+    const L = t();
     const { username, pin } = runAuthReadForm();
-    if (!username || !pin) return runAuthError('Заполните имя и PIN');
-    if (!sb) return runAuthError('Нет соединения с сервером');
+    if (!username || !pin) return runAuthError(L.run.errFill);
+    if (!sb) return runAuthError(L.run.errNoConn);
     const btn = document.getElementById('runAuthSubmitBtn');
     btn.disabled = true;
     try {
       const { data, error } = await sb.rpc('login_student', { p_username: username, p_pin: pin });
       if (error) return runAuthError(runAuthErrorText(error.message));
-      if (data !== true) return runAuthError('Неверное имя или PIN');
+      if (data !== true) return runAuthError(L.run.errBadLogin);
       localStorage.setItem('hc_run_user', username);
       localStorage.setItem('hc_run_pin', pin);
       openRunHub();
     } catch (e) {
-      runAuthError('Нет связи с сервером, попробуйте ещё раз');
+      runAuthError(L.run.errNoConn);
     } finally {
       btn.disabled = false;
     }
@@ -1822,79 +2030,71 @@
     return Math.min(minAttempts(range) + buffer, cap);
   }
 
-  function runFeedbackText(distance, range) {
-    const pct = 1 - (distance / range);
-    if (pct > 0.9) return '🔥 Очень горячо';
-    if (pct > 0.7) return '☀️ Горячо';
-    if (pct > 0.4) return '🌤️ Тепло';
-    if (pct > 0.15) return '❄️ Холодно';
-    return '🧊 Очень холодно';
-  }
-
+  // Режим на рейтинг играется на том же экране, что и одиночная игра:
+  // термометр, история попыток и шкала берутся оттуда как есть
   function startRun() {
-    RUN = { round: 1, totalScore: 0 };
+    RUN = { round: 1, totalScore: 0, locked: false };
+    mode = 'run';
     startRunRound();
-    showScreen('runGame');
+    applyTranslations();
+    showScreen('game');
   }
 
   function startRunRound() {
     if (!RUN) return;
-    const range = runRangeForRound(RUN.round);
-    RUN.range = range;
-    RUN.attemptsAllowed = runAttemptsForRound(RUN.round, range);
-    RUN.attemptsUsed = 0;
+    RANGE_MAX = runRangeForRound(RUN.round);
+    MAX_GUESSES = runAttemptsForRound(RUN.round, RANGE_MAX);
+    FEEDBACK_META = buildFeedbackMeta(RANGE_MAX);
+    secret = Math.floor(Math.random() * RANGE_MAX) + 1;
+    history = [];
+    gameOver = false;
+    gameOverType = null;
     RUN.locked = false;
-    RUN.secret = Math.floor(Math.random() * range) + 1;
-    const input = document.getElementById('runGuessInput');
-    input.value = '';
-    input.max = range;
-    document.getElementById('runFeedback').textContent = '';
-    renderRunGame();
+    document.getElementById('guessInput').value = '';
+    applyRangeToInputs();
+    applyTranslations();
   }
 
-  function renderRunGame() {
-    document.getElementById('runRoundLabel').textContent = 'Раунд ' + RUN.round;
-    document.getElementById('runScoreLabel').textContent = 'Очки: ' + RUN.totalScore;
-    document.getElementById('runRangeLabel').textContent = '1–' + formatNum(RUN.range);
-    document.getElementById('runAttemptsLabel').textContent =
-      'Попыток: ' + (RUN.attemptsAllowed - RUN.attemptsUsed) + ' / ' + RUN.attemptsAllowed;
-  }
-
-  function handleRunGuess() {
-    // locked — пауза между раундами: иначе можно доугадывать уже угаданное число и копить очки
+  function runGuess() {
+    // locked — пауза между раундами: иначе можно ввести уже угаданное число ещё раз и получить очки повторно
     if (!RUN || RUN.locked) return;
-    const input = document.getElementById('runGuessInput');
+    const input = document.getElementById('guessInput');
     const guess = parseInt(input.value);
-    if (isNaN(guess) || guess < 1 || guess > RUN.range) return;
+    if (isNaN(guess) || guess < 1 || guess > RANGE_MAX) return;
+
+    const distance = Math.abs(guess - secret);
+    history.push({ guess, distance, meta: getFeedback(distance), p: null });
     input.value = '';
-    RUN.attemptsUsed++;
-    const distance = Math.abs(guess - RUN.secret);
 
     if (distance === 0) {
-      const roundPoints = Math.round(100 * RUN.round * (minAttempts(RUN.range) / RUN.attemptsUsed));
+      const roundPoints = Math.round(100 * RUN.round * (minAttempts(RANGE_MAX) / history.length));
       RUN.totalScore += roundPoints;
       RUN.locked = true;
-      document.getElementById('runFeedback').textContent = '🎯 Точно! +' + roundPoints + ' очков';
-      document.getElementById('runScoreLabel').textContent = 'Очки: ' + RUN.totalScore;
       RUN.round++;
-      setTimeout(startRunRound, 700);
-    } else if (RUN.attemptsUsed >= RUN.attemptsAllowed) {
+      renderAll();
+      const L = t();
+      document.getElementById('feedbackLabel').textContent =
+        L.labels[8] + '  +' + roundPoints + L.run.plus;
+      setTimeout(startRunRound, 900);
+    } else if (history.length >= MAX_GUESSES) {
+      gameOver = true;
+      renderAll();
       endRun();
     } else {
-      renderRunGame();
-      document.getElementById('runFeedback').textContent = runFeedbackText(distance, RUN.range);
+      renderAll();
     }
   }
 
   async function endRun() {
+    const L = t();
     const finalScore = RUN.totalScore;
     const roundsSurvived = RUN.round - 1;
-    const secretWas = RUN.secret;
+    const secretWas = secret;
     RUN = null;
-    let resultHtml = '<div class="lb-title">Игра окончена</div>' +
-      '<p>Загаданное число было: <strong>' + secretWas + '</strong></p>' +
-      '<p>Раундов пройдено: ' + roundsSurvived + '</p>' +
-      '<p>Итоговый счёт: <strong>' + finalScore + '</strong></p>';
+    let resultHtml = '<div class="lb-title">' + L.run.over + '</div>' +
+      '<p>' + L.run.secretWas + '<strong>' + secretWas + '</strong></p>' +
+      '<p>' + L.run.roundsDone + roundsSurvived + '</p>' +
+      '<p>' + L.run.finalScore + '<strong>' + finalScore + '</strong></p>';
     const auth = runAuth();
     if (auth && sb) {
       try {
@@ -1902,21 +2102,21 @@
           p_username: auth.username, p_pin: auth.pin, p_score: finalScore, p_rounds: roundsSurvived
         });
         if (error) {
-          resultHtml += '<p style="color:#f87171">Результат не сохранился: ' + escapeHtml(error.message) + '</p>';
+          resultHtml += '<p style="color:#f87171">' + L.run.errNoSave + escapeHtml(error.message) + '</p>';
         } else if (data && data.length && data[0].is_best) {
-          resultHtml += '<p>🏆 Новый личный рекорд!</p>';
+          resultHtml += '<p>' + L.run.newBest + '</p>';
         }
       } catch (e) {
-        resultHtml += '<p style="color:#f87171">Результат не сохранился: нет связи с сервером</p>';
+        resultHtml += '<p style="color:#f87171">' + L.run.errNoSave + L.run.errNoConn + '</p>';
       }
     }
+    mode = null;
     openRunHub(resultHtml);
   }
 
   // ================= ИНИЦИАЛИЗАЦИЯ =================
   document.getElementById('guessInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleGuess(); });
   document.getElementById('finalInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitFinal(); });
-  document.getElementById('runGuessInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleRunGuess(); });
   document.getElementById('runPin').addEventListener('keydown', e => { if (e.key === 'Enter') runAuthSubmit(); });
   window.addEventListener('resize', syncRulesOpen);
 
