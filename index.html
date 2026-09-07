@@ -60,10 +60,67 @@
     }
     .card.wide { max-width: 1100px; }
 
-    .lang-switcher {
+    .top-controls {
       position: absolute;
       top: 14px;
       right: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 5;
+      /* коробка контейнера выше своего содержимого и налезает на строку статуса
+         в игре — нажатия сквозь неё проходят, ловят только сами кнопки */
+      pointer-events: none;
+    }
+    .top-controls > * { pointer-events: auto; }
+    .account-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      max-width: 130px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .account-chip .chip-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 8, 24, 0.78);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 50;
+    }
+    .modal-card {
+      width: 100%;
+      max-width: 320px;
+      background: #1b1e3d;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 18px;
+      padding: 22px 18px 18px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+    }
+    .modal-card .modal-text {
+      font-size: 15px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .lang-switcher {
       background: rgba(255, 255, 255, 0.1);
       border: 1px solid rgba(255, 255, 255, 0.2);
       color: rgba(255, 255, 255, 0.8);
@@ -658,12 +715,17 @@
 <body>
 <div class="card" id="card">
   <div id="updateBanner" class="hidden"></div>
-  <select class="lang-switcher" id="langSwitcher" onchange="changeLanguage()">
-    <option value="en">🇺🇸 EN</option>
-    <option value="ru">🇷🇺 RU</option>
-    <option value="fr">🇫🇷 FR</option>
-    <option value="de">🇩🇪 DE</option>
-  </select>
+  <div class="top-controls">
+    <button class="account-chip hidden" id="accountChip" onclick="openLogoutModal()">
+      <span>👤</span><span class="chip-name" id="accountChipName"></span>
+    </button>
+    <select class="lang-switcher" id="langSwitcher" onchange="changeLanguage()">
+      <option value="en">🇺🇸 EN</option>
+      <option value="ru">🇷🇺 RU</option>
+      <option value="fr">🇫🇷 FR</option>
+      <option value="de">🇩🇪 DE</option>
+    </select>
+  </div>
 
   <div class="header">
     <div class="emoji">🌡️</div>
@@ -838,15 +900,24 @@
   <!-- ЭКРАН: хаб режима на рейтинг (старт/результат/топ) -->
   <div id="screenRunHub" class="hidden">
     <div id="runHubMessage"></div>
-    <p class="run-greeting"><span id="tRunYouAre"></span><strong id="runHubUser"></strong></p>
     <button class="btn btn-block" id="tRunStart" onclick="startRun()"></button>
     <div class="lb-wrap">
       <div class="lb-title" id="tRunTop"></div>
       <div id="runLeaderboardList" class="lb-list"></div>
     </div>
     <div class="run-hub-actions">
-      <button class="btn-ghost" id="tRunLogout" onclick="runLogout(); showScreen('mode')"></button>
-      <button class="btn-ghost" id="tRunToMenu" onclick="showScreen('mode')"></button>
+      <button class="btn-ghost btn-block" id="tRunToMenu" onclick="showScreen('mode')"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Подтверждение выхода из аккаунта -->
+<div class="modal-backdrop hidden" id="logoutModal">
+  <div class="modal-card">
+    <div class="modal-text" id="tLogoutAsk"></div>
+    <div class="setup-row">
+      <button class="btn-ghost btn-block" id="tLogoutCancel" onclick="closeLogoutModal()"></button>
+      <button class="btn btn-block" id="tLogoutConfirm" onclick="confirmLogout()"></button>
     </div>
   </div>
 </div>
@@ -916,6 +987,8 @@
         finalScore: "Final score: ",
         newBest: "🏆 New personal best!",
         noScores: "No results yet — be the first",
+        logoutAsk: "Log out of {name}? Your result stays in the leaderboard — log back in with the same name and PIN.",
+        cancel: "Cancel",
         insTitle: "Rating game 📋",
         insBody: "Rounds run back to back. Clear a round — the next one has a wider range and fewer attempts.\n\nMiss, and the game ends and your score goes to the shared leaderboard.\n\nPoints per round: the further you get and the fewer attempts you spend, the more you earn.\n\nOnly your best game counts in the ranking."
       }
@@ -982,6 +1055,8 @@
         finalScore: "Итоговый счёт: ",
         newBest: "🏆 Новый личный рекорд!",
         noScores: "Результатов пока нет — будьте первым",
+        logoutAsk: "Выйти из аккаунта {name}? Результат останется в топе — вернуться можно по тому же имени и PIN.",
+        cancel: "Отмена",
         insTitle: "Игра на рейтинг 📋",
         insBody: "Раунды идут подряд. Прошли раунд — в следующем диапазон больше, а попыток меньше.\n\nОшиблись — игра закончена, результат уходит в общий рейтинг.\n\nОчки за раунд: чем дальше зашли и чем меньше попыток потратили, тем больше.\n\nВ рейтинге учитывается только ваша лучшая игра."
       }
@@ -1048,6 +1123,8 @@
         finalScore: "Score final : ",
         newBest: "🏆 Nouveau record personnel !",
         noScores: "Pas encore de résultats — soyez le premier",
+        logoutAsk: "Se déconnecter de {name} ? Le résultat reste au classement — reconnectez-vous avec le même nom et PIN.",
+        cancel: "Annuler",
         insTitle: "Partie classée 📋",
         insBody: "Les manches s'enchaînent. Manche réussie — la suivante a une plage plus large et moins de tentatives.\n\nUne erreur et la partie s'arrête : le score part au classement commun.\n\nPoints par manche : plus vous allez loin et moins vous utilisez de tentatives, plus vous gagnez.\n\nSeule votre meilleure partie compte au classement."
       }
@@ -1114,6 +1191,8 @@
         finalScore: "Endpunktzahl: ",
         newBest: "🏆 Neuer persönlicher Rekord!",
         noScores: "Noch keine Ergebnisse — sei der Erste",
+        logoutAsk: "Von {name} abmelden? Das Ergebnis bleibt in der Rangliste — melde dich mit demselben Namen und PIN wieder an.",
+        cancel: "Abbrechen",
         insTitle: "Ranglisten-Spiel 📋",
         insBody: "Die Runden laufen nacheinander. Runde geschafft — die nächste hat einen größeren Bereich und weniger Versuche.\n\nEin Fehler und das Spiel endet, das Ergebnis geht in die gemeinsame Rangliste.\n\nPunkte pro Runde: je weiter du kommst und je weniger Versuche du brauchst, desto mehr.\n\nIn der Rangliste zählt nur dein bestes Spiel."
       }
@@ -1310,10 +1389,8 @@
     document.getElementById('tRunName').textContent = L.run.name;
     document.getElementById('tRunPin').textContent = L.run.pin;
     document.getElementById('runUsername').placeholder = L.run.namePh;
-    document.getElementById('tRunYouAre').textContent = L.run.youAre;
     document.getElementById('tRunStart').textContent = L.run.start;
     document.getElementById('tRunTop').textContent = L.run.top;
-    document.getElementById('tRunLogout').textContent = L.run.logout;
     document.getElementById('tRunToMenu').textContent = L.run.toMenu;
     if (mode === 'run') document.getElementById('tMenu').textContent = L.run.abort;
     if (screen === 'auth') {
@@ -1345,6 +1422,7 @@
     document.getElementById('card').classList.toggle('solo-game', name === 'game' && mode !== 'duel');
     document.querySelector('.header').classList.toggle('compact', name === 'game');
     document.querySelector('.legend').classList.toggle('hidden', name !== 'game');
+    updateAccountChip();
   }
 
   function quitToMenu() {
@@ -1956,6 +2034,36 @@
     localStorage.removeItem('hc_run_pin');
   }
 
+  // Чип с именем ученика живёт рядом с переключателем языка и показывается
+  // только в хабе режима на рейтинг — во время самой игры он лишний и легко нажать случайно
+  function updateAccountChip() {
+    const chip = document.getElementById('accountChip');
+    const auth = runAuth();
+    const show = !!auth && screen === 'runHub';
+    chip.classList.toggle('hidden', !show);
+    if (show) document.getElementById('accountChipName').textContent = auth.username;
+  }
+
+  function openLogoutModal() {
+    const auth = runAuth();
+    if (!auth) return;
+    const L = t();
+    document.getElementById('tLogoutAsk').textContent = L.run.logoutAsk.replace('{name}', auth.username);
+    document.getElementById('tLogoutCancel').textContent = L.run.cancel;
+    document.getElementById('tLogoutConfirm').textContent = L.run.logout;
+    document.getElementById('logoutModal').classList.remove('hidden');
+  }
+
+  function closeLogoutModal() {
+    document.getElementById('logoutModal').classList.add('hidden');
+  }
+
+  function confirmLogout() {
+    closeLogoutModal();
+    runLogout();
+    showScreen('mode');
+  }
+
   let runAuthMode = 'login';
 
   function openRunEntry() {
@@ -2048,7 +2156,6 @@
   async function openRunHub(message) {
     const auth = runAuth();
     if (!auth) return showScreen('authChoice');
-    document.getElementById('runHubUser').textContent = auth.username;
     document.getElementById('runHubMessage').innerHTML = message || '';
     await renderRunLeaderboard();
     showScreen('runHub');
