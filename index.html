@@ -756,11 +756,6 @@
           <div class="legend-grid" id="legendGrid"></div>
         </div>
       </details>
-
-      <details class="instruction-box" id="rulesBox">
-        <summary id="tInsTitle">Rules 📋</summary>
-        <p id="tInsBody">Loading...</p>
-      </details>
     </div>
   </div>
 
@@ -1259,15 +1254,6 @@
       document.getElementById('runAuthSubmitBtn').textContent =
         runAuthMode === 'register' ? L.run.registerBtn : L.run.loginBtn;
     }
-
-    const duel = mode === 'duel';
-    const run = mode === 'run';
-    document.getElementById('tInsTitle').textContent =
-      run ? L.run.insTitle : (duel ? L.insDuelTitle : L.insTitle);
-    document.getElementById('tInsBody').textContent =
-      (run ? L.run.insBody : (duel ? L.insDuelBody : L.insBody))
-      .replace(/\{n\}/g, formatNum(RANGE_MAX))
-      .replace(/\{a\}/g, MAX_GUESSES);
 
     document.getElementById('tLblRange').textContent = L.lblRange;
     document.getElementById('tLblAttempts').textContent = L.lblAttempts;
@@ -1824,9 +1810,7 @@
   }
 
   function syncRulesOpen() {
-    const open = window.innerWidth >= 860;
-    document.getElementById('rulesBox').open = open;
-    document.getElementById('scaleBox').open = open;
+    document.getElementById('scaleBox').open = window.innerWidth >= 860;
   }
 
   // ================= SUPABASE: обновления и таблица рекордов =================
