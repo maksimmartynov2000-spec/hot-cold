@@ -4,13 +4,19 @@ const { GAME_URL, launchOptions, applyStub, check, report } = require('./helpers
 
 const PHONE = { width: 430, height: 850 };
 
+// Свой контекст на каждый тест: иначе страницы делят localStorage и влияют друг на друга
 async function newGame(browser, opts) {
-  const page = await browser.newPage({ viewport: PHONE });
+  const context = await browser.newContext({ viewport: PHONE });
+  const page = await context.newPage();
   page.on('pageerror', e => check('без ошибок JS', false, e.message));
   await applyStub(page, opts);
   await page.goto(GAME_URL);
   await page.waitForTimeout(300);
   return page;
+}
+
+async function done(page) {
+  await page.context().close();
 }
 
 async function testModes(browser) {
@@ -45,7 +51,7 @@ async function testModes(browser) {
   check('дуэль: карточки игроков видны', await page.locator('#pcard0').isVisible());
   check('дуэль: показан чей ход', (await page.locator('#turnBanner').textContent()).trim().length > 0);
 
-  await page.close();
+  await done(page);
 }
 
 async function testRating(browser) {
@@ -85,7 +91,7 @@ async function testRating(browser) {
   check('после потолка попыток становится меньше', curve[13].a < curve[8].a,
     curve[8].a + ' -> ' + curve[13].a);
 
-  await page.close();
+  await done(page);
 }
 
 async function testScoringAndSubmit(browser) {
@@ -127,7 +133,7 @@ async function testScoringAndSubmit(browser) {
   const calls = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'submit_run_score'));
   check('результат отправлен на сервер', calls.length === 1, JSON.stringify(calls[0] && calls[0].args));
 
-  await page.close();
+  await done(page);
 }
 
 async function testAuth(browser) {
@@ -156,7 +162,7 @@ async function testAuth(browser) {
   check('экраны входа и регистрации различаются',
     (await page.locator('#runAuthTitle').textContent()) !== regTitle);
 
-  await page.close();
+  await done(page);
 }
 
 async function testLogout(browser) {
@@ -181,7 +187,7 @@ async function testLogout(browser) {
   await page.waitForTimeout(250);
   check('подтверждение разлогинивает', !(await page.evaluate(() => localStorage.getItem('hc_run_user'))));
 
-  await page.close();
+  await done(page);
 }
 
 async function testTranslations(browser) {
@@ -210,7 +216,93 @@ async function testTranslations(browser) {
   });
   check('во всех языках одинаковый набор ключей', missing.length === 0, missing.join(', '));
 
-  await page.close();
+  await done(page);
+}
+
+
+async function testSoundAndShare(browser) {
+  console.log('\nЗвук, рекорд и «поделиться»');
+  const page = await newGame(browser, { user: 'Максим' });
+
+  // Звук: кнопка есть, переключается и запоминается
+  check('кнопка звука видна', await page.locator('#soundBtn').isVisible());
+  check('звук включён по умолчанию', (await page.locator('#soundBtn').textContent()) === '🔊');
+  await page.click('#soundBtn');
+  await page.waitForTimeout(100);
+  check('звук выключается', (await page.locator('#soundBtn').textContent()) === '🔇');
+  await page.reload();
+  await page.waitForTimeout(300);
+  check('выбор звука переживает перезагрузку', (await page.locator('#soundBtn').textContent()) === '🔇');
+  await page.click('#soundBtn');
+  await page.waitForTimeout(100);
+
+  // Тон звучит на каждый ход — проверяем, что осциллятор действительно создаётся
+  await page.evaluate(() => {
+    window.__tones = 0;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const orig = Ctx.prototype.createOscillator;
+    Ctx.prototype.createOscillator = function () { window.__tones++; return orig.call(this); };
+  });
+  await page.click('#tModeRun');
+  await page.waitForTimeout(300);
+  await page.click('#tRunStart');
+  await page.waitForTimeout(250);
+  const s = await page.evaluate(() => ({ secret, RANGE_MAX }));
+  const wrong = s.secret === 1 ? 2 : 1;
+  await page.fill('#guessInput', String(wrong));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(200);
+  check('на ход играет звук', (await page.evaluate(() => window.__tones)) > 0);
+
+  // Личный рекорд в строке статуса
+  await page.evaluate(() => localStorage.setItem('hc_run_best', '4200'));
+  await page.fill('#guessInput', String(s.secret));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(1200);
+  // toLocaleString ставит неразрывный пробел — сравниваем по цифрам
+  const status = (await page.locator('#tConfirmed').textContent()).replace(/\s/g, ' ');
+  check('личный рекорд виден во время игры', status.includes('4 200'), status.trim());
+
+  // «Поделиться» на экране итогов
+  await page.click('#tMenu');
+  await page.waitForTimeout(300);
+  await page.click('#tRunStart');
+  await page.waitForTimeout(250);
+  const s2 = await page.evaluate(() => ({ secret, RANGE_MAX, MAX_GUESSES }));
+  for (let i = 0; i < s2.MAX_GUESSES; i++) {
+    let w = ((s2.secret + i) % s2.RANGE_MAX) + 1;
+    if (w === s2.secret) w = (w % s2.RANGE_MAX) + 1;
+    await page.fill('#guessInput', String(w));
+    await page.click('#tSubmitGuess');
+    await page.waitForTimeout(60);
+  }
+  await page.waitForTimeout(600);
+  check('в итогах есть кнопка «поделиться»', await page.locator('#shareBtn').isVisible());
+
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+  await page.evaluate(() => { navigator.share = undefined; });
+  await page.click('#shareBtn');
+  await page.waitForTimeout(300);
+  const copied = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+  check('результат копируется в буфер', /очк|Горячо/.test(copied), copied.slice(0, 60));
+
+  await done(page);
+}
+
+async function testDuelWording(browser) {
+  console.log('\nФормулировки дуэли');
+  const page = await newGame(browser);
+  await page.click('#tModeDuel');
+  await page.selectOption('#winsNeeded', '1');
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(250);
+  const secret = await page.evaluate(() => secret);
+  await page.fill('#guessInput', String(secret));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(300);
+  const text = (await page.locator('#resultBox').textContent()).replace(/\s+/g, ' ');
+  check('в итогах дуэли нет слова «матч»', !/матч/i.test(text), text.slice(0, 70));
+  await done(page);
 }
 
 (async () => {
@@ -222,6 +314,8 @@ async function testTranslations(browser) {
     await testAuth(browser);
     await testLogout(browser);
     await testTranslations(browser);
+    await testSoundAndShare(browser);
+    await testDuelWording(browser);
   } finally {
     await browser.close();
   }
