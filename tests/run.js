@@ -76,8 +76,9 @@ async function testRating(browser) {
     return !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
   });
   check('панель языка не перекрывает строку статуса', !overlap);
-  check('кнопка выхода из игры нажимается',
+  check('кнопка паузы нажимается',
     await page.click('#tMenu', { timeout: 3000 }).then(() => true).catch(() => false));
+  await page.click('#tPauseResume').catch(() => {});
 
   // круглые диапазоны и убывающие попытки
   await page.waitForTimeout(200);
@@ -263,9 +264,12 @@ async function testSoundAndShare(browser) {
   const status = (await page.locator('#tConfirmed').textContent()).replace(/\s/g, ' ');
   check('личный рекорд виден во время игры', status.includes('4 200'), status.trim());
 
-  // «Поделиться» на экране итогов
+  // «Поделиться» на экране итогов. Прежнюю игру сначала завершаем:
+  // пока она висит незаконченной, новую начать нельзя — так и задумано
   await page.click('#tMenu');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(200);
+  await page.click('#tPauseGiveUp');
+  await page.waitForTimeout(600);
   await page.click('#tRunStart');
   await page.waitForTimeout(250);
   const s2 = await page.evaluate(() => ({ secret, RANGE_MAX, MAX_GUESSES }));
@@ -305,6 +309,76 @@ async function testDuelWording(browser) {
   await done(page);
 }
 
+
+async function testPauseAndGiveUp(browser) {
+  console.log('\nПауза, продолжение и «сдаться»');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeRun');
+  await page.waitForTimeout(300);
+  await page.click('#tRunStart');
+  await page.waitForTimeout(250);
+
+  // выигрываем раунд, чтобы было что сохранять
+  const s = await page.evaluate(() => secret);
+  await page.fill('#guessInput', String(s));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(1200);
+  const scoreBefore = await page.evaluate(() => RUN.totalScore);
+  check('игра сохраняется по ходу дела',
+    !!(await page.evaluate(() => localStorage.getItem('hc_run_state'))));
+
+  // кнопка в игре открывает паузу, а не выбрасывает молча
+  await page.click('#tMenu');
+  await page.waitForTimeout(200);
+  check('кнопка в игре открывает паузу', await page.locator('#pauseModal').isVisible());
+  await page.click('#tPauseResume');
+  await page.waitForTimeout(200);
+  check('«Продолжить» возвращает в игру',
+    !(await page.locator('#pauseModal').isVisible()) && await page.locator('#thermoWrap').isVisible());
+
+  // выход с сохранением -> в хабе предлагают продолжить
+  await page.click('#tMenu');
+  await page.waitForTimeout(200);
+  await page.click('#tPauseExit');
+  await page.waitForTimeout(300);
+  check('после выхода хаб предлагает незаконченную игру',
+    await page.locator('#unfinishedBox').isVisible());
+  check('пока игра не закончена, новую начать не предлагают',
+    !(await page.locator('#tRunStart').isVisible()));
+  const info = await page.locator('#unfinishedInfo').textContent();
+  check('в карточке видно раунд и очки', /Раунд\s*2/.test(info), info.trim());
+
+  // полная перезагрузка страницы — игра должна пережить закрытие приложения
+  await page.reload();
+  await page.waitForTimeout(400);
+  await page.click('#tModeRun');
+  await page.waitForTimeout(400);
+  check('игра переживает перезагрузку страницы', await page.locator('#unfinishedBox').isVisible());
+
+  await page.click('#tUnfinishedResume');
+  await page.waitForTimeout(300);
+  const resumed = await page.evaluate(() => ({ score: RUN.totalScore, round: RUN.round }));
+  check('продолжение восстанавливает счёт и раунд',
+    resumed.score === scoreBefore && resumed.round === 2,
+    'очки ' + resumed.score + ', раунд ' + resumed.round);
+
+  // сдаться -> результат уходит на сервер, сохранение чистится
+  await page.evaluate(() => { window.__rpcCalls.length = 0; });
+  await page.click('#tMenu');
+  await page.waitForTimeout(200);
+  await page.click('#tPauseGiveUp');
+  await page.waitForTimeout(600);
+  const sent = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'submit_run_score'));
+  check('«сдаться» записывает текущий результат',
+    sent.length === 1 && sent[0].args.p_score === scoreBefore,
+    JSON.stringify(sent[0] && sent[0].args));
+  check('после «сдаться» сохранение очищено',
+    !(await page.evaluate(() => localStorage.getItem('hc_run_state'))));
+  check('после «сдаться» снова можно начать игру', await page.locator('#tRunStart').isVisible());
+
+  await done(page);
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -316,6 +390,7 @@ async function testDuelWording(browser) {
     await testTranslations(browser);
     await testSoundAndShare(browser);
     await testDuelWording(browser);
+    await testPauseAndGiveUp(browser);
   } finally {
     await browser.close();
   }

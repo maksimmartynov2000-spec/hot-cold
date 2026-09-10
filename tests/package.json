@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "test": "node run.js",
-    "offline": "node offline.js"
+    "offline": "node offline.js",
+    "layout": "node layout.js"
   },
   "devDependencies": {
     "playwright": "^1.40.0"

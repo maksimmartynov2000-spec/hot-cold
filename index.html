@@ -27,12 +27,21 @@
       height: 100%;
     }
 
-    body {
+    /* Фон живёт на html и прибит к экрану: на body его высота считалась от экрана,
+       а не от всей страницы, и ниже первого экрана вместо градиента шла плоская
+       тёмная заливка — при длинной истории попыток был виден шов */
+    html {
       min-height: 100%;
       background-color: #0b1220;
       background-image: linear-gradient(160deg, #10142c 0%, #1a2142 45%, #0b1220 100%);
       background-repeat: no-repeat;
-      background-size: 100% 100%;
+      background-attachment: fixed;
+      background-size: cover;
+    }
+
+    body {
+      min-height: 100%;
+      background: none;
       overscroll-behavior: none;
       display: flex;
       justify-content: center;
@@ -938,6 +947,12 @@
   <!-- ЭКРАН: хаб режима на рейтинг (старт/результат/топ) -->
   <div id="screenRunHub" class="hidden">
     <div id="runHubMessage"></div>
+    <div class="run-result hidden" id="unfinishedBox">
+      <div class="rr-title" id="tUnfinished"></div>
+      <p id="unfinishedInfo"></p>
+      <button class="btn btn-block" style="margin-top:14px" id="tUnfinishedResume" onclick="resumeSavedRun()"></button>
+      <button class="btn-ghost btn-block" style="margin-top:8px" id="tUnfinishedFinish" onclick="finishSavedRun()"></button>
+    </div>
     <button class="btn btn-block" id="tRunStart" onclick="startRun()"></button>
     <div class="lb-wrap">
       <div class="lb-head">
@@ -952,6 +967,16 @@
     <div class="run-hub-actions">
       <button class="btn-ghost btn-block" id="tRunToMenu" onclick="showScreen('mode')"></button>
     </div>
+  </div>
+</div>
+
+<!-- Пауза в игре на рейтинг -->
+<div class="modal-backdrop hidden" id="pauseModal">
+  <div class="modal-card">
+    <div class="modal-text" id="tPauseTitle"></div>
+    <button class="btn btn-block" id="tPauseResume" onclick="closePause()"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="tPauseExit" onclick="pauseAndLeave()"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="tPauseGiveUp" onclick="giveUpRun()"></button>
   </div>
 </div>
 
@@ -1038,6 +1063,13 @@
         shareCopied: "Copied to clipboard",
         shareText: "I scored {score} in {rounds} rounds of Hot or Cold!",
         sound: "Sound",
+        pause: "Pause",
+        pauseTitle: "Game paused",
+        resume: "Resume",
+        exitKeep: "Leave — the game is saved",
+        surrender: "Give up and record the score",
+        unfinished: "Unfinished game",
+        unfinishedInfo: "Round {round}, score {score}",
       }
     },
     ru: {
@@ -1109,6 +1141,13 @@
         shareCopied: "Скопировано",
         shareText: "Я набрал {score} очков за {rounds} раундов в «Горячо — Холодно»!",
         sound: "Звук",
+        pause: "Пауза",
+        pauseTitle: "Игра на паузе",
+        resume: "Продолжить",
+        exitKeep: "Выйти — игра сохранится",
+        surrender: "Сдаться и записать результат",
+        unfinished: "Незаконченная игра",
+        unfinishedInfo: "Раунд {round}, очки {score}",
       }
     },
     fr: {
@@ -1180,6 +1219,13 @@
         shareCopied: "Copié",
         shareText: "J'ai marqué {score} points en {rounds} manches à Chaud ou Froid !",
         sound: "Son",
+        pause: "Pause",
+        pauseTitle: "Partie en pause",
+        resume: "Reprendre",
+        exitKeep: "Quitter — la partie est gardée",
+        surrender: "Abandonner et enregistrer le score",
+        unfinished: "Partie inachevée",
+        unfinishedInfo: "Manche {round}, score {score}",
       }
     },
     de: {
@@ -1251,6 +1297,13 @@
         shareCopied: "Kopiert",
         shareText: "Ich habe {score} Punkte in {rounds} Runden bei Heiß oder Kalt geschafft!",
         sound: "Ton",
+        pause: "Pause",
+        pauseTitle: "Spiel pausiert",
+        resume: "Fortsetzen",
+        exitKeep: "Verlassen — das Spiel bleibt gespeichert",
+        surrender: "Aufgeben und Ergebnis speichern",
+        unfinished: "Unbeendetes Spiel",
+        unfinishedInfo: "Runde {round}, Punkte {score}",
       }
     }
   };
@@ -1450,7 +1503,14 @@
     document.getElementById('tRunTopWeek').textContent = L.run.topWeek;
     document.getElementById('tRunTopAll').textContent = L.run.topAll;
     document.getElementById('tRunToMenu').textContent = L.run.toMenu;
-    if (mode === 'run') document.getElementById('tMenu').textContent = L.run.abort;
+    if (mode === 'run') document.getElementById('tMenu').textContent = L.run.pause;
+    document.getElementById('tPauseTitle').textContent = L.run.pauseTitle;
+    document.getElementById('tPauseResume').textContent = L.run.resume;
+    document.getElementById('tPauseExit').textContent = L.run.exitKeep;
+    document.getElementById('tPauseGiveUp').textContent = L.run.surrender;
+    document.getElementById('tUnfinished').textContent = L.run.unfinished;
+    document.getElementById('tUnfinishedResume').textContent = L.run.resume;
+    document.getElementById('tUnfinishedFinish').textContent = L.run.surrender;
     renderSoundBtn();
     if (screen === 'auth') {
       document.getElementById('runAuthTitle').textContent =
@@ -1494,13 +1554,7 @@
   // Выход с игрового экрана: в режиме на рейтинг это отказ от текущей игры —
   // возвращаемся в хаб режима, а не в главное меню
   function leaveGame() {
-    if (mode === 'run') {
-      RUN = null;
-      mode = null;
-      applyTranslations();
-      openRunHub();
-      return;
-    }
+    if (mode === 'run') { openPause(); return; }
     quitToMenu();
   }
 
@@ -2231,6 +2285,7 @@
     const auth = runAuth();
     if (!auth) return showScreen('authChoice');
     document.getElementById('runHubMessage').innerHTML = message || '';
+    renderUnfinished();
     await renderRunLeaderboard();
     showScreen('runHub');
   }
@@ -2286,6 +2341,113 @@
                '</span><span>' + formatNum(r.best_run_score) + '</span></div>';
       }).join('');
     } catch (e) {}
+  }
+
+  // ================= ПАУЗА И СОХРАНЁННАЯ ИГРА =================
+  // Состояние пишется после каждого хода, поэтому закрытая вкладка, севший телефон
+  // или случайный выход не стоят игроку результата: игра ждёт его на том же месте.
+  const RUN_STATE_KEY = 'hc_run_state';
+
+  function saveRunState() {
+    if (!RUN) return;
+    try {
+      localStorage.setItem(RUN_STATE_KEY, JSON.stringify({
+        round: RUN.round,
+        totalScore: RUN.totalScore,
+        range: RANGE_MAX,
+        allowed: MAX_GUESSES,
+        secret: secret,
+        history: history.map(h => ({ guess: h.guess, distance: h.distance })),
+        user: (runAuth() || {}).username || ''
+      }));
+    } catch (e) {}
+  }
+
+  function loadRunState() {
+    try {
+      const raw = localStorage.getItem(RUN_STATE_KEY);
+      if (!raw) return null;
+      const st = JSON.parse(raw);
+      if (!st || typeof st.round !== 'number' || typeof st.secret !== 'number') return null;
+      // игра принадлежит тому, кто её начал
+      const auth = runAuth();
+      if (st.user && auth && st.user !== auth.username) return null;
+      return st;
+    } catch (e) { return null; }
+  }
+
+  function clearRunState() {
+    try { localStorage.removeItem(RUN_STATE_KEY); } catch (e) {}
+  }
+
+  // Восстанавливаем прерванную игру ровно в том виде, в каком её оставили
+  function applyRunState(st) {
+    RUN = { round: st.round, totalScore: st.totalScore, locked: false };
+    mode = 'run';
+    RANGE_MAX = st.range;
+    MAX_GUESSES = st.allowed;
+    FEEDBACK_META = buildFeedbackMeta(RANGE_MAX);
+    secret = st.secret;
+    history = (st.history || []).map(h => ({
+      guess: h.guess, distance: h.distance, meta: getFeedback(h.distance), p: null
+    }));
+    gameOver = false;
+    gameOverType = null;
+    document.getElementById('guessInput').value = '';
+    applyRangeToInputs();
+  }
+
+  function resumeSavedRun() {
+    const st = loadRunState();
+    if (!st) { renderUnfinished(); return; }
+    applyRunState(st);
+    applyTranslations();
+    showScreen('game');
+  }
+
+  // «Завершить» из хаба: доигрывать не хочется, но результат должен засчитаться
+  function finishSavedRun() {
+    const st = loadRunState();
+    if (!st) { renderUnfinished(); return; }
+    applyRunState(st);
+    clearRunState();
+    endRun();
+  }
+
+  function renderUnfinished() {
+    const L = t();
+    const st = loadRunState();
+    const box = document.getElementById('unfinishedBox');
+    box.classList.toggle('hidden', !st);
+    // пока игра не закончена, новую не предлагаем — иначе она молча потеряется
+    document.getElementById('tRunStart').classList.toggle('hidden', !!st);
+    if (!st) return;
+    document.getElementById('unfinishedInfo').textContent =
+      L.run.unfinishedInfo.replace('{round}', st.round).replace('{score}', formatNum(st.totalScore));
+  }
+
+  function openPause() {
+    saveRunState();
+    document.getElementById('pauseModal').classList.remove('hidden');
+  }
+
+  function closePause() {
+    document.getElementById('pauseModal').classList.add('hidden');
+  }
+
+  function pauseAndLeave() {
+    closePause();
+    saveRunState();
+    RUN = null;
+    mode = null;
+    applyTranslations();
+    openRunHub();
+  }
+
+  function giveUpRun() {
+    closePause();
+    clearRunState();
+    endRun();
   }
 
   // Поделиться результатом: системное окно «Поделиться» там, где оно есть
@@ -2363,6 +2525,7 @@
     document.getElementById('guessInput').value = '';
     applyRangeToInputs();
     applyTranslations();
+    saveRunState();
   }
 
   function runGuess() {
@@ -2384,6 +2547,7 @@
       RUN.locked = true;
       RUN.round++;
       renderAll();
+      saveRunState();
       const L = t();
       document.getElementById('feedbackLabel').textContent =
         L.labels[8] + '  +' + roundPoints + L.run.plus;
@@ -2395,11 +2559,13 @@
       endRun();
     } else {
       renderAll();
+      saveRunState();
     }
   }
 
   async function endRun() {
     const L = t();
+    clearRunState();
     const finalScore = RUN.totalScore;
     const roundsSurvived = RUN.round - 1;
     const secretWas = secret;
