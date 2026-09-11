@@ -492,11 +492,12 @@
 
       .card.solo-game .thermo-wrap { margin: 0 0 4px; }
 
+      /* Рамку вокруг подсказки на телефоне оставляем — она же и есть главный
+         сигнал «горячо/холодно». Экономим высоту за счёт отступов, а не фона */
       .card.solo-game .feedback-panel {
-        background: none !important;
-        border: none !important;
-        padding: 0 0 8px;
+        padding: 7px 12px;
         margin-bottom: 8px;
+        border-radius: 12px;
         animation: none;
       }
       .card.solo-game .feedback-panel .fb-label { font-size: 16px; }
