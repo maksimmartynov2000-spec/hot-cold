@@ -24,6 +24,7 @@ function stubSupabase(opts) {
             return { data: [{ username: 'Аня', best_run_score: 5200, best_run_rounds: 8 }], error: null };
           }
           if (name === 'submit_run_score') return { data: [{ is_best: true, best_score: args.p_score }], error: null };
+          if (name === 'get_pin_hint') return { data: opts.hint === undefined ? 'номер дома' : opts.hint, error: null };
           return { data: true, error: null };
         }
       })

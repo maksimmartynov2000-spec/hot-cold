@@ -938,6 +938,11 @@
       <label id="tRunPin"></label>
       <input type="text" id="runPin" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="1234" />
     </div>
+    <div class="setup-field hidden" id="hintField">
+      <label id="tRunHint"></label>
+      <input type="text" id="runHint" maxlength="60" />
+    </div>
+    <button class="btn-ghost btn-block hidden" id="tRunForgot" style="margin-bottom:10px" onclick="showPinHint()"></button>
     <div id="runAuthError" class="lb-title hidden" style="color:#f87171"></div>
     <div class="setup-row">
       <button class="btn-ghost" id="tRunAuthBack" onclick="showScreen('authChoice')"></button>
@@ -981,10 +986,13 @@
   </div>
 </div>
 
-<!-- Подтверждение выхода из аккаунта -->
+<!-- Аккаунт: имя, свой PIN и выход -->
 <div class="modal-backdrop hidden" id="logoutModal">
   <div class="modal-card">
-    <div class="modal-text" id="tLogoutAsk"></div>
+    <div class="rr-title" id="tAccountTitle" style="margin-bottom:10px"></div>
+    <div class="modal-text" id="accountName" style="margin-bottom:10px"></div>
+    <button class="btn-ghost btn-block" id="tShowPin" onclick="revealOwnPin()"></button>
+    <div class="modal-text" id="tLogoutAsk" style="margin-top:16px"></div>
     <div class="setup-row">
       <button class="btn-ghost btn-block" id="tLogoutCancel" onclick="closeLogoutModal()"></button>
       <button class="btn btn-block" id="tLogoutConfirm" onclick="confirmLogout()"></button>
@@ -1071,6 +1079,14 @@
         surrender: "Give up and record the score",
         unfinished: "Unfinished game",
         unfinishedInfo: "Round {round}, score {score}",
+        hint: "PIN reminder (optional)",
+        hintPh: "e.g. my house number",
+        forgot: "Forgot your PIN?",
+        hintIs: "Your reminder: ",
+        noHint: "No reminder was saved for this name",
+        account: "Your account",
+        showPin: "Show PIN",
+        yourPin: "Your PIN: ",
       }
     },
     ru: {
@@ -1149,6 +1165,14 @@
         surrender: "Сдаться и записать результат",
         unfinished: "Незаконченная игра",
         unfinishedInfo: "Раунд {round}, очки {score}",
+        hint: "Подсказка к PIN (можно пропустить)",
+        hintPh: "например, номер моего дома",
+        forgot: "Забыли PIN?",
+        hintIs: "Ваша подсказка: ",
+        noHint: "Для этого имени подсказки нет",
+        account: "Ваш аккаунт",
+        showPin: "Показать PIN",
+        yourPin: "Ваш PIN: ",
       }
     },
     fr: {
@@ -1227,6 +1251,14 @@
         surrender: "Abandonner et enregistrer le score",
         unfinished: "Partie inachevée",
         unfinishedInfo: "Manche {round}, score {score}",
+        hint: "Aide pour le PIN (facultatif)",
+        hintPh: "ex. le numéro de ma maison",
+        forgot: "PIN oublié ?",
+        hintIs: "Votre aide : ",
+        noHint: "Aucune aide enregistrée pour ce nom",
+        account: "Votre compte",
+        showPin: "Afficher le PIN",
+        yourPin: "Votre PIN : ",
       }
     },
     de: {
@@ -1305,6 +1337,14 @@
         surrender: "Aufgeben und Ergebnis speichern",
         unfinished: "Unbeendetes Spiel",
         unfinishedInfo: "Runde {round}, Punkte {score}",
+        hint: "PIN-Hilfe (optional)",
+        hintPh: "z. B. meine Hausnummer",
+        forgot: "PIN vergessen?",
+        hintIs: "Deine Hilfe: ",
+        noHint: "Für diesen Namen ist keine Hilfe gespeichert",
+        account: "Dein Konto",
+        showPin: "PIN anzeigen",
+        yourPin: "Dein PIN: ",
       }
     }
   };
@@ -1497,6 +1537,9 @@
     document.getElementById('tRunChoiceBack').textContent = L.run.back;
     document.getElementById('tRunAuthBack').textContent = L.run.back;
     document.getElementById('tRunName').textContent = L.run.name;
+    document.getElementById('tRunHint').textContent = L.run.hint;
+    document.getElementById('runHint').placeholder = L.run.hintPh;
+    document.getElementById('tRunForgot').textContent = L.run.forgot;
     document.getElementById('tRunPin').textContent = L.run.pin;
     document.getElementById('runUsername').placeholder = L.run.namePh;
     document.getElementById('tRunStart').textContent = L.run.start;
@@ -2174,6 +2217,9 @@
     const auth = runAuth();
     if (!auth) return;
     const L = t();
+    document.getElementById('tAccountTitle').textContent = L.run.account;
+    document.getElementById('accountName').textContent = auth.username;
+    document.getElementById('tShowPin').textContent = L.run.showPin;
     document.getElementById('tLogoutAsk').textContent = L.run.logoutAsk.replace('{name}', auth.username);
     document.getElementById('tLogoutCancel').textContent = L.run.cancel;
     document.getElementById('tLogoutConfirm').textContent = L.run.logout;
@@ -2202,6 +2248,10 @@
     runAuthMode = authMode;
     document.getElementById('runUsername').value = '';
     document.getElementById('runPin').value = '';
+    document.getElementById('runHint').value = '';
+    // подсказку пишут при регистрации, а спрашивают при входе
+    document.getElementById('hintField').classList.toggle('hidden', authMode !== 'register');
+    document.getElementById('tRunForgot').classList.toggle('hidden', authMode !== 'login');
     document.getElementById('runAuthTitle').textContent =
       authMode === 'register' ? L.run.registerTitle : L.run.loginTitle;
     document.getElementById('runAuthSubmitBtn').textContent =
@@ -2248,7 +2298,9 @@
     const btn = document.getElementById('runAuthSubmitBtn');
     btn.disabled = true;
     try {
-      const { data, error } = await sb.rpc('register_student', { p_username: username, p_pin: pin });
+      const hint = (document.getElementById('runHint').value || '').trim().slice(0, 60);
+      const { data, error } = await sb.rpc('register_student',
+        { p_username: username, p_pin: pin, p_hint: hint || null });
       if (error) return runAuthError(runAuthErrorText(error.message));
       if (data === false) return runAuthError(L.run.errTaken);
       localStorage.setItem('hc_run_user', username);
@@ -2280,6 +2332,29 @@
     } finally {
       btn.disabled = false;
     }
+  }
+
+  // Подсказку к PIN ученик пишет сам, и она не секрет — иначе от неё не было бы толку
+  async function showPinHint() {
+    const L = t();
+    const username = (document.getElementById('runUsername').value || '').trim();
+    if (!username) return runAuthError(L.run.errFill);
+    if (!sb) return runAuthError(L.run.errNoConn);
+    try {
+      const { data, error } = await sb.rpc('get_pin_hint', { p_username: username });
+      if (error) return runAuthError(runAuthErrorText(error.message));
+      runAuthError(data ? L.run.hintIs + data : L.run.noHint);
+    } catch (e) {
+      runAuthError(L.run.errNoConn);
+    }
+  }
+
+  // Свой собственный PIN на своём же устройстве: он и так лежит в браузере,
+  // так что показать его владельцу — это не раскрытие, а напоминание
+  function revealOwnPin() {
+    const auth = runAuth();
+    if (!auth) return;
+    document.getElementById('tShowPin').textContent = t().run.yourPin + auth.pin;
   }
 
   async function openRunHub(message) {

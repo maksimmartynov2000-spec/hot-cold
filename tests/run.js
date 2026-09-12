@@ -379,6 +379,82 @@ async function testPauseAndGiveUp(browser) {
   await done(page);
 }
 
+
+async function testPinHelp(browser) {
+  console.log('\nПодсказка к PIN и свой PIN');
+  const page = await newGame(browser);
+
+  // При регистрации есть поле подсказки, при входе — кнопка «Забыли PIN?»
+  await page.click('#tModeRun');
+  await page.waitForTimeout(250);
+  await page.click('#screenAuthChoice >> text=Зарегистрироваться');
+  await page.waitForTimeout(150);
+  check('при регистрации есть поле подсказки', await page.locator('#hintField').isVisible());
+  check('при регистрации нет кнопки «Забыли PIN?»', !(await page.locator('#tRunForgot').isVisible()));
+
+  await page.fill('#runUsername', 'Максим');
+  await page.fill('#runPin', '1234');
+  await page.fill('#runHint', 'номер дома');
+  await page.click('#runAuthSubmitBtn');
+  await page.waitForTimeout(300);
+  const reg = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'register_student').pop());
+  check('подсказка уходит на сервер при регистрации',
+    reg && reg.args.p_hint === 'номер дома', JSON.stringify(reg && reg.args));
+
+  await done(page);
+
+  // На экране входа подсказку можно запросить по имени
+  const page2 = await newGame(browser);
+  await page2.click('#tModeRun');
+  await page2.waitForTimeout(250);
+  await page2.click('#screenAuthChoice >> text=Войти');
+  await page2.waitForTimeout(150);
+  check('при входе есть кнопка «Забыли PIN?»', await page2.locator('#tRunForgot').isVisible());
+  check('при входе нет поля подсказки', !(await page2.locator('#hintField').isVisible()));
+
+  await page2.click('#tRunForgot');
+  await page2.waitForTimeout(200);
+  check('без имени просят его ввести',
+    (await page2.locator('#runAuthError').textContent()).length > 0);
+
+  await page2.fill('#runUsername', 'Максим');
+  await page2.click('#tRunForgot');
+  await page2.waitForTimeout(300);
+  const shown = await page2.locator('#runAuthError').textContent();
+  check('подсказка показывается', shown.includes('номер дома'), shown.trim());
+  await done(page2);
+
+  // Если подсказки нет — честно об этом говорим
+  const page3 = await newGame(browser, { hint: null });
+  await page3.click('#tModeRun');
+  await page3.waitForTimeout(250);
+  await page3.click('#screenAuthChoice >> text=Войти');
+  await page3.waitForTimeout(150);
+  await page3.fill('#runUsername', 'Аня');
+  await page3.click('#tRunForgot');
+  await page3.waitForTimeout(300);
+  check('при отсутствии подсказки сообщается об этом',
+    (await page3.locator('#runAuthError').textContent()).includes('подсказки нет'));
+  await done(page3);
+
+  // Свой PIN виден в окне аккаунта
+  const page4 = await newGame(browser, { user: 'Максим' });
+  await page4.click('#tModeRun');
+  await page4.waitForTimeout(300);
+  await page4.click('#accountChip');
+  await page4.waitForTimeout(200);
+  check('в окне аккаунта видно имя',
+    (await page4.locator('#accountName').textContent()).includes('Максим'));
+  check('PIN спрятан до нажатия',
+    !(await page4.locator('#tShowPin').textContent()).includes('1234'));
+  await page4.click('#tShowPin');
+  await page4.waitForTimeout(150);
+  check('свой PIN показывается по нажатию',
+    (await page4.locator('#tShowPin').textContent()).includes('1234'));
+  check('выход из аккаунта остался на месте', await page4.locator('#tLogoutConfirm').isVisible());
+  await done(page4);
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -391,6 +467,7 @@ async function testPauseAndGiveUp(browser) {
     await testSoundAndShare(browser);
     await testDuelWording(browser);
     await testPauseAndGiveUp(browser);
+    await testPinHelp(browser);
   } finally {
     await browser.close();
   }
