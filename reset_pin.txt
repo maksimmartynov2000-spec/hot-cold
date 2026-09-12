@@ -1,0 +1,21 @@
+-- СБРОС PIN УЧЕНИКУ
+--
+-- Когда ученик забыл PIN и подсказка не помогла. Старый PIN узнать нельзя
+-- (в базе только необратимый хэш), можно лишь назначить новый.
+--
+-- Подставьте имя ученика и новый PIN, выполните в SQL Editor:
+-- https://supabase.com/dashboard/project/fzakcsvyceqsnowvkxfu/sql/new
+
+update students
+set pin_hash = extensions.crypt('1234', extensions.gen_salt('bf')),
+    failed_logins = 0,
+    locked_until = null
+where username_lower = lower('ИМЯ_УЧЕНИКА');
+
+-- 1234 — новый PIN, скажите его ученику и попросите не оставлять таким.
+-- failed_logins и locked_until обнуляются заодно: если ученик до этого
+-- перебирал PIN и попал под блокировку, она снимется.
+
+
+-- Посмотреть, кто вообще зарегистрирован (PIN там не увидеть — только хэш):
+-- select username, best_run_score, pin_hint, created_at from students order by created_at;
