@@ -1,0 +1,50 @@
+alter table students add column if not exists pin_hint text;
+
+create or replace function register_student(p_username text, p_pin text, p_hint text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+begin
+  if length(trim(p_username)) < 2 or length(trim(p_username)) > 20 then
+    raise exception 'invalid_username';
+  end if;
+  if p_pin !~ '^[0-9]{4}$' then
+    raise exception 'invalid_pin';
+  end if;
+  if (select count(*) from students where created_at >= now() - interval '1 hour') >= 20 then
+    raise exception 'too_many_signups';
+  end if;
+
+  insert into students(username, pin_hash, pin_hint)
+  values (trim(p_username), crypt(p_pin, gen_salt('bf')), nullif(left(trim(coalesce(p_hint, '')), 60), ''));
+  return true;
+exception when unique_violation then
+  return false;
+end;
+$$;
+
+create or replace function register_student(p_username text, p_pin text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+begin
+  return register_student(p_username, p_pin, null);
+end;
+$$;
+
+create or replace function get_pin_hint(p_username text)
+returns text
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  select s.pin_hint from students s where s.username_lower = lower(trim(p_username));
+$$;
+
+grant execute on function register_student(text, text, text) to anon;
+grant execute on function register_student(text, text) to anon;
+grant execute on function get_pin_hint(text) to anon;
