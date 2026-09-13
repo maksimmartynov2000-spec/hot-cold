@@ -1,7 +1,7 @@
 {
-  "name": "Горячо — Холодно",
-  "short_name": "Горячо-Холодно",
-  "description": "Угадай число по градуснику: тренировка, игра с другом и общий рейтинг",
+  "name": "Hot or Cold",
+  "short_name": "Hot or Cold",
+  "description": "Guess the number by the thermometer: practice, play with a friend, climb the leaderboard",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
