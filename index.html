@@ -499,8 +499,6 @@
     /* Компактная раскладка одиночной игры на телефоне — чтобы всё помещалось
        на экран без прокрутки. На широких экранах (≥860px) не действует. */
     @media (max-width: 859px) {
-      .card.solo-game .header { display: none; }
-
       .card.solo-game .info-bar { margin-bottom: 10px; }
 
       .card.solo-game .thermo-wrap { margin: 0 0 4px; }
@@ -519,12 +517,6 @@
       .card.solo-game .guess-section p { margin-bottom: 5px; }
 
       .card.solo-game .history-list { max-height: 96px; }
-
-      .card.solo-game .lang-switcher {
-        position: static;
-        display: block;
-        margin: 0 0 10px auto;
-      }
     }
 
     .final-box {
@@ -2398,8 +2390,9 @@
   }
 
   // 'week' — топ за последние 7 дней, 'all' — за всё время.
-  // Недельный по умолчанию: вечный топ застывает, и у тех, кто пришёл позже, пропадает смысл стараться
-  let leaderboardScope = 'week';
+  // Дневной по умолчанию: вечный топ застывает, недельный к пятнице уже решён,
+  // а сегодняшний догоняем за один вечер — ради этого и возвращаются
+  let leaderboardScope = 'day';
   const LB_RPC = { day: 'run_leaderboard_daily', week: 'run_leaderboard_weekly', all: 'run_leaderboard' };
 
   function setLeaderboardScope(scope) {

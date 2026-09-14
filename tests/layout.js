@@ -62,6 +62,14 @@ async function run() {
       await page.waitForTimeout(40);
     }
 
+    // Название игры раньше пряталось на телефоне во время игры — ради высоты.
+    // Теперь оно стоит в одной строке с кнопками и ничего не удлиняет
+    const inGame = await topRow();
+    check(d.name + ': название видно во время игры',
+      await page.locator('.header h1').isVisible());
+    check(d.name + ': верхняя строка в один этаж (игра)', inGame.height <= inGame.tallest + 1,
+      inGame.height + 'px при высоте кнопки ' + inGame.tallest);
+
     // 1. Горизонтальной прокрутки быть не должно
     const overflowX = await page.evaluate(() =>
       document.documentElement.scrollWidth > window.innerWidth + 1);
