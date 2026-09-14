@@ -22,6 +22,16 @@ async function run() {
     await page.goto(GAME_URL);
     await page.waitForTimeout(300);
 
+    // Шапка: градусник слева от названия, а не над ним. В два этажа она
+    // съедала высоту, которой на телефоне и так мало
+    const header = await page.evaluate(() => {
+      const h1 = document.querySelector('.header h1').getBoundingClientRect();
+      const em = document.querySelector('.header .emoji').getBoundingClientRect();
+      return { oneRow: Math.abs(h1.top - em.top) < h1.height, spare: +(window.innerWidth - h1.width - em.width).toFixed(1) };
+    });
+    check(d.name + ': название и градусник в одну строку', header.oneRow);
+    check(d.name + ': шапка помещается по ширине', header.spare > 0, 'запас ' + header.spare + 'px');
+
     // набираем длинную историю попыток — именно там вылезал тёмный шов
     await page.click('#tModeRun');
     await page.waitForTimeout(300);
