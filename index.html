@@ -976,6 +976,7 @@
       <div class="lb-head">
         <div class="lb-title" id="tRunTop"></div>
         <div class="lb-tabs">
+          <button class="lb-tab" id="tRunTopDay" onclick="setLeaderboardScope('day')"></button>
           <button class="lb-tab" id="tRunTopWeek" onclick="setLeaderboardScope('week')"></button>
           <button class="lb-tab" id="tRunTopAll" onclick="setLeaderboardScope('all')"></button>
         </div>
@@ -1077,6 +1078,7 @@
         errLocked: "Too many wrong PINs. Try again in 5 minutes.",
         errTooMany: "Too many new accounts right now. Try again later.",
         errImplausible: "The server rejected this result.",
+        topDay: "Today",
         topWeek: "This week",
         topAll: "All time",
         best: "Your best: ",
@@ -1163,6 +1165,7 @@
         errLocked: "Слишком много неверных PIN. Попробуйте через 5 минут.",
         errTooMany: "Сейчас регистрируется слишком много игроков. Попробуйте позже.",
         errImplausible: "Сервер не принял такой результат.",
+        topDay: "Сегодня",
         topWeek: "За неделю",
         topAll: "За всё время",
         best: "Твой рекорд: ",
@@ -1249,6 +1252,7 @@
         errLocked: "Trop de PIN incorrects. Réessayez dans 5 minutes.",
         errTooMany: "Trop de nouveaux comptes en ce moment. Réessayez plus tard.",
         errImplausible: "Le serveur a refusé ce résultat.",
+        topDay: "Aujourd'hui",
         topWeek: "Cette semaine",
         topAll: "Depuis toujours",
         best: "Ton record : ",
@@ -1335,6 +1339,7 @@
         errLocked: "Zu viele falsche PINs. Versuche es in 5 Minuten erneut.",
         errTooMany: "Gerade registrieren sich zu viele Spieler. Versuche es später.",
         errImplausible: "Der Server hat dieses Ergebnis abgelehnt.",
+        topDay: "Heute",
         topWeek: "Diese Woche",
         topAll: "Insgesamt",
         best: "Dein Rekord: ",
@@ -1556,6 +1561,7 @@
     document.getElementById('runUsername').placeholder = L.run.namePh;
     document.getElementById('tRunStart').textContent = L.run.start;
     document.getElementById('tRunTop').textContent = L.run.top;
+    document.getElementById('tRunTopDay').textContent = L.run.topDay;
     document.getElementById('tRunTopWeek').textContent = L.run.topWeek;
     document.getElementById('tRunTopAll').textContent = L.run.topAll;
     document.getElementById('tRunToMenu').textContent = L.run.toMenu;
@@ -2394,6 +2400,7 @@
   // 'week' — топ за последние 7 дней, 'all' — за всё время.
   // Недельный по умолчанию: вечный топ застывает, и у тех, кто пришёл позже, пропадает смысл стараться
   let leaderboardScope = 'week';
+  const LB_RPC = { day: 'run_leaderboard_daily', week: 'run_leaderboard_weekly', all: 'run_leaderboard' };
 
   function setLeaderboardScope(scope) {
     leaderboardScope = scope;
@@ -2405,16 +2412,15 @@
     if (!sb || !el) return;
     const L = t();
     const auth = runAuth();
+    document.getElementById('tRunTopDay').classList.toggle('active', leaderboardScope === 'day');
     document.getElementById('tRunTopWeek').classList.toggle('active', leaderboardScope === 'week');
-    document.getElementById('tRunTopAll').classList.toggle('active', leaderboardScope !== 'week');
+    document.getElementById('tRunTopAll').classList.toggle('active', leaderboardScope === 'all');
     el.innerHTML = '';
     try {
-      let { data, error } = leaderboardScope === 'week'
-        ? await sb.rpc('run_leaderboard_weekly')
-        : await sb.rpc('run_leaderboard');
-      // пока миграция с недельным топом не применена — показываем общий, а не пустоту
-      if (error && leaderboardScope === 'week') {
-        ({ data, error } = await sb.rpc('run_leaderboard'));
+      let { data, error } = await sb.rpc(LB_RPC[leaderboardScope]);
+      // пока миграция со срезом не применена — показываем общий топ, а не пустоту
+      if (error && leaderboardScope !== 'all') {
+        ({ data, error } = await sb.rpc(LB_RPC.all));
       }
       if (error) return;
       if (!data || !data.length) {
@@ -2423,7 +2429,7 @@
       }
       el.innerHTML = data.map((r, i) => {
         const isMe = auth && String(r.username).toLowerCase() === auth.username.toLowerCase();
-        if (isMe && leaderboardScope !== 'week') rememberRunBest(r.best_run_score);
+        if (isMe && leaderboardScope === 'all') rememberRunBest(r.best_run_score);
         const style = isMe ? ' style="color:#fbbf24;font-weight:700"' : '';
         return '<div class="lb-row"' + style + '><span>' + (i + 1) + '. ' + escapeHtml(r.username) +
                '</span><span>' + formatNum(r.best_run_score) + '</span></div>';

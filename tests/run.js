@@ -65,6 +65,22 @@ async function testRating(browser) {
   check('топ за неделю выбран по умолчанию',
     await page.locator('#tRunTopWeek').evaluate(e => e.classList.contains('active')));
 
+  // Каждая вкладка тянет свой срез: за день, за неделю и за всё время
+  for (const [id, rpc] of [['#tRunTopDay', 'run_leaderboard_daily'],
+                           ['#tRunTopAll', 'run_leaderboard'],
+                           ['#tRunTopWeek', 'run_leaderboard_weekly']]) {
+    await page.evaluate(() => { window.__rpcCalls.length = 0; });
+    await page.click(id);
+    await page.waitForTimeout(200);
+    const last = await page.evaluate(() => (window.__rpcCalls.pop() || {}).name);
+    check('вкладка ' + id.slice(8) + ' запрашивает ' + rpc, last === rpc, 'запрошено ' + last);
+    check('вкладка ' + id.slice(8) + ' подсвечена',
+      await page.locator(id).evaluate(e => e.classList.contains('active')));
+    const others = await page.evaluate(sel => [...document.querySelectorAll('.lb-tab')]
+      .filter(e => !e.matches(sel) && e.classList.contains('active')).length, id);
+    check('вкладка ' + id.slice(8) + ': остальные погашены', others === 0);
+  }
+
   await page.click('#tRunStart');
   await page.waitForTimeout(250);
   check('чип скрыт во время игры', !(await page.locator('#accountChip').isVisible()));
@@ -199,7 +215,7 @@ async function testTranslations(browser) {
     await page.selectOption('#langSwitcher', lang);
     await page.waitForTimeout(150);
     const empty = await page.evaluate(() => {
-      const ids = ['tModeSolo', 'tModeDuel', 'tModeRun', 'tRunStart', 'tRunTop', 'tRunTopWeek', 'tRunTopAll'];
+      const ids = ['tModeSolo', 'tModeDuel', 'tModeRun', 'tRunStart', 'tRunTop', 'tRunTopDay', 'tRunTopWeek', 'tRunTopAll'];
       return ids.filter(id => !(document.getElementById(id).textContent || '').trim());
     });
     check('язык ' + lang + ': все подписи заполнены', empty.length === 0, empty.join(', '));

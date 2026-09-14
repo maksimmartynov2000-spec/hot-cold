@@ -1,0 +1,17 @@
+create or replace function run_leaderboard_daily()
+returns table(username text, best_run_score int, best_run_rounds int)
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  select r.username,
+         max(r.score)::int,
+         (array_agg(r.rounds order by r.score desc))[1]::int
+  from runs r
+  where r.created_at >= (date_trunc('day', (now() at time zone 'utc')) at time zone 'utc')
+  group by r.username
+  order by 2 desc
+  limit 10;
+$$;
+
+grant execute on function run_leaderboard_daily() to anon;

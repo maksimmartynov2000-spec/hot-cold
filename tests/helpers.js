@@ -20,7 +20,7 @@ function stubSupabase(opts) {
         }),
         rpc: async (name, args) => {
           window.__rpcCalls.push({ name, args });
-          if (name === 'run_leaderboard_weekly' || name === 'run_leaderboard') {
+          if (name === 'run_leaderboard_daily' || name === 'run_leaderboard_weekly' || name === 'run_leaderboard') {
             return { data: [{ username: 'Аня', best_run_score: 5200, best_run_rounds: 8 }], error: null };
           }
           if (name === 'submit_run_score') return { data: [{ is_best: true, best_score: args.p_score }], error: null };
