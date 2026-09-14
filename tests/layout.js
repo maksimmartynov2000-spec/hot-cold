@@ -22,9 +22,35 @@ async function run() {
     await page.goto(GAME_URL);
     await page.waitForTimeout(300);
 
+    // Верхняя строка: название слева, кнопки справа — всё одним этажом.
+    // Раньше название занимало отдельную строку сверху экрана
+    const topRow = () => page.evaluate(() => {
+      const row = document.querySelector('.top-controls');
+      const kids = [...row.children].filter(el => !el.classList.contains('hidden'));
+      const tallest = Math.max(...kids.map(el => el.getBoundingClientRect().height));
+      const h1 = document.querySelector('.header h1');
+      return {
+        height: +row.getBoundingClientRect().height.toFixed(1),
+        tallest: +tallest.toFixed(1),
+        titleClipped: h1.scrollWidth > h1.clientWidth + 1,
+        overflows: row.scrollWidth > row.clientWidth + 1
+      };
+    });
+    const menu = await topRow();
+    check(d.name + ': верхняя строка в один этаж (меню)', menu.height <= menu.tallest + 1,
+      menu.height + 'px при высоте кнопки ' + menu.tallest);
+    check(d.name + ': название не обрезано (меню)', !menu.titleClipped && !menu.overflows);
+
     // набираем длинную историю попыток — именно там вылезал тёмный шов
     await page.click('#tModeRun');
     await page.waitForTimeout(300);
+
+    // В рейтинге к кнопкам добавляется чип аккаунта — самое тесное место
+    const hub = await topRow();
+    check(d.name + ': верхняя строка в один этаж (рейтинг)', hub.height <= hub.tallest + 1,
+      hub.height + 'px при высоте кнопки ' + hub.tallest);
+    check(d.name + ': название не обрезано (рейтинг)', !hub.titleClipped && !hub.overflows);
+
     await page.click('#tRunStart');
     await page.waitForTimeout(250);
     const s = await page.evaluate(() => ({ secret, RANGE_MAX, MAX_GUESSES }));

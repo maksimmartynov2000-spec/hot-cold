@@ -76,8 +76,9 @@
       display: flex;
       align-items: center;
       justify-content: flex-end;
+      flex-wrap: wrap;
       gap: 6px;
-      margin-bottom: 8px;
+      margin-bottom: 18px;
     }
     .account-chip {
       display: flex;
@@ -154,15 +155,27 @@
     }
     .lang-switcher:focus { border-color: rgba(255,255,255,0.4); }
 
-    .header { text-align: center; margin-bottom: 20px; margin-top: 10px; transition: margin 0.15s; }
-    .header .emoji { font-size: clamp(30px, 8vw, 40px); margin-bottom: 6px; transition: font-size 0.15s; }
-    .header h1 { font-size: clamp(20px, 5vw, 24px); font-weight: 700; letter-spacing: -0.5px; transition: font-size 0.15s; }
-    .header.compact {
-      display: flex; align-items: center; justify-content: center;
-      gap: 8px; margin-bottom: 12px; margin-top: 0;
+    /* Название живёт в той же строке, что имя, звук и язык: отдельной шапкой
+       оно занимало ещё один-два этажа, а сверху экрана и так мало места.
+       margin-right: auto прижимает его влево, кнопки остаются справа */
+    .header {
+      display: flex; align-items: center; gap: 8px;
+      margin-right: auto; min-width: 0;
     }
-    .header.compact .emoji { font-size: 20px; margin-bottom: 0; }
+    .header .emoji { font-size: clamp(22px, 6vw, 28px); line-height: 1; transition: font-size 0.15s; }
+    .header h1 {
+      font-size: clamp(17px, 4.5vw, 22px); font-weight: 700;
+      letter-spacing: -0.5px; white-space: nowrap; transition: font-size 0.15s;
+    }
+    .header.compact .emoji { font-size: 20px; }
     .header.compact h1 { font-size: 15px; opacity: 0.7; }
+
+    /* На телефоне в строке тесно: длинное имя выдавливало бы название на второй
+       этаж, поэтому имя обрезаем раньше. Целиком оно видно по нажатию на чип */
+    @media (max-width: 460px) {
+      .account-chip .chip-name { display: none; }
+      .account-chip { padding: 4px 7px; }
+    }
 
     .row { display: flex; gap: 8px; width: 100%; }
 
@@ -763,6 +776,10 @@
 <div class="card" id="card">
   <div id="updateBanner" class="hidden"></div>
   <div class="top-controls">
+    <div class="header">
+      <div class="emoji">🌡️</div>
+      <h1 id="tTitle">Hot or Cold</h1>
+    </div>
     <button class="account-chip hidden" id="accountChip" onclick="openLogoutModal()">
       <span>👤</span><span class="chip-name" id="accountChipName"></span>
     </button>
@@ -773,11 +790,6 @@
       <option value="fr">🇫🇷 FR</option>
       <option value="de">🇩🇪 DE</option>
     </select>
-  </div>
-
-  <div class="header">
-    <div class="emoji">🌡️</div>
-    <h1 id="tTitle">Hot or Cold</h1>
   </div>
 
   <!-- ЭКРАН 1: выбор режима -->
@@ -1090,7 +1102,7 @@
       }
     },
     ru: {
-      title: "Горячо — Холодно", docTitle: "Горячо — Холодно",
+      title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", newGame: "Новая игра", menu: "Меню",
       enterGuess: "Введите число", placeholderTpl: "Число от 1 до {n}...", submitGuess: "Проверить",
       finalWarning: "Попытки закончились — последний шанс!", finalSubmit: "Ответ", finalInput: "Финальный ответ...",
@@ -1176,7 +1188,7 @@
       }
     },
     fr: {
-      title: "Chaud ou Froid", docTitle: "Chaud ou Froid",
+      title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Nombre généré ✓", attemptsPrefix: "Essais: ", newGame: "Nouvelle partie", menu: "Menu",
       enterGuess: "Entrez un nombre", placeholderTpl: "Nombre 1–{n}...", submitGuess: "Vérifier",
       finalWarning: "Tentatives épuisées — dernière chance !", finalSubmit: "Valider", finalInput: "Réponse finale...",
@@ -1262,7 +1274,7 @@
       }
     },
     de: {
-      title: "Heiß oder Kalt", docTitle: "Heiß oder Kalt",
+      title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", newGame: "Neues Spiel", menu: "Menü",
       enterGuess: "Gib eine Zahl ein", placeholderTpl: "Zahl 1–{n}...", submitGuess: "Prüfen",
       finalWarning: "Versuche aufgebraucht — letzte Chance!", finalSubmit: "Bestätigen", finalInput: "Letzte Antwort...",
