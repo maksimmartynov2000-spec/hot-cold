@@ -35,6 +35,7 @@ async function testModes(browser) {
   await page.click('#tStartMatch');
   await page.waitForTimeout(200);
   check('тренировка: термометр виден', await page.locator('#thermoWrap').isVisible());
+  check('тренировка: название игры видно', await page.locator('.header h1').isVisible());
   check('тренировка: шкала расстояний раскрыта', await page.evaluate(() => document.getElementById('scaleBox').open));
   const secret = await page.evaluate(() => secret);
   await page.fill('#guessInput', String(secret));
@@ -62,8 +63,8 @@ async function testRating(browser) {
   await page.waitForTimeout(300);
   check('вход по сохранённому аккаунту ведёт сразу в хаб', await page.locator('#screenRunHub').isVisible());
   check('чип с именем виден в хабе', await page.locator('#accountChip').isVisible());
-  check('топ за неделю выбран по умолчанию',
-    await page.locator('#tRunTopWeek').evaluate(e => e.classList.contains('active')));
+  check('топ за сегодня выбран по умолчанию',
+    await page.locator('#tRunTopDay').evaluate(e => e.classList.contains('active')));
 
   // Каждая вкладка тянет свой срез: за день, за неделю и за всё время
   for (const [id, rpc] of [['#tRunTopDay', 'run_leaderboard_daily'],
@@ -84,6 +85,7 @@ async function testRating(browser) {
   await page.click('#tRunStart');
   await page.waitForTimeout(250);
   check('чип скрыт во время игры', !(await page.locator('#accountChip').isVisible()));
+  check('название игры видно в рейтинге', await page.locator('.header h1').isVisible());
 
   // язык не должен налезать на строку статуса
   const overlap = await page.evaluate(() => {
