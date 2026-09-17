@@ -584,6 +584,117 @@ async function testFrostMode(browser) {
   await done(page2);
 }
 
+
+async function testNumberLine(browser) {
+  console.log('\nЧисловая прямая');
+  const page = await newGame(browser, { user: 'Максим' });
+
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(200);
+  await page.check('#frostSetup');
+  await page.waitForTimeout(200);
+  await page.selectOption('#rangeMax', '10');
+  await page.waitForTimeout(150);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { secret = 3; });
+
+  check('прямая видна до первой догадки', await page.locator('#numLine').isVisible());
+
+  // на −5…+5 места хватает на каждое целое число
+  const labels = await page.evaluate(() =>
+    [...document.querySelectorAll('#numLineSvg text')].map(t => t.textContent));
+  const want = ['-5', '-4', '-3', '-2', '-1', '0', '1', '2', '3', '4', '5'];
+  check('на узком диапазоне подписано каждое деление',
+    want.every(v => labels.includes(v)), labels.join(' '));
+  check('ноль подписан', labels.includes('0'));
+
+  // подсказок о том, где ответ, на прямой нет — только числа и догадки
+  check('закрашенных участков нет',
+    await page.evaluate(() => document.querySelectorAll('#numLineSvg rect').length) === 0);
+
+  await page.fill('#guessInput', '-1');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const marks = await page.evaluate(() => {
+    const c = [...document.querySelectorAll('#numLineSvg circle')];
+    return { count: c.length, filled: c.filter(e => e.getAttribute('fill') !== 'none').length,
+             x: parseFloat(c[c.length - 1].getAttribute('cx')), want: nlPos(-1) };
+  });
+  check('догадка отмечена на своём месте', Math.abs(marks.x - marks.want) < 0.01,
+    marks.x + ' вместо ' + marks.want);
+  check('текущая догадка одна и она залита', marks.filled === 1, JSON.stringify(marks));
+
+  // подсказка снова только про пояс, без чисел расстояния
+  check('в подсказке нет расстояния',
+    !/\d/.test(await page.locator('#feedbackLabel').textContent()),
+    await page.locator('#feedbackLabel').textContent());
+
+  // на широком диапазоне подписи редеют, но не наезжают друг на друга
+  await page.evaluate(() => { frostMode = false; applyBounds(1000); history = []; secret = 640; renderAll(); });
+  await page.waitForTimeout(150);
+  const wide = await page.evaluate(() => {
+    const texts = [...document.querySelectorAll('#numLineSvg text')];
+    const xs = texts.map(t => parseFloat(t.getAttribute('x'))).sort((a, b) => a - b);
+    let min = 100;
+    for (let i = 1; i < xs.length; i++) min = Math.min(min, xs[i] - xs[i - 1]);
+    return { count: texts.length, minGap: +min.toFixed(1), labels: texts.map(t => t.textContent) };
+  });
+  check('на широком диапазоне подписи не наезжают', wide.minGap >= 8,
+    'минимальный зазор ' + wide.minGap + '%, подписи: ' + wide.labels.join(' '));
+  check('границы диапазона подписаны',
+    wide.labels.some(v => v.replace(/\s/g, '') === '1000'), wide.labels.join(' '));
+
+  await done(page);
+}
+
+async function testVizToggles(browser) {
+  console.log('\nКнопки «спрятать градусник» и «спрятать прямую»');
+  const page = await newGame(browser, { user: 'Максим' });
+
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(200);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+
+  check('по умолчанию градусник виден', await page.locator('#thermoWrap').isVisible());
+  check('по умолчанию прямая видна', await page.locator('#numLine').isVisible());
+  check('обе кнопки подсвечены как включённые', await page.evaluate(() =>
+    document.getElementById('toggleThermoBtn').classList.contains('on') &&
+    document.getElementById('toggleLineBtn').classList.contains('on')));
+  check('у кнопок есть подпись для наведения',
+    (await page.locator('#toggleThermoBtn').getAttribute('title')) === 'Градусник');
+
+  await page.click('#toggleThermoBtn');
+  await page.waitForTimeout(200);
+  check('градусник прячется', !(await page.locator('#thermoWrap').isVisible()));
+  check('прямая при этом остаётся', await page.locator('#numLine').isVisible());
+  check('кнопка градусника погасла', await page.evaluate(() =>
+    !document.getElementById('toggleThermoBtn').classList.contains('on')));
+
+  await page.click('#toggleLineBtn');
+  await page.waitForTimeout(200);
+  check('прямая прячется', !(await page.locator('#numLine').isVisible()));
+
+  await page.reload();
+  await page.waitForTimeout(400);
+  check('выбор запомнился после перезагрузки',
+    await page.evaluate(() => showThermo === false && showLine === false));
+
+  // и возвращается обратно
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(200);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(250);
+  await page.click('#toggleThermoBtn');
+  await page.click('#toggleLineBtn');
+  await page.waitForTimeout(250);
+  check('обе возвращаются на место',
+    (await page.locator('#thermoWrap').isVisible()) && (await page.locator('#numLine').isVisible()));
+
+  await done(page);
+}
+
 async function testPinHelp(browser) {
   console.log('\nПодсказка к PIN и свой PIN');
   const page = await newGame(browser);
@@ -674,6 +785,8 @@ async function testPinHelp(browser) {
     await testPinHelp(browser);
     await testFrostMode(browser);
     await testBestPerAccount(browser);
+    await testNumberLine(browser);
+    await testVizToggles(browser);
   } finally {
     await browser.close();
   }

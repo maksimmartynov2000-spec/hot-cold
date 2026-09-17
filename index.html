@@ -391,6 +391,28 @@
     .info-bar .attempts { font-size: 13px; font-weight: 600; color: #a5f3fc; }
     .info-bar .attempts.low { color: #f87171; }
 
+    .bar-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+
+    /* Градусник и прямую можно убрать: на маленьком экране лишние 150 пикселей
+       иногда дороже красоты. Включённое состояние подсвечено, выключенное бледное */
+    .mini-toggle {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      padding: 2px 6px;
+      font-size: 13px;
+      line-height: 1.3;
+      cursor: pointer;
+      font-family: inherit;
+      opacity: 0.4;
+      transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .mini-toggle.on {
+      opacity: 1;
+      background: rgba(99, 102, 241, 0.22);
+      border-color: rgba(99, 102, 241, 0.6);
+    }
+
     .turn-banner {
       padding: 10px 14px;
       border-radius: 12px;
@@ -501,13 +523,15 @@
     @media (max-width: 859px) {
       .card.solo-game .info-bar { margin-bottom: 10px; }
 
-      .card.solo-game .thermo-wrap { margin: 0 0 4px; }
+      .card.solo-game .thermo-wrap { margin: 0 0 2px; }
+
+      .card.solo-game .numline { margin-bottom: 6px; }
 
       /* Рамку вокруг подсказки на телефоне оставляем — она же и есть главный
          сигнал «горячо/холодно». Экономим высоту за счёт отступов, а не фона */
       .card.solo-game .feedback-panel {
         padding: 7px 12px;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
         border-radius: 12px;
         animation: none;
       }
@@ -517,6 +541,32 @@
       .card.solo-game .guess-section p { margin-bottom: 5px; }
 
       .card.solo-game .history-list { max-height: 96px; }
+    }
+
+    /* Числовая прямая: где стоит догадка и в каких двух участках может быть ответ.
+       Проценты внутри SVG считаются от его ширины, поэтому пересчитывать
+       координаты при смене размера экрана не нужно */
+    .numline {
+      margin: 0 0 8px;
+      padding: 0 4px;
+    }
+    .numline svg { display: block; overflow: visible; }
+
+    /* Прямая заняла место, которого на невысоком экране нет. Забираем его у
+       градусника: «где именно» теперь показывает прямая, а ему остаётся
+       «насколько горячо». Условие по высоте, а не по ширине — широкий, но
+       низкий ноутбук стеснён так же, как телефон */
+    @media (max-height: 900px) {
+      .card.solo-game .thermo-wrap { margin-top: 0; }
+      .card.solo-game .thermo-tube { height: 62px; }
+      .card.solo-game .thermo-bulb { width: 36px; height: 36px; }
+      .card.solo-game .thermo-bulb::after { top: 8px; left: 10px; width: 9px; height: 6px; }
+    }
+
+    /* Широкому, но низкому экрану телефонные правила не достаются, а место
+       ему нужно так же — подрезаем отступ под градусником отдельно */
+    @media (max-height: 900px) and (min-width: 860px) {
+      .card.solo-game .thermo-wrap { margin-bottom: 10px; }
     }
 
     .final-box {
@@ -884,7 +934,11 @@
         <div class="info-bar" id="infoBar">
           <span class="confirmed" id="tConfirmed">Number generated ✓</span>
           <span class="attempts" id="attemptsLabel"></span>
-          <button class="btn-reset" onclick="leaveGame()" id="tMenu">Menu</button>
+          <span class="bar-actions">
+            <button class="mini-toggle" id="toggleThermoBtn" onclick="toggleThermo()">🌡️</button>
+            <button class="mini-toggle" id="toggleLineBtn" onclick="toggleLine()">📏</button>
+            <button class="btn-reset" onclick="leaveGame()" id="tMenu">Menu</button>
+          </span>
         </div>
 
         <div class="turn-banner hidden" id="turnBanner"></div>
@@ -897,6 +951,8 @@
         <div class="feedback-panel hidden" id="feedbackPanel">
           <div class="fb-label" id="feedbackLabel"></div>
         </div>
+
+        <div class="numline hidden" id="numLine"><svg id="numLineSvg" width="100%" height="46"></svg></div>
 
         <div class="final-box hidden" id="finalBox">
           <p id="tFinalWarning">Attempts used — last chance!</p>
@@ -1035,6 +1091,7 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", newGame: "New Game", menu: "Menu",
       frostLabel: "Frost and heat",
+      vizThermo: "Thermometer", vizLine: "Number line",
       enterGuess: "Enter a number", placeholderTpl: "from {a} to {b}", submitGuess: "Check",
       finalWarning: "Attempts used — last chance!", finalSubmit: "Submit", finalInput: "Final answer...",
       resultWin: "🎉 Victory! You guessed the number!", resultLose: "❌ Wrong. The secret number was: ",
@@ -1123,6 +1180,7 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", newGame: "Новая игра", menu: "Меню",
       frostLabel: "Мороз и жара",
+      vizThermo: "Градусник", vizLine: "Числовая прямая",
       enterGuess: "Введите число", placeholderTpl: "от {a} до {b}", submitGuess: "Проверить",
       finalWarning: "Попытки закончились — последний шанс!", finalSubmit: "Ответить", finalInput: "Финальный ответ...",
       resultWin: "🎉 Победа! Число угадано!", resultLose: "❌ Неверно. Загаданное число было: ",
@@ -1211,6 +1269,7 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", newGame: "Nouvelle partie", menu: "Menu",
       frostLabel: "Gel et chaleur",
+      vizThermo: "Thermomètre", vizLine: "Droite numérique",
       enterGuess: "Entrez un nombre", placeholderTpl: "de {a} à {b}", submitGuess: "Vérifier",
       finalWarning: "Tentatives épuisées — dernière chance !", finalSubmit: "Valider", finalInput: "Réponse finale...",
       resultWin: "🎉 Victoire ! Le nombre a été deviné !", resultLose: "❌ Incorrect. Le nombre secret était : ",
@@ -1299,6 +1358,7 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze",
+      vizThermo: "Thermometer", vizLine: "Zahlenstrahl",
       enterGuess: "Gib eine Zahl ein", placeholderTpl: "von {a} bis {b}", submitGuess: "Prüfen",
       finalWarning: "Versuche aufgebraucht — letzte Chance!", finalSubmit: "Bestätigen", finalInput: "Letzte Antwort...",
       resultWin: "🎉 Gewonnen! Die Zahl wurde erraten!", resultLose: "❌ Falsch. Die Geheimzahl war: ",
@@ -1497,6 +1557,36 @@
   // диапазона, чтобы чисел осталось столько же и игра не стала длиннее
   let frostMode = localStorage.getItem('hc_frost') === '1';
 
+  // Градусник и числовая прямая показываются по умолчанию; кому тесно на экране —
+  // может убрать любую из них, и выбор запомнится
+  let showThermo = localStorage.getItem('hc_show_thermo') !== '0';
+  let showLine = localStorage.getItem('hc_show_line') !== '0';
+
+  function renderVizToggles() {
+    const L = t();
+    [['toggleThermoBtn', showThermo, L.vizThermo], ['toggleLineBtn', showLine, L.vizLine]]
+      .forEach(([id, on, title]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.toggle('on', on);
+        el.title = title;
+        el.setAttribute('aria-label', title);
+        el.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+  }
+
+  function toggleThermo() {
+    showThermo = !showThermo;
+    try { localStorage.setItem('hc_show_thermo', showThermo ? '1' : '0'); } catch (e) {}
+    renderAll();
+  }
+
+  function toggleLine() {
+    showLine = !showLine;
+    try { localStorage.setItem('hc_show_line', showLine ? '1' : '0'); } catch (e) {}
+    renderAll();
+  }
+
   function rangeCount() { return RANGE_MAX - RANGE_MIN + 1; }
   function maxDistance() { return RANGE_MAX - RANGE_MIN; }
 
@@ -1625,6 +1715,7 @@
     document.getElementById('guessInput').placeholder =
       L.placeholderTpl.replace('{a}', formatNum(RANGE_MIN)).replace('{b}', formatNum(RANGE_MAX));
     document.getElementById('finalInput').placeholder = L.finalInput;
+    renderVizToggles();
     document.getElementById('tFrostSetup').textContent = L.frostLabel;
     document.getElementById('tFrostRun').textContent = L.frostLabel;
     renderFrostToggles();
@@ -1941,7 +2032,9 @@
     document.getElementById('historyList').classList.toggle('tall', duel);
 
     renderFeedback();
+    renderVizToggles();
     renderThermo();
+    renderNumberLine();
     renderStatus();
     renderResult();
     renderHistory();
@@ -1963,7 +2056,8 @@
 
   function renderThermo() {
     const wrap = document.getElementById('thermoWrap');
-    wrap.classList.remove('hidden');
+    wrap.classList.toggle('hidden', !showThermo);
+    if (!showThermo) return;
 
     const fill = document.getElementById('thermoFill');
     const bulb = document.getElementById('thermoBulb');
@@ -1993,6 +2087,103 @@
     } else {
       bulb.classList.remove('pulse');
     }
+  }
+
+  // ================= ЧИСЛОВАЯ ПРЯМАЯ =================
+  // Игрок знает не точное расстояние, а пояс: «очень горячо» — это 4–10.
+  // Значит из догадки g следует, что ответ лежит в [g−max; g−min] или [g+min; g+max].
+  // Эти два участка и закрашиваем: ученик видит, что ответ бывает по обе стороны,
+  // и что минус — не край мира, а такая же сторона прямой.
+  const NL = { left: 6, right: 94, axisY: 25, baseY: 43 };
+
+  function nlPos(v) {
+    const span = Math.max(1, RANGE_MAX - RANGE_MIN);
+    const k = (Math.min(RANGE_MAX, Math.max(RANGE_MIN, v)) - RANGE_MIN) / span;
+    return NL.left + (NL.right - NL.left) * k;
+  }
+
+  // Шаг делений выбираем круглый и такой, чтобы их поместилось не больше нужного
+  function nlStep(span, maxCount) {
+    return [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10000]
+      .find(v => span / v <= maxCount) || span;
+  }
+
+  function nlText(x, y, anchor, size, fill, weight, str) {
+    return '<text x="' + x + '%" y="' + y + '" text-anchor="' + anchor + '" font-size="' + size +
+           '" font-weight="' + weight + '" fill="' + fill + '">' + str + '</text>';
+  }
+
+  function nlTick(v, y1, y2, stroke, width) {
+    return '<line x1="' + nlPos(v) + '%" y1="' + y1 + '" x2="' + nlPos(v) + '%" y2="' + y2 +
+           '" stroke="' + stroke + '" stroke-width="' + width + '" />';
+  }
+
+  function renderNumberLine() {
+    const box = document.getElementById('numLine');
+    const svg = document.getElementById('numLineSvg');
+    if (!box || !svg) return;
+    box.classList.toggle('hidden', !showLine);
+    if (!showLine) return;
+
+    const span = Math.max(1, RANGE_MAX - RANGE_MIN);
+    const last = history[history.length - 1];
+    let out = '';
+
+    // Сама прямая
+    out += '<line x1="' + NL.left + '%" y1="' + NL.axisY + '" x2="' + NL.right + '%" y2="' + NL.axisY +
+           '" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round" />';
+
+    // Подписей помещается столько, сколько позволяет ширина: считаем её по самому
+    // длинному числу на прямой, иначе на узком телефоне они наедут друг на друга
+    const w = svg.clientWidth || 320;
+    const labelPx = Math.max(formatNum(RANGE_MIN).length, formatNum(RANGE_MAX).length) * 6 + 14;
+    const labelPct = (labelPx / w) * 100;
+    const labelStep = nlStep(span, Math.max(2, Math.floor(w / labelPx) - 1));
+    const tickStep = nlStep(span, 20);
+
+    for (let v = Math.ceil(RANGE_MIN / tickStep) * tickStep; v <= RANGE_MAX; v += tickStep) {
+      if (v === 0 && RANGE_MIN < 0) continue;       // ноль рисуется отдельно и ярче
+      out += nlTick(v, NL.axisY + 3, NL.axisY + 7, 'rgba(255,255,255,0.22)', 1.5);
+    }
+
+    for (let v = Math.ceil(RANGE_MIN / labelStep) * labelStep; v <= RANGE_MAX; v += labelStep) {
+      if (v === 0 && RANGE_MIN < 0) continue;
+      const p = nlPos(v);
+      // пропускаем только те, что реально налезли бы на подписи границ
+      if (Math.abs(p - NL.left) < labelPct || Math.abs(p - NL.right) < labelPct) continue;
+      out += nlTick(v, NL.axisY + 3, NL.axisY + 9, 'rgba(255,255,255,0.35)', 1.5);
+      out += nlText(p, NL.baseY, 'middle', 10, 'rgba(255,255,255,0.45)', 400, formatNum(v));
+    }
+
+    // Ноль отмечаем отдельно — ради него всё и затевалось
+    if (RANGE_MIN < 0 && RANGE_MAX > 0) {
+      out += nlTick(0, NL.axisY - 7, NL.axisY + 9, 'rgba(255,255,255,0.55)', 1.5);
+      out += nlText(nlPos(0), NL.baseY, 'middle', 10, 'rgba(255,255,255,0.65)', 700, '0');
+    }
+
+    // Границы диапазона. Их подписи тоже по центру деления, как у остальных:
+    // так соседнее число не приходится выбрасывать из-за мнимого наложения
+    [RANGE_MIN, RANGE_MAX].forEach(v => {
+      out += nlText(nlPos(v), NL.baseY, 'middle', 10, 'rgba(255,255,255,0.45)', 400, formatNum(v));
+    });
+
+    // Прошлые догадки — полыми кружками, текущая — залитым
+    history.slice(0, -1).forEach(h => {
+      out += '<circle cx="' + nlPos(h.guess) + '%" cy="' + NL.axisY + '" r="2.5" fill="none" ' +
+             'stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />';
+    });
+
+    if (last) {
+      const color = last.distance === 0 ? BULLSEYE_TIER.color : last.meta.color;
+      const p = nlPos(last.guess);
+      out += '<circle cx="' + p + '%" cy="' + NL.axisY + '" r="5" fill="#0f1430" stroke="' + color +
+             '" stroke-width="2.5" />';
+      // у самого края подпись разворачиваем внутрь, иначе она уезжает за карточку
+      const anchor = p < 12 ? 'start' : (p > 88 ? 'end' : 'middle');
+      out += nlText(p, 11, anchor, 11, color, 700, formatNum(last.guess));
+    }
+
+    svg.innerHTML = out;
   }
 
   function renderStatus() {
@@ -2810,6 +3001,10 @@
   // Приписать его текущему аккаунту нельзя: именно так и появлялся чужой рекорд.
   // Убираем; свой вернётся с сервера после первой же доигранной партии
   try { localStorage.removeItem('hc_run_best'); } catch (e) {}
+
+  // Подписи на прямой расставляются по ширине экрана, поэтому поворот телефона
+  // или смена размера окна требуют пересчёта
+  window.addEventListener('resize', () => { if (screen === 'game') renderNumberLine(); });
 
   document.getElementById('langSwitcher').value = currentLang;
   document.getElementById('winsNeeded').value = '3';
