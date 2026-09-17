@@ -647,7 +647,7 @@
     .history-item .h-guess { font-weight: 700; font-size: 16px; flex-shrink: 0; }
     .history-item .h-label { font-size: 13px; font-weight: 600; text-align: right; word-break: break-word; }
 
-    .legend { margin-top: 20px; }
+    .legend { margin-top: 14px; }
     #scaleBox { margin-bottom: 10px; }
     .legend-body { margin-top: 10px; }
 
@@ -655,13 +655,16 @@
 
     .legend-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 210px));
+      /* Верхнюю границу подняли: при крупном шрифте «Очень холодно 501–1000»
+         в 210 пикселей уже не помещалось и переносилось на вторую строку */
+      grid-template-columns: repeat(auto-fit, minmax(150px, 260px));
       justify-content: center;
-      gap: 8px 18px;
+      /* Строки стоят плотнее: шрифт вырос, и без этого шкала перестала помещаться */
+      gap: 3px 18px;
     }
-    .legend-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; }
+    .legend-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
     .legend-item .l-label { font-weight: 600; }
-    .legend-item .l-range { color: rgba(255, 255, 255, 0.4); font-variant-numeric: tabular-nums; }
+    .legend-item .l-range { color: rgba(255, 255, 255, 0.5); font-variant-numeric: tabular-nums; }
 
     @media (min-width: 860px) {
       .legend-bar {
@@ -669,7 +672,7 @@
         height: 10px;
         border-radius: 999px;
         overflow: hidden;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
         box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
       }
       .legend-bar span { flex: 1; }
@@ -686,8 +689,8 @@
         text-align: center;
         gap: 3px;
       }
-      .legend-item .l-label { font-size: 11.5px; line-height: 1.25; }
-      .legend-item .l-range { font-size: 11px; }
+      .legend-item .l-label { font-size: 13px; line-height: 1.25; }
+      .legend-item .l-range { font-size: 12.5px; }
     }
 
     .instruction-box {
@@ -697,7 +700,7 @@
       border: 1px solid rgba(255, 255, 255, 0.05);
     }
     .instruction-box summary {
-      font-size: 12px;
+      font-size: 14px;
       color: rgba(255, 255, 255, 0.5);
       font-weight: 600;
       cursor: pointer;
@@ -2187,7 +2190,7 @@
              '" stroke-width="2.5" />';
       // у самого края подпись разворачиваем внутрь, иначе она уезжает за карточку
       const anchor = p < 12 ? 'start' : (p > 88 ? 'end' : 'middle');
-      out += nlText(p, 11, anchor, fs + 1, color, 700, formatNum(last.guess));
+      out += nlText(p, 12, anchor, fs + 3, color, 700, formatNum(last.guess));
     }
 
     svg.innerHTML = out;
