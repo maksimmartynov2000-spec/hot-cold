@@ -498,14 +498,28 @@
       50% { box-shadow: 0 0 0 14px rgba(255,255,255,0); }
     }
 
+    /* Подсказка и пояс расстояний разведены по краям: «Тепло · 51–100» одной
+       строкой посередине читалось как одно слово с непонятным хвостом */
     .feedback-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
       border-radius: 16px;
       padding: 14px 16px;
       margin-bottom: 16px;
       text-align: center;
       animation: pop 0.3s ease;
     }
+    .feedback-panel.with-band { justify-content: space-between; }
     .feedback-panel .fb-label { font-size: clamp(20px, 6vw, 26px); font-weight: 600; }
+    .feedback-panel .fb-band {
+      font-size: clamp(15px, 4.4vw, 20px);
+      font-weight: 700;
+      opacity: 0.75;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
 
     @keyframes pop {
       0% { transform: scale(0.95); opacity: 0; }
@@ -536,6 +550,7 @@
         animation: none;
       }
       .card.solo-game .feedback-panel .fb-label { font-size: 16px; }
+      .card.solo-game .feedback-panel .fb-band { font-size: 14px; }
 
       .card.solo-game .guess-section { margin-bottom: 10px; }
       .card.solo-game .guess-section p { margin-bottom: 5px; }
@@ -648,7 +663,7 @@
     .history-item .h-label { font-size: 13px; font-weight: 600; text-align: right; word-break: break-word; }
 
     .legend { margin-top: 14px; }
-    #scaleBox { margin-bottom: 10px; }
+    #scaleBox { margin-bottom: 8px; }
     .legend-body { margin-top: 10px; }
 
     .legend-bar { display: none; }
@@ -677,20 +692,11 @@
       }
       .legend-bar span { flex: 1; }
 
-      .legend-grid {
-        grid-template-columns: repeat(8, 1fr);
-        justify-content: stretch;
-        gap: 4px;
-      }
-      .legend-item {
-        flex-direction: column;
-        justify-content: flex-start;
-        align-items: center;
-        text-align: center;
-        gap: 3px;
-      }
-      .legend-item .l-label { font-size: 13px; line-height: 1.25; }
-      .legend-item .l-range { font-size: 12.5px; }
+      /* Восемь колонок в ряд раскладывались по ширине окна, а живут они внутри
+         карточки вдвое уже: на планшете подписи налезали друг на друга и
+         обрезались. Список остаётся списком, просто в две колонки */
+      .legend-grid { grid-template-columns: repeat(2, 1fr); column-gap: 20px; }
+      .legend-item { font-size: 13px; }
     }
 
     .instruction-box {
@@ -878,6 +884,11 @@
       <span id="tFrostSetup"></span>
     </label>
 
+    <label class="frost-row hidden" id="hintRow">
+      <input type="checkbox" id="hintSetup" onchange="setDistanceHint(this.checked)" />
+      <span id="tHintSetup"></span>
+    </label>
+
     <div class="setup-field" id="attemptsField">
       <label id="tLblAttempts">Attempts</label>
       <select class="field" id="attemptsCount"></select>
@@ -953,6 +964,7 @@
 
         <div class="feedback-panel hidden" id="feedbackPanel">
           <div class="fb-label" id="feedbackLabel"></div>
+          <div class="fb-band hidden" id="feedbackBand"></div>
         </div>
 
         <div class="numline hidden" id="numLine"><svg id="numLineSvg" width="100%" height="48"></svg></div>
@@ -1093,7 +1105,8 @@
     en: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", newGame: "New Game", menu: "Menu",
-      frostLabel: "Frost and heat",
+      frostLabel: "Frost and Heat",
+      hintLabel: "Hint: distance",
       vizThermo: "Thermometer", vizLine: "Number line",
       enterGuess: "Enter a number", placeholderTpl: "from {a} to {b}", submitGuess: "Check",
       finalWarning: "Attempts used — last chance!", finalSubmit: "Submit", finalInput: "Final answer...",
@@ -1182,7 +1195,8 @@
     ru: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", newGame: "Новая игра", menu: "Меню",
-      frostLabel: "Мороз и жара",
+      frostLabel: "Мороз и Жара",
+      hintLabel: "Подсказка: расстояние",
       vizThermo: "Градусник", vizLine: "Числовая прямая",
       enterGuess: "Введите число", placeholderTpl: "от {a} до {b}", submitGuess: "Проверить",
       finalWarning: "Попытки закончились — последний шанс!", finalSubmit: "Ответить", finalInput: "Финальный ответ...",
@@ -1271,7 +1285,8 @@
     fr: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", newGame: "Nouvelle partie", menu: "Menu",
-      frostLabel: "Gel et chaleur",
+      frostLabel: "Gel et Chaleur",
+      hintLabel: "Indice : distance",
       vizThermo: "Thermomètre", vizLine: "Droite numérique",
       enterGuess: "Entrez un nombre", placeholderTpl: "de {a} à {b}", submitGuess: "Vérifier",
       finalWarning: "Tentatives épuisées — dernière chance !", finalSubmit: "Valider", finalInput: "Réponse finale...",
@@ -1361,6 +1376,7 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze",
+      hintLabel: "Hinweis: Abstand",
       vizThermo: "Thermometer", vizLine: "Zahlenstrahl",
       enterGuess: "Gib eine Zahl ein", placeholderTpl: "von {a} bis {b}", submitGuess: "Prüfen",
       finalWarning: "Versuche aufgebraucht — letzte Chance!", finalSubmit: "Bestätigen", finalInput: "Letzte Antwort...",
@@ -1562,6 +1578,15 @@
 
   // Градусник и числовая прямая показываются по умолчанию; кому тесно на экране —
   // может убрать любую из них, и выбор запомнится
+  // Пояс расстояний рядом с подсказкой — помощь для тренировки. Включён по
+  // умолчанию, но перед началом игры его можно снять и считать самому
+  let distanceHint = localStorage.getItem('hc_hint') !== '0';
+
+  function setDistanceHint(on) {
+    distanceHint = !!on;
+    try { localStorage.setItem('hc_hint', distanceHint ? '1' : '0'); } catch (e) {}
+  }
+
   let showThermo = localStorage.getItem('hc_show_thermo') !== '0';
   let showLine = localStorage.getItem('hc_show_line') !== '0';
 
@@ -1720,6 +1745,7 @@
     document.getElementById('finalInput').placeholder = L.finalInput;
     renderVizToggles();
     document.getElementById('tFrostSetup').textContent = L.frostLabel;
+    document.getElementById('tHintSetup').textContent = L.hintLabel;
     document.getElementById('tFrostRun').textContent = L.frostLabel;
     renderFrostToggles();
 
@@ -1804,6 +1830,9 @@
     const L = t();
     document.getElementById('duelOnlyFields').classList.toggle('hidden', m !== 'duel');
     document.getElementById('attemptsField').classList.toggle('hidden', m !== 'solo');
+    // Подсказка про расстояние есть только в тренировке
+    document.getElementById('hintRow').classList.toggle('hidden', m !== 'solo');
+    document.getElementById('hintSetup').checked = distanceHint;
     document.getElementById('tStartMatch').textContent = (m === 'duel') ? L.startMatch : L.startGame;
     buildRangeOptions();
     if (m === 'duel') buildHandicapOptions();
@@ -2053,10 +2082,15 @@
     panel.style.border = '1px solid ' + last.meta.color;
     panel.classList.remove('hidden');
     const label = document.getElementById('feedbackLabel');
-    // Пояс расстояний рядом с подсказкой — помощь для тренировки: там учатся.
-    // В игре с другом и в рейтинге его нет, иначе это преимущество, а не учёба
-    label.textContent = getFbText(last.meta) +
-      (mode === 'solo' && last.distance > 0 ? '  ·  ' + last.meta.rangeSign : '');
+    label.textContent = getFbText(last.meta);
+    // Пояс — помощь для тренировки: там учатся. В игре с другом и в рейтинге его
+    // нет, иначе это преимущество, а не учёба
+    const band = document.getElementById('feedbackBand');
+    const showBand = mode === 'solo' && distanceHint && last.distance > 0;
+    band.classList.toggle('hidden', !showBand);
+    band.textContent = showBand ? last.meta.rangeSign : '';
+    band.style.color = last.meta.color;
+    panel.classList.toggle('with-band', showBand);
     label.style.color = last.meta.color;
   }
 
@@ -2377,7 +2411,9 @@
     grid.innerHTML = '';
     bar.innerHTML = '';
     const labels = t().labels;
-    FEEDBACK_META.slice(0, 8).forEach(meta => {
+    // От лавы к холоду, а не наоборот: ближняя подсказка — самая частая и самая
+    // нужная, ей место в начале списка, а не в самом низу
+    FEEDBACK_META.slice(0, 8).reverse().forEach(meta => {
       const item = document.createElement('div');
       item.className = 'legend-item';
       item.innerHTML = '<span class="l-label" style="color:' + meta.color + '">' + labels[meta.labelIndex] +
