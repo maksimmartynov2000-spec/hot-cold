@@ -501,13 +501,15 @@
     @media (max-width: 859px) {
       .card.solo-game .info-bar { margin-bottom: 10px; }
 
-      .card.solo-game .thermo-wrap { margin: 0 0 4px; }
+      .card.solo-game .thermo-wrap { margin: 0 0 2px; }
+
+      .card.solo-game .numline { margin-bottom: 6px; }
 
       /* Рамку вокруг подсказки на телефоне оставляем — она же и есть главный
          сигнал «горячо/холодно». Экономим высоту за счёт отступов, а не фона */
       .card.solo-game .feedback-panel {
         padding: 7px 12px;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
         border-radius: 12px;
         animation: none;
       }
@@ -517,6 +519,32 @@
       .card.solo-game .guess-section p { margin-bottom: 5px; }
 
       .card.solo-game .history-list { max-height: 96px; }
+    }
+
+    /* Числовая прямая: где стоит догадка и в каких двух участках может быть ответ.
+       Проценты внутри SVG считаются от его ширины, поэтому пересчитывать
+       координаты при смене размера экрана не нужно */
+    .numline {
+      margin: 0 0 8px;
+      padding: 0 4px;
+    }
+    .numline svg { display: block; overflow: visible; }
+
+    /* Прямая заняла место, которого на невысоком экране нет. Забираем его у
+       градусника: «где именно» теперь показывает прямая, а ему остаётся
+       «насколько горячо». Условие по высоте, а не по ширине — широкий, но
+       низкий ноутбук стеснён так же, как телефон */
+    @media (max-height: 900px) {
+      .card.solo-game .thermo-wrap { margin-top: 0; }
+      .card.solo-game .thermo-tube { height: 62px; }
+      .card.solo-game .thermo-bulb { width: 36px; height: 36px; }
+      .card.solo-game .thermo-bulb::after { top: 8px; left: 10px; width: 9px; height: 6px; }
+    }
+
+    /* Широкому, но низкому экрану телефонные правила не достаются, а место
+       ему нужно так же — подрезаем отступ под градусником отдельно */
+    @media (max-height: 900px) and (min-width: 860px) {
+      .card.solo-game .thermo-wrap { margin-bottom: 10px; }
     }
 
     .final-box {
@@ -897,6 +925,8 @@
         <div class="feedback-panel hidden" id="feedbackPanel">
           <div class="fb-label" id="feedbackLabel"></div>
         </div>
+
+        <div class="numline hidden" id="numLine"><svg id="numLineSvg" width="100%" height="46"></svg></div>
 
         <div class="final-box hidden" id="finalBox">
           <p id="tFinalWarning">Attempts used — last chance!</p>
@@ -1942,6 +1972,7 @@
 
     renderFeedback();
     renderThermo();
+    renderNumberLine();
     renderStatus();
     renderResult();
     renderHistory();
@@ -1957,7 +1988,10 @@
     panel.style.border = '1px solid ' + last.meta.color;
     panel.classList.remove('hidden');
     const label = document.getElementById('feedbackLabel');
-    label.textContent = getFbText(last.meta);
+    // К подсказке добавляем сам пояс: именно из него получаются закрашенные
+    // участки на прямой, и в шкале снизу это число всё равно написано
+    label.textContent = getFbText(last.meta) +
+      (last.distance === 0 ? '' : '  ·  ' + last.meta.rangeSign);
     label.style.color = last.meta.color;
   }
 
@@ -1993,6 +2027,129 @@
     } else {
       bulb.classList.remove('pulse');
     }
+  }
+
+  // ================= ЧИСЛОВАЯ ПРЯМАЯ =================
+  // Игрок знает не точное расстояние, а пояс: «очень горячо» — это 4–10.
+  // Значит из догадки g следует, что ответ лежит в [g−max; g−min] или [g+min; g+max].
+  // Эти два участка и закрашиваем: ученик видит, что ответ бывает по обе стороны,
+  // и что минус — не край мира, а такая же сторона прямой.
+  const NL = { left: 4, right: 96, axisY: 25, zoneY: 17, zoneH: 16, baseY: 43 };
+
+  // Что именно показываем: обычно весь диапазон, но на широком диапазоне горячий
+  // пояс занимает доли процента длины и превращается в пятно у точки. Тогда
+  // показываем окрестность догадки и честно подписываем её края
+  let NLVIEW = { min: 0, max: 1, zoomed: false };
+
+  function nlView() {
+    const last = history[history.length - 1];
+    const span = Math.max(1, RANGE_MAX - RANGE_MIN);
+    if (!last || last.distance === 0) return { min: RANGE_MIN, max: RANGE_MAX, zoomed: false };
+    // Решает ширина одной зоны, а не двух вместе: если она занимает меньше
+    // сороковой части прямой, на телефоне это пара пикселей и сливается с точкой
+    const zoneWidth = (last.meta.max - last.meta.min + 1) / span;
+    if (zoneWidth >= 0.025) return { min: RANGE_MIN, max: RANGE_MAX, zoomed: false };
+    const half = Math.max(3 * last.meta.max, 5);
+    const min = Math.max(RANGE_MIN, last.guess - half);
+    const max = Math.min(RANGE_MAX, last.guess + half);
+    return { min, max, zoomed: min > RANGE_MIN || max < RANGE_MAX };
+  }
+
+  function nlPos(v) {
+    const span = Math.max(1, NLVIEW.max - NLVIEW.min);
+    const k = (Math.min(NLVIEW.max, Math.max(NLVIEW.min, v)) - NLVIEW.min) / span;
+    return NL.left + (NL.right - NL.left) * k;
+  }
+
+  function nlInView(v) { return v >= NLVIEW.min && v <= NLVIEW.max; }
+
+  function nlBand(from, to, color) {
+    const a = Math.max(NLVIEW.min, Math.min(from, to));
+    const b = Math.min(NLVIEW.max, Math.max(from, to));
+    if (b < a) return '';
+    const x = nlPos(a), w = Math.max(1.5, nlPos(b) - x);
+    return '<rect x="' + x + '%" y="' + NL.zoneY + '" width="' + w + '%" height="' + NL.zoneH +
+           '" rx="3" fill="' + color + '" fill-opacity="0.3" stroke="' + color +
+           '" stroke-opacity="0.8" stroke-width="1" />';
+  }
+
+  function nlText(x, y, anchor, size, fill, weight, str) {
+    return '<text x="' + x + '%" y="' + y + '" text-anchor="' + anchor + '" font-size="' + size +
+           '" font-weight="' + weight + '" fill="' + fill + '">' + str + '</text>';
+  }
+
+  function renderNumberLine() {
+    const box = document.getElementById('numLine');
+    const svg = document.getElementById('numLineSvg');
+    if (!box || !svg) return;
+    box.classList.remove('hidden');
+
+    NLVIEW = nlView();
+    const last = history[history.length - 1];
+    let out = '';
+
+    // два участка, где может прятаться ответ
+    if (last && last.distance > 0) {
+      out += nlBand(last.guess - last.meta.max, last.guess - last.meta.min, last.meta.color);
+      out += nlBand(last.guess + last.meta.min, last.guess + last.meta.max, last.meta.color);
+    }
+
+    // сама прямая
+    out += '<line x1="' + NL.left + '%" y1="' + NL.axisY + '" x2="' + NL.right + '%" y2="' + NL.axisY +
+           '" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round" />';
+
+    // Если это окно, а не весь диапазон — на краях уголки: прямая идёт дальше.
+    // Рисуем их текстом: в атрибуте d проценты не работают, а у text — работают
+    if (NLVIEW.zoomed) {
+      if (NLVIEW.min > RANGE_MIN)
+        out += nlText(1, NL.axisY + 4, 'start', 13, 'rgba(255,255,255,0.45)', 400, '‹');
+      if (NLVIEW.max < RANGE_MAX)
+        out += nlText(99, NL.axisY + 4, 'end', 13, 'rgba(255,255,255,0.45)', 400, '›');
+    }
+
+    // Деления. Прямая нужна не только чтобы смотреть, но и чтобы считать:
+    // на «−5…+5» видно каждую единицу, и ученик доходит до ответа пальцем.
+    // Шаг подбираем так, чтобы делений было не больше двух десятков
+    const viewSpan = NLVIEW.max - NLVIEW.min;
+    const step = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500].find(v => viewSpan / v <= 20);
+    if (step) {
+      for (let v = Math.ceil(NLVIEW.min / step) * step; v <= NLVIEW.max; v += step) {
+        if (v === 0 && RANGE_MIN < 0) continue;   // ноль рисуется отдельно и ярче
+        out += '<line x1="' + nlPos(v) + '%" y1="' + (NL.axisY + 3) + '" x2="' + nlPos(v) +
+               '%" y2="' + (NL.axisY + 7) + '" stroke="rgba(255,255,255,0.22)" stroke-width="1.5" />';
+      }
+    }
+
+    // прошлые догадки — полыми кружками: штрихи путались с делениями шкалы
+    history.slice(0, -1).forEach(h => {
+      if (!nlInView(h.guess)) return;
+      out += '<circle cx="' + nlPos(h.guess) + '%" cy="' + NL.axisY + '" r="2.5" fill="none" ' +
+             'stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />';
+    });
+
+    // ноль отмечаем отдельно — ради него всё и затевалось
+    if (nlInView(0) && RANGE_MIN < 0) {
+      out += '<line x1="' + nlPos(0) + '%" y1="' + (NL.zoneY - 2) + '" x2="' + nlPos(0) + '%" y2="' +
+             (NL.zoneY + NL.zoneH + 2) + '" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" />';
+      out += nlText(nlPos(0), NL.baseY, 'middle', 10, 'rgba(255,255,255,0.6)', 700, '0');
+    }
+
+    const endFill = NLVIEW.zoomed ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.45)';
+    out += nlText(nlPos(NLVIEW.min), NL.baseY, 'start', 10, endFill, 400, formatNum(NLVIEW.min));
+    out += nlText(nlPos(NLVIEW.max), NL.baseY, 'end', 10, endFill, 400, formatNum(NLVIEW.max));
+
+    // текущая догадка
+    if (last) {
+      const color = last.distance === 0 ? BULLSEYE_TIER.color : last.meta.color;
+      const p = nlPos(last.guess);
+      out += '<circle cx="' + p + '%" cy="' + NL.axisY + '" r="5" fill="#0f1430" stroke="' + color +
+             '" stroke-width="2.5" />';
+      // у самого края подпись разворачиваем внутрь, иначе она уезжает за карточку
+      const anchor = p < 12 ? 'start' : (p > 88 ? 'end' : 'middle');
+      out += nlText(p, 11, anchor, 11, color, 700, formatNum(last.guess));
+    }
+
+    svg.innerHTML = out;
   }
 
   function renderStatus() {

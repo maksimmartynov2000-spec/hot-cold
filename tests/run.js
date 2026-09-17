@@ -584,6 +584,75 @@ async function testFrostMode(browser) {
   await done(page2);
 }
 
+
+async function testNumberLine(browser) {
+  console.log('\nЧисловая прямая');
+  const page = await newGame(browser, { user: 'Максим' });
+
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(200);
+  await page.check('#frostSetup');
+  await page.waitForTimeout(200);
+  await page.selectOption('#rangeMax', '100');
+  await page.waitForTimeout(150);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { secret = 37; });
+
+  check('прямая видна до первой догадки', await page.locator('#numLine').isVisible());
+  check('ноль отмечен на прямой',
+    await page.evaluate(() => document.getElementById('numLineSvg').textContent.indexOf('0') >= 0));
+
+  await page.fill('#guessInput', '30');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+
+  // из догадки 30 и пояса 4–10 следуют участки [20;26] и [34;40]
+  const zones = await page.evaluate(() => {
+    const last = history[history.length - 1];
+    const rects = [...document.querySelectorAll('#numLineSvg rect')]
+      .map(r => parseFloat(r.getAttribute('x')));
+    const want = [nlPos(last.guess - last.meta.max), nlPos(last.guess + last.meta.min)];
+    return { band: [last.meta.min, last.meta.max], count: rects.length,
+             ok: rects.length === 2 && rects.every((x, i) => Math.abs(x - want[i]) < 0.01) };
+  });
+  check('участков ровно два, по обе стороны от догадки', zones.ok,
+    'прямоугольников ' + zones.count + ', пояс ' + zones.band.join('–'));
+
+  check('на узком диапазоне видно весь диапазон, без приближения',
+    await page.evaluate(() => NLVIEW.zoomed === false));
+
+  // пояс написан в подсказке — из него и получаются участки
+  check('пояс расстояний виден в подсказке',
+    (await page.locator('#feedbackLabel').textContent()).indexOf('4–10') >= 0,
+    await page.locator('#feedbackLabel').textContent());
+
+  // широкий диапазон: прямая переходит в окно, иначе участки — пятно у точки
+  await page.evaluate(() => {
+    frostMode = false;
+    applyBounds(1000);
+    history = [];
+    secret = 640;
+  });
+  await page.fill('#guessInput', '660');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const zoom = await page.evaluate(() => ({ view: NLVIEW, min: RANGE_MIN, max: RANGE_MAX }));
+  check('на широком диапазоне показывается окно вокруг догадки',
+    zoom.view.zoomed && zoom.view.min > zoom.min && zoom.view.max < zoom.max,
+    JSON.stringify(zoom.view));
+
+  // окно должно быть заметно шире самих участков, иначе смысла в нём нет
+  const roomy = await page.evaluate(() => {
+    const last = history[history.length - 1];
+    return (last.meta.max - last.meta.min + 1) / (NLVIEW.max - NLVIEW.min);
+  });
+  check('в окне участок занимает заметную долю прямой', roomy > 0.05 && roomy < 0.5,
+    'доля ' + roomy.toFixed(3));
+
+  await done(page);
+}
+
 async function testPinHelp(browser) {
   console.log('\nПодсказка к PIN и свой PIN');
   const page = await newGame(browser);
@@ -674,6 +743,7 @@ async function testPinHelp(browser) {
     await testPinHelp(browser);
     await testFrostMode(browser);
     await testBestPerAccount(browser);
+    await testNumberLine(browser);
   } finally {
     await browser.close();
   }
