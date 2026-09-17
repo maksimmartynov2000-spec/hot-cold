@@ -625,10 +625,16 @@ async function testNumberLine(browser) {
     marks.x + ' вместо ' + marks.want);
   check('текущая догадка одна и она залита', marks.filled === 1, JSON.stringify(marks));
 
-  // подсказка снова только про пояс, без чисел расстояния
-  check('в подсказке нет расстояния',
-    !/\d/.test(await page.locator('#feedbackLabel').textContent()),
+  // пояс расстояний — помощь для тренировки, тут он нужен
+  check('в тренировке подсказка называет пояс',
+    /\d/.test(await page.locator('#feedbackLabel').textContent()),
     await page.locator('#feedbackLabel').textContent());
+
+  // на телефоне подписи крупнее: их читает второклассник с рук
+  const sizes = await page.evaluate(() =>
+    [...document.querySelectorAll('#numLineSvg text')].map(t => +t.getAttribute('font-size')));
+  check('подписи на телефоне не мельче 12 пикселей', Math.min(...sizes) >= 12,
+    'минимальный размер ' + Math.min(...sizes));
 
   // на широком диапазоне подписи редеют, но не наезжают друг на друга
   await page.evaluate(() => { frostMode = false; applyBounds(1000); history = []; secret = 640; renderAll(); });
@@ -646,6 +652,51 @@ async function testNumberLine(browser) {
     wide.labels.some(v => v.replace(/\s/g, '') === '1000'), wide.labels.join(' '));
 
   await done(page);
+}
+
+async function testBandOnlyInPractice(browser) {
+  console.log('\nПояс расстояний только в тренировке');
+
+  // Тренировка — пояс есть
+  const solo = await newGame(browser, { user: 'Максим' });
+  await solo.click('#tModeSolo');
+  await solo.waitForTimeout(200);
+  await solo.click('#tStartMatch');
+  await solo.waitForTimeout(250);
+  await solo.evaluate(() => { secret = 2; });   // догадка 1 гарантированно мимо
+  await solo.fill('#guessInput', '1');
+  await solo.click('#tSubmitGuess');
+  await solo.waitForTimeout(250);
+  const soloText = await solo.locator('#feedbackLabel').textContent();
+  check('в тренировке пояс показан', /\d/.test(soloText), soloText);
+  await done(solo);
+
+  // Игра с другом — пояса быть не должно
+  const duel = await newGame(browser, { user: 'Максим' });
+  await duel.click('#tModeDuel');
+  await duel.waitForTimeout(200);
+  await duel.click('#tStartMatch');
+  await duel.waitForTimeout(250);
+  await duel.fill('#guessInput', '1');
+  await duel.click('#tSubmitGuess');
+  await duel.waitForTimeout(250);
+  const duelText = await duel.locator('#feedbackLabel').textContent();
+  check('в игре с другом пояса нет', !/\d/.test(duelText), duelText);
+  await done(duel);
+
+  // Рейтинг — тоже без пояса
+  const run = await newGame(browser, { user: 'Максим' });
+  await run.click('#tModeRun');
+  await run.waitForTimeout(350);
+  await run.click('#tRunStart');
+  await run.waitForTimeout(300);
+  await run.evaluate(() => { secret = 2; });
+  await run.fill('#guessInput', '1');
+  await run.click('#tSubmitGuess');
+  await run.waitForTimeout(250);
+  const runText = await run.locator('#feedbackLabel').textContent();
+  check('в рейтинге пояса нет', !/\d/.test(runText), runText);
+  await done(run);
 }
 
 async function testVizToggles(browser) {
@@ -787,6 +838,7 @@ async function testPinHelp(browser) {
     await testBestPerAccount(browser);
     await testNumberLine(browser);
     await testVizToggles(browser);
+    await testBandOnlyInPractice(browser);
   } finally {
     await browser.close();
   }
