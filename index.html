@@ -525,7 +525,7 @@
 
       .card.solo-game .thermo-wrap { margin: 0 0 2px; }
 
-      .card.solo-game .numline { margin-bottom: 6px; }
+      .card.solo-game .numline { margin-bottom: 4px; }
 
       /* Рамку вокруг подсказки на телефоне оставляем — она же и есть главный
          сигнал «горячо/холодно». Экономим высоту за счёт отступов, а не фона */
@@ -566,7 +566,7 @@
     /* Широкому, но низкому экрану телефонные правила не достаются, а место
        ему нужно так же — подрезаем отступ под градусником отдельно */
     @media (max-height: 900px) and (min-width: 860px) {
-      .card.solo-game .thermo-wrap { margin-bottom: 10px; }
+      .card.solo-game .thermo-wrap { margin-bottom: 8px; }
     }
 
     .final-box {
@@ -952,7 +952,7 @@
           <div class="fb-label" id="feedbackLabel"></div>
         </div>
 
-        <div class="numline hidden" id="numLine"><svg id="numLineSvg" width="100%" height="46"></svg></div>
+        <div class="numline hidden" id="numLine"><svg id="numLineSvg" width="100%" height="48"></svg></div>
 
         <div class="final-box hidden" id="finalBox">
           <p id="tFinalWarning">Attempts used — last chance!</p>
@@ -2050,7 +2050,10 @@
     panel.style.border = '1px solid ' + last.meta.color;
     panel.classList.remove('hidden');
     const label = document.getElementById('feedbackLabel');
-    label.textContent = getFbText(last.meta);
+    // Пояс расстояний рядом с подсказкой — помощь для тренировки: там учатся.
+    // В игре с другом и в рейтинге его нет, иначе это преимущество, а не учёба
+    label.textContent = getFbText(last.meta) +
+      (mode === 'solo' && last.distance > 0 ? '  ·  ' + last.meta.rangeSign : '');
     label.style.color = last.meta.color;
   }
 
@@ -2094,7 +2097,7 @@
   // Значит из догадки g следует, что ответ лежит в [g−max; g−min] или [g+min; g+max].
   // Эти два участка и закрашиваем: ученик видит, что ответ бывает по обе стороны,
   // и что минус — не край мира, а такая же сторона прямой.
-  const NL = { left: 6, right: 94, axisY: 25, baseY: 43 };
+  const NL = { left: 6, right: 94, axisY: 25, baseY: 45 };
 
   function nlPos(v) {
     const span = Math.max(1, RANGE_MAX - RANGE_MIN);
@@ -2134,11 +2137,15 @@
            '" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round" />';
 
     // Подписей помещается столько, сколько позволяет ширина: считаем её по самому
-    // длинному числу на прямой, иначе на узком телефоне они наедут друг на друга
+    // длинному числу на прямой, иначе на узком телефоне они наедут друг на друга.
+    // На телефоне шрифт крупнее: читать эти числа должен второклассник с рук
     const w = svg.clientWidth || 320;
-    const labelPx = Math.max(formatNum(RANGE_MIN).length, formatNum(RANGE_MAX).length) * 6 + 14;
+    const fs = w < 520 ? 12 : 11;
+    const labelPx = Math.max(formatNum(RANGE_MIN).length, formatNum(RANGE_MAX).length) * fs * 0.62 + 9;
     const labelPct = (labelPx / w) * 100;
-    const labelStep = nlStep(span, Math.max(2, Math.floor(w / labelPx) - 1));
+    // Считаем по той длине, что прямая занимает на самом деле, а не по всей ширине
+    const labelRoom = w * (NL.right - NL.left) / 100;
+    const labelStep = nlStep(span, Math.max(2, Math.floor(labelRoom / labelPx)));
     const tickStep = nlStep(span, 20);
 
     for (let v = Math.ceil(RANGE_MIN / tickStep) * tickStep; v <= RANGE_MAX; v += tickStep) {
@@ -2152,19 +2159,19 @@
       // пропускаем только те, что реально налезли бы на подписи границ
       if (Math.abs(p - NL.left) < labelPct || Math.abs(p - NL.right) < labelPct) continue;
       out += nlTick(v, NL.axisY + 3, NL.axisY + 9, 'rgba(255,255,255,0.35)', 1.5);
-      out += nlText(p, NL.baseY, 'middle', 10, 'rgba(255,255,255,0.45)', 400, formatNum(v));
+      out += nlText(p, NL.baseY, 'middle', fs, 'rgba(255,255,255,0.5)', 400, formatNum(v));
     }
 
     // Ноль отмечаем отдельно — ради него всё и затевалось
     if (RANGE_MIN < 0 && RANGE_MAX > 0) {
       out += nlTick(0, NL.axisY - 7, NL.axisY + 9, 'rgba(255,255,255,0.55)', 1.5);
-      out += nlText(nlPos(0), NL.baseY, 'middle', 10, 'rgba(255,255,255,0.65)', 700, '0');
+      out += nlText(nlPos(0), NL.baseY, 'middle', fs, 'rgba(255,255,255,0.75)', 700, '0');
     }
 
     // Границы диапазона. Их подписи тоже по центру деления, как у остальных:
     // так соседнее число не приходится выбрасывать из-за мнимого наложения
     [RANGE_MIN, RANGE_MAX].forEach(v => {
-      out += nlText(nlPos(v), NL.baseY, 'middle', 10, 'rgba(255,255,255,0.45)', 400, formatNum(v));
+      out += nlText(nlPos(v), NL.baseY, 'middle', fs, 'rgba(255,255,255,0.5)', 400, formatNum(v));
     });
 
     // Прошлые догадки — полыми кружками, текущая — залитым
@@ -2180,7 +2187,7 @@
              '" stroke-width="2.5" />';
       // у самого края подпись разворачиваем внутрь, иначе она уезжает за карточку
       const anchor = p < 12 ? 'start' : (p > 88 ? 'end' : 'middle');
-      out += nlText(p, 11, anchor, 11, color, 700, formatNum(last.guess));
+      out += nlText(p, 11, anchor, fs + 1, color, 700, formatNum(last.guess));
     }
 
     svg.innerHTML = out;
