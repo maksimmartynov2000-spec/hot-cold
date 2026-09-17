@@ -278,17 +278,20 @@
     .mode-btn.run { border-left: 3px solid #4ade80; }
 
     /* ---------- Настройка дуэли ---------- */
-    .setup-field { margin-bottom: 14px; }
+    .setup-field { margin-bottom: 20px; }
+    /* Поле, под которым стоит своя галочка: она должна держаться за него,
+       а не висеть ровно посередине между двумя полями */
+    .setup-field.tight { margin-bottom: 8px; }
     .setup-field label {
       display: block;
-      font-size: 12px;
+      font-size: 12.5px;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: rgba(255, 255, 255, 0.4);
+      color: rgba(255, 255, 255, 0.45);
       font-weight: 600;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
-    .setup-row { display: flex; gap: 8px; }
+    .setup-row { display: flex; gap: 8px; margin-top: 4px; }
 
     /* ---------- Игровое поле ---------- */
     .board {
@@ -796,14 +799,15 @@
     .frost-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin: 10px 0 4px;
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.75);
+      gap: 10px;
+      margin: 0 0 20px;
+      padding: 2px 0;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
       cursor: pointer;
       user-select: none;
     }
-    .frost-row input { width: 17px; height: 17px; accent-color: #6366f1; cursor: pointer; }
+    .frost-row input { width: 19px; height: 19px; accent-color: #6366f1; cursor: pointer; }
 
     .lb-empty {
       font-size: 13px;
@@ -874,7 +878,7 @@
 
   <!-- ЭКРАН 2: настройка -->
   <div id="screenSetup" class="hidden">
-    <div class="setup-field">
+    <div class="setup-field tight">
       <label id="tLblRange">Range</label>
       <select class="field" id="rangeMax" onchange="buildAttemptsOptions()"></select>
     </div>
