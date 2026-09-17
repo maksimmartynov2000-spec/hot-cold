@@ -768,6 +768,48 @@ async function testDistanceHint(browser) {
   await done(muted);
 }
 
+async function testRoundTiers(browser) {
+  console.log('\nКруглые числа в поясах расстояний');
+  const page = await newGame(browser, { user: 'Максим' });
+
+  const bad = await page.evaluate(() => {
+    const problems = [];
+    const sizes = [10, 20, 50, 100, 250, 500, 1000, 2000];
+    for (const n of sizes) {
+      for (const frost of [false, true]) {
+        const count = frost ? Math.floor(n / 2) * 2 + 1 : n;
+        const maxDistance = count - 1;
+        const meta = buildFeedbackMeta(count);
+        const name = (frost ? '±' + (n / 2) : '1–' + n);
+        const tiers = meta.slice(0, 8);
+
+        // пояса идут подряд и вместе накрывают все возможные расстояния
+        if (tiers[7].min !== 1) problems.push(name + ': шкала начинается не с 1');
+        if (tiers[0].max < maxDistance) problems.push(name + ': не накрыто расстояние ' + maxDistance);
+        for (let i = 0; i < 8; i++) {
+          if (tiers[i].min > tiers[i].max) problems.push(name + ': пустой пояс ' + i);
+          if (i && tiers[i - 1].min !== tiers[i].max + 1) problems.push(name + ': разрыв между поясами');
+        }
+        // Круглой должна быть верхняя граница пояса. Нижняя — это «предыдущая
+        // плюс один», она и обязана быть 21 или 61: так «21–50» и читается
+        tiers.forEach(t => {
+          if (t.max > 10 && t.max % 5 !== 0) problems.push(name + ': некруглая граница ' + t.max);
+        });
+      }
+    }
+    return problems;
+  });
+  check('границы поясов круглые и без дыр', bad.length === 0, bad.slice(0, 5).join('; '));
+
+  // сотня — самый ходовой диапазон, проверяем её подписи целиком
+  const hundred = await page.evaluate(() =>
+    buildFeedbackMeta(100).slice(0, 8).map(m => m.rangeSign).reverse().join(' '));
+  check('шкала сотни читается круглыми числами',
+    hundred === '1 2 3–4 5–8 9–15 16–30 31–60 61–100', hundred);
+
+  await done(page);
+}
+
 async function testScaleOrder(browser) {
   console.log('\nПорядок в шкале расстояний');
   const page = await newGame(browser, { user: 'Максим' });
@@ -945,6 +987,7 @@ async function testPinHelp(browser) {
     await testVizToggles(browser);
     await testDistanceHint(browser);
     await testScaleOrder(browser);
+    await testRoundTiers(browser);
   } finally {
     await browser.close();
   }
