@@ -223,6 +223,31 @@ async function testTranslations(browser) {
     check('язык ' + lang + ': все подписи заполнены', empty.length === 0, empty.join(', '));
   }
 
+  // Числительные согласуются с числом, а не подставляются одной строкой
+  const plurals = await page.evaluate(() => {
+    const bad = [];
+    const expect = {
+      ru: { 1: '1 очко', 2: '2 очка', 5: '5 очков', 11: '11 очков', 21: '21 очко', 133: '133 очка' },
+      en: { 1: '1 point', 2: '2 points', 5: '5 points' },
+      fr: { 0: '0 point', 1: '1 point', 2: '2 points' },
+      de: { 1: '1 Punkt', 2: '2 Punkte', 5: '5 Punkte' }
+    };
+    for (const lang of Object.keys(expect)) {
+      currentLang = lang;
+      for (const n of Object.keys(expect[lang])) {
+        const got = withPlural(+n, i18n[lang].run.pointForms);
+        if (got !== expect[lang][n]) bad.push(lang + ': ' + got + ' вместо ' + expect[lang][n]);
+      }
+    }
+    return bad;
+  });
+  check('числительные согласованы во всех языках', plurals.length === 0, plurals.join('; '));
+
+  // Игра называется одинаково везде, включая текст «поделиться»
+  const named = await page.evaluate(() => Object.keys(i18n)
+    .filter(l => i18n[l].run.shareText.indexOf('Hot or Cold') === -1));
+  check('в тексте «поделиться» игра названа как Hot or Cold', named.length === 0, named.join(', '));
+
   const missing = await page.evaluate(() => {
     const used = new Set();
     const html = document.documentElement.outerHTML;
