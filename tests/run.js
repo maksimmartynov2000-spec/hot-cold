@@ -398,6 +398,92 @@ async function testPauseAndGiveUp(browser) {
 }
 
 
+async function testFrostMode(browser) {
+  console.log('\nМороз и жара');
+  const page = await newGame(browser, { user: 'Максим' });
+
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(200);
+  const before = await page.evaluate(() => ({
+    labels: [...document.querySelectorAll('#rangeMax option')].map(o => o.textContent),
+    attempts: [...document.querySelectorAll('#attemptsCount option')].map(o => o.textContent)
+  }));
+  check('без мороза границы обычные', before.labels.join(' ').indexOf('-') === -1, before.labels.join(' '));
+
+  await page.check('#frostSetup');
+  await page.waitForTimeout(200);
+  const after = await page.evaluate(() => ({
+    labels: [...document.querySelectorAll('#rangeMax option')].map(o => o.textContent),
+    attempts: [...document.querySelectorAll('#attemptsCount option')].map(o => o.textContent)
+  }));
+  check('с морозом границы симметричные', after.labels[1] === '-50…+50', after.labels.join(' '));
+  // чисел столько же, значит и попыток должно предлагаться столько же
+  check('попыток предлагается столько же', after.attempts.join() === before.attempts.join(),
+    before.attempts.join() + ' → ' + after.attempts.join());
+
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  const g = await page.evaluate(() => ({
+    min: RANGE_MIN, max: RANGE_MAX, count: rangeCount(), secret,
+    inputMin: document.getElementById('guessInput').min,
+    placeholder: document.getElementById('guessInput').placeholder
+  }));
+  check('границы зеркальны относительно нуля', g.min === -g.max, g.min + '…' + g.max);
+  check('чисел столько же, сколько в обычной тысяче', g.count === 1001, String(g.count));
+  check('секрет внутри границ', g.secret >= g.min && g.secret <= g.max, String(g.secret));
+  check('поле ввода пускает минус', g.inputMin === String(g.min), g.inputMin);
+  check('подсказка в поле называет обе границы',
+    g.placeholder.indexOf('-500') >= 0 && g.placeholder.indexOf('500') >= 0, g.placeholder);
+
+  // отрицательная догадка засчитывается, расстояние считается верно
+  await page.fill('#guessInput', '-400');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const h = await page.evaluate(() => ({ len: history.length, d: history[0].distance, s: secret }));
+  check('отрицательная догадка принята', h.len === 1);
+  check('расстояние от отрицательной догадки верное', h.d === Math.abs(-400 - h.s),
+    h.d + ' вместо ' + Math.abs(-400 - h.s));
+
+  // ноль — тоже допустимое число
+  await page.fill('#guessInput', '0');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  check('ноль принимается как догадка', await page.evaluate(() => history.length) === 2);
+
+  // за границей — не принимается
+  await page.fill('#guessInput', '-501');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(200);
+  check('число за нижней границей отклонено', await page.evaluate(() => history.length) === 2);
+
+  // рекорды не перемешиваются с обычной игрой
+  const keys = await page.evaluate(() => {
+    localStorage.setItem('hc_record_1000', '5');
+    return { frost: recordKey(1000), normal: (setFrostMode(false), recordKey(1000)) };
+  });
+  check('у мороза свой ключ рекорда', keys.frost !== keys.normal, keys.frost + ' / ' + keys.normal);
+
+  await done(page);
+
+  // Переключатель есть и в режиме на рейтинг, и он запоминается
+  const page2 = await newGame(browser, { user: 'Максим' });
+  await page2.click('#tModeRun');
+  await page2.waitForTimeout(350);
+  check('в хабе рейтинга есть переключатель', await page2.locator('#frostRun').isVisible());
+  await page2.check('#frostRun');
+  await page2.waitForTimeout(150);
+  await page2.click('#tRunStart');
+  await page2.waitForTimeout(300);
+  const r = await page2.evaluate(() => ({ min: RANGE_MIN, max: RANGE_MAX }));
+  check('рейтинг играется в симметричных границах', r.min === -r.max && r.min < 0, r.min + '…' + r.max);
+
+  await page2.reload();
+  await page2.waitForTimeout(400);
+  check('выбор запомнился после перезагрузки', await page2.evaluate(() => frostMode === true));
+
+  await done(page2);
+}
+
 async function testPinHelp(browser) {
   console.log('\nПодсказка к PIN и свой PIN');
   const page = await newGame(browser);
@@ -486,6 +572,7 @@ async function testPinHelp(browser) {
     await testDuelWording(browser);
     await testPauseAndGiveUp(browser);
     await testPinHelp(browser);
+    await testFrostMode(browser);
   } finally {
     await browser.close();
   }
