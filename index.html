@@ -2469,14 +2469,26 @@
 
   // Личный рекорд знаем из двух бесплатных источников: ответа сервера при отправке
   // результата и собственной строки в общем топе. Отдельный запрос ради него не нужен.
+  //
+  // Ключ — с именем ученика. На одном телефоне играют по очереди: с общим ключом
+  // следующий вошедший видел чужой рекорд как свой
+  function runBestKey() {
+    const auth = runAuth();
+    return auth ? 'hc_run_best_' + auth.username.toLowerCase() : null;
+  }
+
   function runBest() {
-    const v = parseInt(localStorage.getItem('hc_run_best'));
+    const key = runBestKey();
+    if (!key) return 0;
+    const v = parseInt(localStorage.getItem(key));
     return isNaN(v) ? 0 : v;
   }
 
   function rememberRunBest(value) {
+    const key = runBestKey();
+    if (!key) return;
     if (typeof value === 'number' && value > runBest()) {
-      try { localStorage.setItem('hc_run_best', String(value)); } catch (e) {}
+      try { localStorage.setItem(key, String(value)); } catch (e) {}
     }
   }
 
@@ -2791,6 +2803,11 @@
       navigator.serviceWorker.register('sw.js').catch(() => {});
     });
   }
+
+  // Общий ключ рекорда остался от прежней версии, и чей он — уже не узнать.
+  // Приписать его текущему аккаунту нельзя: именно так и появлялся чужой рекорд.
+  // Убираем; свой вернётся с сервера после первой же доигранной партии
+  try { localStorage.removeItem('hc_run_best'); } catch (e) {}
 
   document.getElementById('langSwitcher').value = currentLang;
   document.getElementById('winsNeeded').value = '3';
