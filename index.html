@@ -2560,9 +2560,11 @@
       if (!raw) return null;
       const st = JSON.parse(raw);
       if (!st || typeof st.round !== 'number' || typeof st.secret !== 'number') return null;
-      // игра принадлежит тому, кто её начал
+      // Игра принадлежит тому, кто её начал. Регистр не учитываем: сервер пускает
+      // «аню» в аккаунт «Ани», и незаконченная игра должна найтись так же
       const auth = runAuth();
-      if (st.user && auth && st.user !== auth.username) return null;
+      if (st.user && auth &&
+          String(st.user).toLowerCase() !== auth.username.toLowerCase()) return null;
       return st;
     } catch (e) { return null; }
   }
