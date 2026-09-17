@@ -233,7 +233,7 @@ async function testTranslations(browser) {
     await page.selectOption('#langSwitcher', lang);
     await page.waitForTimeout(150);
     const empty = await page.evaluate(() => {
-      const ids = ['tModeSolo', 'tModeDuel', 'tModeRun', 'tRunStart', 'tRunTop', 'tHintSetup', 'tRunTopDay', 'tRunTopWeek', 'tRunTopAll'];
+      const ids = ['tModeSolo', 'tModeDuel', 'tModeRun', 'tRunStart', 'tRunTop', 'tRunTopDay', 'tRunTopWeek', 'tRunTopAll'];
       return ids.filter(id => !(document.getElementById(id).textContent || '').trim());
     });
     check('язык ' + lang + ': все подписи заполнены', empty.length === 0, empty.join(', '));
@@ -710,78 +710,62 @@ async function testNumberLine(browser) {
   await done(page);
 }
 
-async function testBandOnlyInPractice(browser) {
-  console.log('\nПояс расстояний только в тренировке');
+async function testDistanceHint(browser) {
+  console.log('\nПодсказка о расстоянии во всех режимах');
 
-  // Тренировка — пояс есть
-  const solo = await newGame(browser, { user: 'Максим' });
-  await solo.click('#tModeSolo');
-  await solo.waitForTimeout(200);
-  await solo.click('#tStartMatch');
-  await solo.waitForTimeout(250);
-  await solo.evaluate(() => { secret = 2; });   // догадка 1 гарантированно мимо
-  await solo.fill('#guessInput', '1');
-  await solo.click('#tSubmitGuess');
-  await solo.waitForTimeout(250);
-  const soloBand = await solo.locator('#feedbackBand').isVisible();
-  check('в тренировке пояс показан', soloBand === true);
-  await done(solo);
+  // Во всех трёх режимах пояс есть и снимается кнопкой прямо во время игры
+  for (const kind of ['solo', 'duel', 'run']) {
+    const page = await newGame(browser, { user: 'Максим' });
+    if (kind === 'run') {
+      await page.click('#tModeRun');
+      await page.waitForTimeout(350);
+      await page.click('#tRunStart');
+    } else {
+      await page.click(kind === 'solo' ? '#tModeSolo' : '#tModeDuel');
+      await page.waitForTimeout(200);
+      await page.click('#tStartMatch');
+    }
+    await page.waitForTimeout(300);
+    await page.evaluate(() => { secret = 2; });   // догадка 1 гарантированно мимо
+    await page.fill('#guessInput', '1');
+    await page.click('#tSubmitGuess');
+    await page.waitForTimeout(300);
 
-  // Игра с другом — пояса быть не должно
-  const duel = await newGame(browser, { user: 'Максим' });
-  await duel.click('#tModeDuel');
-  await duel.waitForTimeout(200);
-  await duel.click('#tStartMatch');
-  await duel.waitForTimeout(250);
-  await duel.fill('#guessInput', '1');
-  await duel.click('#tSubmitGuess');
-  await duel.waitForTimeout(250);
-  const duelBand = await duel.locator('#feedbackBand').isVisible();
-  check('в игре с другом пояса нет', duelBand === false);
-  await done(duel);
+    check(kind + ': пояс показан', await page.locator('#feedbackBand').isVisible());
+    check(kind + ': кнопка подсказки подсвечена', await page.evaluate(() =>
+      document.getElementById('toggleHintBtn').classList.contains('on')));
 
-  // Рейтинг — тоже без пояса
-  const run = await newGame(browser, { user: 'Максим' });
-  await run.click('#tModeRun');
-  await run.waitForTimeout(350);
-  await run.click('#tRunStart');
-  await run.waitForTimeout(300);
-  await run.evaluate(() => { secret = 2; });
-  await run.fill('#guessInput', '1');
-  await run.click('#tSubmitGuess');
-  await run.waitForTimeout(250);
-  const runBand = await run.locator('#feedbackBand').isVisible();
-  check('в рейтинге пояса нет', runBand === false);
-  await done(run);
+    await page.click('#toggleHintBtn');
+    await page.waitForTimeout(250);
+    check(kind + ': пояс снимается кнопкой', !(await page.locator('#feedbackBand').isVisible()));
+    check(kind + ': кнопка погасла', await page.evaluate(() =>
+      !document.getElementById('toggleHintBtn').classList.contains('on')));
 
-  // Переключатель подсказки стоит на экране настройки и только в тренировке
-  const setup = await newGame(browser, { user: 'Максим' });
-  await setup.click('#tModeSolo');
-  await setup.waitForTimeout(200);
-  check('в тренировке переключатель подсказки виден', await setup.locator('#hintRow').isVisible());
-  check('подсказка включена по умолчанию',
-    await setup.locator('#hintSetup').isChecked());
+    await page.click('#toggleHintBtn');
+    await page.waitForTimeout(250);
+    check(kind + ': пояс возвращается', await page.locator('#feedbackBand').isVisible());
+    check(kind + ': выбор записан в память',
+      await page.evaluate(() => localStorage.getItem('hc_hint')) === '1');
 
-  await setup.uncheck('#hintSetup');
-  await setup.waitForTimeout(150);
-  await setup.click('#tStartMatch');
-  await setup.waitForTimeout(250);
-  await setup.evaluate(() => { secret = 2; });
-  await setup.fill('#guessInput', '1');
-  await setup.click('#tSubmitGuess');
-  await setup.waitForTimeout(250);
-  check('снятая галочка убирает пояс', !(await setup.locator('#feedbackBand').isVisible()));
+    await done(page);
+  }
 
-  await setup.reload();
-  await setup.waitForFunction(() => typeof distanceHint !== 'undefined');
-  check('выбор подсказки запомнился', await setup.evaluate(() => distanceHint === false));
-
-  await setup.click('#tModeDuel');
-  await setup.waitForTimeout(200);
-  check('в игре с другом переключателя подсказки нет',
-    !(await setup.locator('#hintRow').isVisible()));
-
-  await done(setup);
+  // Выключённая подсказка читается из памяти при запуске
+  const muted = await gameWithStorage(browser, { user: 'Максим' }, { hc_hint: '0' });
+  check('при запуске выключенная подсказка читается из памяти',
+    await muted.evaluate(() => distanceHint === false));
+  await muted.click('#tModeSolo');
+  await muted.waitForTimeout(200);
+  await muted.click('#tStartMatch');
+  await muted.waitForTimeout(250);
+  await muted.evaluate(() => { secret = 2; });
+  await muted.fill('#guessInput', '1');
+  await muted.click('#tSubmitGuess');
+  await muted.waitForTimeout(300);
+  check('и пояс не появляется', !(await muted.locator('#feedbackBand').isVisible()));
+  check('галочки на экране настройки больше нет',
+    await muted.evaluate(() => document.getElementById('hintRow') === null));
+  await done(muted);
 }
 
 async function testScaleOrder(browser) {
@@ -819,9 +803,9 @@ async function testVizToggles(browser) {
 
   check('по умолчанию градусник виден', await page.locator('#thermoWrap').isVisible());
   check('по умолчанию прямая видна', await page.locator('#numLine').isVisible());
-  check('обе кнопки подсвечены как включённые', await page.evaluate(() =>
-    document.getElementById('toggleThermoBtn').classList.contains('on') &&
-    document.getElementById('toggleLineBtn').classList.contains('on')));
+  check('все три кнопки подсвечены как включённые', await page.evaluate(() =>
+    ['toggleThermoBtn', 'toggleLineBtn', 'toggleHintBtn']
+      .every(id => document.getElementById(id).classList.contains('on'))));
   check('у кнопок есть подпись для наведения',
     (await page.locator('#toggleThermoBtn').getAttribute('title')) === 'Градусник');
 
@@ -865,160 +849,6 @@ async function testVizToggles(browser) {
     !(await page2.locator('#thermoWrap').isVisible()) && !(await page2.locator('#numLine').isVisible()));
 
   await done(page2);
-}
-
-async function testBandOnlyInPractice(browser) {
-  console.log('\nПояс расстояний только в тренировке');
-
-  // Тренировка — пояс есть
-  const solo = await newGame(browser, { user: 'Максим' });
-  await solo.click('#tModeSolo');
-  await solo.waitForTimeout(200);
-  await solo.click('#tStartMatch');
-  await solo.waitForTimeout(250);
-  await solo.evaluate(() => { secret = 2; });   // догадка 1 гарантированно мимо
-  await solo.fill('#guessInput', '1');
-  await solo.click('#tSubmitGuess');
-  await solo.waitForTimeout(250);
-  const soloBand = await solo.locator('#feedbackBand').isVisible();
-  check('в тренировке пояс показан', soloBand === true);
-  await done(solo);
-
-  // Игра с другом — пояса быть не должно
-  const duel = await newGame(browser, { user: 'Максим' });
-  await duel.click('#tModeDuel');
-  await duel.waitForTimeout(200);
-  await duel.click('#tStartMatch');
-  await duel.waitForTimeout(250);
-  await duel.fill('#guessInput', '1');
-  await duel.click('#tSubmitGuess');
-  await duel.waitForTimeout(250);
-  const duelBand = await duel.locator('#feedbackBand').isVisible();
-  check('в игре с другом пояса нет', duelBand === false);
-  await done(duel);
-
-  // Рейтинг — тоже без пояса
-  const run = await newGame(browser, { user: 'Максим' });
-  await run.click('#tModeRun');
-  await run.waitForTimeout(350);
-  await run.click('#tRunStart');
-  await run.waitForTimeout(300);
-  await run.evaluate(() => { secret = 2; });
-  await run.fill('#guessInput', '1');
-  await run.click('#tSubmitGuess');
-  await run.waitForTimeout(250);
-  const runBand = await run.locator('#feedbackBand').isVisible();
-  check('в рейтинге пояса нет', runBand === false);
-  await done(run);
-
-  // Переключатель подсказки стоит на экране настройки и только в тренировке
-  const setup = await newGame(browser, { user: 'Максим' });
-  await setup.click('#tModeSolo');
-  await setup.waitForTimeout(200);
-  check('в тренировке переключатель подсказки виден', await setup.locator('#hintRow').isVisible());
-  check('подсказка включена по умолчанию',
-    await setup.locator('#hintSetup').isChecked());
-
-  await setup.uncheck('#hintSetup');
-  await setup.waitForTimeout(150);
-  await setup.click('#tStartMatch');
-  await setup.waitForTimeout(250);
-  await setup.evaluate(() => { secret = 2; });
-  await setup.fill('#guessInput', '1');
-  await setup.click('#tSubmitGuess');
-  await setup.waitForTimeout(250);
-  check('снятая галочка убирает пояс', !(await setup.locator('#feedbackBand').isVisible()));
-
-  await setup.reload();
-  await setup.waitForFunction(() => typeof distanceHint !== 'undefined');
-  check('выбор подсказки запомнился', await setup.evaluate(() => distanceHint === false));
-
-  await setup.click('#tModeDuel');
-  await setup.waitForTimeout(200);
-  check('в игре с другом переключателя подсказки нет',
-    !(await setup.locator('#hintRow').isVisible()));
-
-  await done(setup);
-}
-
-async function testScaleOrder(browser) {
-  console.log('\nПорядок в шкале расстояний');
-  const page = await newGame(browser, { user: 'Максим' });
-  await page.click('#tModeSolo');
-  await page.waitForTimeout(200);
-  await page.click('#tStartMatch');
-  await page.waitForTimeout(250);
-
-  const order = await page.evaluate(() => ({
-    labels: [...document.querySelectorAll('.legend-item .l-label')].map(e => e.textContent.trim()),
-    ranges: [...document.querySelectorAll('.legend-item .l-range')].map(e => e.textContent.trim())
-  }));
-  check('шкала начинается с лавы', order.labels[0].indexOf('Лава') >= 0, order.labels[0]);
-  check('и заканчивается самым холодным',
-    order.labels[order.labels.length - 1].indexOf('Очень холодно') >= 0,
-    order.labels[order.labels.length - 1]);
-  // расстояния должны расти сверху вниз: от ближнего к дальнему
-  const firstNums = order.ranges.map(r => parseInt(r));
-  check('расстояния идут по возрастанию',
-    firstNums.every((v, i) => i === 0 || v > firstNums[i - 1]), order.ranges.join(' '));
-
-  await done(page);
-}
-
-async function testVizToggles(browser) {
-  console.log('\nКнопки «спрятать градусник» и «спрятать прямую»');
-  const page = await newGame(browser, { user: 'Максим' });
-
-  await page.click('#tModeSolo');
-  await page.waitForTimeout(200);
-  await page.click('#tStartMatch');
-  await page.waitForTimeout(300);
-
-  check('по умолчанию градусник виден', await page.locator('#thermoWrap').isVisible());
-  check('по умолчанию прямая видна', await page.locator('#numLine').isVisible());
-  check('обе кнопки подсвечены как включённые', await page.evaluate(() =>
-    document.getElementById('toggleThermoBtn').classList.contains('on') &&
-    document.getElementById('toggleLineBtn').classList.contains('on')));
-  check('у кнопок есть подпись для наведения',
-    (await page.locator('#toggleThermoBtn').getAttribute('title')) === 'Градусник');
-
-  await page.click('#toggleThermoBtn');
-  await page.waitForTimeout(200);
-  check('градусник прячется', !(await page.locator('#thermoWrap').isVisible()));
-  check('прямая при этом остаётся', await page.locator('#numLine').isVisible());
-  check('кнопка градусника погасла', await page.evaluate(() =>
-    !document.getElementById('toggleThermoBtn').classList.contains('on')));
-
-  await page.click('#toggleLineBtn');
-  await page.waitForTimeout(200);
-  check('прямая прячется', !(await page.locator('#numLine').isVisible()));
-
-  // Сначала убеждаемся, что выбор вообще записался: если нет — значит не сработало
-  // нажатие, а не память, и мигающий тест не должен это путать
-  const saved = await page.evaluate(() => ({
-    t: localStorage.getItem('hc_show_thermo'), l: localStorage.getItem('hc_show_line') }));
-  check('выбор записан в память браузера', saved.t === '0' && saved.l === '0', JSON.stringify(saved));
-
-  await page.reload();
-  await page.waitForFunction(() => typeof showThermo !== 'undefined');
-  const after = await page.evaluate(() => ({
-    showThermo, showLine,
-    t: localStorage.getItem('hc_show_thermo'), l: localStorage.getItem('hc_show_line') }));
-  check('выбор запомнился после перезагрузки',
-    after.showThermo === false && after.showLine === false, JSON.stringify(after));
-
-  // и возвращается обратно
-  await page.click('#tModeSolo');
-  await page.waitForTimeout(200);
-  await page.click('#tStartMatch');
-  await page.waitForTimeout(250);
-  await page.click('#toggleThermoBtn');
-  await page.click('#toggleLineBtn');
-  await page.waitForTimeout(250);
-  check('обе возвращаются на место',
-    (await page.locator('#thermoWrap').isVisible()) && (await page.locator('#numLine').isVisible()));
-
-  await done(page);
 }
 
 async function testPinHelp(browser) {
@@ -1113,7 +943,7 @@ async function testPinHelp(browser) {
     await testBestPerAccount(browser);
     await testNumberLine(browser);
     await testVizToggles(browser);
-    await testBandOnlyInPractice(browser);
+    await testDistanceHint(browser);
     await testScaleOrder(browser);
   } finally {
     await browser.close();
