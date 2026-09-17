@@ -468,6 +468,34 @@ async function testBestPerAccount(browser) {
   check('из старого ключа рекорд не подставляется', legacy.best === 0, String(legacy.best));
 
   await done(page2);
+
+  // Сервер пускает «аню» в аккаунт «Ани» — незаконченная игра должна найтись так же
+  const page3 = await newGame(browser, { user: 'Аня' });
+  await page3.evaluate(() => {
+    localStorage.setItem('hc_run_state', JSON.stringify({
+      round: 3, totalScore: 900, range: 50, rangeMin: 1, allowed: 9,
+      secret: 7, history: [], user: 'АНЯ'
+    }));
+  });
+  await page3.click('#tModeRun');
+  await page3.waitForTimeout(400);
+  check('игра находится, даже если имя набрано в другом регистре',
+    await page3.locator('#tUnfinishedResume').isVisible());
+
+  // а чужую игру по-прежнему не отдаём
+  await page3.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('hc_run_state'));
+    st.user = 'Максим';
+    localStorage.setItem('hc_run_state', JSON.stringify(st));
+  });
+  await page3.reload();
+  await page3.waitForTimeout(300);
+  await page3.click('#tModeRun');
+  await page3.waitForTimeout(400);
+  check('чужая незаконченная игра не показывается',
+    !(await page3.locator('#tUnfinishedResume').isVisible()));
+
+  await done(page3);
 }
 
 async function testFrostMode(browser) {
