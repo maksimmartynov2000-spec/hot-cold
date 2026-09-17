@@ -1479,7 +1479,7 @@
   // пересчитанная под свой диапазон (см. ответ в чате).
   const RANGE_TIER_UPPER = {
     10:      [9, 7, 6, 5, 4, 3, 2, 1],
-    100:     [99, 64, 32, 16, 8, 4, 2, 1],
+    100:     [100, 60, 30, 15, 8, 4, 2, 1],
     1000:    [1000, 500, 200, 100, 50, 20, 10, 3],
   };
   const RANGE_PRESETS = [10, 100, 1000];
@@ -1491,6 +1491,20 @@
   // Значения взяты из ручной таблицы для 1000 — то есть шкала ведёт себя так же, как там.
   const HOT_TIER_UPPER = [50, 20, 10, 3];
 
+  // Границы поясов округляем: «51–100» читается и запоминается легче, чем «51–106»,
+  // а ученику ещё и считать по ним. Шаг растёт вместе с величиной, чтобы округление
+  // не перекосило сам пояс: у сотни это десятки, у тысячи — полсотни
+  function tierStep(v) {
+    return v < 12 ? 1 : v < 30 ? 5 : v < 100 ? 10 : v < 300 ? 25 : v < 1000 ? 50 : v < 3000 ? 100 : 500;
+  }
+
+  // Верхнюю границу самого холодного пояса округляем вверх: она должна накрывать
+  // и наибольшее возможное расстояние, иначе подпись начнёт врать
+  function roundTier(v, up) {
+    const step = tierStep(v);
+    return Math.max(1, (up ? Math.ceil(v / step) : Math.round(v / step)) * step);
+  }
+
   // Для произвольного диапазона (режим на рейтинг) готовой таблицы поясов нет — считаем её.
   function generateTierUpper(rangeMax) {
     const maxDistance = Math.max(1, rangeMax - 1);
@@ -1500,7 +1514,7 @@
     if (maxDistance <= HOT_TIER_UPPER[0]) {
       const U = [];
       for (let i = 0; i < 8; i++) {
-        U.push(Math.max(Math.round(maxDistance * Math.pow(0.45, i)), 8 - i));
+        U.push(Math.max(roundTier(maxDistance * Math.pow(0.45, i), i === 0), 8 - i));
       }
       for (let i = 1; i < 8; i++) {
         if (U[i] >= U[i - 1]) U[i] = Math.max(1, U[i - 1] - 1);
@@ -1512,7 +1526,7 @@
     // до начала горячей зоны, горячие четыре — фиксированы.
     const ratio = Math.pow(HOT_TIER_UPPER[0] / maxDistance, 1 / 4);
     const U = [];
-    for (let i = 0; i < 4; i++) U.push(Math.round(maxDistance * Math.pow(ratio, i)));
+    for (let i = 0; i < 4; i++) U.push(roundTier(maxDistance * Math.pow(ratio, i), i === 0));
     HOT_TIER_UPPER.forEach(v => U.push(v));
     for (let i = 1; i < 8; i++) {
       if (U[i] >= U[i - 1]) U[i] = Math.max(1, U[i - 1] - 1);
