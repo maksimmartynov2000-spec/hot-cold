@@ -546,13 +546,13 @@ async function testFrostMode(browser) {
   await page.waitForTimeout(300);
   const g = await page.evaluate(() => ({
     min: RANGE_MIN, max: RANGE_MAX, count: rangeCount(), secret,
-    inputMin: document.getElementById('guessInput').min,
+    signBtn: !document.getElementById('guessSign').classList.contains('hidden'),
     placeholder: document.getElementById('guessInput').placeholder
   }));
   check('границы зеркальны относительно нуля', g.min === -g.max, g.min + '…' + g.max);
   check('чисел столько же, сколько в обычной тысяче', g.count === 1001, String(g.count));
   check('секрет внутри границ', g.secret >= g.min && g.secret <= g.max, String(g.secret));
-  check('поле ввода пускает минус', g.inputMin === String(g.min), g.inputMin);
+  check('минус доступен — рядом с полем стоит своя кнопка', g.signBtn === true);
   check('подсказка в поле называет обе границы',
     g.placeholder.indexOf('-500') >= 0 && g.placeholder.indexOf('500') >= 0, g.placeholder);
 
@@ -840,6 +840,74 @@ async function testSetupSpacing(browser) {
   await done(page);
 }
 
+async function testMinusButton(browser) {
+  console.log('\nКнопка минуса');
+  const page = await newGame(browser, { user: 'Максим' });
+
+  // В обычной игре отрицательных чисел нет — и кнопки быть не должно
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(200);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(250);
+  check('в обычной игре кнопки минуса нет', !(await page.locator('#guessSign').isVisible()));
+
+  await page.click('#tMenu');
+  await page.waitForTimeout(200);
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(200);
+  await page.check('#frostSetup');
+  await page.waitForTimeout(150);
+  await page.selectOption('#rangeMax', '100');
+  await page.waitForTimeout(120);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { secret = 37; });
+  check('в «Морозе и Жаре» кнопка минуса есть', await page.locator('#guessSign').isVisible());
+
+  // Минус можно нажать до цифр — как пишут на бумаге
+  await page.click('#guessSign');
+  await page.waitForTimeout(120);
+  check('минус остаётся в пустом поле', (await page.inputValue('#guessInput')) === '-');
+  await page.type('#guessInput', '30');
+  await page.waitForTimeout(120);
+  check('цифры дописываются после минуса', (await page.inputValue('#guessInput')) === '-30');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  check('отрицательная догадка засчитана',
+    await page.evaluate(() => history.length === 1 && history[0].guess === -30));
+
+  // И после цифр — знак переставляется туда-обратно
+  await page.fill('#guessInput', '12');
+  await page.click('#guessSign');
+  await page.waitForTimeout(120);
+  check('знак ставится к набранному числу', (await page.inputValue('#guessInput')) === '-12');
+  check('кнопка подсвечена при минусе',
+    await page.evaluate(() => document.getElementById('guessSign').classList.contains('on')));
+  await page.click('#guessSign');
+  await page.waitForTimeout(120);
+  check('знак снимается повторным нажатием', (await page.inputValue('#guessInput')) === '12');
+  check('подсветка снялась',
+    await page.evaluate(() => !document.getElementById('guessSign').classList.contains('on')));
+
+  // Буквы и лишние минусы в поле не попадают
+  await page.fill('#guessInput', 'ab-1-2c3');
+  await page.waitForTimeout(150);
+  check('в поле остаются только цифры и один минус',
+    (await page.inputValue('#guessInput')) === '-123', await page.inputValue('#guessInput'));
+
+  // Строка ввода не разъезжается даже на самом узком телефоне
+  const fits = await page.evaluate(() => {
+    const row = document.querySelector('.guess-section .row').getBoundingClientRect();
+    const btn = document.getElementById('tSubmitGuess').getBoundingClientRect();
+    const sign = document.getElementById('guessSign').getBoundingClientRect();
+    return { overflow: Math.round(btn.right - row.right), sign: Math.round(sign.width) };
+  });
+  check('строка ввода помещается', fits.overflow <= 0, JSON.stringify(fits));
+  check('по кнопке минуса удобно попасть пальцем', fits.sign >= 44, String(fits.sign));
+
+  await done(page);
+}
+
 async function testScaleOrder(browser) {
   console.log('\nПорядок в шкале расстояний');
   const page = await newGame(browser, { user: 'Максим' });
@@ -1019,6 +1087,7 @@ async function testPinHelp(browser) {
     await testScaleOrder(browser);
     await testRoundTiers(browser);
     await testSetupSpacing(browser);
+    await testMinusButton(browser);
   } finally {
     await browser.close();
   }

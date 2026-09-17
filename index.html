@@ -179,6 +179,32 @@
 
     .row { display: flex; gap: 8px; width: 100%; }
 
+    /* Цифровая клавиатура телефона минуса не показывает — своя кнопка.
+       Она же и понятнее ребёнку, чем поиск знака среди символов */
+    .sign-btn {
+      flex: 0 0 auto;
+      /* 44 пикселя — нижняя граница удобного нажатия пальцем, а на узком
+         телефоне каждый лишний отнимается у самого поля ввода */
+      min-width: 44px;
+      padding: 0 6px;
+      /* Высоту не задаём отступами, а растягиваем по строке: иначе кнопка
+         оказывается выше поля ввода и вся страница подрастает */
+      align-self: stretch;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      font-family: inherit;
+      font-size: 21px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .sign-btn.on {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: rgba(99, 102, 241, 0.75);
+    }
+
     input[type=number], input[type=text], select.field {
       flex: 1;
       min-width: 0;
@@ -972,7 +998,8 @@
         <div class="final-box hidden" id="finalBox">
           <p id="tFinalWarning">Attempts used — last chance!</p>
           <div class="row">
-            <input type="number" id="finalInput" min="1" max="1000" placeholder="" pattern="[0-9]*" inputmode="numeric" />
+            <button class="sign-btn hidden" id="finalSign" onclick="flipSign('finalInput')" aria-label="−">−</button>
+            <input type="text" id="finalInput" placeholder="" inputmode="numeric" autocomplete="off" />
             <button class="btn-yellow" onclick="submitFinal()" id="tFinalSubmit">Submit</button>
           </div>
         </div>
@@ -982,7 +1009,8 @@
         <div class="guess-section" id="guessSection">
           <p id="tEnterGuess">Enter a number</p>
           <div class="row">
-            <input type="number" id="guessInput" min="1" max="1000" placeholder="" pattern="[0-9]*" inputmode="numeric" />
+            <button class="sign-btn hidden" id="guessSign" onclick="flipSign('guessInput')" aria-label="−">−</button>
+            <input type="text" id="guessInput" placeholder="" inputmode="numeric" autocomplete="off" />
             <button class="btn" onclick="handleGuess()" id="tSubmitGuess">Check</button>
           </div>
         </div>
@@ -1884,10 +1912,39 @@
   }
 
   function applyRangeToInputs() {
-    ['guessInput', 'finalInput'].forEach(id => {
+    const signed = RANGE_MIN < 0;
+    [['guessInput', 'guessSign'], ['finalInput', 'finalSign']].forEach(([id, signId]) => {
       const el = document.getElementById(id);
-      el.min = RANGE_MIN; el.max = RANGE_MAX;
+      el.setAttribute('aria-valuemin', RANGE_MIN);
+      el.setAttribute('aria-valuemax', RANGE_MAX);
+      // Кнопка минуса нужна только там, где отрицательные числа вообще бывают
+      document.getElementById(signId).classList.toggle('hidden', !signed);
+      renderSignBtn(id, signId);
     });
+  }
+
+  // В поле пускаем только цифры и один минус в начале: клавиатура на компьютере
+  // и автозамена на телефоне иначе занесут туда что угодно
+  function filterNumberInput(el) {
+    const cleaned = el.value.replace(/[^0-9-]/g, '').replace(/(?!^)-/g, '');
+    if (cleaned !== el.value) el.value = cleaned;
+  }
+
+  function renderSignBtn(id, signId) {
+    const el = document.getElementById(id);
+    const btn = document.getElementById(signId);
+    if (el && btn) btn.classList.toggle('on', String(el.value).trim().charAt(0) === '-');
+  }
+
+  // Переставляет знак у набранного числа. Пустое поле просто запоминает минус,
+  // чтобы можно было нажать его до цифр — как на бумаге
+  function flipSign(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const v = String(el.value).trim();
+    el.value = v.charAt(0) === '-' ? v.slice(1) : '-' + v;
+    renderSignBtn(id, id === 'guessInput' ? 'guessSign' : 'finalSign');
+    el.focus();
   }
 
   function startFromSetup() {
@@ -3046,6 +3103,12 @@
 
   // ================= ИНИЦИАЛИЗАЦИЯ =================
   document.getElementById('guessInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleGuess(); });
+  [['guessInput', 'guessSign'], ['finalInput', 'finalSign']].forEach(([id, signId]) => {
+    document.getElementById(id).addEventListener('input', e => {
+      filterNumberInput(e.target);
+      renderSignBtn(id, signId);
+    });
+  });
   document.getElementById('finalInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitFinal(); });
   document.getElementById('runPin').addEventListener('keydown', e => { if (e.key === 'Enter') runAuthSubmit(); });
 
