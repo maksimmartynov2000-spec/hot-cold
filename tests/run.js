@@ -275,7 +275,9 @@ async function testSoundAndShare(browser) {
   await page.waitForTimeout(100);
   check('звук выключается', (await page.locator('#soundBtn').textContent()) === '🔇');
   await page.reload();
-  await page.waitForTimeout(300);
+  // Ждём не «сколько-нибудь миллисекунд», а именно готовности страницы: на
+  // фиксированном ожидании проверка изредка успевала раньше самой игры
+  await page.waitForFunction(() => typeof soundOn !== 'undefined');
   check('выбор звука переживает перезагрузку', (await page.locator('#soundBtn').textContent()) === '🔇');
   await page.click('#soundBtn');
   await page.waitForTimeout(100);
@@ -578,8 +580,11 @@ async function testFrostMode(browser) {
   check('рейтинг играется в симметричных границах', r.min === -r.max && r.min < 0, r.min + '…' + r.max);
 
   await page2.reload();
-  await page2.waitForTimeout(400);
-  check('выбор запомнился после перезагрузки', await page2.evaluate(() => frostMode === true));
+  // Ждём готовности страницы, а не фиксированные миллисекунды: на медленном
+  // прогоне проверка изредка успевала раньше, чем игра прочитает память
+  await page2.waitForFunction(() => typeof frostMode !== 'undefined');
+  check('мороз запомнился после перезагрузки',
+    await page2.evaluate(() => frostMode === true));
 
   await done(page2);
 }
@@ -635,6 +640,24 @@ async function testNumberLine(browser) {
     [...document.querySelectorAll('#numLineSvg text')].map(t => +t.getAttribute('font-size')));
   check('подписи на телефоне не мельче 12 пикселей', Math.min(...sizes) >= 12,
     'минимальный размер ' + Math.min(...sizes));
+  // число самой догадки — главное на прямой, оно крупнее делений
+  // догадка рисуется последней, поэтому деления — это всё, кроме неё
+  const guessSize = sizes[sizes.length - 1];
+  const tickMax = Math.max(...sizes.slice(0, -1));
+  check('номер догадки крупнее подписей делений', guessSize >= tickMax + 2,
+    guessSize + ' против ' + tickMax);
+
+  // шкалу расстояний внизу читают те же дети
+  const legend = await page.evaluate(() => {
+    const px = sel => parseFloat(getComputedStyle(document.querySelector(sel)).fontSize);
+    return { item: px('.legend-item .l-label'), range: px('.legend-item .l-range'),
+             title: px('#scaleBox summary'),
+             wrapped: [...document.querySelectorAll('.legend-item')]
+               .filter(i => i.getBoundingClientRect().height > 24).length };
+  });
+  check('шкала расстояний не мельче 14 пикселей',
+    legend.item >= 14 && legend.range >= 14 && legend.title >= 14, JSON.stringify(legend));
+  check('строки шкалы не переносятся', legend.wrapped === 0, 'перенесено строк: ' + legend.wrapped);
 
   // на широком диапазоне подписи редеют, но не наезжают друг на друга
   await page.evaluate(() => { frostMode = false; applyBounds(1000); history = []; secret = 640; renderAll(); });
@@ -727,10 +750,19 @@ async function testVizToggles(browser) {
   await page.waitForTimeout(200);
   check('прямая прячется', !(await page.locator('#numLine').isVisible()));
 
+  // Сначала убеждаемся, что выбор вообще записался: если нет — значит не сработало
+  // нажатие, а не память, и мигающий тест не должен это путать
+  const saved = await page.evaluate(() => ({
+    t: localStorage.getItem('hc_show_thermo'), l: localStorage.getItem('hc_show_line') }));
+  check('выбор записан в память браузера', saved.t === '0' && saved.l === '0', JSON.stringify(saved));
+
   await page.reload();
-  await page.waitForTimeout(400);
+  await page.waitForFunction(() => typeof showThermo !== 'undefined');
+  const after = await page.evaluate(() => ({
+    showThermo, showLine,
+    t: localStorage.getItem('hc_show_thermo'), l: localStorage.getItem('hc_show_line') }));
   check('выбор запомнился после перезагрузки',
-    await page.evaluate(() => showThermo === false && showLine === false));
+    after.showThermo === false && after.showLine === false, JSON.stringify(after));
 
   // и возвращается обратно
   await page.click('#tModeSolo');
