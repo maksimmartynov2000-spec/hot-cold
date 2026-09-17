@@ -299,7 +299,7 @@ async function testSoundAndShare(browser) {
   check('на ход играет звук', (await page.evaluate(() => window.__tones)) > 0);
 
   // Личный рекорд в строке статуса
-  await page.evaluate(() => localStorage.setItem('hc_run_best', '4200'));
+  await page.evaluate(() => localStorage.setItem(runBestKey(), '4200'));
   await page.fill('#guessInput', String(s.secret));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(1200);
@@ -422,6 +422,53 @@ async function testPauseAndGiveUp(browser) {
   await done(page);
 }
 
+
+async function testBestPerAccount(browser) {
+  console.log('\nЛичный рекорд принадлежит аккаунту');
+  const page = await newGame(browser, { user: 'Аня' });
+
+  // Ане записался рекорд — она в общем топе
+  await page.click('#tModeRun');
+  await page.waitForTimeout(350);
+  await page.click('#tRunTopAll');
+  await page.waitForTimeout(300);
+  const anyaBest = await page.evaluate(() => runBest());
+  check('рекорд подтянулся из общего топа', anyaBest === 5200, String(anyaBest));
+
+  // тот же телефон, другой ученик
+  const maksimBest = await page.evaluate(() => {
+    localStorage.setItem('hc_run_user', 'Максим');
+    return runBest();
+  });
+  check('новому ученику чужой рекорд не достался', maksimBest === 0, String(maksimBest));
+
+  // а Ане её рекорд остался
+  const back = await page.evaluate(() => {
+    localStorage.setItem('hc_run_user', 'Аня');
+    return runBest();
+  });
+  check('свой рекорд у Ани остался', back === 5200, String(back));
+
+  // без входа рекорда нет вовсе
+  const anon = await page.evaluate(() => {
+    localStorage.removeItem('hc_run_user');
+    return runBest();
+  });
+  check('без входа рекорд не показывается', anon === 0, String(anon));
+
+  await done(page);
+
+  // Ключ прежней версии был общим на всё устройство — он не должен достаться никому
+  const page2 = await newGame(browser, { user: 'Новичок' });
+  await page2.evaluate(() => localStorage.setItem('hc_run_best', '99999'));
+  await page2.reload();
+  await page2.waitForTimeout(400);
+  const legacy = await page2.evaluate(() => ({ best: runBest(), old: localStorage.getItem('hc_run_best') }));
+  check('старый общий ключ убирается', legacy.old === null, String(legacy.old));
+  check('из старого ключа рекорд не подставляется', legacy.best === 0, String(legacy.best));
+
+  await done(page2);
+}
 
 async function testFrostMode(browser) {
   console.log('\nМороз и жара');
@@ -598,6 +645,7 @@ async function testPinHelp(browser) {
     await testPauseAndGiveUp(browser);
     await testPinHelp(browser);
     await testFrostMode(browser);
+    await testBestPerAccount(browser);
   } finally {
     await browser.close();
   }
