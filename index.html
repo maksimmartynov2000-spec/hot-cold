@@ -732,6 +732,20 @@
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
     .run-hub-actions .btn-ghost { flex: 1; }
+    /* Переключатель «мороз и жара». Вся строка — часть label, чтобы по подписи
+       можно было попасть пальцем, а не только по самой галочке */
+    .frost-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0 4px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.75);
+      cursor: pointer;
+      user-select: none;
+    }
+    .frost-row input { width: 17px; height: 17px; accent-color: #6366f1; cursor: pointer; }
+
     .lb-empty {
       font-size: 13px;
       color: rgba(255, 255, 255, 0.4);
@@ -805,6 +819,11 @@
       <label id="tLblRange">Range</label>
       <select class="field" id="rangeMax" onchange="buildAttemptsOptions()"></select>
     </div>
+
+    <label class="frost-row">
+      <input type="checkbox" id="frostSetup" onchange="setFrostMode(this.checked)" />
+      <span id="tFrostSetup"></span>
+    </label>
 
     <div class="setup-field" id="attemptsField">
       <label id="tLblAttempts">Attempts</label>
@@ -964,6 +983,10 @@
       <button class="btn-ghost btn-block" style="margin-top:8px" id="tUnfinishedFinish" onclick="finishSavedRun()"></button>
     </div>
     <button class="btn btn-block" id="tRunStart" onclick="startRun()"></button>
+    <label class="frost-row">
+      <input type="checkbox" id="frostRun" onchange="setFrostMode(this.checked)" />
+      <span id="tFrostRun"></span>
+    </label>
     <div class="lb-wrap">
       <div class="lb-head">
         <div class="lb-title" id="tRunTop"></div>
@@ -1011,9 +1034,10 @@
     en: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", newGame: "New Game", menu: "Menu",
-      enterGuess: "Enter a number", placeholderTpl: "Number 1–{n}...", submitGuess: "Check",
+      frostLabel: "Frost and heat",
+      enterGuess: "Enter a number", placeholderTpl: "from {a} to {b}", submitGuess: "Check",
       finalWarning: "Attempts used — last chance!", finalSubmit: "Submit", finalInput: "Final answer...",
-      resultWin: "🎉 Victory! Number is guessed!", resultLose: "❌ Wrong. The secret number was: ",
+      resultWin: "🎉 Victory! You guessed the number!", resultLose: "❌ Wrong. The secret number was: ",
       historyTitle: "Guess History", legendTitle: "📊 Distance Scale",
       labels: ["🧊 Very cold", "❄️ Cold", "🌬️ Chilly", "🌤️ Warm", "☀️ Hot", "🔥 Very hot", "💥 Burning", "🌋 Lava", "🎯 Bullseye!"],
 
@@ -1058,7 +1082,7 @@
         abort: "Quit",
         round: "Round ",
         score: "Score: ",
-        plus: " points",
+        pointForms: ["point", "points", "points"], roundForms: ["round", "rounds", "rounds"],
         over: "Game over",
         secretWas: "The number was: ",
         roundsDone: "Rounds cleared: ",
@@ -1076,7 +1100,7 @@
         best: "Your best: ",
         share: "Share result",
         shareCopied: "Copied to clipboard",
-        shareText: "I scored {score} in {rounds} rounds of Hot or Cold!",
+        shareText: "I scored {score} in {rounds} of Hot or Cold!",
         sound: "Sound",
         pause: "Pause",
         pauseTitle: "Game paused",
@@ -1098,8 +1122,9 @@
     ru: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", newGame: "Новая игра", menu: "Меню",
-      enterGuess: "Введите число", placeholderTpl: "Число от 1 до {n}...", submitGuess: "Проверить",
-      finalWarning: "Попытки закончились — последний шанс!", finalSubmit: "Ответ", finalInput: "Финальный ответ...",
+      frostLabel: "Мороз и жара",
+      enterGuess: "Введите число", placeholderTpl: "от {a} до {b}", submitGuess: "Проверить",
+      finalWarning: "Попытки закончились — последний шанс!", finalSubmit: "Ответить", finalInput: "Финальный ответ...",
       resultWin: "🎉 Победа! Число угадано!", resultLose: "❌ Неверно. Загаданное число было: ",
       historyTitle: "История попыток", legendTitle: "📊 Шкала расстояний",
       labels: ["🧊 Очень холодно", "❄️ Холодно", "🌬️ Прохладно", "🌤️ Тепло", "☀️ Жарко", "🔥 Горячо", "💥 Очень горячо", "🌋 Лава", "🎯 В точку!"],
@@ -1107,7 +1132,7 @@
       modeSolo: "Тренировка",
       modeDuel: "Игра с другом",
       lblP1: "Игрок 1", lblP2: "Игрок 2", defP1: "Игрок 1", defP2: "Игрок 2",
-      lblWins: "Играем до скольки побед", lblHandicap: "Фора",
+      lblWins: "Играем до скольких побед", lblHandicap: "Фора",
       lblRange: "Диапазон", lblAttempts: "Попыток",
       hcNone: "Нет", hcTokens: "2 жетона", hcFirst: "всегда ходит первым",
       back: "Назад", startMatch: "Начать игру", startGame: "Начать игру",
@@ -1145,13 +1170,13 @@
         abort: "Прервать",
         round: "Раунд ",
         score: "Очки: ",
-        plus: " очков",
+        pointForms: ["очко", "очка", "очков"], roundForms: ["раунд", "раунда", "раундов"],
         over: "Игра окончена",
         secretWas: "Загаданное число было: ",
         roundsDone: "Раундов пройдено: ",
         finalScore: "Итоговый счёт: ",
         newBest: "🏆 Новый личный рекорд!",
-        noScores: "Результатов пока нет — будьте первым",
+        noScores: "Результатов пока нет — ваш может стать первым",
         logoutAsk: "Выйти из аккаунта {name}? Результат останется в топе — вернуться можно по тому же имени и PIN.",
         cancel: "Отмена",
         errLocked: "Слишком много неверных PIN. Попробуйте через 5 минут.",
@@ -1160,10 +1185,10 @@
         topDay: "Сегодня",
         topWeek: "За неделю",
         topAll: "За всё время",
-        best: "Твой рекорд: ",
+        best: "Ваш рекорд: ",
         share: "Поделиться",
         shareCopied: "Скопировано",
-        shareText: "Я набрал {score} очков за {rounds} раундов в «Горячо — Холодно»!",
+        shareText: "Мой результат в Hot or Cold: {score} за {rounds}!",
         sound: "Звук",
         pause: "Пауза",
         pauseTitle: "Игра на паузе",
@@ -1184,8 +1209,9 @@
     },
     fr: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Nombre généré ✓", attemptsPrefix: "Essais: ", newGame: "Nouvelle partie", menu: "Menu",
-      enterGuess: "Entrez un nombre", placeholderTpl: "Nombre 1–{n}...", submitGuess: "Vérifier",
+      confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", newGame: "Nouvelle partie", menu: "Menu",
+      frostLabel: "Gel et chaleur",
+      enterGuess: "Entrez un nombre", placeholderTpl: "de {a} à {b}", submitGuess: "Vérifier",
       finalWarning: "Tentatives épuisées — dernière chance !", finalSubmit: "Valider", finalInput: "Réponse finale...",
       resultWin: "🎉 Victoire ! Le nombre a été deviné !", resultLose: "❌ Incorrect. Le nombre secret était : ",
       historyTitle: "Historique des tentatives", legendTitle: "📊 Échelle de distance",
@@ -1224,7 +1250,7 @@
         errBadLogin: "Nom ou PIN incorrect",
         errServer: "Erreur serveur : ",
         errNoSave: "Résultat non enregistré : ",
-        start: "Commencer",
+        start: "Commencer la partie",
         top: "🏆 Meilleurs joueurs",
         logout: "Se déconnecter",
         toMenu: "Menu",
@@ -1232,13 +1258,13 @@
         abort: "Abandonner",
         round: "Manche ",
         score: "Points : ",
-        plus: " points",
+        pointForms: ["point", "points", "points"], roundForms: ["manche", "manches", "manches"],
         over: "Partie terminée",
         secretWas: "Le nombre était : ",
         roundsDone: "Manches réussies : ",
         finalScore: "Score final : ",
         newBest: "🏆 Nouveau record personnel !",
-        noScores: "Pas encore de résultats — soyez le premier",
+        noScores: "Pas encore de résultats — à vous de commencer",
         logoutAsk: "Se déconnecter de {name} ? Le résultat reste au classement — reconnectez-vous avec le même nom et PIN.",
         cancel: "Annuler",
         errLocked: "Trop de PIN incorrects. Réessayez dans 5 minutes.",
@@ -1247,10 +1273,10 @@
         topDay: "Aujourd'hui",
         topWeek: "Cette semaine",
         topAll: "Depuis toujours",
-        best: "Ton record : ",
+        best: "Votre record : ",
         share: "Partager",
         shareCopied: "Copié",
-        shareText: "J'ai marqué {score} points en {rounds} manches à Chaud ou Froid !",
+        shareText: "Hot or Cold : {score} en {rounds} !",
         sound: "Son",
         pause: "Pause",
         pauseTitle: "Partie en pause",
@@ -1272,10 +1298,11 @@
     de: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", newGame: "Neues Spiel", menu: "Menü",
-      enterGuess: "Gib eine Zahl ein", placeholderTpl: "Zahl 1–{n}...", submitGuess: "Prüfen",
+      frostLabel: "Frost und Hitze",
+      enterGuess: "Gib eine Zahl ein", placeholderTpl: "von {a} bis {b}", submitGuess: "Prüfen",
       finalWarning: "Versuche aufgebraucht — letzte Chance!", finalSubmit: "Bestätigen", finalInput: "Letzte Antwort...",
       resultWin: "🎉 Gewonnen! Die Zahl wurde erraten!", resultLose: "❌ Falsch. Die Geheimzahl war: ",
-      historyTitle: "Rateverlauf", legendTitle: "📊 Entfernungsskala",
+      historyTitle: "Bisherige Versuche", legendTitle: "📊 Entfernungsskala",
       labels: ["🧊 Sehr kalt", "❄️ Kalt", "🌬️ Kühl", "🌤️ Warm", "☀️ Heiß", "🔥 Sehr heiß", "💥 Glühend", "🌋 Lava", "🎯 Volltreffer!"],
 
       modeSolo: "Training",
@@ -1283,9 +1310,9 @@
       lblP1: "Spieler 1", lblP2: "Spieler 2", defP1: "Spieler 1", defP2: "Spieler 2",
       lblWins: "Bis wie viele Siege", lblHandicap: "Vorsprung",
       lblRange: "Bereich", lblAttempts: "Versuche",
-      hcNone: "Keins", hcTokens: "2 Marken", hcFirst: "beginnt immer",
+      hcNone: "Ohne", hcTokens: "2 Jetons", hcFirst: "beginnt immer",
       back: "Zurück", startMatch: "Spiel starten", startGame: "Spiel starten",
-      winsLabel: "Siege", tokenBtn: "⚡ Extrazug", tokenArmed: "⚡ Extrazug aktiv", tokenSpent: "⚡ Marke verbraucht",
+      winsLabel: "Siege", tokenBtn: "⚡ Extrazug", tokenArmed: "⚡ Extrazug aktiv", tokenSpent: "⚡ Jeton verbraucht",
       turnOf: "Am Zug: ", roundLabel: "Runde ",
       roundWin: " gewinnt die Runde!", matchWin: " gewinnt das Spiel!",
       secretWas: "Zahl: ", nextRound: "Nächste Runde", newMatch: "Neues Spiel", toMenu: "Menü",
@@ -1308,7 +1335,7 @@
         errFill: "Name und PIN ausfüllen",
         errNoConn: "Keine Verbindung zum Server",
         errTaken: "Dieser Name ist vergeben, wähle einen anderen",
-        errBadLogin: "Falscher Name oder PIN",
+        errBadLogin: "Name oder PIN falsch",
         errServer: "Serverfehler: ",
         errNoSave: "Ergebnis nicht gespeichert: ",
         start: "Spiel starten",
@@ -1316,16 +1343,16 @@
         logout: "Abmelden",
         toMenu: "Menü",
         back: "Zurück",
-        abort: "Abbrechen",
+        abort: "Beenden",
         round: "Runde ",
         score: "Punkte: ",
-        plus: " Punkte",
+        pointForms: ["Punkt", "Punkte", "Punkte"], roundForms: ["Runde", "Runden", "Runden"],
         over: "Spiel beendet",
         secretWas: "Die Zahl war: ",
         roundsDone: "Geschaffte Runden: ",
         finalScore: "Endpunktzahl: ",
         newBest: "🏆 Neuer persönlicher Rekord!",
-        noScores: "Noch keine Ergebnisse — sei der Erste",
+        noScores: "Noch keine Ergebnisse — mach den Anfang",
         logoutAsk: "Von {name} abmelden? Das Ergebnis bleibt in der Rangliste — melde dich mit demselben Namen und PIN wieder an.",
         cancel: "Abbrechen",
         errLocked: "Zu viele falsche PINs. Versuche es in 5 Minuten erneut.",
@@ -1337,7 +1364,7 @@
         best: "Dein Rekord: ",
         share: "Teilen",
         shareCopied: "Kopiert",
-        shareText: "Ich habe {score} Punkte in {rounds} Runden bei Heiß oder Kalt geschafft!",
+        shareText: "Hot or Cold: {score} in {rounds}!",
         sound: "Ton",
         pause: "Pause",
         pauseTitle: "Spiel pausiert",
@@ -1353,7 +1380,7 @@
         noHint: "Für diesen Namen ist keine Hilfe gespeichert",
         account: "Dein Konto",
         showPin: "PIN anzeigen",
-        yourPin: "Dein PIN: ",
+        yourPin: "Deine PIN: ",
       }
     }
   };
@@ -1439,14 +1466,75 @@
     return Math.max(1, Math.ceil(Math.log2(rangeMax)));
   }
 
+  // Русский требует трёх форм («1 очко», «2 очка», «5 очков»), остальным хватает двух.
+  // Форму выбираем по числу, иначе на экране появляется «133 очков»
+  function plural(n, forms) {
+    // Во французском единственное число берут и ноль, и единица, в остальных — только единица
+    const one = (currentLang === 'fr') ? Math.abs(n) < 2 : Math.abs(n) === 1;
+    if (currentLang !== 'ru') return forms[one ? 0 : 1];
+    const rest100 = Math.abs(n) % 100, rest10 = rest100 % 10;
+    if (rest100 > 10 && rest100 < 20) return forms[2];
+    if (rest10 === 1) return forms[0];
+    if (rest10 > 1 && rest10 < 5) return forms[1];
+    return forms[2];
+  }
+
+  function withPlural(n, forms) { return formatNum(n) + ' ' + plural(n, forms); }
+
   function formatNum(n) {
     try { return n.toLocaleString(currentLang === 'en' ? 'en-US' : currentLang); }
     catch (e) { return String(n); }
   }
 
   let RANGE_MAX = 1000;
+  // Нижняя граница. В обычной игре это 1, в «морозе и жаре» — зеркало верхней.
+  // Дальше всё считается от пары границ, поэтому минус не плодит отдельных веток
+  let RANGE_MIN = 1;
   let MAX_GUESSES = 10;
   let FEEDBACK_META = buildFeedbackMeta(RANGE_MAX);
+
+  // «Мороз и жара»: число берётся из −N…+N. Половину берём от выбранного
+  // диапазона, чтобы чисел осталось столько же и игра не стала длиннее
+  let frostMode = localStorage.getItem('hc_frost') === '1';
+
+  function rangeCount() { return RANGE_MAX - RANGE_MIN + 1; }
+  function maxDistance() { return RANGE_MAX - RANGE_MIN; }
+
+  // Сколько чисел получится из выбранного размера диапазона
+  function countFor(size) { return frostMode ? Math.floor(size / 2) * 2 + 1 : size; }
+
+  function applyBounds(size) {
+    if (frostMode) {
+      const half = Math.floor(size / 2);
+      RANGE_MIN = -half; RANGE_MAX = half;
+    } else {
+      RANGE_MIN = 1; RANGE_MAX = size;
+    }
+    // Пояса зависят от расстояния между догадкой и ответом, а не от границ:
+    // равносильный обычный диапазон — это «максимальное расстояние плюс один»
+    FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
+  }
+
+  function boundsLabel(size) {
+    const half = Math.floor(size / 2);
+    // Минус берём обычный, с клавиатуры: ребёнок увидит ровно то, что ему набирать
+    return frostMode ? (formatNum(-half) + '…+' + formatNum(half))
+                     : ('1–' + formatNum(size));
+  }
+
+  function renderFrostToggles() {
+    ['frostSetup', 'frostRun'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.checked = frostMode;
+    });
+  }
+
+  function setFrostMode(on) {
+    frostMode = !!on;
+    try { localStorage.setItem('hc_frost', frostMode ? '1' : '0'); } catch (e) {}
+    buildRangeOptions();
+    renderFrostToggles();
+  }
   const P_COLORS = ["#6366f1", "#fbbf24"];
 
   let currentLang = localStorage.getItem('hc_lang') || 'en';
@@ -1534,8 +1622,12 @@
 
     document.getElementById('nameP1').placeholder = L.defP1;
     document.getElementById('nameP2').placeholder = L.defP2;
-    document.getElementById('guessInput').placeholder = L.placeholderTpl.replace('{n}', formatNum(RANGE_MAX));
+    document.getElementById('guessInput').placeholder =
+      L.placeholderTpl.replace('{a}', formatNum(RANGE_MIN)).replace('{b}', formatNum(RANGE_MAX));
     document.getElementById('finalInput').placeholder = L.finalInput;
+    document.getElementById('tFrostSetup').textContent = L.frostLabel;
+    document.getElementById('tFrostRun').textContent = L.frostLabel;
+    renderFrostToggles();
 
     // экраны режима на рейтинг
     document.getElementById('tModeRun').textContent = L.run.mode;
@@ -1632,7 +1724,7 @@
     RANGE_PRESETS.forEach(n => {
       const o = document.createElement('option');
       o.value = n;
-      o.textContent = '1–' + formatNum(n);
+      o.textContent = boundsLabel(n);
       sel.appendChild(o);
     });
     sel.value = RANGE_PRESETS.includes(parseInt(prev)) ? prev : '1000';
@@ -1642,7 +1734,7 @@
   function buildAttemptsOptions() {
     const rangeSel = document.getElementById('rangeMax');
     const rangeMax = parseInt(rangeSel && rangeSel.value) || 1000;
-    const min = minAttempts(rangeMax);
+    const min = minAttempts(countFor(rangeMax));
     const sel = document.getElementById('attemptsCount');
     const prev = sel.value;
     const options = [min, min + 1, min + 2, min + 3, min + 5, min + 8, min + 12];
@@ -1658,16 +1750,15 @@
   function applyRangeToInputs() {
     ['guessInput', 'finalInput'].forEach(id => {
       const el = document.getElementById(id);
-      el.min = 1; el.max = RANGE_MAX;
+      el.min = RANGE_MIN; el.max = RANGE_MAX;
     });
   }
 
   function startFromSetup() {
-    RANGE_MAX = parseInt(document.getElementById('rangeMax').value) || 1000;
+    applyBounds(parseInt(document.getElementById('rangeMax').value) || 1000);
     if (mode === 'solo') {
-      MAX_GUESSES = parseInt(document.getElementById('attemptsCount').value) || minAttempts(RANGE_MAX);
+      MAX_GUESSES = parseInt(document.getElementById('attemptsCount').value) || minAttempts(rangeCount());
     }
-    FEEDBACK_META = buildFeedbackMeta(RANGE_MAX);
     applyRangeToInputs();
     if (mode === 'duel') startMatch(); else startSolo();
   }
@@ -1680,7 +1771,7 @@
   }
 
   function resetSolo() {
-    secret = Math.floor(Math.random() * RANGE_MAX) + 1;
+    secret = RANGE_MIN + Math.floor(Math.random() * rangeCount());
     history = [];
     gameOver = false;
     gameOverType = null;
@@ -1696,7 +1787,7 @@
     if (gameOver) return;
     const input = document.getElementById('guessInput');
     const guess = parseInt(input.value);
-    if (isNaN(guess) || guess < 1 || guess > RANGE_MAX) return;
+    if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
 
     const distance = Math.abs(guess - secret);
     const meta = getFeedback(distance);
@@ -1726,7 +1817,7 @@
   }
 
   // ================= РЕКОРДЫ (только одиночная игра) =================
-  function recordKey(rangeMax) { return 'hc_record_' + rangeMax; }
+  function recordKey(rangeMax) { return 'hc_record_' + (frostMode ? 's' : '') + rangeMax; }
 
   function getRecord(rangeMax) {
     try {
@@ -1764,7 +1855,7 @@
   }
 
   function startRound() {
-    secret = Math.floor(Math.random() * RANGE_MAX) + 1;
+    secret = RANGE_MIN + Math.floor(Math.random() * rangeCount());
     history = [];
     D.tokens = [1, 1];
     if (D.handicap === 1) D.tokens[0] = 2;
@@ -1811,7 +1902,7 @@
     if (D.roundOver || D.matchOver) return;
     const input = document.getElementById('guessInput');
     const guess = parseInt(input.value);
-    if (isNaN(guess) || guess < 1 || guess > RANGE_MAX) return;
+    if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
 
     const distance = Math.abs(guess - secret);
     const meta = getFeedback(distance);
@@ -2442,6 +2533,7 @@
         round: RUN.round,
         totalScore: RUN.totalScore,
         range: RANGE_MAX,
+        rangeMin: RANGE_MIN,
         allowed: MAX_GUESSES,
         secret: secret,
         history: history.map(h => ({ guess: h.guess, distance: h.distance })),
@@ -2472,8 +2564,10 @@
     RUN = { round: st.round, totalScore: st.totalScore, locked: false };
     mode = 'run';
     RANGE_MAX = st.range;
+    // игры, сохранённые до появления «мороза и жары», нижней границы не знают
+    RANGE_MIN = (typeof st.rangeMin === 'number') ? st.rangeMin : 1;
     MAX_GUESSES = st.allowed;
-    FEEDBACK_META = buildFeedbackMeta(RANGE_MAX);
+    FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
     secret = st.secret;
     history = (st.history || []).map(h => ({
       guess: h.guess, distance: h.distance, meta: getFeedback(h.distance), p: null
@@ -2542,7 +2636,9 @@
   async function shareRunResult(score, rounds) {
     const L = t();
     const link = location.origin + location.pathname;
-    const text = L.run.shareText.replace('{score}', formatNum(score)).replace('{rounds}', rounds);
+    const text = L.run.shareText
+      .replace('{score}', withPlural(score, L.run.pointForms))
+      .replace('{rounds}', withPlural(rounds, L.run.roundForms));
     const btn = document.getElementById('shareBtn');
     try {
       if (navigator.share) {
@@ -2601,10 +2697,9 @@
 
   function startRunRound() {
     if (!RUN) return;
-    RANGE_MAX = runRangeForRound(RUN.round);
-    MAX_GUESSES = runAttemptsForRound(RUN.round, RANGE_MAX);
-    FEEDBACK_META = buildFeedbackMeta(RANGE_MAX);
-    secret = Math.floor(Math.random() * RANGE_MAX) + 1;
+    applyBounds(runRangeForRound(RUN.round));
+    MAX_GUESSES = runAttemptsForRound(RUN.round, rangeCount());
+    secret = RANGE_MIN + Math.floor(Math.random() * rangeCount());
     history = [];
     gameOver = false;
     gameOverType = null;
@@ -2620,7 +2715,7 @@
     if (!RUN || RUN.locked) return;
     const input = document.getElementById('guessInput');
     const guess = parseInt(input.value);
-    if (isNaN(guess) || guess < 1 || guess > RANGE_MAX) return;
+    if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
 
     const distance = Math.abs(guess - secret);
     const meta = getFeedback(distance);
@@ -2629,7 +2724,7 @@
     soundForGuess(meta);
 
     if (distance === 0) {
-      const roundPoints = Math.round(100 * RUN.round * (minAttempts(RANGE_MAX) / history.length));
+      const roundPoints = Math.round(100 * RUN.round * (minAttempts(rangeCount()) / history.length));
       RUN.totalScore += roundPoints;
       RUN.locked = true;
       RUN.round++;
@@ -2637,7 +2732,7 @@
       saveRunState();
       const L = t();
       document.getElementById('feedbackLabel').textContent =
-        L.labels[8] + '  +' + roundPoints + L.run.plus;
+        L.labels[8] + '  +' + withPlural(roundPoints, L.run.pointForms);
       setTimeout(startRunRound, 900);
     } else if (history.length >= MAX_GUESSES) {
       gameOver = true;
