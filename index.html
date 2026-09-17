@@ -884,11 +884,6 @@
       <span id="tFrostSetup"></span>
     </label>
 
-    <label class="frost-row hidden" id="hintRow">
-      <input type="checkbox" id="hintSetup" onchange="setDistanceHint(this.checked)" />
-      <span id="tHintSetup"></span>
-    </label>
-
     <div class="setup-field" id="attemptsField">
       <label id="tLblAttempts">Attempts</label>
       <select class="field" id="attemptsCount"></select>
@@ -951,6 +946,7 @@
           <span class="bar-actions">
             <button class="mini-toggle" id="toggleThermoBtn" onclick="toggleThermo()">🌡️</button>
             <button class="mini-toggle" id="toggleLineBtn" onclick="toggleLine()">📏</button>
+            <button class="mini-toggle" id="toggleHintBtn" onclick="toggleHint()">💡</button>
             <button class="btn-reset" onclick="leaveGame()" id="tMenu">Menu</button>
           </span>
         </div>
@@ -1106,7 +1102,7 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", newGame: "New Game", menu: "Menu",
       frostLabel: "Frost and Heat",
-      hintLabel: "Hint: distance",
+      hintLabel: "Distance hint",
       vizThermo: "Thermometer", vizLine: "Number line",
       enterGuess: "Enter a number", placeholderTpl: "from {a} to {b}", submitGuess: "Check",
       finalWarning: "Attempts used — last chance!", finalSubmit: "Submit", finalInput: "Final answer...",
@@ -1286,7 +1282,7 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", newGame: "Nouvelle partie", menu: "Menu",
       frostLabel: "Gel et Chaleur",
-      hintLabel: "Indice : distance",
+      hintLabel: "Indice de distance",
       vizThermo: "Thermomètre", vizLine: "Droite numérique",
       enterGuess: "Entrez un nombre", placeholderTpl: "de {a} à {b}", submitGuess: "Vérifier",
       finalWarning: "Tentatives épuisées — dernière chance !", finalSubmit: "Valider", finalInput: "Réponse finale...",
@@ -1376,7 +1372,7 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze",
-      hintLabel: "Hinweis: Abstand",
+      hintLabel: "Abstandshinweis",
       vizThermo: "Thermometer", vizLine: "Zahlenstrahl",
       enterGuess: "Gib eine Zahl ein", placeholderTpl: "von {a} bis {b}", submitGuess: "Prüfen",
       finalWarning: "Versuche aufgebraucht — letzte Chance!", finalSubmit: "Bestätigen", finalInput: "Letzte Antwort...",
@@ -1578,21 +1574,18 @@
 
   // Градусник и числовая прямая показываются по умолчанию; кому тесно на экране —
   // может убрать любую из них, и выбор запомнится
-  // Пояс расстояний рядом с подсказкой — помощь для тренировки. Включён по
-  // умолчанию, но перед началом игры его можно снять и считать самому
+  // Пояс расстояний рядом с подсказкой. Включён по умолчанию и снимается кнопкой
+  // прямо во время игры — как градусник и прямая. Тайны в нём нет: те же числа
+  // написаны в шкале расстояний внизу экрана, она открыта во всех режимах
   let distanceHint = localStorage.getItem('hc_hint') !== '0';
-
-  function setDistanceHint(on) {
-    distanceHint = !!on;
-    try { localStorage.setItem('hc_hint', distanceHint ? '1' : '0'); } catch (e) {}
-  }
 
   let showThermo = localStorage.getItem('hc_show_thermo') !== '0';
   let showLine = localStorage.getItem('hc_show_line') !== '0';
 
   function renderVizToggles() {
     const L = t();
-    [['toggleThermoBtn', showThermo, L.vizThermo], ['toggleLineBtn', showLine, L.vizLine]]
+    [['toggleThermoBtn', showThermo, L.vizThermo], ['toggleLineBtn', showLine, L.vizLine],
+     ['toggleHintBtn', distanceHint, L.hintLabel]]
       .forEach(([id, on, title]) => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -1612,6 +1605,12 @@
   function toggleLine() {
     showLine = !showLine;
     try { localStorage.setItem('hc_show_line', showLine ? '1' : '0'); } catch (e) {}
+    renderAll();
+  }
+
+  function toggleHint() {
+    distanceHint = !distanceHint;
+    try { localStorage.setItem('hc_hint', distanceHint ? '1' : '0'); } catch (e) {}
     renderAll();
   }
 
@@ -1745,7 +1744,6 @@
     document.getElementById('finalInput').placeholder = L.finalInput;
     renderVizToggles();
     document.getElementById('tFrostSetup').textContent = L.frostLabel;
-    document.getElementById('tHintSetup').textContent = L.hintLabel;
     document.getElementById('tFrostRun').textContent = L.frostLabel;
     renderFrostToggles();
 
@@ -1830,9 +1828,6 @@
     const L = t();
     document.getElementById('duelOnlyFields').classList.toggle('hidden', m !== 'duel');
     document.getElementById('attemptsField').classList.toggle('hidden', m !== 'solo');
-    // Подсказка про расстояние есть только в тренировке
-    document.getElementById('hintRow').classList.toggle('hidden', m !== 'solo');
-    document.getElementById('hintSetup').checked = distanceHint;
     document.getElementById('tStartMatch').textContent = (m === 'duel') ? L.startMatch : L.startGame;
     buildRangeOptions();
     if (m === 'duel') buildHandicapOptions();
@@ -2086,7 +2081,7 @@
     // Пояс — помощь для тренировки: там учатся. В игре с другом и в рейтинге его
     // нет, иначе это преимущество, а не учёба
     const band = document.getElementById('feedbackBand');
-    const showBand = mode === 'solo' && distanceHint && last.distance > 0;
+    const showBand = distanceHint && last.distance > 0;
     band.classList.toggle('hidden', !showBand);
     band.textContent = showBand ? last.meta.rangeSign : '';
     band.style.color = last.meta.color;
