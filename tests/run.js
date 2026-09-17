@@ -810,6 +810,36 @@ async function testRoundTiers(browser) {
   await done(page);
 }
 
+async function testSetupSpacing(browser) {
+  console.log('\nВоздух на экране настройки');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(250);
+
+  const gaps = await page.evaluate(() => {
+    const r = sel => document.querySelector(sel).getBoundingClientRect();
+    const range = r('#rangeMax'), frost = r('.frost-row'), attempts = r('#attemptsField');
+    return { above: +(frost.top - range.bottom).toFixed(0),
+             below: +(attempts.top - frost.bottom).toFixed(0) };
+  });
+  // Галочка относится к диапазону, значит держится за него, а не висит посередине
+  check('галочка ближе к своему полю, чем к следующему', gaps.below > gaps.above + 6,
+    'сверху ' + gaps.above + 'px, снизу ' + gaps.below + 'px');
+  check('зазоры не слипшиеся', gaps.above >= 6 && gaps.below >= 16, JSON.stringify(gaps));
+
+  // Экран настройки должен помещаться целиком — и в дуэли, где полей вдвое больше
+  check('настройка тренировки помещается без прокрутки', await page.evaluate(() =>
+    document.documentElement.scrollHeight <= window.innerHeight + 1));
+  await page.click('#tBack');
+  await page.waitForTimeout(150);
+  await page.click('#tModeDuel');
+  await page.waitForTimeout(250);
+  check('настройка дуэли помещается без прокрутки', await page.evaluate(() =>
+    document.documentElement.scrollHeight <= window.innerHeight + 1));
+
+  await done(page);
+}
+
 async function testScaleOrder(browser) {
   console.log('\nПорядок в шкале расстояний');
   const page = await newGame(browser, { user: 'Максим' });
@@ -988,6 +1018,7 @@ async function testPinHelp(browser) {
     await testDistanceHint(browser);
     await testScaleOrder(browser);
     await testRoundTiers(browser);
+    await testSetupSpacing(browser);
   } finally {
     await browser.close();
   }
