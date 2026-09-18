@@ -908,6 +908,54 @@ async function testMinusButton(browser) {
   await done(page);
 }
 
+async function testShortHistory(browser) {
+  console.log('\nВидны только последние ходы');
+
+  for (const kind of ['solo', 'duel', 'run']) {
+    const page = await newGame(browser, { user: 'Максим' });
+    if (kind === 'run') {
+      await page.click('#tModeRun');
+      await page.waitForTimeout(350);
+      await page.click('#tRunStart');
+      await page.waitForTimeout(300);
+      // в рейтинге раунд короткий — расширяем, чтобы успеть сделать семь ходов
+      await page.evaluate(() => { MAX_GUESSES = 20; renderAll(); });
+    } else {
+      await page.click(kind === 'solo' ? '#tModeSolo' : '#tModeDuel');
+      await page.waitForTimeout(200);
+      await page.click('#tStartMatch');
+      await page.waitForTimeout(300);
+    }
+    // В рейтинге первый раунд узкий, туда крупные числа просто не пройдут
+    const guesses = kind === 'run' ? [1, 2, 3, 4, 5, 6, 7] : [100, 200, 300, 400, 500, 600, 700];
+    await page.evaluate(v => { secret = v; }, kind === 'run' ? 10 : -999999);
+
+    for (const g of guesses) {
+      await page.fill('#guessInput', String(g));
+      await page.click('#tSubmitGuess');
+      await page.waitForTimeout(90);
+    }
+
+    const seen = await page.evaluate(() => {
+      const list = document.getElementById('historyList');
+      return { total: history.length, rows: list.children.length,
+               nums: [...list.children].map(el => el.querySelector('.h-num').textContent),
+               guesses: [...list.children].map(el => el.querySelector('.h-guess').textContent),
+               rings: document.querySelectorAll('#numLineSvg circle').length };
+    });
+    check(kind + ': ходов сделано семь, показано четыре',
+      seen.total === 7 && seen.rows === 4, JSON.stringify(seen));
+    check(kind + ': показаны именно последние четыре',
+      seen.guesses.join() === guesses.slice(-4).reverse().join(), seen.guesses.join());
+    check(kind + ': номера настоящие, а не с единицы',
+      seen.nums.join() === '#7,#6,#5,#4', seen.nums.join());
+    // прямая — та же память: старые догадки не должны на ней оставаться
+    check(kind + ': на прямой тоже четыре отметки', seen.rings === 4, String(seen.rings));
+
+    await done(page);
+  }
+}
+
 async function testScaleOrder(browser) {
   console.log('\nПорядок в шкале расстояний');
   const page = await newGame(browser, { user: 'Максим' });
@@ -1088,6 +1136,7 @@ async function testPinHelp(browser) {
     await testRoundTiers(browser);
     await testSetupSpacing(browser);
     await testMinusButton(browser);
+    await testShortHistory(browser);
   } finally {
     await browser.close();
   }
