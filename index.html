@@ -1796,17 +1796,18 @@
     try { localStorage.setItem('hc_bonus', bonusMode ? '1' : '0'); } catch (e) {}
   }
 
-  // Бонусы расставляем врассыпную: подальше от ответа, чтобы находка не была
-  // наводкой, и подальше друг от друга, чтобы значок «рядом» означал один бонус
+  // Бонусы ложатся куда угодно — на любое число, кроме загаданного и кроме
+  // уже занятого другим бонусом. Больше никаких правил: пусть решает случай
   function placeBonuses() {
     D.bonuses = [];
     if (!bonusMode) return;
     const count = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(rangeCount()) / 4)));
     const types = BONUS_TYPES.slice().sort(() => Math.random() - 0.5);
-    for (let guard = 0; guard < 600 && D.bonuses.length < count; guard++) {
+    const used = new Set([secret]);
+    for (let guard = 0; guard < 800 && D.bonuses.length < count; guard++) {
       const v = RANGE_MIN + Math.floor(Math.random() * rangeCount());
-      if (Math.abs(v - secret) <= BONUS_NEAR + 7) continue;
-      if (D.bonuses.some(b => Math.abs(b.value - v) <= BONUS_NEAR * 2 + 1)) continue;
+      if (used.has(v)) continue;
+      used.add(v);
       D.bonuses.push({ value: v, type: types[D.bonuses.length % types.length], taken: false });
     }
   }

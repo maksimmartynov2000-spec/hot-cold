@@ -1061,22 +1061,20 @@ async function testBonusMode(browser) {
   await page2.waitForTimeout(250);
   const placed = await page2.evaluate(() => {
     const bad = [];
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 60; i++) {
       startRound();
       if (!D.bonuses.length) bad.push('раунд без бонусов');
+      const seen = new Set();
       D.bonuses.forEach(b => {
-        if (Math.abs(b.value - secret) <= 10) bad.push('бонус в ' + b.value + ' у ответа ' + secret);
+        if (b.value === secret) bad.push('бонус на загаданном числе');
         if (b.value < RANGE_MIN || b.value > RANGE_MAX) bad.push('бонус за диапазоном: ' + b.value);
+        if (seen.has(b.value)) bad.push('два бонуса на одном числе');
+        seen.add(b.value);
       });
-      for (let a = 0; a < D.bonuses.length; a++) {
-        for (let b = a + 1; b < D.bonuses.length; b++) {
-          if (Math.abs(D.bonuses[a].value - D.bonuses[b].value) <= 6) bad.push('бонусы слиплись');
-        }
-      }
     }
     return bad.slice(0, 3);
   });
-  check('бонусы стоят врозь и далеко от ответа', placed.length === 0, placed.join('; '));
+  check('бонусы не садятся на ответ и не наслаиваются', placed.length === 0, placed.join('; '));
 
   await page2.evaluate(() => { bonusMode = false; startRound(); });
   check('без галочки бонусов нет', await page2.evaluate(() => D.bonuses.length === 0));
