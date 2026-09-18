@@ -2283,12 +2283,12 @@
     return false;
   }
 
-  // Последний ход, который игроку видно: от него и градусник, и подсказка
-  function lastVisible() {
-    for (let i = history.length - 1; i >= 0; i--) {
-      if (!hiddenRow(history[i].p)) return history[i];
-    }
-    return null;
+  // Подсказка и градусник показывают положение дел прямо сейчас — то есть
+  // последний сделанный ход. Если он от игрока закрыт, показывать нечего:
+  // откатываться на ход раньше нельзя, старая подсказка прочитается как свежая
+  function currentMove() {
+    const last = history[history.length - 1];
+    return (last && !hiddenRow(last.p)) ? last : null;
   }
 
   function getFeedback(distance) {
@@ -2336,7 +2336,7 @@
 
   function renderFeedback() {
     const panel = document.getElementById('feedbackPanel');
-    const last = lastVisible();
+    const last = currentMove();
     const hide = !last || (mode === 'duel' ? D.roundOver : gameOverType === 'win' || gameOverType === 'lose');
     if (hide) { panel.classList.add('hidden'); return; }
     panel.style.background = last.meta.bg;
@@ -2362,7 +2362,7 @@
 
     const fill = document.getElementById('thermoFill');
     const bulb = document.getElementById('thermoBulb');
-    const last = lastVisible();
+    const last = currentMove();
 
     let pct, color;
     if (!last) {
@@ -2427,8 +2427,11 @@
     if (!showLine) return;
 
     const span = Math.max(1, RANGE_MAX - RANGE_MIN);
-    const shown = history.slice(-HISTORY_VISIBLE).filter(h => !hiddenRow(h.p));
-    const last = shown[shown.length - 1];
+    // Закрытые ходы на прямой не отмечаем, а залитой точкой обозначаем только
+    // настоящий последний ход — если он виден
+    const visible = history.slice(-HISTORY_VISIBLE).filter(h => !hiddenRow(h.p));
+    const last = currentMove();
+    const rings = last ? visible.filter(h => h !== last) : visible;
     let out = '';
 
     // Сама прямая
@@ -2474,7 +2477,7 @@
     });
 
     // Прошлые догадки — полыми кружками, текущая — залитым
-    shown.slice(0, -1).forEach(h => {
+    rings.forEach(h => {
       out += '<circle cx="' + nlPos(h.guess) + '%" cy="' + NL.axisY + '" r="2.5" fill="none" ' +
              'stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />';
     });
