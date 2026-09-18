@@ -584,7 +584,11 @@
       .card.solo-game .guess-section { margin-bottom: 10px; }
       .card.solo-game .guess-section p { margin-bottom: 5px; }
 
-      .card.solo-game .history-list { max-height: 96px; }
+      /* Ходов теперь всегда четыре, и окно под них не растёт — но строки
+         поплотнее, чтобы в те же пиксели их помещалось больше */
+      .card.solo-game .history-list { max-height: 96px; gap: 4px; }
+      .card.solo-game .history-item { padding: 6px 12px; }
+      .card.solo-game .history-item .h-guess { font-size: 15px; }
     }
 
     /* Числовая прямая: где стоит догадка и в каких двух участках может быть ответ.
@@ -1700,6 +1704,10 @@
   }
   const P_COLORS = ["#6366f1", "#fbbf24"];
 
+  // Сколько последних ходов остаётся на виду — и в истории, и на прямой.
+  // Остальное игрок помнит сам: в этом и смысл
+  const HISTORY_VISIBLE = 4;
+
   let currentLang = localStorage.getItem('hc_lang') || 'en';
 
   // ---------- общее состояние ----------
@@ -2282,7 +2290,7 @@
     });
 
     // Прошлые догадки — полыми кружками, текущая — залитым
-    history.slice(0, -1).forEach(h => {
+    history.slice(-HISTORY_VISIBLE, -1).forEach(h => {
       out += '<circle cx="' + nlPos(h.guess) + '%" cy="' + NL.axisY + '" r="2.5" fill="none" ' +
              'stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />';
     });
@@ -2453,7 +2461,9 @@
     section.classList.remove('hidden');
     list.innerHTML = '';
 
-    [...history].reverse().forEach((h, i) => {
+    // Видны только последние ходы: остальное игрок держит в голове. Номера
+    // остаются настоящими, поэтому пропуск виден и без пояснений
+    history.slice(-HISTORY_VISIBLE).reverse().forEach((h, i) => {
       const realIndex = history.length - i;
       const item = document.createElement('div');
       item.className = 'history-item';
