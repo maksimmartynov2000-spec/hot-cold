@@ -1076,6 +1076,25 @@ async function testBonusMode(browser) {
   });
   check('бонусы не садятся на ответ и не наслаиваются', placed.length === 0, placed.join('; '));
 
+  // Сигнал «рядом» перестаёт что-либо значить, если накрывает половину прямой
+  const density = await page2.evaluate(() => {
+    const bad = [];
+    [10, 20, 50, 100, 250, 500, 1000].forEach(n => {
+      RANGE_MIN = 1; RANGE_MAX = n;
+      const k = bonusCount();
+      if (k < 1) bad.push(n + ': ни одного бонуса');
+      if (k > 12) bad.push(n + ': бонусов больше дюжины');
+      // На тесном диапазоне зона «рядом» в семь чисел и так накрывает половину
+      // прямой — там бонусов должно остаться столько же, сколько было
+      const base = Math.max(1, Math.ceil(Math.sqrt(n) / 4));
+      if (n <= 20 && k !== base) bad.push(n + ': на тесном диапазоне бонусов стало больше — ' + k);
+      // Дюжина — потолок: больше бонусов уже не про поиск, а про толчею
+      if (n >= 50 && k < Math.min(base * 2, 12)) bad.push(n + ': на широком диапазоне бонусов мало — ' + k);
+    });
+    return bad;
+  });
+  check('бонусов столько, чтобы сигнал ещё что-то значил', density.length === 0, density.join('; '));
+
   await page2.evaluate(() => { bonusMode = false; startRound(); });
   check('без галочки бонусов нет', await page2.evaluate(() => D.bonuses.length === 0));
   await done(page2);

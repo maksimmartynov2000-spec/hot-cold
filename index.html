@@ -1796,12 +1796,23 @@
     try { localStorage.setItem('hc_bonus', bonusMode ? '1' : '0'); } catch (e) {}
   }
 
+  // Сколько бонусов на раунд. Растёт медленнее диапазона: на тысяче их должно
+  // быть заметно больше, чем на сотне, но не в сто раз. На тесных диапазонах
+  // удваивать нельзя — зона «рядом» в семь чисел накроет половину прямой,
+  // и сигнал перестанет что-либо значить
+  function bonusCount() {
+    const n = rangeCount();
+    const base = Math.max(1, Math.ceil(Math.sqrt(n) / 4));
+    const roomy = Math.max(1, Math.floor(n * 0.086));
+    return Math.max(base, Math.min(base * 2, 12, roomy));
+  }
+
   // Бонусы ложатся куда угодно — на любое число, кроме загаданного и кроме
   // уже занятого другим бонусом. Больше никаких правил: пусть решает случай
   function placeBonuses() {
     D.bonuses = [];
     if (!bonusMode) return;
-    const count = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(rangeCount()) / 4)));
+    const count = bonusCount();
     const types = BONUS_TYPES.slice().sort(() => Math.random() - 0.5);
     const used = new Set([secret]);
     for (let guard = 0; guard < 800 && D.bonuses.length < count; guard++) {
