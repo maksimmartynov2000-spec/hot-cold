@@ -1035,6 +1035,34 @@ async function testBonusMode(browser) {
   check('после хода помеха снимается', await page.evaluate(() => D.blind[1] === null));
   await done(page);
 
+  // Закрытый ход не должен подменяться прошлым: пока помеха висит, подсказки нет
+  page = await duelWithBonus(browser, 'blind', 40);
+  await page.evaluate(() => {
+    secret = 90;
+    history = [{ guess: 10, distance: 80, meta: getFeedback(80), p: 0 },
+               { guess: 40, distance: 50, meta: getFeedback(50), p: 1 }];
+    D.cur = 0;
+    D.blind = ['rival', null];
+    renderAll();
+  });
+  const blinded = await page.evaluate(() => ({
+    panel: !document.getElementById('feedbackPanel').classList.contains('hidden'),
+    thermo: document.getElementById('thermoFill').style.height,
+    filled: [...document.querySelectorAll('#numLineSvg circle')]
+      .filter(c => c.getAttribute('fill') !== 'none').length,
+    rows: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent)
+  }));
+  check('при закрытом ходе подсказки нет вовсе', blinded.panel === false, JSON.stringify(blinded));
+  check('и градусник не показывает прошлый ход', blinded.thermo === '8%', blinded.thermo);
+  check('и на прямой нет текущей точки', blinded.filled === 0, String(blinded.filled));
+  check('свой прошлый ход при этом виден', blinded.rows.indexOf('10') >= 0, blinded.rows.join());
+
+  // а без помехи подсказка на месте — значит проверка выше не пустая
+  await page.evaluate(() => { D.blind = [null, null]; renderAll(); });
+  check('без помехи подсказка возвращается', await page.evaluate(() =>
+    !document.getElementById('feedbackPanel').classList.contains('hidden')));
+  await done(page);
+
   // Бросок в лаву — ход за соперника делает случай, рядом с ответом
   page = await duelWithBonus(browser, 'lava', 40);
   await page.fill('#guessInput', '40');
