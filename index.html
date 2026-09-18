@@ -617,6 +617,27 @@
       .card.solo-game .thermo-wrap { margin-bottom: 8px; }
     }
 
+    /* Строка бонуса: либо «рядом», либо что именно сработало. Появляется
+       только когда есть что сказать — в остальное время её просто нет */
+    .bonus-line {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin: 0 0 8px;
+      padding: 7px 12px;
+      border-radius: 12px;
+      background: rgba(251, 191, 36, 0.12);
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      font-size: 14px;
+      color: #fbbf24;
+    }
+    .bonus-line .b-name { font-weight: 700; }
+    .bonus-line .b-desc { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+    /* Пустая строка помех не должна занимать место: без бонусов её просто нет */
+    .p-effects { margin-top: 6px; font-size: 15px; letter-spacing: 3px; }
+    .p-effects:empty { display: none; }
+    .history-item .h-masked { opacity: 0.45; }
+
     .final-box {
       background: rgba(251, 191, 36, 0.1);
       border: 1px solid #fbbf24;
@@ -924,6 +945,11 @@
     </div>
 
     <div id="duelOnlyFields">
+      <label class="frost-row">
+        <input type="checkbox" id="bonusSetup" onchange="setBonusMode(this.checked)" />
+        <span id="tBonusSetup"></span>
+      </label>
+
       <div class="setup-field">
         <label id="tLblP1">Player 1</label>
         <input type="text" id="nameP1" maxlength="14" />
@@ -963,6 +989,7 @@
         <div class="p-wins-label" id="tWinsLabel0">Wins</div>
         <div class="p-pips" id="ppips0"></div>
         <button class="token-btn" id="ptoken0" onclick="useToken(0)"></button>
+        <div class="p-effects" id="peff0"></div>
       </div>
 
       <div class="pcard pc1" id="pcard1">
@@ -970,6 +997,7 @@
         <div class="p-wins-label" id="tWinsLabel1">Wins</div>
         <div class="p-pips" id="ppips1"></div>
         <button class="token-btn" id="ptoken1" onclick="useToken(1)"></button>
+        <div class="p-effects" id="peff1"></div>
       </div>
 
       <div class="center">
@@ -996,6 +1024,8 @@
           <div class="fb-label" id="feedbackLabel"></div>
           <div class="fb-band hidden" id="feedbackBand"></div>
         </div>
+
+        <div class="bonus-line hidden" id="bonusLine"></div>
 
         <div class="numline hidden" id="numLine"><svg id="numLineSvg" width="100%" height="48"></svg></div>
 
@@ -1138,6 +1168,9 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", newGame: "New Game", menu: "Menu",
       frostLabel: "Frost and Heat",
+      bonusLabel: "Bonuses", bonusNear: "near",
+      bonusNames: { extra: "Extra turn", fog: "Fog", blind: "Blind turn", lava: "Lava toss" },
+      bonusDesc: { extra: "{a} goes again", fog: "{b} cannot see the other\u2019s moves", blind: "{b} moves without hints", lava: "chance moves for {b}" },
       hintLabel: "Distance hint",
       vizThermo: "Thermometer", vizLine: "Number line",
       enterGuess: "Enter a number", placeholderTpl: "from {a} to {b}", submitGuess: "Check",
@@ -1228,6 +1261,9 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", newGame: "Новая игра", menu: "Меню",
       frostLabel: "Мороз и Жара",
+      bonusLabel: "Бонусы", bonusNear: "рядом",
+      bonusNames: { extra: "Ещё ход", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву" },
+      bonusDesc: { extra: "{a} ходит ещё раз", fog: "{b} не видит чужие ходы", blind: "{b} — ход без подсказок", lava: "за {b} сходит случай" },
       hintLabel: "Подсказка: расстояние",
       vizThermo: "Градусник", vizLine: "Числовая прямая",
       enterGuess: "Введите число", placeholderTpl: "от {a} до {b}", submitGuess: "Проверить",
@@ -1318,6 +1354,9 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", newGame: "Nouvelle partie", menu: "Menu",
       frostLabel: "Gel et Chaleur",
+      bonusLabel: "Bonus", bonusNear: "tout près",
+      bonusNames: { extra: "Tour en plus", fog: "Brouillard", blind: "Tour aveugle", lava: "Jet de lave" },
+      bonusDesc: { extra: "{a} rejoue", fog: "{b} ne voit plus les coups adverses", blind: "{b} joue sans indices", lava: "le hasard joue pour {b}" },
       hintLabel: "Indice de distance",
       vizThermo: "Thermomètre", vizLine: "Droite numérique",
       enterGuess: "Entrez un nombre", placeholderTpl: "de {a} à {b}", submitGuess: "Vérifier",
@@ -1408,6 +1447,9 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze",
+      bonusLabel: "Boni", bonusNear: "in der Nähe",
+      bonusNames: { extra: "Extrazug", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf" },
+      bonusDesc: { extra: "{a} zieht noch einmal", fog: "{b} sieht fremde Züge nicht", blind: "{b} zieht ohne Hinweise", lava: "der Zufall zieht für {b}" },
       hintLabel: "Abstandshinweis",
       vizThermo: "Thermometer", vizLine: "Zahlenstrahl",
       enterGuess: "Gib eine Zahl ein", placeholderTpl: "von {a} bis {b}", submitGuess: "Prüfen",
@@ -1732,8 +1774,54 @@
     armed: false,
     roundOver: false,
     matchOver: false,
-    roundWinner: null
+    roundWinner: null,
+
+    // Бонусы раунда и наложенные ими помехи. Всё живёт только внутри раунда
+    bonuses: [],              // { value, type, taken }
+    fog: [false, false],      // не видит ходы соперника до конца раунда
+    blind: [null, null],      // 'own' | 'rival' — на один свой ход
+    autoLava: [false, false], // следующий ход сделает случай
+    nearBonus: false,         // последний ход прошёл рядом с бонусом
+    lastBonus: null,          // что сработало, для строки под подсказкой
+    lastBonusBy: 0            // кто его взял — чтобы назвать игроков поимённо
   };
+
+  // Бонус чувствуется за три клетки, а срабатывает только при точном попадании
+  const BONUS_NEAR = 3;
+  const BONUS_TYPES = ['extra', 'fog', 'blind', 'lava'];
+  let bonusMode = localStorage.getItem('hc_bonus') === '1';
+
+  function setBonusMode(on) {
+    bonusMode = !!on;
+    try { localStorage.setItem('hc_bonus', bonusMode ? '1' : '0'); } catch (e) {}
+  }
+
+  // Сколько бонусов на раунд. Растёт медленнее диапазона: на тысяче их должно
+  // быть заметно больше, чем на сотне, но не в сто раз. На тесных диапазонах
+  // удваивать нельзя — зона «рядом» в семь чисел накроет половину прямой,
+  // и сигнал перестанет что-либо значить
+  function bonusCount() {
+    const n = rangeCount();
+    const base = Math.max(1, Math.ceil(Math.sqrt(n) / 4));
+    const roomy = Math.max(1, Math.floor(n * 0.086));
+    return Math.max(base, Math.min(base * 2, 12, roomy));
+  }
+
+  // Бонусы ложатся куда угодно — на любое число, кроме загаданного и кроме
+  // уже занятого другим бонусом. Больше никаких правил: пусть решает случай
+  function placeBonuses() {
+    D.bonuses = [];
+    if (!bonusMode) return;
+    const count = bonusCount();
+    const types = BONUS_TYPES.slice().sort(() => Math.random() - 0.5);
+    const used = new Set([secret]);
+    for (let guard = 0; guard < 800 && D.bonuses.length < count; guard++) {
+      const v = RANGE_MIN + Math.floor(Math.random() * rangeCount());
+      if (used.has(v)) continue;
+      used.add(v);
+      D.bonuses.push({ value: v, type: types[D.bonuses.length % types.length], taken: false });
+    }
+  }
 
   function t() { return i18n[currentLang]; }
 
@@ -1798,6 +1886,8 @@
     document.getElementById('finalInput').placeholder = L.finalInput;
     renderVizToggles();
     document.getElementById('tFrostSetup').textContent = L.frostLabel;
+    document.getElementById('tBonusSetup').textContent = L.bonusLabel;
+    document.getElementById('bonusSetup').checked = bonusMode;
     document.getElementById('tFrostRun').textContent = L.frostLabel;
     renderFrostToggles();
 
@@ -2065,6 +2155,12 @@
     D.armed = false;
     D.roundOver = false;
     D.roundWinner = null;
+    D.fog = [false, false];
+    D.blind = [null, null];
+    D.autoLava = [false, false];
+    D.nearBonus = false;
+    D.lastBonus = null;
+    placeBonuses();
     document.getElementById('guessInput').value = '';
     renderAll();
   }
@@ -2104,12 +2200,28 @@
     const input = document.getElementById('guessInput');
     const guess = parseInt(input.value);
     if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
+    input.value = '';
+    duelPlay(guess);
+  }
 
+  function duelPlay(guess) {
     const distance = Math.abs(guess - secret);
     const meta = getFeedback(distance);
     history.push({ guess, distance, meta, p: D.cur });
     soundForGuess(meta);
-    input.value = '';
+
+    // Ход сделан — помеха «слепой ход» на нём и кончается
+    D.blind[D.cur] = null;
+
+    const hit = D.bonuses.find(b => !b.taken && b.value === guess);
+    D.nearBonus = !hit && D.bonuses.some(b => !b.taken && Math.abs(b.value - guess) <= BONUS_NEAR);
+    D.lastBonus = hit ? hit.type : null;
+    D.lastBonusBy = D.cur;
+    let extraTurn = false;
+    if (hit) {
+      hit.taken = true;
+      extraTurn = applyBonus(hit.type, D.cur);
+    }
 
     const usedDouble = D.armed;
     D.armed = false;
@@ -2119,13 +2231,66 @@
       D.roundWinner = D.cur;
       D.wins[D.cur]++;
       if (D.wins[D.cur] >= D.winsNeeded) D.matchOver = true;
-    } else if (!usedDouble) {
+    } else if (!usedDouble && !extraTurn) {
       D.cur = 1 - D.cur;
     }
     renderAll();
+    maybeAutoMove();
+  }
+
+  // Возвращает true, если ход остаётся за тем, кто взял бонус
+  function applyBonus(type, by) {
+    const rival = 1 - by;
+    if (type === 'extra') return true;
+    if (type === 'fog') D.fog[rival] = true;
+    if (type === 'blind') D.blind[rival] = Math.random() < 0.5 ? 'own' : 'rival';
+    if (type === 'lava') D.autoLava[rival] = true;
+    return false;
+  }
+
+  // «Бросок в лаву»: ход за игрока делает случай — случайное число в самом
+  // горячем поясе, но не само загаданное, иначе бонус дарил бы сопернику победу
+  function maybeAutoMove() {
+    if (mode !== 'duel' || D.roundOver || D.matchOver) return;
+    const p = D.cur;
+    if (!D.autoLava[p]) return;
+    D.autoLava[p] = false;
+    const lava = FEEDBACK_META[7];
+    const options = [];
+    for (let d = lava.min; d <= lava.max; d++) {
+      [secret - d, secret + d].forEach(v => {
+        if (v >= RANGE_MIN && v <= RANGE_MAX && v !== secret) options.push(v);
+      });
+    }
+    if (!options.length) return;
+    const value = options[Math.floor(Math.random() * options.length)];
+    setTimeout(() => {
+      if (mode === 'duel' && !D.roundOver && !D.matchOver) duelPlay(value);
+    }, 1100);
   }
 
   // ================= РЕНДЕР =================
+  // Помехи из бонусов прячут чужие или свои ходы от того, чей сейчас ход.
+  // Когда раунд окончен, прячется всё равно нечего — показываем как есть
+  function hiddenRow(ownerP) {
+    if (mode !== 'duel' || D.roundOver || D.matchOver) return false;
+    if (ownerP === null || ownerP === undefined) return false;
+    const viewer = D.cur;
+    const mine = ownerP === viewer;
+    if (D.fog[viewer] && !mine) return true;
+    if (D.blind[viewer] === 'own' && mine) return true;
+    if (D.blind[viewer] === 'rival' && !mine) return true;
+    return false;
+  }
+
+  // Последний ход, который игроку видно: от него и градусник, и подсказка
+  function lastVisible() {
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (!hiddenRow(history[i].p)) return history[i];
+    }
+    return null;
+  }
+
   function getFeedback(distance) {
     return FEEDBACK_META.find(f => distance >= f.min && distance <= f.max) || FEEDBACK_META[0];
   }
@@ -2148,12 +2313,30 @@
     renderStatus();
     renderResult();
     renderHistory();
+    renderBonusLine();
     if (duel) renderPlayers();
+  }
+
+  function renderBonusLine() {
+    const box = document.getElementById('bonusLine');
+    if (!box) return;
+    const L = t();
+    const show = mode === 'duel' && bonusMode && !D.roundOver && (D.lastBonus || D.nearBonus);
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const by = D.lastBonusBy, rival = 1 - by;
+    const desc = (L.bonusDesc[D.lastBonus] || '')
+      .replace('{a}', escapeHtml(D.names[by]))
+      .replace('{b}', escapeHtml(D.names[rival]));
+    box.innerHTML = D.lastBonus
+      ? '<span class="b-name">🎁 ' + L.bonusNames[D.lastBonus] + '</span>' +
+        '<span class="b-desc">' + desc + '</span>'
+      : '<span class="b-name">🎁 ' + L.bonusNear + '</span>';
   }
 
   function renderFeedback() {
     const panel = document.getElementById('feedbackPanel');
-    const last = history[history.length - 1];
+    const last = lastVisible();
     const hide = !last || (mode === 'duel' ? D.roundOver : gameOverType === 'win' || gameOverType === 'lose');
     if (hide) { panel.classList.add('hidden'); return; }
     panel.style.background = last.meta.bg;
@@ -2179,7 +2362,7 @@
 
     const fill = document.getElementById('thermoFill');
     const bulb = document.getElementById('thermoBulb');
-    const last = history[history.length - 1];
+    const last = lastVisible();
 
     let pct, color;
     if (!last) {
@@ -2244,7 +2427,8 @@
     if (!showLine) return;
 
     const span = Math.max(1, RANGE_MAX - RANGE_MIN);
-    const last = history[history.length - 1];
+    const shown = history.slice(-HISTORY_VISIBLE).filter(h => !hiddenRow(h.p));
+    const last = shown[shown.length - 1];
     let out = '';
 
     // Сама прямая
@@ -2290,7 +2474,7 @@
     });
 
     // Прошлые догадки — полыми кружками, текущая — залитым
-    history.slice(-HISTORY_VISIBLE, -1).forEach(h => {
+    shown.slice(0, -1).forEach(h => {
       out += '<circle cx="' + nlPos(h.guess) + '%" cy="' + NL.axisY + '" r="2.5" fill="none" ' +
              'stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />';
     });
@@ -2451,6 +2635,13 @@
       const count = D.tokens[p] > 1 ? ' ×' + D.tokens[p] : '';
       btn.textContent = (D.armed && D.cur === p) ? L.tokenArmed
                         : (D.tokens[p] === 0 ? L.tokenSpent : L.tokenBtn + count);
+
+      // Что на игроке висит: туман, слепой ход, бросок в лаву
+      const marks = (D.fog[p] ? '🙈' : '') + (D.blind[p] ? '🌫️' : '') + (D.autoLava[p] ? '🌋' : '');
+      const eff = document.getElementById('peff' + p);
+      eff.textContent = marks;
+      eff.title = marks ? [D.fog[p] && L.bonusNames.fog, D.blind[p] && L.bonusNames.blind,
+                           D.autoLava[p] && L.bonusNames.lava].filter(Boolean).join(', ') : '';
     }
   }
 
@@ -2467,15 +2658,19 @@
       const realIndex = history.length - i;
       const item = document.createElement('div');
       item.className = 'history-item';
-      const accent = (h.p === null || h.p === undefined) ? h.meta.color : P_COLORS[h.p];
+      const masked = hiddenRow(h.p);
+      const accent = masked ? 'rgba(255,255,255,0.2)'
+                            : ((h.p === null || h.p === undefined) ? h.meta.color : P_COLORS[h.p]);
       item.style.borderLeft = '3px solid ' + accent;
       const who = (h.p === null || h.p === undefined)
         ? ''
         : '<span class="h-who" style="color:' + P_COLORS[h.p] + '">' + escapeHtml(D.names[h.p]) + '</span>';
-      item.innerHTML =
-        '<span class="h-num">#' + realIndex + '</span>' + who +
-        '<span class="h-guess">' + h.guess + '</span>' +
-        '<span class="h-label" style="color:' + h.meta.color + '">' + getFbText(h.meta) + '</span>';
+      item.innerHTML = masked
+        ? '<span class="h-num">#' + realIndex + '</span>' + who +
+          '<span class="h-guess h-masked">•••</span><span class="h-label h-masked">🙈</span>'
+        : '<span class="h-num">#' + realIndex + '</span>' + who +
+          '<span class="h-guess">' + h.guess + '</span>' +
+          '<span class="h-label" style="color:' + h.meta.color + '">' + getFbText(h.meta) + '</span>';
       list.appendChild(item);
     });
   }

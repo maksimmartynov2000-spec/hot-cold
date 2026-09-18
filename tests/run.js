@@ -956,6 +956,160 @@ async function testShortHistory(browser) {
   }
 }
 
+// Ставит дуэль с бонусами и один бонус нужного вида в известное место
+async function duelWithBonus(browser, type, at) {
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeDuel');
+  await page.waitForTimeout(200);
+  await page.check('#bonusSetup');
+  await page.waitForTimeout(150);
+  await page.selectOption('#rangeMax', '100');
+  await page.waitForTimeout(120);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  await page.evaluate(([t, v]) => {
+    secret = 90;
+    D.bonuses = [{ value: v, type: t, taken: false }];
+    history = [];
+    renderAll();
+  }, [type, at]);
+  return page;
+}
+
+async function testBonusMode(browser) {
+  console.log('\nБонусы в игре с другом');
+
+  // Значок «рядом» — за три клетки, не дальше
+  let page = await duelWithBonus(browser, 'extra', 40);
+  await page.fill('#guessInput', '44');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  check('за четыре клетки бонус не чувствуется', !(await page.locator('#bonusLine').isVisible()));
+  await page.fill('#guessInput', '43');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  check('за три клетки виден значок «рядом»',
+    (await page.locator('#bonusLine').textContent()).indexOf('рядом') >= 0);
+  check('бонус при этом не сработал', await page.evaluate(() => D.bonuses[0].taken === false));
+  await done(page);
+
+  // Ещё ход — ход остаётся за тем, кто взял
+  page = await duelWithBonus(browser, 'extra', 40);
+  const before = await page.evaluate(() => D.cur);
+  await page.fill('#guessInput', '40');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  check('«Ещё ход» оставляет ход за игроком', await page.evaluate(() => D.cur) === before);
+  check('бонус назван в строке под подсказкой',
+    (await page.locator('#bonusLine').textContent()).indexOf('Ещё ход') >= 0);
+  check('взятый бонус больше не сработает', await page.evaluate(() => D.bonuses[0].taken === true));
+  await done(page);
+
+  // Туман — соперник до конца раунда не видит ваши ходы
+  page = await duelWithBonus(browser, 'fog', 40);
+  await page.fill('#guessInput', '40');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const fog = await page.evaluate(() => ({
+    onRival: D.fog[1] === true, turn: D.cur,
+    masked: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent),
+    panel: !document.getElementById('feedbackPanel').classList.contains('hidden'),
+    marks: document.getElementById('peff1').textContent
+  }));
+  check('«Туман» ложится на соперника', fog.onRival && fog.turn === 1, JSON.stringify(fog));
+  check('чужой ход в истории скрыт', fog.masked.join() === '•••', fog.masked.join());
+  check('подсказка тоже скрыта', fog.panel === false);
+  check('на карточке соперника виден значок помехи', fog.marks.indexOf('🙈') >= 0, fog.marks);
+  await done(page);
+
+  // Слепой ход — одна помеха и только на один ход
+  page = await duelWithBonus(browser, 'blind', 40);
+  await page.fill('#guessInput', '40');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  check('«Слепой ход» ложится на соперника',
+    await page.evaluate(() => D.blind[1] === 'own' || D.blind[1] === 'rival'));
+  await page.fill('#guessInput', '50');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  check('после хода помеха снимается', await page.evaluate(() => D.blind[1] === null));
+  await done(page);
+
+  // Бросок в лаву — ход за соперника делает случай, рядом с ответом
+  page = await duelWithBonus(browser, 'lava', 40);
+  await page.fill('#guessInput', '40');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(1600);
+  const lava = await page.evaluate(() => {
+    const last = history[history.length - 1];
+    return { by: last.p, guess: last.guess, distance: last.distance, moves: history.length };
+  });
+  check('за соперника сходил случай', lava.moves === 2 && lava.by === 1, JSON.stringify(lava));
+  check('ход попал в самый горячий пояс, но не в ответ',
+    lava.distance >= 1 && lava.distance <= 3, 'расстояние ' + lava.distance);
+  await done(page);
+
+  // Бонусы не стоят у ответа и не появляются там, где их не просили
+  const page2 = await newGame(browser, { user: 'Максим' });
+  await page2.click('#tModeDuel');
+  await page2.waitForTimeout(200);
+  await page2.check('#bonusSetup');
+  await page2.waitForTimeout(150);
+  await page2.selectOption('#rangeMax', '1000');
+  await page2.waitForTimeout(120);
+  await page2.click('#tStartMatch');
+  await page2.waitForTimeout(250);
+  const placed = await page2.evaluate(() => {
+    const bad = [];
+    for (let i = 0; i < 60; i++) {
+      startRound();
+      if (!D.bonuses.length) bad.push('раунд без бонусов');
+      const seen = new Set();
+      D.bonuses.forEach(b => {
+        if (b.value === secret) bad.push('бонус на загаданном числе');
+        if (b.value < RANGE_MIN || b.value > RANGE_MAX) bad.push('бонус за диапазоном: ' + b.value);
+        if (seen.has(b.value)) bad.push('два бонуса на одном числе');
+        seen.add(b.value);
+      });
+    }
+    return bad.slice(0, 3);
+  });
+  check('бонусы не садятся на ответ и не наслаиваются', placed.length === 0, placed.join('; '));
+
+  // Сигнал «рядом» перестаёт что-либо значить, если накрывает половину прямой
+  const density = await page2.evaluate(() => {
+    const bad = [];
+    [10, 20, 50, 100, 250, 500, 1000].forEach(n => {
+      RANGE_MIN = 1; RANGE_MAX = n;
+      const k = bonusCount();
+      if (k < 1) bad.push(n + ': ни одного бонуса');
+      if (k > 12) bad.push(n + ': бонусов больше дюжины');
+      // На тесном диапазоне зона «рядом» в семь чисел и так накрывает половину
+      // прямой — там бонусов должно остаться столько же, сколько было
+      const base = Math.max(1, Math.ceil(Math.sqrt(n) / 4));
+      if (n <= 20 && k !== base) bad.push(n + ': на тесном диапазоне бонусов стало больше — ' + k);
+      // Дюжина — потолок: больше бонусов уже не про поиск, а про толчею
+      if (n >= 50 && k < Math.min(base * 2, 12)) bad.push(n + ': на широком диапазоне бонусов мало — ' + k);
+    });
+    return bad;
+  });
+  check('бонусов столько, чтобы сигнал ещё что-то значил', density.length === 0, density.join('; '));
+
+  await page2.evaluate(() => { bonusMode = false; startRound(); });
+  check('без галочки бонусов нет', await page2.evaluate(() => D.bonuses.length === 0));
+  await done(page2);
+
+  // В тренировке бонусов не бывает
+  const solo = await newGame(browser, { user: 'Максим' });
+  await solo.click('#tModeSolo');
+  await solo.waitForTimeout(200);
+  await solo.click('#tStartMatch');
+  await solo.waitForTimeout(250);
+  check('в тренировке строки бонуса нет', !(await solo.locator('#bonusLine').isVisible()));
+  check('в тренировке галочки бонусов нет', !(await solo.locator('#bonusSetup').isVisible()));
+  await done(solo);
+}
+
 async function testScaleOrder(browser) {
   console.log('\nПорядок в шкале расстояний');
   const page = await newGame(browser, { user: 'Максим' });
@@ -1137,6 +1291,7 @@ async function testPinHelp(browser) {
     await testSetupSpacing(browser);
     await testMinusButton(browser);
     await testShortHistory(browser);
+    await testBonusMode(browser);
   } finally {
     await browser.close();
   }
