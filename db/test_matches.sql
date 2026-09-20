@@ -25,7 +25,7 @@ do $$ begin
     perform challenge_friend('Лев','1234','Максим',100,false,3);
     raise exception 'ОШИБКА: вызвал не друга';
   exception when others then
-    if sqlerrm <> 'not_a_friend' then raise; end if;
+    if sqlerrm is distinct from 'not_a_friend' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -37,9 +37,9 @@ begin
   mid := challenge_friend('Лев','1234','Кира',100,false,3);
   perform set_config('t.m', mid::text, false);
   select count(*) into n from list_matches('Лев','1234') where id = mid and status = 'invited' and other = 'Кира';
-  if n <> 1 then raise exception 'ОШИБКА: у пригласившего вызова нет'; end if;
+  if n is distinct from 1 then raise exception 'ОШИБКА: у пригласившего вызова нет'; end if;
   select count(*) into n from list_matches('Кира','4321') where id = mid and status = 'invited' and other = 'Лев';
-  if n <> 1 then raise exception 'ОШИБКА: у приглашённого вызова нет'; end if;
+  if n is distinct from 1 then raise exception 'ОШИБКА: у приглашённого вызова нет'; end if;
 end $$;
 \echo ok
 
@@ -49,7 +49,7 @@ do $$ begin
     perform challenge_friend('Лев','1234','Кира',100,false,3);
     raise exception 'ОШИБКА: создался второй матч';
   exception when others then
-    if sqlerrm <> 'match_already_live' then raise; end if;
+    if sqlerrm is distinct from 'match_already_live' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -62,7 +62,7 @@ begin
     perform respond_challenge('Лев','1234',mid,true);
     raise exception 'ОШИБКА: пригласивший принял свой же вызов';
   exception when others then
-    if sqlerrm <> 'not_your_invite' then raise; end if;
+    if sqlerrm is distinct from 'not_your_invite' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -75,7 +75,7 @@ begin
     perform match_guess('Кира','4321',mid,50);
     raise exception 'ОШИБКА: ход прошёл до принятия вызова';
   exception when others then
-    if sqlerrm <> 'not_playing' then raise; end if;
+    if sqlerrm is distinct from 'not_playing' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -113,7 +113,7 @@ begin
     perform match_state('Максим','1111',mid);
     raise exception 'ОШИБКА: посторонний прочитал матч';
   exception when others then
-    if sqlerrm <> 'not_your_match' then raise; end if;
+    if sqlerrm is distinct from 'not_your_match' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -123,12 +123,12 @@ do $$
 declare mid bigint := current_setting('t.m')::bigint; st jsonb;
 begin
   st := match_state('Лев','1234',mid);
-  if (st ->> 'cur')::int <> 0 then raise exception 'ОШИБКА: первым ходит не тот'; end if;
+  if (st ->> 'cur')::int is distinct from 0 then raise exception 'ОШИБКА: первым ходит не тот'; end if;
   begin
     perform match_guess('Кира','4321',mid,50);
     raise exception 'ОШИБКА: сходил не в свою очередь';
   exception when others then
-    if sqlerrm <> 'not_your_turn' then raise; end if;
+    if sqlerrm is distinct from 'not_your_turn' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -141,7 +141,7 @@ begin
   band := match_guess('Лев','1234',mid, case when sec = 1 then 2 else 1 end);
   if band is null or band < 0 or band > 8 then raise exception 'ОШИБКА: странный пояс %', band; end if;
   st := match_state('Кира','4321',mid);
-  if (st ->> 'cur')::int <> 1 then raise exception 'ОШИБКА: очередь не перешла'; end if;
+  if (st ->> 'cur')::int is distinct from 1 then raise exception 'ОШИБКА: очередь не перешла'; end if;
   if (st -> 'moves' -> 0 ->> 'guess') is null then raise exception 'ОШИБКА: ход не записан'; end if;
   if (st -> 'moves' -> 0) ? 'distance' then raise exception 'ОШИБКА: расстояние утекло в ход'; end if;
 end $$;
@@ -155,7 +155,7 @@ begin
     perform match_guess('Кира','4321',mid,101);
     raise exception 'ОШИБКА: приняли число вне диапазона';
   exception when others then
-    if sqlerrm <> 'out_of_range' then raise; end if;
+    if sqlerrm is distinct from 'out_of_range' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -167,7 +167,7 @@ begin
   perform use_match_token('Кира','4321',mid,true);
   st := match_state('Кира','4321',mid);
   if not (st ->> 'armed')::boolean then raise exception 'ОШИБКА: жетон не взвёлся'; end if;
-  if (st -> 'tokens' ->> 1)::int <> 0 then raise exception 'ОШИБКА: жетон не списался'; end if;
+  if (st -> 'tokens' ->> 1)::int is distinct from 0 then raise exception 'ОШИБКА: жетон не списался'; end if;
 end $$;
 \echo ok
 
@@ -178,7 +178,7 @@ begin
   select secret into sec from matches where id = mid;
   perform match_guess('Кира','4321',mid, case when sec = 100 then 99 else 100 end);
   st := match_state('Кира','4321',mid);
-  if (st ->> 'cur')::int <> 1 then raise exception 'ОШИБКА: ход ушёл, хотя жетон был'; end if;
+  if (st ->> 'cur')::int is distinct from 1 then raise exception 'ОШИБКА: ход ушёл, хотя жетон был'; end if;
   if (st ->> 'armed')::boolean then raise exception 'ОШИБКА: жетон не потратился'; end if;
 end $$;
 \echo ok
@@ -191,9 +191,9 @@ begin
   perform match_guess('Кира','4321',mid, sec);
   st := match_state('Лев','1234',mid);
   if not (st ->> 'roundOver')::boolean then raise exception 'ОШИБКА: раунд не закончился'; end if;
-  if (st ->> 'roundWinner')::int <> 1 then raise exception 'ОШИБКА: победитель не тот'; end if;
-  if (st -> 'wins' ->> 1)::int <> 1 then raise exception 'ОШИБКА: победа не засчитана'; end if;
-  if (st ->> 'secret')::int <> sec then raise exception 'ОШИБКА: ответ не показан после раунда'; end if;
+  if (st ->> 'roundWinner')::int is distinct from 1 then raise exception 'ОШИБКА: победитель не тот'; end if;
+  if (st -> 'wins' ->> 1)::int is distinct from 1 then raise exception 'ОШИБКА: победа не засчитана'; end if;
+  if (st ->> 'secret')::int is distinct from sec then raise exception 'ОШИБКА: ответ не показан после раунда'; end if;
 end $$;
 \echo ok
 
@@ -205,7 +205,7 @@ begin
     perform match_guess('Лев','1234',mid,50);
     raise exception 'ОШИБКА: сходили после конца раунда';
   exception when others then
-    if sqlerrm <> 'round_over' then raise; end if;
+    if sqlerrm is distinct from 'round_over' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -216,14 +216,14 @@ declare mid bigint := current_setting('t.m')::bigint; st jsonb;
 begin
   perform next_match_round('Лев','1234',mid);
   st := match_state('Лев','1234',mid);
-  if (st ->> 'round')::int <> 2 then raise exception 'ОШИБКА: раунд не сменился'; end if;
-  if (st ->> 'cur')::int <> 1 then raise exception 'ОШИБКА: начинает не второй игрок'; end if;
+  if (st ->> 'round')::int is distinct from 2 then raise exception 'ОШИБКА: раунд не сменился'; end if;
+  if (st ->> 'cur')::int is distinct from 1 then raise exception 'ОШИБКА: начинает не второй игрок'; end if;
   if (st ->> 'roundOver')::boolean then raise exception 'ОШИБКА: раунд сразу закрыт'; end if;
-  if (st -> 'tokens' ->> 0)::int <> 1 or (st -> 'tokens' ->> 1)::int <> 1 then
+  if (st -> 'tokens' ->> 0)::int is distinct from 1 or (st -> 'tokens' ->> 1)::int <> 1 then
     raise exception 'ОШИБКА: жетоны не вернулись';
   end if;
   if st ->> 'secret' is not null then raise exception 'ОШИБКА: ответ виден в новом раунде'; end if;
-  if jsonb_array_length(st -> 'moves') <> 0 then raise exception 'ОШИБКА: ходы прошлого раунда не убрались'; end if;
+  if jsonb_array_length(st -> 'moves') is distinct from 0 then raise exception 'ОШИБКА: ходы прошлого раунда не убрались'; end if;
 end $$;
 \echo ok
 
@@ -247,8 +247,8 @@ begin
     end if;
   end loop;
   st := match_state('Лев','1234',mid);
-  if (st ->> 'status') <> 'finished' then raise exception 'ОШИБКА: статус не finished'; end if;
-  if greatest((st -> 'wins' ->> 0)::int, (st -> 'wins' ->> 1)::int) <> 3 then
+  if (st ->> 'status') is distinct from 'finished' then raise exception 'ОШИБКА: статус не finished'; end if;
+  if greatest((st -> 'wins' ->> 0)::int, (st -> 'wins' ->> 1)::int) is distinct from 3 then
     raise exception 'ОШИБКА: побед не три';
   end if;
 end $$;
@@ -259,7 +259,7 @@ do $$
 declare n int;
 begin
   select count(*) into n from list_matches('Лев','1234');
-  if n <> 0 then raise exception 'ОШИБКА: доигранный матч остался в списке (% шт.)', n; end if;
+  if n is distinct from 0 then raise exception 'ОШИБКА: доигранный матч остался в списке (% шт.)', n; end if;
 end $$;
 \echo ok
 
@@ -270,9 +270,9 @@ begin
   mid := challenge_friend('Лев','1234','Кира',10,true,1);
   update matches set updated_at = now() - interval '2 hours' where id = mid;
   select count(*) into n from list_matches('Лев','1234');
-  if n <> 0 then raise exception 'ОШИБКА: протухший вызов остался в списке (% шт.)', n; end if;
+  if n is distinct from 0 then raise exception 'ОШИБКА: протухший вызов остался в списке (% шт.)', n; end if;
   select status into st from matches where id = mid;
-  if st <> 'expired' then raise exception 'ОШИБКА: статус % вместо expired', st; end if;
+  if st is distinct from 'expired' then raise exception 'ОШИБКА: статус % вместо expired', st; end if;
 end $$;
 \echo ok
 
@@ -282,7 +282,7 @@ declare mid bigint; lo int; hi int;
 begin
   mid := challenge_friend('Лев','1234','Кира',100,true,1);
   select range_min, range_max into lo, hi from matches where id = mid;
-  if lo <> -50 or hi <> 50 then raise exception 'ОШИБКА: границы %…% вместо -50…50', lo, hi; end if;
+  if lo is distinct from -50 or hi <> 50 then raise exception 'ОШИБКА: границы %…% вместо -50…50', lo, hi; end if;
   delete from matches where id = mid;
 end $$;
 \echo ok
@@ -305,4 +305,41 @@ begin
   end;
 end $$;
 commit;
+\echo ok
+
+\echo === 22. новые диапазоны принимаются, чужие — нет
+do $$
+declare mid bigint; n int; r int;
+begin
+  foreach r in array array[10, 20, 100, 200, 1000, 2000] loop
+    delete from matches where (p0, p1) in (('Лев','Кира'), ('Кира','Лев'));
+    mid := challenge_friend('Лев','1234','Кира', r, false, 1, false, null);
+    select count(*) into n from matches where id = mid and range_max = r;
+    if n is distinct from 1 then raise exception 'ОШИБКА: диапазон % не принят', r; end if;
+  end loop;
+  delete from matches where (p0, p1) in (('Лев','Кира'), ('Кира','Лев'));
+  begin
+    perform challenge_friend('Лев','1234','Кира', 500, false, 1, false, null);
+    raise exception 'ОШИБКА: принят диапазон, которого нет в игре';
+  exception when others then
+    if sqlerrm is distinct from 'bad_range' then raise; end if;
+  end;
+end $$;
+\echo ok
+
+\echo === 23. мороз на новых диапазонах даёт ровные границы
+do $$
+declare mid bigint; lo int; hi int; r int; want int;
+begin
+  foreach r in array array[20, 200, 2000] loop
+    delete from matches where (p0, p1) in (('Лев','Кира'), ('Кира','Лев'));
+    mid := challenge_friend('Лев','1234','Кира', r, true, 1, false, null);
+    select range_min, range_max into lo, hi from matches where id = mid;
+    want := r / 2;
+    if lo is distinct from -want or hi is distinct from want then
+      raise exception 'ОШИБКА: для % границы %…% вместо -%…%', r, lo, hi, want, want;
+    end if;
+  end loop;
+  delete from matches where (p0, p1) in (('Лев','Кира'), ('Кира','Лев'));
+end $$;
 \echo ok

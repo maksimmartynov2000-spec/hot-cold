@@ -42,9 +42,9 @@ declare st jsonb;
 begin
   delete from run_sessions where username = 'Лев';
   st := run_start('Лев','1234',false,true);
-  if (st ->> 'round')::int <> 1 then raise exception 'ОШИБКА: не первый раунд'; end if;
-  if (st ->> 'score')::int <> 0 then raise exception 'ОШИБКА: очки не с нуля'; end if;
-  if (st ->> 'rangeMin')::int <> 1 or (st ->> 'rangeMax')::int <> 10 then
+  if (st ->> 'round')::int is distinct from 1 then raise exception 'ОШИБКА: не первый раунд'; end if;
+  if (st ->> 'score')::int is distinct from 0 then raise exception 'ОШИБКА: очки не с нуля'; end if;
+  if (st ->> 'rangeMin')::int is distinct from 1 or (st ->> 'rangeMax')::int <> 10 then
     raise exception 'ОШИБКА: границы % … %', st ->> 'rangeMin', st ->> 'rangeMax';
   end if;
   if not (st ->> 'active')::boolean then raise exception 'ОШИБКА: забег не активен'; end if;
@@ -75,7 +75,7 @@ begin
   res := run_guess('Лев','1234', case when r.secret = 1 then 2 else 1 end);
   if (res ->> 'tier')::int = 8 then raise exception 'ОШИБКА: промах засчитан как попадание'; end if;
   if res ? 'roundWon' then raise exception 'ОШИБКА: раунд закрыт промахом'; end if;
-  if (res -> 'state' ->> 'moves')::int <> 1 then raise exception 'ОШИБКА: ход не посчитан'; end if;
+  if (res -> 'state' ->> 'moves')::int is distinct from 1 then raise exception 'ОШИБКА: ход не посчитан'; end if;
 end $$;
 \echo ok
 
@@ -85,7 +85,7 @@ do $$ begin
     perform run_guess('Лев','1234',999);
     raise exception 'ОШИБКА: приняли число вне диапазона';
   exception when others then
-    if sqlerrm <> 'out_of_range' then raise; end if;
+    if sqlerrm is distinct from 'out_of_range' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -97,15 +97,15 @@ begin
   select * into r from run_sessions where username = 'Лев';
   want := round(100.0 * r.round * (min_attempts(r.range_max - r.range_min + 1)::numeric / (r.moves + 1)));
   res := run_guess('Лев','1234', r.secret);
-  if (res ->> 'tier')::int <> 8 then raise exception 'ОШИБКА: попадание не признано'; end if;
-  if (res ->> 'points')::int <> want then
+  if (res ->> 'tier')::int is distinct from 8 then raise exception 'ОШИБКА: попадание не признано'; end if;
+  if (res ->> 'points')::int is distinct from want then
     raise exception 'ОШИБКА: очков % вместо %', res ->> 'points', want;
   end if;
-  if (res -> 'state' ->> 'round')::int <> r.round + 1 then
+  if (res -> 'state' ->> 'round')::int is distinct from r.round + 1 then
     raise exception 'ОШИБКА: раунд не сменился';
   end if;
-  if (res -> 'state' ->> 'score')::int <> want then raise exception 'ОШИБКА: очки не начислены'; end if;
-  if (res -> 'state' ->> 'moves')::int <> 0 then raise exception 'ОШИБКА: ходы не обнулились'; end if;
+  if (res -> 'state' ->> 'score')::int is distinct from want then raise exception 'ОШИБКА: очки не начислены'; end if;
+  if (res -> 'state' ->> 'moves')::int is distinct from 0 then raise exception 'ОШИБКА: ходы не обнулились'; end if;
 end $$;
 \echo ok
 
@@ -124,9 +124,9 @@ begin
     exit when (res ->> 'over')::boolean;
   end loop;
   select count(*) into after from runs where username = 'Лев';
-  if after <> before + 1 then raise exception 'ОШИБКА: забег не записан в историю'; end if;
+  if after is distinct from before + 1 then raise exception 'ОШИБКА: забег не записан в историю'; end if;
   select * into r from run_sessions where username = 'Лев';
-  if r.status <> 'finished' then raise exception 'ОШИБКА: забег остался активным'; end if;
+  if r.status is distinct from 'finished' then raise exception 'ОШИБКА: забег остался активным'; end if;
 end $$;
 \echo ok
 
@@ -136,7 +136,7 @@ do $$ begin
     perform run_guess('Лев','1234',1);
     raise exception 'ОШИБКА: ход прошёл после конца забега';
   exception when others then
-    if sqlerrm <> 'no_run' then raise; end if;
+    if sqlerrm is distinct from 'no_run' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -148,8 +148,8 @@ begin
   a := run_start('Лев','1234',false,true);
   perform run_guess('Лев','1234', case when (select secret from run_sessions where username='Лев') = 1 then 2 else 1 end);
   b := run_start('Лев','1234',false,false);
-  if (b ->> 'moves')::int <> 1 then raise exception 'ОШИБКА: продолжение потеряло ход'; end if;
-  if (b ->> 'round')::int <> (a ->> 'round')::int then raise exception 'ОШИБКА: раунд сбросился'; end if;
+  if (b ->> 'moves')::int is distinct from 1 then raise exception 'ОШИБКА: продолжение потеряло ход'; end if;
+  if (b ->> 'round')::int is distinct from (a ->> 'round')::int then raise exception 'ОШИБКА: раунд сбросился'; end if;
 end $$;
 \echo ok
 
@@ -160,14 +160,14 @@ begin
   update students set best_run_score = 100000 where username = 'Лев';
   perform run_give_up('Лев','1234');
   select best_run_score into best_after from students where username = 'Лев';
-  if best_after <> 100000 then raise exception 'ОШИБКА: слабый забег перебил рекорд'; end if;
+  if best_after is distinct from 100000 then raise exception 'ОШИБКА: слабый забег перебил рекорд'; end if;
 
   update students set best_run_score = 0 where username = 'Лев';
   perform run_start('Лев','1234',false,true);
   update run_sessions set score = 4242, round = 5 where username = 'Лев';
   perform run_give_up('Лев','1234');
   select best_run_score into best_after from students where username = 'Лев';
-  if best_after <> 4242 then raise exception 'ОШИБКА: рекорд не обновился — %', best_after; end if;
+  if best_after is distinct from 4242 then raise exception 'ОШИБКА: рекорд не обновился — %', best_after; end if;
 end $$;
 \echo ok
 
@@ -176,7 +176,7 @@ do $$
 declare st jsonb;
 begin
   st := run_start('Лев','1234',true,true);
-  if (st ->> 'rangeMin')::int <> -5 or (st ->> 'rangeMax')::int <> 5 then
+  if (st ->> 'rangeMin')::int is distinct from -5 or (st ->> 'rangeMax')::int <> 5 then
     raise exception 'ОШИБКА: границы % … %', st ->> 'rangeMin', st ->> 'rangeMax';
   end if;
 end $$;
@@ -188,7 +188,7 @@ do $$ begin
     perform run_guess('Лев','9999',1);
     raise exception 'ОШИБКА: чужой PIN прошёл';
   exception when others then
-    if sqlerrm <> 'auth_failed' then raise; end if;
+    if sqlerrm is distinct from 'auth_failed' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -217,10 +217,10 @@ begin
   g := case when r.secret = r.range_min then r.range_max else r.range_min end;
   perform run_guess('Лев','1234', g);
   st := run_state('Лев','1234');
-  if jsonb_array_length(st -> 'movesLog') <> 1 then
+  if jsonb_array_length(st -> 'movesLog') is distinct from 1 then
     raise exception 'ОШИБКА: ход не попал в состояние — %', st -> 'movesLog';
   end if;
-  if (st -> 'movesLog' -> 0 ->> 'guess')::int <> g then
+  if (st -> 'movesLog' -> 0 ->> 'guess')::int is distinct from g then
     raise exception 'ОШИБКА: в состоянии не то число';
   end if;
   if not (st -> 'movesLog' -> 0) ? 'tier' then raise exception 'ОШИБКА: пояс не сохранён'; end if;
@@ -235,7 +235,7 @@ begin
   select * into r from run_sessions where username = 'Лев';
   perform run_guess('Лев','1234', r.secret);
   st := run_state('Лев','1234');
-  if jsonb_array_length(st -> 'movesLog') <> 0 then
+  if jsonb_array_length(st -> 'movesLog') is distinct from 0 then
     raise exception 'ОШИБКА: ходы прошлого раунда остались';
   end if;
 end $$;
@@ -250,7 +250,7 @@ begin
   if not (st ->> 'active')::boolean then
     raise exception 'ОШИБКА: по имени в другом регистре забег не нашёлся';
   end if;
-  if (st ->> 'round')::int <> 1 then raise exception 'ОШИБКА: нашёлся не тот забег'; end if;
+  if (st ->> 'round')::int is distinct from 1 then raise exception 'ОШИБКА: нашёлся не тот забег'; end if;
 end $$;
 \echo ok
 

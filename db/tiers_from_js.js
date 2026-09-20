@@ -37,7 +37,7 @@ function tierOf(meta, distance) {
 
 const SPANS = [];
 for (let n = 2; n <= 120; n++) SPANS.push(n);
-[250, 251, 500, 501, 1000, 1001, 2000, 2001, 5000].forEach(n => SPANS.push(n));
+[200, 201, 250, 251, 500, 501, 1000, 1001, 2000, 2001, 5000].forEach(n => SPANS.push(n));
 
 const out = [];
 const bounds = [];

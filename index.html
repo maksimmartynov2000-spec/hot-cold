@@ -1285,14 +1285,10 @@
       <div class="lb-title" id="challengeTitle"></div>
       <div class="setup-field tight">
         <label id="tChRange">Range</label>
-        <select class="field" id="chRange" onchange="renderChallengeBonuses()">
-          <option value="10">1–10</option>
-          <option value="100" selected>1–100</option>
-          <option value="1000">1–1000</option>
-        </select>
+        <select class="field" id="chRange" onchange="renderChallengeBonuses()"></select>
       </div>
       <label class="frost-row">
-        <input type="checkbox" id="chFrost" />
+        <input type="checkbox" id="chFrost" onchange="buildChallengeRanges()" />
         <span id="tChFrost"></span>
       </label>
       <label class="frost-row">
@@ -1934,7 +1930,9 @@
     100:     [100, 60, 30, 15, 8, 4, 2, 1],
     1000:    [1000, 500, 200, 100, 50, 20, 10, 3],
   };
-  const RANGE_PRESETS = [10, 100, 1000];
+  // Между десяткой и сотней (и дальше) шаг был слишком большим: двадцать и
+  // двести дают промежуточную ступень, которой не хватало младшим
+  const RANGE_PRESETS = [10, 20, 100, 200, 1000, 2000];
 
   // Горячий конец шкалы не растёт вместе с диапазоном: жарко/горячо/очень горячо/лава
   // всегда означают одни и те же расстояния. Именно по горячим поясам игрок и вычисляет
@@ -2106,11 +2104,14 @@
     FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
   }
 
-  function boundsLabel(size) {
+  // Вызов онлайн выбирает мороз своей галочкой, а не общей настройкой, поэтому
+  // подпись умеет принимать его отдельно
+  function boundsLabel(size, frost) {
     const half = Math.floor(size / 2);
+    const cold = (frost === undefined) ? frostMode : frost;
     // Минус берём обычный, с клавиатуры: ребёнок увидит ровно то, что ему набирать
-    return frostMode ? (formatNum(-half) + '…+' + formatNum(half))
-                     : ('1–' + formatNum(size));
+    return cold ? (formatNum(-half) + '…+' + formatNum(half))
+                : ('1–' + formatNum(size));
   }
 
   function renderFrostToggles() {
@@ -4015,9 +4016,27 @@
     sel.value = String(values.includes(prev) ? prev : auto);
   }
 
+  // Список диапазонов один на всю игру: собирать его руками в двух местах —
+  // значит однажды забыть про одно из них
+  function buildChallengeRanges() {
+    const sel = document.getElementById('chRange');
+    if (!sel) return;
+    const prev = sel.value;
+    const frost = document.getElementById('chFrost').checked;
+    sel.innerHTML = '';
+    RANGE_PRESETS.forEach(n => {
+      const o = document.createElement('option');
+      o.value = n;
+      o.textContent = boundsLabel(n, frost);
+      sel.appendChild(o);
+    });
+    sel.value = RANGE_PRESETS.includes(parseInt(prev)) ? prev : '100';
+  }
+
   function openChallenge(name) {
     const box = document.getElementById('challengeBox');
     box.dataset.name = name;
+    buildChallengeRanges();
     renderChallengeBonuses();
     document.getElementById('challengeTitle').textContent =
       t().online.chTitle.replace('{name}', name);

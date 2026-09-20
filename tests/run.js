@@ -551,7 +551,17 @@ async function testFrostMode(browser) {
     labels: [...document.querySelectorAll('#rangeMax option')].map(o => o.textContent),
     attempts: [...document.querySelectorAll('#attemptsCount option')].map(o => o.textContent)
   }));
-  check('с морозом границы симметричные', after.labels[1] === '-50…+50', after.labels.join(' '));
+  check('с морозом границы симметричные',
+    after.labels.includes('-50…+50') && after.labels.includes('-5…+5') &&
+    after.labels.every(l => l.indexOf('-') === 0), after.labels.join(' '));
+  // toLocaleString ставит неразрывный пробел — сравниваем после нормализации
+  const plain = arr => arr.map(l => l.replace(/\s/g, ' '));
+  check('новые диапазоны на месте',
+    ['1–20', '1–200', '1–2 000'].every(v => plain(before.labels).includes(v)),
+    plain(before.labels).join(' '));
+  check('и у них симметричная пара',
+    ['-10…+10', '-100…+100', '-1 000…+1 000'].every(v => plain(after.labels).includes(v)),
+    plain(after.labels).join(' '));
   // чисел столько же, значит и попыток должно предлагаться столько же
   check('попыток предлагается столько же', after.attempts.join() === before.attempts.join(),
     before.attempts.join() + ' → ' + after.attempts.join());
@@ -622,9 +632,11 @@ async function testFrostMode(browser) {
     await page3.evaluate(() => frostMode === true));
   await page3.click('#tModeSolo');
   await page3.waitForTimeout(200);
+  const startLabels = await page3.evaluate(() =>
+    [...document.querySelectorAll('#rangeMax option')].map(o => o.textContent));
   check('и границы сразу симметричные',
-    (await page3.evaluate(() =>
-      [...document.querySelectorAll('#rangeMax option')].map(o => o.textContent)))[1] === '-50…+50');
+    startLabels.length > 0 && startLabels.every(l => l.indexOf('-') === 0),
+    startLabels.join(' '));
   await done(page3);
 }
 

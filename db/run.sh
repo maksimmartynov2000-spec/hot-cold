@@ -24,6 +24,8 @@ su postgres -c "psql -q -d hotcold_test -v ON_ERROR_STOP=1 \
   -f $ROOT/migration_online_bonuses.txt \
   -f $ROOT/migration_timeout_row.txt \
   -f $ROOT/migration_run_server.txt \
+  -f $ROOT/migration_run_moves.txt \
+  -f $ROOT/migration_more_ranges.txt \
   -c \"select register_student('Лев','1234',null), register_student('Кира','4321',null), register_student('Максим','1111',null);\"" >/dev/null
 
 FAILED=0

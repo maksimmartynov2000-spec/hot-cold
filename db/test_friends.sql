@@ -8,7 +8,7 @@ do $$ begin
     perform find_students('Лев','1234','Л');
     raise exception 'ОШИБКА: короткий запрос прошёл';
   exception when others then
-    if sqlerrm <> 'query_too_short' then raise; end if;
+    if sqlerrm is distinct from 'query_too_short' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -19,7 +19,7 @@ do $$ begin
     perform find_students('Лев','9999','Ки');
     raise exception 'ОШИБКА: чужой PIN прошёл';
   exception when others then
-    if sqlerrm <> 'auth_failed' then raise; end if;
+    if sqlerrm is distinct from 'auth_failed' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -52,7 +52,7 @@ do $$ begin
     perform send_friend_request('Лев','1234','Лев');
     raise exception 'ОШИБКА: сам себе отправил';
   exception when others then
-    if sqlerrm <> 'cannot_friend_self' then raise; end if;
+    if sqlerrm is distinct from 'cannot_friend_self' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -65,7 +65,7 @@ do $$ begin
     perform send_friend_request('Лев','1234','Максим');
     raise exception 'ОШИБКА: заявка прошла сразу после отказа';
   exception when others then
-    if sqlerrm <> 'recently_declined' then raise; end if;
+    if sqlerrm is distinct from 'recently_declined' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -87,7 +87,7 @@ do $$ begin
     perform respond_friend_request('Кира','4321','Максим',true);
     raise exception 'ОШИБКА: ответ на пустоту прошёл';
   exception when others then
-    if sqlerrm <> 'no_such_request' then raise; end if;
+    if sqlerrm is distinct from 'no_such_request' then raise; end if;
   end;
 end $$;
 \echo ok
@@ -113,7 +113,7 @@ begin
     perform send_friend_request('Кира','4321','Бот21');
     raise exception 'ОШИБКА: 21-я заявка прошла';
   exception when others then
-    if sqlerrm <> 'too_many_requests' then raise; end if;
+    if sqlerrm is distinct from 'too_many_requests' then raise; end if;
   end;
 end $$;
 \echo ok (двадцать заявок предел)
