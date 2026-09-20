@@ -1,0 +1,33 @@
+#!/bin/sh
+# Проверка миграций на настоящем PostgreSQL. База собирается заново каждый раз,
+# иначе прогон видит состояние предыдущего и проверки начинают врать.
+#   sh db/run.sh
+set -e
+DIR=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(dirname "$DIR")
+
+service postgresql status >/dev/null 2>&1 || service postgresql start >/dev/null
+
+su postgres -c "dropdb --if-exists hotcold_test" >/dev/null 2>&1
+su postgres -c "createdb hotcold_test"
+su postgres -c "psql -q -d hotcold_test -v ON_ERROR_STOP=1 \
+  -f $DIR/00_base.sql \
+  -f $ROOT/migration_friends.txt \
+  -c \"select register_student('Лев','1234',null), register_student('Кира','4321',null), register_student('Максим','1111',null);\"" >/dev/null
+
+FAILED=0
+for T in "$DIR"/test_*.sql; do
+  echo "--- $(basename "$T")"
+  if ! su postgres -c "psql -q -d hotcold_test -v ON_ERROR_STOP=1 -f $T" 2>&1; then
+    FAILED=1
+  fi
+done
+
+if [ "$FAILED" = "0" ]; then
+  echo ""
+  echo "все сценарии прошли"
+else
+  echo ""
+  echo "ЕСТЬ ПАДЕНИЯ"
+  exit 1
+fi
