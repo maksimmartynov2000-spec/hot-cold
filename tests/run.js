@@ -979,8 +979,23 @@ async function duelWithBonus(browser, type, at) {
 async function testBonusMode(browser) {
   console.log('\nБонусы в игре с другом');
 
-  // Значок «рядом» — за три клетки, не дальше
+  // Радиус сигнала «рядом» — от диапазона: три клетки накрывали почти весь
+  // десяток и не значили ничего на тысяче
   let page = await duelWithBonus(browser, 'extra', 40);
+  const radii = await page.evaluate(() => {
+    const out = {};
+    [[1, 10], [1, 100], [1, 1000], [-500, 500]].forEach(([lo, hi]) => {
+      RANGE_MIN = lo; RANGE_MAX = hi;
+      out[lo + '..' + hi] = bonusNearRadius();
+    });
+    RANGE_MIN = 1; RANGE_MAX = 100;
+    return out;
+  });
+  check('на десятке сигнал за одну клетку', radii['1..10'] === 1, JSON.stringify(radii));
+  check('на сотне — за три', radii['1..100'] === 3, JSON.stringify(radii));
+  check('на тысяче — за пять', radii['1..1000'] === 5 && radii['-500..500'] === 5,
+    JSON.stringify(radii));
+
   await page.fill('#guessInput', '44');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
@@ -988,24 +1003,31 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '43');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
-  check('за три клетки виден значок «рядом»',
-    (await page.locator('#bonusLine').textContent()).indexOf('рядом') >= 0);
+  const nearLine = await page.locator('#bonusLine').textContent();
+  check('за три клетки виден сигнал', nearLine.indexOf('рядом') >= 0, nearLine);
+  // Рядом может лежать и ловушка, поэтому значок больше не подарок
+  check('значок сигнала нейтральный', nearLine.indexOf('❓') >= 0 && nearLine.indexOf('🎁') < 0,
+    nearLine);
   check('бонус при этом не сработал', await page.evaluate(() => D.bonuses[0].taken === false));
   await done(page);
 
-  // Ещё ход — ход остаётся за тем, кто взял
+  // Два про запас — жетоны, а не немедленный лишний ход
   page = await duelWithBonus(browser, 'extra', 40);
-  const before = await page.evaluate(() => D.cur);
+  const tokensBefore = await page.evaluate(() => D.tokens.slice());
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
-  check('«Ещё ход» оставляет ход за игроком', await page.evaluate(() => D.cur) === before);
+  const extra = await page.evaluate(() => ({ tokens: D.tokens.slice(), cur: D.cur }));
+  check('«Два про запас» даёт взявшему два жетона',
+    extra.tokens[0] === tokensBefore[0] + 2, tokensBefore.join() + ' → ' + extra.tokens.join());
+  check('сопернику жетонов не добавилось', extra.tokens[1] === tokensBefore[1]);
+  check('ход при этом переходит к сопернику', extra.cur === 1, 'ходит ' + extra.cur);
   check('бонус назван в строке под подсказкой',
-    (await page.locator('#bonusLine').textContent()).indexOf('Ещё ход') >= 0);
+    (await page.locator('#bonusLine').textContent()).indexOf('Два про запас') >= 0);
   check('взятый бонус больше не сработает', await page.evaluate(() => D.bonuses[0].taken === true));
   await done(page);
 
-  // Туман — соперник до конца раунда не видит ваши ходы
+  // Туман — соперник до конца раунда не видит ЧУЖИЕ ходы
   page = await duelWithBonus(browser, 'fog', 40);
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
@@ -1022,27 +1044,53 @@ async function testBonusMode(browser) {
   check('на карточке соперника виден значок помехи', fog.marks.indexOf('🙈') >= 0, fog.marks);
   await done(page);
 
-  // Слепой ход — одна помеха и только на один ход
+  // Слепой ход — соперник не видит СВОИ ходы, и это до конца раунда
   page = await duelWithBonus(browser, 'blind', 40);
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
-  check('«Слепой ход» ложится на соперника',
-    await page.evaluate(() => D.blind[1] === 'own' || D.blind[1] === 'rival'));
-  await page.fill('#guessInput', '50');
+  check('«Слепой ход» ложится на соперника', await page.evaluate(() => D.blind[1] === true));
+  await page.fill('#guessInput', '50');       // ходит соперник
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
-  check('после хода помеха снимается', await page.evaluate(() => D.blind[1] === null));
+  await page.fill('#guessInput', '60');       // ходит взявший
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const blindView = await page.evaluate(() => ({
+    still: D.blind[1] === true, viewer: D.cur,
+    rows: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent)
+  }));
+  check('помеха не снимается после хода', blindView.still, JSON.stringify(blindView));
+  check('соперник смотрит на доску своим ходом', blindView.viewer === 1);
+  check('его собственный ход закрыт', blindView.rows.indexOf('50') < 0, blindView.rows.join());
+  check('чужие ходы он при этом видит',
+    blindView.rows.indexOf('60') >= 0 && blindView.rows.indexOf('40') >= 0, blindView.rows.join());
+  await done(page);
+
+  // Туман и слепой ход вместе оставили бы игрока совсем без глаз
+  page = await duelWithBonus(browser, 'blind', 40);
+  await page.evaluate(() => { D.fog[1] = true; renderAll(); });
+  await page.fill('#guessInput', '40');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const guard = await page.evaluate(() => ({
+    blind: D.blind[1], fog: D.fog[1], shown: D.lastBonus, tokens: D.tokens.slice()
+  }));
+  check('вторая помеха на того же игрока не ложится', guard.blind === false, JSON.stringify(guard));
+  check('вместо неё выдан запас ходов', guard.shown === 'extra' && guard.tokens[0] === 3,
+    JSON.stringify(guard));
+  check('и в строке написано именно это',
+    (await page.locator('#bonusLine').textContent()).indexOf('Два про запас') >= 0);
   await done(page);
 
   // Закрытый ход не должен подменяться прошлым: пока помеха висит, подсказки нет
   page = await duelWithBonus(browser, 'blind', 40);
   await page.evaluate(() => {
     secret = 90;
-    history = [{ guess: 10, distance: 80, meta: getFeedback(80), p: 0 },
-               { guess: 40, distance: 50, meta: getFeedback(50), p: 1 }];
-    D.cur = 0;
-    D.blind = ['rival', null];
+    history = [{ guess: 10, distance: 80, meta: getFeedback(80), p: 1 },
+               { guess: 40, distance: 50, meta: getFeedback(50), p: 0 }];
+    D.cur = 0;                 // свой же ход последний — так бывает с жетоном
+    D.blind = [true, false];
     renderAll();
   });
   const blinded = await page.evaluate(() => ({
@@ -1055,26 +1103,157 @@ async function testBonusMode(browser) {
   check('при закрытом ходе подсказки нет вовсе', blinded.panel === false, JSON.stringify(blinded));
   check('и градусник не показывает прошлый ход', blinded.thermo === '8%', blinded.thermo);
   check('и на прямой нет текущей точки', blinded.filled === 0, String(blinded.filled));
-  check('свой прошлый ход при этом виден', blinded.rows.indexOf('10') >= 0, blinded.rows.join());
+  check('чужой ход при этом виден', blinded.rows.indexOf('10') >= 0, blinded.rows.join());
 
-  // а без помехи подсказка на месте — значит проверка выше не пустая
-  await page.evaluate(() => { D.blind = [null, null]; renderAll(); });
+  await page.evaluate(() => { D.blind = [false, false]; renderAll(); });
   check('без помехи подсказка возвращается', await page.evaluate(() =>
     !document.getElementById('feedbackPanel').classList.contains('hidden')));
   await done(page);
 
-  // Бросок в лаву — ход за соперника делает случай, рядом с ответом
+  // Бросок в лаву — ход делает случай, но по кнопке и руками того, у кого его отняли
   page = await duelWithBonus(browser, 'lava', 40);
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
-  await page.waitForTimeout(1600);
+  await page.waitForTimeout(600);
+  const waiting = await page.evaluate(() => ({
+    onRival: D.autoLava[1] === true, turn: D.cur, moves: history.length,
+    panel: !document.getElementById('forcedTurn').classList.contains('hidden'),
+    input: !document.getElementById('guessSection').classList.contains('hidden'),
+    text: document.getElementById('forcedText').textContent,
+    token: document.getElementById('ptoken1').disabled
+  }));
+  check('сам собой ход не делается', waiting.moves === 1 && waiting.turn === 1,
+    JSON.stringify(waiting));
+  check('вместо поля ввода — панель с кнопкой', waiting.panel && !waiting.input,
+    JSON.stringify(waiting));
+  check('в панели названо, что происходит',
+    waiting.text.indexOf('лаву') >= 0 && waiting.text.indexOf('за вас') >= 0, waiting.text);
+  check('жетон на отнятом ходе не взвести', waiting.token === true);
+
+  await page.click('#forcedBtn');
+  await page.waitForTimeout(400);
   const lava = await page.evaluate(() => {
     const last = history[history.length - 1];
-    return { by: last.p, guess: last.guess, distance: last.distance, moves: history.length };
+    return { by: last.p, distance: last.distance, moves: history.length,
+             turn: D.cur, flag: D.autoLava[1] };
   });
-  check('за соперника сходил случай', lava.moves === 2 && lava.by === 1, JSON.stringify(lava));
+  check('по кнопке за соперника ходит случай', lava.moves === 2 && lava.by === 1,
+    JSON.stringify(lava));
   check('ход попал в самый горячий пояс, но не в ответ',
     lava.distance >= 1 && lava.distance <= 3, 'расстояние ' + lava.distance);
+  check('помеха снялась и ход вернулся', lava.flag === false && lava.turn === 0,
+    JSON.stringify(lava));
+  await done(page);
+
+  // Пропуск хода — ловушка: бьёт по тому, кто наступил
+  page = await duelWithBonus(browser, 'skip', 40);
+  await page.fill('#guessInput', '40');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  check('«Пропуск хода» ложится на взявшего', await page.evaluate(() => D.skip[0] === true));
+  await page.fill('#guessInput', '50');       // соперник ходит как обычно
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const skipping = await page.evaluate(() => ({
+    turn: D.cur, moves: history.length,
+    panel: !document.getElementById('forcedTurn').classList.contains('hidden'),
+    input: !document.getElementById('guessSection').classList.contains('hidden'),
+    btn: document.getElementById('forcedBtn').textContent
+  }));
+  check('свой ход взявший не получает', skipping.turn === 0 && skipping.panel && !skipping.input,
+    JSON.stringify(skipping));
+  check('кнопка так и называется', skipping.btn === 'Пропустить', skipping.btn);
+  await page.click('#forcedBtn');
+  await page.waitForTimeout(300);
+  const skipped = await page.evaluate(() => ({
+    turn: D.cur, moves: history.length, flag: D.skip[0]
+  }));
+  check('пропуск отдаёт ход сопернику', skipped.turn === 1, JSON.stringify(skipped));
+  check('и не добавляет хода в историю', skipped.moves === 2, JSON.stringify(skipped));
+  check('пропуск одноразовый', skipped.flag === false);
+  await done(page);
+
+  // Подарок сопернику — жетон уходит не туда, куда хотелось
+  page = await duelWithBonus(browser, 'gift', 40);
+  await page.fill('#guessInput', '40');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const gift = await page.evaluate(() => D.tokens.slice());
+  check('«Подарок сопернику» добавляет жетон сопернику', gift[1] === 2, gift.join());
+  check('а взявшему — ничего', gift[0] === 1, gift.join());
+  await done(page);
+
+  // Короткая память — до конца раунда видно два хода вместо четырёх
+  page = await duelWithBonus(browser, 'memory', 40);
+  await page.fill('#guessInput', '40');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  check('«Короткая память» ложится на взявшего',
+    await page.evaluate(() => D.shortMemory[0] === true));
+  const memory = await page.evaluate(() => {
+    history = [1, 2, 3, 4, 5, 6].map((v, i) => ({
+      guess: v * 10, distance: Math.abs(v * 10 - secret),
+      meta: getFeedback(Math.abs(v * 10 - secret)), p: i % 2
+    }));
+    D.cur = 0; renderAll();
+    const mine = { rows: document.querySelectorAll('.history-item').length,
+                   dots: document.querySelectorAll('#numLineSvg circle').length };
+    D.cur = 1; renderAll();
+    const his = { rows: document.querySelectorAll('.history-item').length,
+                  dots: document.querySelectorAll('#numLineSvg circle').length };
+    return { mine, his };
+  });
+  check('взявший видит два хода вместо четырёх', memory.mine.rows === 2,
+    JSON.stringify(memory));
+  check('и на прямой у него тоже два', memory.mine.dots === 2, JSON.stringify(memory));
+  check('соперника это не касается', memory.his.rows === 4, JSON.stringify(memory));
+  await done(page);
+
+  // Ловушек примерно треть — они должны попадаться, но не решать раунд
+  page = await duelWithBonus(browser, 'extra', 40);
+  const mix = await page.evaluate(() => {
+    let good = 0, trap = 0;
+    for (let i = 0; i < 200; i++) {
+      startRound();
+      D.bonuses.forEach(b => (BONUS_TRAP.indexOf(b.type) >= 0 ? trap++ : good++));
+    }
+    return { good, trap, share: trap / (good + trap) };
+  });
+  check('ловушек примерно треть', mix.share > 0.25 && mix.share < 0.42,
+    (100 * mix.share).toFixed(0) + '%');
+  check('и полезных бонусов больше', mix.good > mix.trap);
+  await done(page);
+
+  // Сколько бонусов на поле — выбирает игрок
+  page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeDuel');
+  await page.waitForTimeout(200);
+  check('без галочки настройки числа нет', !(await page.locator('#bonusCountField').isVisible()));
+  await page.check('#bonusSetup');
+  await page.waitForTimeout(200);
+  check('с галочкой она появляется', await page.locator('#bonusCountField').isVisible());
+  await page.selectOption('#rangeMax', '10');
+  await page.waitForTimeout(200);
+  const ladder = await page.evaluate(() => ({
+    values: [...document.querySelectorAll('#bonusCount option')].map(o => +o.value),
+    labels: [...document.querySelectorAll('#bonusCount option')].map(o => o.textContent)
+  }));
+  check('на десятке больше девяти бонусов не предлагают',
+    Math.max(...ladder.values) === 9, ladder.values.join(','));
+  check('обычное значение подписано словами',
+    ladder.labels.some(l => l.indexOf('как обычно') >= 0), ladder.labels.join(' / '));
+
+  await page.selectOption('#bonusCount', '6');
+  await page.waitForTimeout(150);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  check('выбранное число бонусов и ставится',
+    await page.evaluate(() => D.bonuses.length === 6),
+    String(await page.evaluate(() => D.bonuses.length)));
+  check('выбор запомнился',
+    await page.evaluate(() => localStorage.getItem('hc_bonus_n')) === '6');
+  check('больше, чем чисел без загаданного, не поместится',
+    await page.evaluate(() => { bonusCountChoice = 999; return bonusCount() === rangeCount() - 1; }));
   await done(page);
 
   // Бонусы не стоят у ответа и не появляются там, где их не просили
