@@ -559,6 +559,7 @@
       .pcard.active { transform: none; }
       .thermo-fill, .thermo-bulb { transition: none; }
       .thermo-bulb.pulse { animation: none; }
+      /* Движение точки по прямой выключается в самом SVG — см. nlCalm() */
     }
 
     /* Компактная раскладка одиночной игры на телефоне — чтобы всё помещалось
@@ -827,12 +828,18 @@
     .run-result .rr-error { margin-top: 10px; font-size: 13px; color: #f87171; }
     .run-result #shareBtn { margin-top: 14px; }
 
+    /* На телефоне в верхней строке имени места нет — там и так тесно. А знать,
+       под кем ты играешь, нужно именно здесь: с этого экрана игра и начинается */
     .run-greeting {
       font-size: 13px;
       color: rgba(255, 255, 255, 0.55);
       text-align: center;
       margin: 0 0 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
+    .run-greeting strong { color: rgba(255, 255, 255, 0.85); }
     #screenRunHub .lb-wrap { margin-top: 28px; }
     #screenRunHub .lb-list { margin-top: 10px; }
     #screenRunHub .lb-row { padding: 9px 4px; font-size: 14px; }
@@ -1135,6 +1142,7 @@
 
   <!-- ЭКРАН: хаб режима на рейтинг (старт/результат/топ) -->
   <div id="screenRunHub" class="hidden">
+    <div class="run-greeting hidden" id="runGreeting"></div>
     <div id="runHubMessage"></div>
     <div class="run-result hidden" id="unfinishedBox">
       <div class="rr-title" id="tUnfinished"></div>
@@ -1253,6 +1261,7 @@
         roundsDone: "Rounds cleared: ",
         finalScore: "Final score: ",
         newBest: "🏆 New personal best!",
+        greeting: "Playing as {name}",
         noScores: "No results yet — be the first",
         logoutAsk: "Log out of {name}? Your result stays in the leaderboard — log back in with the same name and PIN.",
         cancel: "Cancel",
@@ -1346,6 +1355,7 @@
         roundsDone: "Раундов пройдено: ",
         finalScore: "Итоговый счёт: ",
         newBest: "🏆 Новый личный рекорд!",
+        greeting: "Играет {name}",
         noScores: "Результатов пока нет — ваш может стать первым",
         logoutAsk: "Выйти из аккаунта {name}? Результат останется в топе — вернуться можно по тому же имени и PIN.",
         cancel: "Отмена",
@@ -1439,6 +1449,7 @@
         roundsDone: "Manches réussies : ",
         finalScore: "Score final : ",
         newBest: "🏆 Nouveau record personnel !",
+        greeting: "Vous jouez en tant que {name}",
         noScores: "Pas encore de résultats — à vous de commencer",
         logoutAsk: "Se déconnecter de {name} ? Le résultat reste au classement — reconnectez-vous avec le même nom et PIN.",
         cancel: "Annuler",
@@ -1532,6 +1543,7 @@
         roundsDone: "Geschaffte Runden: ",
         finalScore: "Endpunktzahl: ",
         newBest: "🏆 Neuer persönlicher Rekord!",
+        greeting: "Du spielst als {name}",
         noScores: "Noch keine Ergebnisse — mach den Anfang",
         logoutAsk: "Von {name} abmelden? Das Ergebnis bleibt in der Rangliste — melde dich mit demselben Namen und PIN wieder an.",
         cancel: "Abbrechen",
@@ -1894,6 +1906,9 @@
     document.getElementById('tSubmitGuess').textContent = L.submitGuess;
     document.getElementById('tHistoryTitle').textContent = L.historyTitle;
     document.getElementById('tLegendTitle').textContent = L.legendTitle;
+    // Приветствие собирается из имени, поэтому при смене языка его надо пересобрать
+    const greetAuth = runAuth();
+    renderGreeting(greetAuth && greetAuth.username);
 
     document.getElementById('tModeSolo').textContent = L.modeSolo;
     document.getElementById('tModeDuel').textContent = L.modeDuel;
@@ -2447,6 +2462,38 @@
            '" font-weight="' + weight + '" fill="' + fill + '">' + str + '</text>';
   }
 
+  // Игрок с выключенной анимацией в системе не должен ничего ловить глазами
+  function nlCalm() {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch (e) { return false; }
+  }
+
+  // Движение точки описываем в самом SVG: разметку прямой мы каждый раз
+  // собираем заново, и CSS-переход на новом элементе просто не с чего начинать
+  // begin="indefinite" — обязательное: отсчёт SMIL идёт от загрузки страницы,
+  // и «begin=0s» на только что вставленном элементе означает «уже давно кончилось».
+  // Запускаем вручную сразу после вставки разметки, см. nlPlay()
+  function nlSlide(attr, from, to) {
+    return '<animate attributeName="' + attr + '" from="' + from + '%" to="' + to +
+           '%" dur="0.34s" begin="indefinite" fill="freeze" calcMode="spline" ' +
+           'keyTimes="0;1" keySplines="0.22 0.61 0.36 1" />';
+  }
+
+  function nlFade() {
+    return '<animate attributeName="opacity" from="0" to="1" dur="0.3s" ' +
+           'begin="indefinite" fill="freeze" />';
+  }
+
+  function nlPlay(svg) {
+    svg.querySelectorAll('animate').forEach(a => {
+      try { a.beginElement(); } catch (e) {}
+    });
+  }
+
+  // Где стояла точка в прошлый раз и от какого хода. Ключ нужен, чтобы прямая
+  // не дёргалась на перерисовках без хода — от поворота экрана или кнопки
+  let nlAnim = { key: null, x: null };
+
   function nlTick(v, y1, y2, stroke, width) {
     return '<line x1="' + nlPos(v) + '%" y1="' + y1 + '" x2="' + nlPos(v) + '%" y2="' + y2 +
            '" stroke="' + stroke + '" stroke-width="' + width + '" />';
@@ -2522,14 +2569,28 @@
              'stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />';
     });
 
+    // Новый ход или нет — видно по ключу. Двигаем точку только на новом ходе:
+    // так глаз сам замечает, в какую сторону игрок сдвинулся и насколько
+    const animKey = history.length + '|' + (last ? last.guess : '-') + '|' + revealed +
+                    '|' + RANGE_MIN + '|' + RANGE_MAX;
+    const fresh = animKey !== nlAnim.key && !nlCalm();
+    let dotX = null;
+
     if (last && !revealed) {
       const color = last.distance === 0 ? BULLSEYE_TIER.color : last.meta.color;
       const p = nlPos(last.guess);
+      dotX = p;
+      // Ехать есть откуда только со второго хода: первому не от чего отталкиваться
+      const from = (fresh && nlAnim.x !== null) ? nlAnim.x : null;
+      const move = (from === null) ? '' : nlSlide('cx', from, p);
       out += '<circle cx="' + p + '%" cy="' + NL.axisY + '" r="5" fill="#0f1430" stroke="' + color +
-             '" stroke-width="2.5" />';
+             '" stroke-width="2.5">' + (move || (fresh ? nlFade() : '')) + '</circle>';
       // у самого края подпись разворачиваем внутрь, иначе она уезжает за карточку
       const anchor = p < 12 ? 'start' : (p > 88 ? 'end' : 'middle');
-      out += nlText(p, 12, anchor, fs + 3, color, 700, formatNum(last.guess));
+      const label = nlText(p, 12, anchor, fs + 3, color, 700, formatNum(last.guess));
+      // Подпись едет вместе со своей точкой, иначе число отрывается от неё
+      out += (from === null) ? label
+                             : label.replace('</text>', nlSlide('x', from, p) + '</text>');
     }
 
     if (revealed) {
@@ -2537,12 +2598,15 @@
       const color = BULLSEYE_TIER.color;
       out += nlTick(secret, NL.axisY - 10, NL.axisY + 10, color, 2);
       out += '<circle cx="' + p + '%" cy="' + NL.axisY + '" r="5" fill="' + color +
-             '" stroke="#0f1430" stroke-width="1.5" />';
+             '" stroke="#0f1430" stroke-width="1.5">' + (fresh ? nlFade() : '') + '</circle>';
       const anchor = p < 12 ? 'start' : (p > 88 ? 'end' : 'middle');
       out += nlText(p, 12, anchor, fs + 3, color, 700, formatNum(secret));
     }
 
+    if (animKey !== nlAnim.key) nlAnim = { key: animKey, x: dotX };
+
     svg.innerHTML = out;
+    nlPlay(svg);
   }
 
   function renderStatus() {
@@ -3068,10 +3132,18 @@
   async function openRunHub(message) {
     const auth = runAuth();
     if (!auth) return showScreen('authChoice');
+    renderGreeting(auth.username);
     document.getElementById('runHubMessage').innerHTML = message || '';
     renderUnfinished();
     await renderRunLeaderboard();
     showScreen('runHub');
+  }
+
+  function renderGreeting(name) {
+    const el = document.getElementById('runGreeting');
+    if (!el) return;
+    el.classList.toggle('hidden', !name);
+    if (name) el.innerHTML = t().run.greeting.replace('{name}', '<strong>' + escapeHtml(name) + '</strong>');
   }
 
   // Личный рекорд знаем из двух бесплатных источников: ответа сервера при отправке
