@@ -858,7 +858,34 @@
       cursor: pointer;
       user-select: none;
     }
-    .frost-row input { width: 19px; height: 19px; accent-color: #6366f1; cursor: pointer; }
+    /* Системный чекбокс на тёмном фоне — белый квадрат, самое яркое пятно на
+       экране. Рисуем свой: погашенный в покое, синий с галочкой во включённом */
+    .frost-row input {
+      appearance: none;
+      -webkit-appearance: none;
+      flex: 0 0 auto;
+      width: 19px;
+      height: 19px;
+      margin: 0;
+      position: relative;
+      border: 1.5px solid rgba(255, 255, 255, 0.28);
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .frost-row input:checked { background: #6366f1; border-color: #6366f1; }
+    .frost-row input:checked::after {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 1px;
+      width: 5px;
+      height: 9px;
+      border: solid #fff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
 
     .lb-empty {
       font-size: 13px;
@@ -1166,7 +1193,7 @@
   const i18n = {
     en: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", newGame: "New Game", menu: "Menu",
+      confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
       frostLabel: "Frost and Heat",
       bonusLabel: "Bonuses", bonusNear: "near",
       bonusNames: { extra: "Extra turn", fog: "Fog", blind: "Blind turn", lava: "Lava toss" },
@@ -1259,7 +1286,7 @@
     },
     ru: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", newGame: "Новая игра", menu: "Меню",
+      confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
       frostLabel: "Мороз и Жара",
       bonusLabel: "Бонусы", bonusNear: "рядом",
       bonusNames: { extra: "Ещё ход", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву" },
@@ -1352,7 +1379,7 @@
     },
     fr: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", newGame: "Nouvelle partie", menu: "Menu",
+      confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
       frostLabel: "Gel et Chaleur",
       bonusLabel: "Bonus", bonusNear: "tout près",
       bonusNames: { extra: "Tour en plus", fog: "Brouillard", blind: "Tour aveugle", lava: "Jet de lave" },
@@ -1445,7 +1472,7 @@
     },
     de: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", newGame: "Neues Spiel", menu: "Menü",
+      confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze",
       bonusLabel: "Boni", bonusNear: "in der Nähe",
       bonusNames: { extra: "Extrazug", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf" },
@@ -1759,6 +1786,7 @@
   let history = [];
   let gameOver = false;
   let gameOverType = null;
+  let movesUsed = 0;
   let lastWinIsRecord = false;
 
   // ---------- состояние дуэли ----------
@@ -2066,6 +2094,7 @@
     history = [];
     gameOver = false;
     gameOverType = null;
+    movesUsed = 0;
     lastWinIsRecord = false;
     document.getElementById('finalInput').value = '';
     document.getElementById('guessInput').value = '';
@@ -2089,6 +2118,7 @@
     if (distance === 0) {
       gameOver = true;
       gameOverType = 'win';
+      movesUsed = history.length;
       lastWinIsRecord = maybeSaveRecord(RANGE_MAX, history.length);
     } else if (history.length >= MAX_GUESSES) {
       gameOver = true;
@@ -2103,6 +2133,8 @@
     if (isNaN(g)) return;
     const win = (g === secret);
     gameOverType = win ? 'win' : 'lose';
+    // Последняя догадка в историю не идёт, но ходом она была — считаем её
+    movesUsed = history.length + 1;
     lastWinIsRecord = win ? maybeSaveRecord(RANGE_MAX, history.length + 1) : false;
     renderAll();
   }
@@ -2314,6 +2346,7 @@
     renderResult();
     renderHistory();
     renderBonusLine();
+    syncScaleBox();
     if (duel) renderPlayers();
   }
 
@@ -2476,13 +2509,20 @@
       out += nlText(nlPos(v), NL.baseY, 'middle', fs, 'rgba(255,255,255,0.5)', 400, formatNum(v));
     });
 
-    // Прошлые догадки — полыми кружками, текущая — залитым
-    rings.forEach(h => {
+    // Раунд кончился — число больше не тайна. Словами его и так называют, но на
+    // прямой видно то, чего в словах нет: насколько мимо прошли догадки и с
+    // какой стороны. Ради этого прямая и нужна
+    const revealed = (mode === 'duel') ? D.roundOver
+                                       : (gameOverType === 'win' || gameOverType === 'lose');
+
+    // Прошлые догадки — полыми кружками, текущая — залитым. После раскрытия
+    // залитая точка снимается: ярким на прямой остаётся только ответ
+    (revealed ? visible : rings).forEach(h => {
       out += '<circle cx="' + nlPos(h.guess) + '%" cy="' + NL.axisY + '" r="2.5" fill="none" ' +
              'stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />';
     });
 
-    if (last) {
+    if (last && !revealed) {
       const color = last.distance === 0 ? BULLSEYE_TIER.color : last.meta.color;
       const p = nlPos(last.guess);
       out += '<circle cx="' + p + '%" cy="' + NL.axisY + '" r="5" fill="#0f1430" stroke="' + color +
@@ -2490,6 +2530,16 @@
       // у самого края подпись разворачиваем внутрь, иначе она уезжает за карточку
       const anchor = p < 12 ? 'start' : (p > 88 ? 'end' : 'middle');
       out += nlText(p, 12, anchor, fs + 3, color, 700, formatNum(last.guess));
+    }
+
+    if (revealed) {
+      const p = nlPos(secret);
+      const color = BULLSEYE_TIER.color;
+      out += nlTick(secret, NL.axisY - 10, NL.axisY + 10, color, 2);
+      out += '<circle cx="' + p + '%" cy="' + NL.axisY + '" r="5" fill="' + color +
+             '" stroke="#0f1430" stroke-width="1.5" />';
+      const anchor = p < 12 ? 'start' : (p > 88 ? 'end' : 'middle');
+      out += nlText(p, 12, anchor, fs + 3, color, 700, formatNum(secret));
     }
 
     svg.innerHTML = out;
@@ -2518,9 +2568,14 @@
       document.getElementById('guessSection').classList.toggle('hidden', D.roundOver);
     } else {
       banner.classList.add('hidden');
+      // Партия кончилась — «осталось попыток» уже ничего не значит и читается
+      // как ошибка. На этом месте полезно то, что игрок и так хочет знать:
+      // за сколько ходов вышло
+      const over = gameOverType === 'win' || gameOverType === 'lose';
       const left = MAX_GUESSES - history.length;
-      attempts.textContent = L.attemptsPrefix + left + ' / ' + MAX_GUESSES;
-      attempts.className = 'attempts' + (left <= 3 ? ' low' : '');
+      attempts.textContent = over ? withPlural(movesUsed, L.moveForms)
+                                  : L.attemptsPrefix + left + ' / ' + MAX_GUESSES;
+      attempts.className = 'attempts' + (!over && left <= 3 ? ' low' : '');
       document.getElementById('finalBox').classList.toggle('hidden', mode === 'run' || gameOverType !== 'lose_waiting');
       document.getElementById('guessSection').classList.toggle('hidden', gameOver);
 
@@ -2681,6 +2736,43 @@
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // Шкала расстояний нужна, пока идёт партия. На итогах она занимает пол-экрана
+  // и отодвигает вниз то, ради чего партия и была — сворачиваем её, а в новом
+  // раунде возвращаем в том виде, в каком её оставил игрок
+  let scaleWanted = localStorage.getItem('hc_scale_open') !== '0';
+  let scaleAutoValue = null;
+  let scaleCollapsed = false;
+
+  function setScaleOpen(open) {
+    const box = document.getElementById('scaleBox');
+    if (!box || box.open === open) return;
+    scaleAutoValue = open;
+    box.open = open;
+  }
+
+  function initScaleBox() {
+    const box = document.getElementById('scaleBox');
+    if (!box) return;
+    // toggle у <details> приходит отложенно, поэтому свой щелчок от щелчка игрока
+    // отличаем не флагом (он успеет сброситься), а совпадением с выставленным
+    box.addEventListener('toggle', () => {
+      const auto = scaleAutoValue;
+      scaleAutoValue = null;
+      if (auto !== null && box.open === auto) return;
+      scaleWanted = box.open;
+      try { localStorage.setItem('hc_scale_open', scaleWanted ? '1' : '0'); } catch (e) {}
+    });
+    setScaleOpen(scaleWanted);
+  }
+
+  function syncScaleBox() {
+    const over = (mode === 'duel') ? D.roundOver
+                                   : (gameOverType === 'win' || gameOverType === 'lose');
+    if (over === scaleCollapsed) return;
+    scaleCollapsed = over;
+    setScaleOpen(over ? false : scaleWanted);
   }
 
   function buildLegend() {
@@ -3336,6 +3428,7 @@
   // или смена размера окна требуют пересчёта
   window.addEventListener('resize', () => { if (screen === 'game') renderNumberLine(); });
 
+  initScaleBox();
   document.getElementById('langSwitcher').value = currentLang;
   document.getElementById('winsNeeded').value = '3';
   applyTranslations();
