@@ -1,0 +1,390 @@
+create table if not exists matches (
+  id bigint generated always as identity primary key,
+  p0 text not null references students(username) on delete cascade,
+  p1 text not null references students(username) on delete cascade,
+  status text not null default 'invited',
+  wins_needed int not null default 3,
+  range_min int not null default 1,
+  range_max int not null default 100,
+  frost boolean not null default false,
+  round int not null default 1,
+  wins int[] not null default array[0, 0],
+  cur int not null default 0,
+  starter int not null default 0,
+  tokens int[] not null default array[1, 1],
+  armed boolean not null default false,
+  secret int,
+  round_over boolean not null default false,
+  round_winner int,
+  match_over boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint match_not_self check (p0 <> p1),
+  constraint match_status check (status in ('invited', 'active', 'finished', 'declined', 'expired'))
+);
+create index if not exists matches_p0_idx on matches (p0, status);
+create index if not exists matches_p1_idx on matches (p1, status);
+alter table matches enable row level security;
+
+create table if not exists match_moves (
+  id bigint generated always as identity primary key,
+  match_id bigint not null references matches(id) on delete cascade,
+  round int not null,
+  seat int not null,
+  guess int not null,
+  tier int not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists match_moves_idx on match_moves (match_id, round, id);
+alter table match_moves enable row level security;
+
+create or replace function match_span(m matches)
+returns int
+language sql
+immutable
+as $$
+  select m.range_max - m.range_min + 1;
+$$;
+
+create or replace function match_seat(m matches, p_name text)
+returns int
+language sql
+immutable
+as $$
+  select case when m.p0 = p_name then 0 when m.p1 = p_name then 1 else null end;
+$$;
+
+create or replace function expire_stale_matches()
+returns void
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  update matches
+  set status = 'expired'
+  where (status = 'invited' and updated_at < now() - interval '30 minutes')
+     or (status = 'active' and updated_at < now() - interval '60 minutes');
+$$;
+
+create or replace function start_match_round(p_match_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches;
+begin
+  select * into m from matches where id = p_match_id;
+  update matches
+  set secret = m.range_min + floor(random() * (m.range_max - m.range_min + 1))::int,
+      tokens = array[1, 1],
+      cur = m.starter,
+      armed = false,
+      round_over = false,
+      round_winner = null,
+      updated_at = now()
+  where id = p_match_id;
+end;
+$$;
+
+create or replace function challenge_friend(p_username text, p_pin text, p_to text,
+                                            p_range int, p_frost boolean, p_wins int)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; other text; lo int; hi int; new_id bigint; live int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select s.username into other from students s where s.username_lower = lower(trim(p_to));
+  if other is null then raise exception 'no_such_student'; end if;
+  if friend_status(me, other) is distinct from 'friend' then raise exception 'not_a_friend'; end if;
+
+  if p_range not in (10, 100, 1000) then raise exception 'bad_range'; end if;
+  if p_wins not in (1, 3, 5, 7, 9) then raise exception 'bad_wins'; end if;
+
+  perform expire_stale_matches();
+
+  select count(*) into live from matches
+  where status in ('invited', 'active')
+    and ((p0 = me and p1 = other) or (p0 = other and p1 = me));
+  if live > 0 then raise exception 'match_already_live'; end if;
+
+  if p_frost then
+    hi := p_range / 2; lo := -hi;
+  else
+    lo := 1; hi := p_range;
+  end if;
+
+  insert into matches(p0, p1, wins_needed, range_min, range_max, frost)
+  values (me, other, p_wins, lo, hi, coalesce(p_frost, false))
+  returning id into new_id;
+  return new_id;
+end;
+$$;
+
+create or replace function respond_challenge(p_username text, p_pin text,
+                                             p_match_id bigint, p_accept boolean)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  if m.p1 <> me then raise exception 'not_your_invite'; end if;
+  if m.status <> 'invited' then raise exception 'invite_closed'; end if;
+
+  if not p_accept then
+    update matches set status = 'declined', updated_at = now() where id = p_match_id;
+    return 'declined';
+  end if;
+
+  update matches set status = 'active', starter = 0, updated_at = now() where id = p_match_id;
+  perform start_match_round(p_match_id);
+  return 'active';
+end;
+$$;
+
+create or replace function use_match_token(p_username text, p_pin text,
+                                           p_match_id bigint, p_arm boolean)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; seat int; moves int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  seat := match_seat(m, me);
+  if seat is null then raise exception 'not_your_match'; end if;
+  if m.status <> 'active' or m.round_over then raise exception 'not_playing'; end if;
+  if m.cur <> seat then raise exception 'not_your_turn'; end if;
+
+  if not p_arm then
+    if not m.armed then return false; end if;
+    update matches set armed = false, tokens[seat + 1] = m.tokens[seat + 1] + 1,
+                       updated_at = now()
+    where id = p_match_id;
+    return false;
+  end if;
+
+  if m.armed then return true; end if;
+  if m.tokens[seat + 1] <= 0 then raise exception 'no_tokens'; end if;
+
+  select count(*) into moves from match_moves where match_id = p_match_id and round = m.round;
+  if moves = 0 then raise exception 'not_first_move'; end if;
+
+  update matches set armed = true, tokens[seat + 1] = m.tokens[seat + 1] - 1,
+                     updated_at = now()
+  where id = p_match_id;
+  return true;
+end;
+$$;
+
+create or replace function match_guess(p_username text, p_pin text,
+                                       p_match_id bigint, p_guess int)
+returns int
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; seat int; dist int; band int; used_double boolean;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  seat := match_seat(m, me);
+  if seat is null then raise exception 'not_your_match'; end if;
+  if m.status <> 'active' then raise exception 'not_playing'; end if;
+  if m.round_over or m.match_over then raise exception 'round_over'; end if;
+  if m.cur <> seat then raise exception 'not_your_turn'; end if;
+  if p_guess is null or p_guess < m.range_min or p_guess > m.range_max then
+    raise exception 'out_of_range';
+  end if;
+
+  dist := abs(p_guess - m.secret);
+  band := feedback_tier(match_span(m), dist);
+  insert into match_moves(match_id, round, seat, guess, tier)
+  values (p_match_id, m.round, seat, p_guess, band);
+
+  used_double := m.armed;
+
+  if dist = 0 then
+    update matches
+    set round_over = true,
+        round_winner = seat,
+        wins[seat + 1] = m.wins[seat + 1] + 1,
+        match_over = (m.wins[seat + 1] + 1) >= m.wins_needed,
+        status = case when (m.wins[seat + 1] + 1) >= m.wins_needed then 'finished' else status end,
+        armed = false,
+        updated_at = now()
+    where id = p_match_id;
+  else
+    update matches
+    set cur = case when used_double then m.cur else 1 - m.cur end,
+        armed = false,
+        updated_at = now()
+    where id = p_match_id;
+  end if;
+
+  return band;
+end;
+$$;
+
+create or replace function next_match_round(p_username text, p_pin text, p_match_id bigint)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  if match_seat(m, me) is null then raise exception 'not_your_match'; end if;
+  if m.match_over then raise exception 'match_over'; end if;
+  if not m.round_over then raise exception 'round_not_over'; end if;
+
+  update matches
+  set round = m.round + 1,
+      starter = 1 - m.starter,
+      updated_at = now()
+  where id = p_match_id;
+  perform start_match_round(p_match_id);
+  return true;
+end;
+$$;
+
+create or replace function leave_match(p_username text, p_pin text, p_match_id bigint)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  if match_seat(m, me) is null then raise exception 'not_your_match'; end if;
+  if m.status not in ('invited', 'active') then return false; end if;
+
+  update matches set status = 'finished', match_over = true, updated_at = now()
+  where id = p_match_id;
+  return true;
+end;
+$$;
+
+create or replace function match_state(p_username text, p_pin text, p_match_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; seat int; moves jsonb; reveal boolean;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  seat := match_seat(m, me);
+  if seat is null then raise exception 'not_your_match'; end if;
+
+  reveal := m.round_over or m.match_over or m.status <> 'active';
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'seat', mv.seat, 'guess', mv.guess, 'tier', mv.tier) order by mv.id), '[]'::jsonb)
+    into moves
+  from match_moves mv
+  where mv.match_id = p_match_id and mv.round = m.round;
+
+  return jsonb_build_object(
+    'id', m.id,
+    'seat', seat,
+    'names', jsonb_build_array(m.p0, m.p1),
+    'status', m.status,
+    'winsNeeded', m.wins_needed,
+    'rangeMin', m.range_min,
+    'rangeMax', m.range_max,
+    'frost', m.frost,
+    'round', m.round,
+    'wins', m.wins,
+    'cur', m.cur,
+    'tokens', m.tokens,
+    'armed', m.armed,
+    'roundOver', m.round_over,
+    'roundWinner', m.round_winner,
+    'matchOver', m.match_over,
+    'moves', moves,
+    'secret', case when reveal then to_jsonb(m.secret) else 'null'::jsonb end,
+    'updatedAt', m.updated_at
+  );
+end;
+$$;
+
+create or replace function list_matches(p_username text, p_pin text)
+returns table(id bigint, other text, seat int, status text, round int,
+              wins int[], my_turn boolean, updated_at timestamptz)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+
+  return query
+  select m.id,
+         case when m.p0 = me then m.p1 else m.p0 end,
+         case when m.p0 = me then 0 else 1 end,
+         m.status,
+         m.round,
+         m.wins,
+         (m.status = 'active' and not m.round_over
+            and m.cur = case when m.p0 = me then 0 else 1 end),
+         m.updated_at
+  from matches m
+  where (m.p0 = me or m.p1 = me)
+    and m.status in ('invited', 'active')
+  order by m.updated_at desc;
+end;
+$$;
+
+revoke execute on function match_span(matches) from public, anon;
+revoke execute on function match_seat(matches, text) from public, anon;
+revoke execute on function expire_stale_matches() from public, anon;
+revoke execute on function start_match_round(bigint) from public, anon;
+grant execute on function challenge_friend(text, text, text, int, boolean, int) to anon;
+grant execute on function respond_challenge(text, text, bigint, boolean) to anon;
+grant execute on function use_match_token(text, text, bigint, boolean) to anon;
+grant execute on function match_guess(text, text, bigint, int) to anon;
+grant execute on function next_match_round(text, text, bigint) to anon;
+grant execute on function leave_match(text, text, bigint) to anon;
+grant execute on function match_state(text, text, bigint) to anon;
+grant execute on function list_matches(text, text) to anon;
