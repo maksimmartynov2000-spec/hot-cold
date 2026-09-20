@@ -10,9 +10,15 @@ service postgresql status >/dev/null 2>&1 || service postgresql start >/dev/null
 
 su postgres -c "dropdb --if-exists hotcold_test" >/dev/null 2>&1
 su postgres -c "createdb hotcold_test"
+# Пояса считаются и в браузере, и в базе. Таблицу для сверки достаём из
+# index.html каждый раз заново: копия рядом разошлась бы с игрой незаметно
+node "$DIR/tiers_from_js.js"
+chmod a+r "$DIR"/*.csv
+
 su postgres -c "psql -q -d hotcold_test -v ON_ERROR_STOP=1 \
   -f $DIR/00_base.sql \
   -f $ROOT/migration_friends.txt \
+  -f $ROOT/migration_tiers.txt \
   -c \"select register_student('Лев','1234',null), register_student('Кира','4321',null), register_student('Максим','1111',null);\"" >/dev/null
 
 FAILED=0
