@@ -1572,6 +1572,95 @@ async function testHubGreeting(browser) {
   await done(page);
 }
 
+// Итог раунда — первое, что видно после статуса, а не середина экрана
+async function testResultPlacement(browser) {
+  console.log('\nМесто карточки результата');
+
+  const geom = page => page.evaluate(() => {
+    const r = s => { const e = document.querySelector(s); if (!e) return null;
+      const b = e.getBoundingClientRect();
+      return { top: Math.round(b.top), bottom: Math.round(b.bottom) }; };
+    return { card: r('#resultBox'), bar: r('.info-bar'), thermo: r('#thermoWrap'),
+             line: r('#numLine'), histTitle: r('.history-title'),
+             view: innerHeight };
+  });
+
+  // Тренировка, победа
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(200);
+  await page.selectOption('#rangeMax', '100');
+  await page.waitForTimeout(150);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { secret = 40; MAX_GUESSES = 8; renderAll(); });
+  for (const g of [70, 20, 40]) {
+    await page.fill('#guessInput', String(g));
+    await page.click('#tSubmitGuess');
+    await page.waitForTimeout(200);
+  }
+  await page.waitForTimeout(300);
+
+  const g = await geom(page);
+  check('карточка идёт сразу за строкой статуса', g.card.top < g.thermo.top && g.card.top < g.line.top,
+    JSON.stringify(g));
+  check('и не заезжает на саму строку статуса', g.card.top >= g.bar.bottom, g.bar.bottom + ' / ' + g.card.top);
+  check('карточка видна целиком, без прокрутки', g.card.bottom <= g.view,
+    g.card.bottom + ' при экране ' + g.view);
+  check('прямая под ней не слипается с историей', g.histTitle.top - g.line.bottom >= 10,
+    (g.histTitle.top - g.line.bottom) + 'px');
+
+  // Во время игры карточки нет, и прямая стоит как стояла
+  await page.click('#resultBox .btn');
+  await page.waitForTimeout(300);
+  check('во время игры карточки не видно', !(await page.locator('#resultBox').isVisible()));
+  const playing = await page.evaluate(() =>
+    document.getElementById('board').classList.contains('over'));
+  check('признак конца партии снят', !playing);
+  await done(page);
+
+  // Дуэль: тот же порядок
+  const duel = await newGame(browser, { user: 'Максим' });
+  await duel.click('#tModeDuel');
+  await duel.waitForTimeout(200);
+  await duel.selectOption('#rangeMax', '100');
+  await duel.waitForTimeout(150);
+  await duel.click('#tStartMatch');
+  await duel.waitForTimeout(300);
+  await duel.evaluate(() => { secret = 40; renderAll(); });
+  for (const guess of [70, 20, 40]) {
+    await duel.fill('#guessInput', String(guess));
+    await duel.click('#tSubmitGuess');
+    await duel.waitForTimeout(250);
+  }
+  await duel.waitForTimeout(300);
+  const d = await geom(duel);
+  check('в дуэли итог раунда тоже сверху', d.card.top < d.thermo.top && d.card.top < d.line.top,
+    JSON.stringify(d));
+  await done(duel);
+
+  // На невысоком телефоне карточка целиком в первом экране
+  const small = await browser.newContext({ viewport: { width: 360, height: 640 } });
+  const p3 = await small.newPage();
+  await applyStub(p3, { user: 'Максим' });
+  await p3.goto(GAME_URL);
+  await p3.waitForTimeout(300);
+  await p3.click('#tModeSolo');
+  await p3.click('#tStartMatch');
+  await p3.waitForTimeout(300);
+  await p3.evaluate(() => { secret = 500; MAX_GUESSES = 8; renderAll(); });
+  for (const guess of [100, 900, 500]) {
+    await p3.fill('#guessInput', String(guess));
+    await p3.click('#tSubmitGuess');
+    await p3.waitForTimeout(200);
+  }
+  await p3.waitForTimeout(300);
+  const s3 = await geom(p3);
+  check('на маленьком экране итог виден целиком', s3.card.bottom <= s3.view,
+    s3.card.bottom + ' при экране ' + s3.view);
+  await small.close();
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -1601,6 +1690,7 @@ async function testHubGreeting(browser) {
     await testCheckboxLook(browser);
     await testDotMotion(browser);
     await testHubGreeting(browser);
+    await testResultPlacement(browser);
   } finally {
     await browser.close();
   }

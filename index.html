@@ -601,6 +601,11 @@
     }
     .numline svg { display: block; overflow: visible; }
 
+    /* После партии под прямой сразу начинается история: без этого отступа
+       подписи делений слипаются с её заголовком. Во время игры между ними
+       стоит поле ввода, и лишнее место там ни к чему */
+    .board.over .numline { margin-bottom: 16px; }
+
     /* Прямая заняла место, которого на невысоком экране нет. Забираем его у
        градусника: «где именно» теперь показывает прямая, а ему остаётся
        «насколько горячо». Условие по высоте, а не по ширине — широкий, но
@@ -1049,6 +1054,10 @@
 
         <div class="turn-banner hidden" id="turnBanner"></div>
 
+        <!-- Итог раунда стоит выше градусника и прямой: когда партия кончилась,
+             первое, что нужно увидеть, — чем она кончилась, а не чем мерили -->
+        <div class="result-box hidden" id="resultBox"></div>
+
         <div class="thermo-wrap hidden" id="thermoWrap">
           <div class="thermo-tube"><div class="thermo-fill" id="thermoFill"></div></div>
           <div class="thermo-bulb" id="thermoBulb"></div>
@@ -1071,8 +1080,6 @@
             <button class="btn-yellow" onclick="submitFinal()" id="tFinalSubmit">Submit</button>
           </div>
         </div>
-
-        <div class="result-box hidden" id="resultBox"></div>
 
         <div class="guess-section" id="guessSection">
           <p id="tEnterGuess">Enter a number</p>
@@ -2349,6 +2356,7 @@
     const board = document.getElementById('board');
     board.classList.toggle('duel', duel);
     board.classList.toggle('solo', !duel);
+    board.classList.toggle('over', roundOver());
     document.getElementById('pcard0').classList.toggle('hidden', !duel);
     document.getElementById('pcard1').classList.toggle('hidden', !duel);
     document.getElementById('historyList').classList.toggle('tall', duel);
@@ -2499,6 +2507,13 @@
            '" stroke="' + stroke + '" stroke-width="' + width + '" />';
   }
 
+  // Партия (или раунд в дуэли) кончилась. Вопрос один и тот же в четырёх местах,
+  // поэтому и ответ на него один
+  function roundOver() {
+    return (mode === 'duel') ? D.roundOver
+                             : (gameOverType === 'win' || gameOverType === 'lose');
+  }
+
   function renderNumberLine() {
     const box = document.getElementById('numLine');
     const svg = document.getElementById('numLineSvg');
@@ -2559,8 +2574,7 @@
     // Раунд кончился — число больше не тайна. Словами его и так называют, но на
     // прямой видно то, чего в словах нет: насколько мимо прошли догадки и с
     // какой стороны. Ради этого прямая и нужна
-    const revealed = (mode === 'duel') ? D.roundOver
-                                       : (gameOverType === 'win' || gameOverType === 'lose');
+    const revealed = roundOver();
 
     // Прошлые догадки — полыми кружками, текущая — залитым. После раскрытия
     // залитая точка снимается: ярким на прямой остаётся только ответ
@@ -2635,7 +2649,7 @@
       // Партия кончилась — «осталось попыток» уже ничего не значит и читается
       // как ошибка. На этом месте полезно то, что игрок и так хочет знать:
       // за сколько ходов вышло
-      const over = gameOverType === 'win' || gameOverType === 'lose';
+      const over = roundOver();
       const left = MAX_GUESSES - history.length;
       attempts.textContent = over ? withPlural(movesUsed, L.moveForms)
                                   : L.attemptsPrefix + left + ' / ' + MAX_GUESSES;
@@ -2832,8 +2846,7 @@
   }
 
   function syncScaleBox() {
-    const over = (mode === 'duel') ? D.roundOver
-                                   : (gameOverType === 'win' || gameOverType === 'lose');
+    const over = roundOver();
     if (over === scaleCollapsed) return;
     scaleCollapsed = over;
     setScaleOpen(over ? false : scaleWanted);
