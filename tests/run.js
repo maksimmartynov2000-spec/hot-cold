@@ -42,9 +42,12 @@ async function testModes(browser) {
   const names = await page.evaluate(() => [
     document.getElementById('tModeSolo').textContent,
     document.getElementById('tModeDuel').textContent,
-    document.getElementById('tModeRun').textContent
+    document.getElementById('tModeRun').textContent,
+    document.getElementById('tModeOnline').textContent
   ]);
-  check('в меню три режима с названиями', names.every(n => n && n.trim()), names.join(' / '));
+  check('в меню четыре режима с названиями', names.every(n => n && n.trim()), names.join(' / '));
+  check('карточек в меню тоже четыре',
+    await page.evaluate(() => document.querySelectorAll('#screenMode .mode-btn').length) === 4);
 
   // Тренировка
   await page.click('#tModeSolo');
@@ -1882,6 +1885,150 @@ async function testResultPlacement(browser) {
   await small.close();
 }
 
+// Онлайн: друзья
+async function testFriends(browser) {
+  console.log('\nОнлайн: друзья');
+
+  // Без аккаунта режим ведёт на вход, а после входа — обратно в онлайн
+  let page = await newGame(browser);
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(250);
+  check('без аккаунта просят войти', await page.locator('#screenAuthChoice').isVisible());
+  await page.click('#tRunChoiceRegister');
+  await page.waitForTimeout(200);
+  await page.fill('#runUsername', 'Лев');
+  await page.fill('#runPin', '1234');
+  await page.click('#runAuthSubmitBtn');
+  await page.waitForTimeout(400);
+  check('после входа возвращаемся в онлайн, а не в рейтинг',
+    await page.locator('#screenOnline').isVisible());
+  check('на экране написано, кто играет',
+    (await page.locator('#onlineGreeting').textContent()).includes('Лев'));
+  check('пустой список объясняет себя',
+    (await page.locator('#friendsNote').textContent()).length > 0,
+    await page.locator('#friendsNote').textContent());
+  await done(page);
+
+  // Поиск
+  page = await newGame(browser, { user: 'Лев' });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  check('со входом сразу открывается онлайн', await page.locator('#screenOnline').isVisible());
+
+  await page.fill('#friendSearch', 'к');
+  await page.click('#tFindBtn');
+  await page.waitForTimeout(200);
+  const short = await page.locator('#searchNote').textContent();
+  check('одна буква — поиска нет', short.length > 0 && (await page.evaluate(() =>
+    window.__rpcCalls.filter(c => c.name === 'find_students').length)) === 0, short);
+
+  await page.evaluate(() => {
+    window.__found = [{ username: 'Кира', best_run_score: 5200, relation: null },
+                      { username: 'Ким', best_run_score: 0, relation: 'friend' },
+                      { username: 'Кузя', best_run_score: 10, relation: 'outgoing' }];
+  });
+  await page.fill('#friendSearch', 'ки');
+  await page.click('#tFindBtn');
+  await page.waitForTimeout(300);
+  const search = await page.evaluate(() => ({
+    sent: (window.__rpcCalls.filter(c => c.name === 'find_students').pop() || {}).args,
+    rows: [...document.querySelectorAll('#searchResults .friend-row')].map(r => ({
+      name: r.dataset.name, rel: r.dataset.relation,
+      btns: [...r.querySelectorAll('.fr-btn')].map(b => b.textContent)
+    }))
+  }));
+  check('запрос ушёл с именем и PIN',
+    search.sent.p_query === 'ки' && search.sent.p_username === 'Лев' && search.sent.p_pin === '1234',
+    JSON.stringify(search.sent));
+  check('найденных показали троих', search.rows.length === 3, JSON.stringify(search.rows));
+  check('незнакомого можно добавить',
+    search.rows[0].btns.join() === 'Добавить', JSON.stringify(search.rows[0]));
+  check('другу добавить не предлагают',
+    search.rows[1].btns.join() === 'Убрать', JSON.stringify(search.rows[1]));
+  check('на висящую заявку кнопки нет',
+    search.rows[2].btns.length === 0, JSON.stringify(search.rows[2]));
+
+  // Добавление
+  await page.evaluate(() => { window.__found[0].relation = 'outgoing'; });
+  await page.click('#searchResults .friend-row:first-child .fr-btn');
+  await page.waitForTimeout(400);
+  const added = await page.evaluate(() => ({
+    sent: (window.__rpcCalls.filter(c => c.name === 'send_friend_request').pop() || {}).args,
+    note: document.getElementById('searchNote').textContent,
+    rel: document.querySelector('#searchResults .friend-row').dataset.relation
+  }));
+  check('заявка ушла на выбранное имя', added.sent.p_to === 'Кира', JSON.stringify(added.sent));
+  check('игроку сказали, что заявка ушла', added.note.includes('Кира'), added.note);
+  check('строка сразу перерисовалась в «ждёт ответа»', added.rel === 'outgoing', added.rel);
+  await done(page);
+
+  // Список: входящие первыми
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Яна', relation: 'outgoing' },
+                        { username: 'Аня', relation: 'friend' },
+                        { username: 'Кира', relation: 'incoming' },
+                        { username: 'Боря', relation: 'friend' }];
+  });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  const list = await page.evaluate(() =>
+    [...document.querySelectorAll('#friendsList .friend-row')].map(r => r.dataset.name + ':' + r.dataset.relation));
+  check('входящие заявки стоят первыми',
+    list.join(' ') === 'Кира:incoming Аня:friend Боря:friend Яна:outgoing', list.join(' '));
+
+  // Принять
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' },
+                        { username: 'Аня', relation: 'friend' },
+                        { username: 'Боря', relation: 'friend' },
+                        { username: 'Яна', relation: 'outgoing' }];
+  });
+  await page.click('#friendsList .friend-row:first-child .fr-btn.yes');
+  await page.waitForTimeout(400);
+  const accepted = await page.evaluate(() => ({
+    sent: (window.__rpcCalls.filter(c => c.name === 'respond_friend_request').pop() || {}).args,
+    rel: document.querySelector('#friendsList .friend-row').dataset.relation
+  }));
+  check('принятие ушло на сервер с согласием',
+    accepted.sent.p_from === 'Кира' && accepted.sent.p_accept === true, JSON.stringify(accepted.sent));
+  check('список обновился сам', accepted.rel === 'friend', accepted.rel);
+  await done(page);
+
+  // Ошибки сервера читаются по-человечески
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__found = [{ username: 'Максим', best_run_score: 0, relation: null }];
+  });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.fill('#friendSearch', 'ма');
+  await page.click('#tFindBtn');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    window.__rpcError = { name: 'send_friend_request', message: 'recently_declined' };
+  });
+  await page.click('#searchResults .friend-row:first-child .fr-btn');
+  await page.waitForTimeout(400);
+  const err = await page.locator('#searchNote').textContent();
+  check('отказ объясняют словами, а не кодом',
+    err.indexOf('Заявку отклонили') >= 0 && err.indexOf('recently_declined') < 0, err);
+  check('строка ошибки подсвечена',
+    await page.locator('#searchNote').evaluate(e => e.classList.contains('bad')));
+  await done(page);
+
+  // Опрос идёт только пока экран открыт
+  page = await newGame(browser, { user: 'Лев' });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  check('опрос запущен', await page.evaluate(() => friendsTimer !== null));
+  await page.click('#tOnlineBack');
+  await page.waitForTimeout(300);
+  check('после выхода опрос остановлен', await page.evaluate(() => friendsTimer === null));
+  check('вышли в меню', await page.locator('#screenMode').isVisible());
+  await done(page);
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -1912,6 +2059,7 @@ async function testResultPlacement(browser) {
     await testDotMotion(browser);
     await testHubGreeting(browser);
     await testResultPlacement(browser);
+    await testFriends(browser);
   } finally {
     await browser.close();
   }

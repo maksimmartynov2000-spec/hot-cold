@@ -306,6 +306,54 @@
     .mode-btn.duel { border-left: 3px solid var(--p1); }
     .mode-btn.solo { border-left: 3px solid var(--p0); }
     .mode-btn.run { border-left: 3px solid #4ade80; }
+    .mode-btn.online { border-left: 3px solid #38bdf8; }
+
+    /* ---------- Онлайн: друзья ---------- */
+    .friend-list { margin-bottom: 4px; }
+    .friend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 2px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 14px;
+    }
+    .friend-row:last-child { border-bottom: none; }
+    /* Имя забирает всё свободное место и обрезается само: кнопки справа должны
+       стоять на одном месте, каким бы длинным ни было имя */
+    .friend-row .fr-name {
+      flex: 1;
+      min-width: 0;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .friend-row .fr-wait { font-size: 12px; color: rgba(255, 255, 255, 0.4); }
+    .fr-btn {
+      flex: 0 0 auto;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.85);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .fr-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+    .fr-btn:disabled { opacity: 0.45; cursor: default; }
+    .fr-btn.yes { background: rgba(74, 222, 128, 0.18); border-color: rgba(74, 222, 128, 0.5); color: #4ade80; }
+    .fr-btn.no { background: rgba(248, 113, 113, 0.14); border-color: rgba(248, 113, 113, 0.4); color: #f87171; }
+    .fr-block { margin-top: 22px; }
+    .fr-note {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.45);
+      padding: 8px 2px;
+    }
+    .fr-note.bad { color: #f87171; }
 
     /* ---------- Настройка дуэли ---------- */
     .setup-field { margin-bottom: 20px; }
@@ -985,6 +1033,10 @@
       <button class="mode-btn run" onclick="openRunEntry()">
         <div class="m-title" id="tModeRun"></div>
       </button>
+      <button class="mode-btn online" onclick="openOnlineEntry()">
+        <div class="m-title" id="tModeOnline"></div>
+        <div class="m-sub" id="tModeOnlineSub"></div>
+      </button>
     </div>
   </div>
 
@@ -1181,6 +1233,31 @@
     </div>
   </div>
 
+  <!-- ЭКРАН: онлайн. Сейчас это друзья; вызовы на игру встанут сюда же -->
+  <div id="screenOnline" class="hidden">
+    <div class="run-greeting hidden" id="onlineGreeting"></div>
+
+    <div class="setup-field">
+      <label id="tLblFindFriend">Find a player</label>
+      <div class="row">
+        <input type="text" id="friendSearch" maxlength="20" autocomplete="off" />
+        <button class="btn" id="tFindBtn" onclick="searchStudents()">Find</button>
+      </div>
+    </div>
+    <div class="fr-note hidden" id="searchNote"></div>
+    <div id="searchResults" class="friend-list"></div>
+
+    <div class="fr-block">
+      <div class="lb-title" id="tFriendsTitle">Friends</div>
+      <div class="fr-note hidden" id="friendsNote"></div>
+      <div id="friendsList" class="friend-list"></div>
+    </div>
+
+    <div class="run-hub-actions">
+      <button class="btn-ghost btn-block" id="tOnlineBack" onclick="quitToMenu()">Menu</button>
+    </div>
+  </div>
+
   <!-- ЭКРАН: хаб режима на рейтинг (старт/результат/топ) -->
   <div id="screenRunHub" class="hidden">
     <div class="run-greeting hidden" id="runGreeting"></div>
@@ -1244,6 +1321,22 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
       frostLabel: "Frost and Heat",
+      online: {
+        mode: "Online", modeSub: "Friends and challenges",
+        find: "Find a player", findBtn: "Find", searchPh: "name",
+        friends: "\ud83d\udc65 Friends", back: "Menu",
+        searching: "Searching\u2026", nobody: "Nobody found",
+        noFriends: "No friends yet \u2014 find someone by name",
+        add: "Add", accept: "Accept", decline: "Decline", remove: "Remove", waiting: "waiting",
+        sent: "Request sent to {name}",
+        errAuth: "Could not confirm your account",
+        errShort: "At least two letters, please",
+        errNoStudent: "No such player",
+        errSelf: "You cannot add yourself",
+        errDeclined: "The request was declined \u2014 try tomorrow",
+        errTooMany: "Too many requests are waiting",
+        errNoRequest: "That request is gone"
+      },
       bonusLabel: "Bonuses", bonusNear: "something is near", lblBonusCount: "Bonuses on the board", bonusAuto: "as usual ({n})",
       bonusNames: { extra: "Two in reserve", fog: "Fog", blind: "Blind move", lava: "Lava toss", skip: "Skipped turn", gift: "Gift to the rival", memory: "Short memory" },
       bonusDesc: { extra: "{a} gets two tokens", fog: "{b} cannot see the other\u2019s moves", blind: "{b} cannot see their own moves", lava: "chance moves for {b}", skip: "{a} loses the next turn", gift: "{b} gets a token", memory: "{a} sees only the last two moves" },
@@ -1340,6 +1433,22 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
       frostLabel: "Мороз и Жара",
+      online: {
+        mode: "Игра онлайн", modeSub: "Друзья и вызовы",
+        find: "Найти игрока", findBtn: "Найти", searchPh: "имя",
+        friends: "\ud83d\udc65 Друзья", back: "В меню",
+        searching: "Ищем\u2026", nobody: "Никого не нашлось",
+        noFriends: "Друзей пока нет — найдите кого-нибудь по имени",
+        add: "Добавить", accept: "Принять", decline: "Отклонить", remove: "Убрать", waiting: "ждёт ответа",
+        sent: "Заявка отправлена: {name}",
+        errAuth: "Не получилось подтвердить аккаунт",
+        errShort: "Нужно хотя бы две буквы",
+        errNoStudent: "Такого игрока нет",
+        errSelf: "Себя добавить нельзя",
+        errDeclined: "Заявку отклонили — попробуйте завтра",
+        errTooMany: "Слишком много заявок ждёт ответа",
+        errNoRequest: "Заявки больше нет"
+      },
       bonusLabel: "Бонусы", bonusNear: "рядом что-то есть", lblBonusCount: "Бонусов на поле", bonusAuto: "как обычно ({n})",
       bonusNames: { extra: "Два про запас", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву", skip: "Пропуск хода", gift: "Подарок сопернику", memory: "Короткая память" },
       bonusDesc: { extra: "{a} получает два жетона", fog: "{b} не видит чужие ходы", blind: "{b} не видит свои ходы", lava: "{b} — ход делает случай", skip: "{a} пропускает следующий ход", gift: "{b} получает жетон", memory: "{a} видит только два последних хода" },
@@ -1436,6 +1545,22 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
       frostLabel: "Gel et Chaleur",
+      online: {
+        mode: "Jouer en ligne", modeSub: "Amis et d\u00e9fis",
+        find: "Trouver un joueur", findBtn: "Chercher", searchPh: "nom",
+        friends: "\ud83d\udc65 Amis", back: "Menu",
+        searching: "Recherche\u2026", nobody: "Aucun joueur trouv\u00e9",
+        noFriends: "Pas encore d\u2019amis \u2014 cherchez quelqu\u2019un par son nom",
+        add: "Ajouter", accept: "Accepter", decline: "Refuser", remove: "Retirer", waiting: "en attente",
+        sent: "Demande envoy\u00e9e \u00e0 {name}",
+        errAuth: "Impossible de v\u00e9rifier votre compte",
+        errShort: "Au moins deux lettres",
+        errNoStudent: "Ce joueur n\u2019existe pas",
+        errSelf: "Vous ne pouvez pas vous ajouter",
+        errDeclined: "La demande a \u00e9t\u00e9 refus\u00e9e \u2014 r\u00e9essayez demain",
+        errTooMany: "Trop de demandes en attente",
+        errNoRequest: "Cette demande n\u2019existe plus"
+      },
       bonusLabel: "Bonus", bonusNear: "quelque chose est tout près", lblBonusCount: "Bonus sur le plateau", bonusAuto: "comme d\u2019habitude ({n})",
       bonusNames: { extra: "Deux en réserve", fog: "Brouillard", blind: "Coup aveugle", lava: "Jet de lave", skip: "Tour perdu", gift: "Cadeau à l\u2019adversaire", memory: "Mémoire courte" },
       bonusDesc: { extra: "{a} reçoit deux jetons", fog: "{b} ne voit plus les coups adverses", blind: "{b} ne voit plus ses propres coups", lava: "le hasard joue pour {b}", skip: "{a} perd son prochain tour", gift: "{b} reçoit un jeton", memory: "{a} ne voit que les deux derniers coups" },
@@ -1532,6 +1657,22 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze",
+      online: {
+        mode: "Online spielen", modeSub: "Freunde und Herausforderungen",
+        find: "Spieler finden", findBtn: "Suchen", searchPh: "Name",
+        friends: "\ud83d\udc65 Freunde", back: "Men\u00fc",
+        searching: "Suche\u2026", nobody: "Niemand gefunden",
+        noFriends: "Noch keine Freunde \u2014 such jemanden \u00fcber den Namen",
+        add: "Hinzuf\u00fcgen", accept: "Annehmen", decline: "Ablehnen", remove: "Entfernen", waiting: "wartet",
+        sent: "Anfrage an {name} gesendet",
+        errAuth: "Konto konnte nicht best\u00e4tigt werden",
+        errShort: "Mindestens zwei Buchstaben",
+        errNoStudent: "Diesen Spieler gibt es nicht",
+        errSelf: "Du kannst dich nicht selbst hinzuf\u00fcgen",
+        errDeclined: "Die Anfrage wurde abgelehnt \u2014 versuch es morgen",
+        errTooMany: "Zu viele Anfragen warten",
+        errNoRequest: "Diese Anfrage gibt es nicht mehr"
+      },
       bonusLabel: "Boni", bonusNear: "etwas ist in der Nähe", lblBonusCount: "Boni auf dem Feld", bonusAuto: "wie üblich ({n})",
       bonusNames: { extra: "Zwei in Reserve", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf", skip: "Zug verloren", gift: "Geschenk an den Gegner", memory: "Kurzes Gedächtnis" },
       bonusDesc: { extra: "{a} bekommt zwei Marken", fog: "{b} sieht fremde Züge nicht", blind: "{b} sieht eigene Züge nicht", lava: "der Zufall zieht für {b}", skip: "{a} setzt den nächsten Zug aus", gift: "{b} bekommt eine Marke", memory: "{a} sieht nur die letzten zwei Züge" },
@@ -2030,6 +2171,13 @@
 
     // экраны режима на рейтинг
     document.getElementById('tModeRun').textContent = L.run.mode;
+    document.getElementById('tModeOnline').textContent = L.online.mode;
+    document.getElementById('tModeOnlineSub').textContent = L.online.modeSub;
+    document.getElementById('tLblFindFriend').textContent = L.online.find;
+    document.getElementById('tFindBtn').textContent = L.online.findBtn;
+    document.getElementById('tFriendsTitle').textContent = L.online.friends;
+    document.getElementById('tOnlineBack').textContent = L.online.back;
+    document.getElementById('friendSearch').placeholder = L.online.searchPh;
     document.getElementById('tRunChoiceLogin').textContent = L.run.choiceLogin;
     document.getElementById('tRunChoiceLoginSub').textContent = L.run.choiceLoginSub;
     document.getElementById('tRunChoiceRegister').textContent = L.run.choiceRegister;
@@ -2082,6 +2230,8 @@
     document.getElementById('screenAuthChoice').classList.toggle('hidden', name !== 'authChoice');
     document.getElementById('screenAuth').classList.toggle('hidden', name !== 'auth');
     document.getElementById('screenRunHub').classList.toggle('hidden', name !== 'runHub');
+    document.getElementById('screenOnline').classList.toggle('hidden', name !== 'online');
+    if (name !== 'online') stopFriendsPoll();
     document.getElementById('card').classList.toggle('wide', name === 'game' && mode === 'duel');
     document.getElementById('card').classList.toggle('solo-game', name === 'game' && mode !== 'duel');
     document.querySelector('.header').classList.toggle('compact', name === 'game');
@@ -3181,7 +3331,7 @@
   function updateAccountChip() {
     const chip = document.getElementById('accountChip');
     const auth = runAuth();
-    const show = !!auth && screen === 'runHub';
+    const show = !!auth && (screen === 'runHub' || screen === 'online');
     chip.classList.toggle('hidden', !show);
     if (show) document.getElementById('accountChipName').textContent = auth.username;
   }
@@ -3211,8 +3361,22 @@
 
   let runAuthMode = 'login';
 
+  // Куда вернуться после входа: аккаунт нужен и рейтингу, и онлайну
+  let authReturn = 'runHub';
+
+  function afterAuth() {
+    if (authReturn === 'online') return openOnline();
+    return openRunHub();
+  }
+
   function openRunEntry() {
+    authReturn = 'runHub';
     if (runAuth()) openRunHub(); else showScreen('authChoice');
+  }
+
+  function openOnlineEntry() {
+    authReturn = 'online';
+    if (runAuth()) openOnline(); else showScreen('authChoice');
   }
 
   // Открывает форму заново: поля чистые, ошибок нет
@@ -3278,7 +3442,7 @@
       if (data === false) return runAuthError(L.run.errTaken);
       localStorage.setItem('hc_run_user', username);
       localStorage.setItem('hc_run_pin', pin);
-      openRunHub();
+      afterAuth();
     } catch (e) {
       runAuthError(L.run.errNoConn);
     } finally {
@@ -3299,7 +3463,7 @@
       if (data !== true) return runAuthError(L.run.errBadLogin);
       localStorage.setItem('hc_run_user', username);
       localStorage.setItem('hc_run_pin', pin);
-      openRunHub();
+      afterAuth();
     } catch (e) {
       runAuthError(L.run.errNoConn);
     } finally {
@@ -3341,10 +3505,13 @@
   }
 
   function renderGreeting(name) {
-    const el = document.getElementById('runGreeting');
-    if (!el) return;
-    el.classList.toggle('hidden', !name);
-    if (name) el.innerHTML = t().run.greeting.replace('{name}', '<strong>' + escapeHtml(name) + '</strong>');
+    const html = name
+      ? t().run.greeting.replace('{name}', '<strong>' + escapeHtml(name) + '</strong>')
+      : '';
+    document.querySelectorAll('.run-greeting').forEach(el => {
+      el.classList.toggle('hidden', !name);
+      if (name) el.innerHTML = html;
+    });
   }
 
   // Личный рекорд знаем из двух бесплатных источников: ответа сервера при отправке
@@ -3411,6 +3578,184 @@
                '</span><span>' + formatNum(r.best_run_score) + '</span></div>';
       }).join('');
     } catch (e) {}
+  }
+
+  // ================= ОНЛАЙН: ДРУЗЬЯ =================
+  // Список опрашивается, пока экран открыт: входящая заявка должна появиться
+  // сама, без перезахода. Раз в десять секунд — заметить успеваешь, а нагрузка
+  // остаётся крошечной: два запроса в минуту на одного открытого игрока
+  const FRIENDS_POLL_MS = 10000;
+  let friendsTimer = null;
+  let friendsBusy = false;
+
+  function openOnline() {
+    const auth = runAuth();
+    if (!auth) { authReturn = 'online'; return showScreen('authChoice'); }
+    renderGreeting(auth.username);
+    document.getElementById('searchResults').innerHTML = '';
+    document.getElementById('friendSearch').value = '';
+    setNote('searchNote', '');
+    setNote('friendsNote', '');
+    applyTranslations();
+    showScreen('online');
+    startFriendsPoll();
+    loadFriends();
+  }
+
+  function startFriendsPoll() {
+    stopFriendsPoll();
+    friendsTimer = setInterval(() => {
+      if (screen === 'online') loadFriends(true); else stopFriendsPoll();
+    }, FRIENDS_POLL_MS);
+  }
+
+  function stopFriendsPoll() {
+    if (friendsTimer) { clearInterval(friendsTimer); friendsTimer = null; }
+  }
+
+  function setNote(id, text, bad) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('hidden', !text);
+    el.classList.toggle('bad', !!bad);
+  }
+
+  // Сервер отвечает кодом, игрок должен прочитать человеческую фразу
+  function friendErrorText(message) {
+    const L = t();
+    const m = String(message || '');
+    // Сеть отвалилась: supabase-js бросает «Failed to fetch» и подобное, и это
+    // не ошибка сервера, а её отсутствие — игрок должен прочитать про связь
+    if (m.indexOf('no_conn') >= 0) return L.run.errNoConn;
+    if (/fetch|network|offline|Load failed/i.test(m)) return L.run.errNoConn;
+    if (m.indexOf('auth_failed') >= 0) return L.online.errAuth;
+    if (m.indexOf('locked_out') >= 0) return L.run.errLocked;
+    if (m.indexOf('query_too_short') >= 0) return L.online.errShort;
+    if (m.indexOf('no_such_student') >= 0) return L.online.errNoStudent;
+    if (m.indexOf('cannot_friend_self') >= 0) return L.online.errSelf;
+    if (m.indexOf('recently_declined') >= 0) return L.online.errDeclined;
+    if (m.indexOf('too_many_requests') >= 0) return L.online.errTooMany;
+    if (m.indexOf('no_such_request') >= 0) return L.online.errNoRequest;
+    return L.run.errServer + m;
+  }
+
+  // Имя и PIN подставляются сами: руками их не передаёт ни один вызов
+  async function friendRpc(name, args) {
+    const auth = runAuth();
+    if (!auth || !sb) throw new Error('no_conn');
+    const { data, error } = await sb.rpc(name,
+      Object.assign({ p_username: auth.username, p_pin: auth.pin }, args || {}));
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // Входящие заявки первыми: это единственное, что требует действия
+  const FRIEND_ORDER = { incoming: 0, friend: 1, outgoing: 2 };
+
+  function friendRow(name, relation) {
+    const L = t().online;
+    const row = document.createElement('div');
+    row.className = 'friend-row';
+    row.dataset.name = name;
+    row.dataset.relation = relation || 'none';
+
+    const who = document.createElement('span');
+    who.className = 'fr-name';
+    who.textContent = name;
+    row.appendChild(who);
+
+    const button = (label, cls, fn) => {
+      const b = document.createElement('button');
+      b.className = 'fr-btn' + (cls ? ' ' + cls : '');
+      b.textContent = label;
+      b.onclick = fn;
+      row.appendChild(b);
+    };
+
+    if (relation === 'incoming') {
+      button(L.accept, 'yes', () => respondFriend(name, true));
+      button(L.decline, 'no', () => respondFriend(name, false));
+    } else if (relation === 'friend') {
+      button(L.remove, '', () => removeFriend(name));
+    } else if (relation === 'outgoing') {
+      const wait = document.createElement('span');
+      wait.className = 'fr-wait';
+      wait.textContent = L.waiting;
+      row.appendChild(wait);
+    } else if (relation !== 'declined') {
+      button(L.add, '', () => addFriend(name));
+    }
+    return row;
+  }
+
+  function renderFriends(rows) {
+    const box = document.getElementById('friendsList');
+    box.innerHTML = '';
+    rows.slice()
+      .sort((a, b) => (FRIEND_ORDER[a.relation] - FRIEND_ORDER[b.relation]) ||
+                      String(a.username).localeCompare(String(b.username)))
+      .forEach(r => box.appendChild(friendRow(r.username, r.relation)));
+  }
+
+  // quiet — это опрос по таймеру: молча, иначе на экране будет мигать ошибка
+  // связи каждые десять секунд
+  async function loadFriends(quiet) {
+    if (friendsBusy) return;
+    friendsBusy = true;
+    try {
+      const rows = (await friendRpc('list_friends')) || [];
+      renderFriends(rows);
+      setNote('friendsNote', rows.length ? '' : t().online.noFriends);
+    } catch (e) {
+      if (!quiet) setNote('friendsNote', friendErrorText(e.message), true);
+    } finally {
+      friendsBusy = false;
+    }
+  }
+
+  async function searchStudents() {
+    const q = (document.getElementById('friendSearch').value || '').trim();
+    const box = document.getElementById('searchResults');
+    box.innerHTML = '';
+    if (q.length < 2) return setNote('searchNote', t().online.errShort, true);
+    setNote('searchNote', t().online.searching);
+    try {
+      const rows = (await friendRpc('find_students', { p_query: q })) || [];
+      rows.forEach(r => box.appendChild(friendRow(r.username, r.relation)));
+      setNote('searchNote', rows.length ? '' : t().online.nobody);
+    } catch (e) {
+      setNote('searchNote', friendErrorText(e.message), true);
+    }
+  }
+
+  async function addFriend(name) {
+    try {
+      await friendRpc('send_friend_request', { p_to: name });
+      await searchStudents();
+      setNote('searchNote', t().online.sent.replace('{name}', name));
+      loadFriends(true);
+    } catch (e) {
+      setNote('searchNote', friendErrorText(e.message), true);
+    }
+  }
+
+  async function respondFriend(name, accept) {
+    try {
+      await friendRpc('respond_friend_request', { p_from: name, p_accept: !!accept });
+      await loadFriends();
+    } catch (e) {
+      setNote('friendsNote', friendErrorText(e.message), true);
+    }
+  }
+
+  async function removeFriend(name) {
+    try {
+      await friendRpc('remove_friend', { p_other: name });
+      await loadFriends();
+    } catch (e) {
+      setNote('friendsNote', friendErrorText(e.message), true);
+    }
   }
 
   // ================= ПАУЗА И СОХРАНЁННАЯ ИГРА =================
