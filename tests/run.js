@@ -1296,6 +1296,150 @@ async function testPinHelp(browser) {
   await done(page4);
 }
 
+// Конец раунда: ответ на прямой, счётчик ходов, свёрнутая шкала
+async function testEndOfRound(browser) {
+  console.log('\nИтоги раунда');
+  const page = await newGame(browser, { user: 'Максим' });
+
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(200);
+  await page.selectOption('#rangeMax', '100');
+  await page.waitForTimeout(150);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { secret = 40; MAX_GUESSES = 3; renderAll(); });
+
+  const nl = () => page.evaluate(() => {
+    const svg = document.getElementById('numLineSvg');
+    const marks = [...svg.querySelectorAll('circle')].map(c => c.getAttribute('fill'));
+    return {
+      answer: marks.filter(f => f === '#4ADE80').length,
+      hollow: marks.filter(f => f === 'none').length,
+      current: marks.filter(f => f === '#0f1430').length,
+      labels: [...svg.querySelectorAll('text')].map(t => t.textContent),
+      // Подпись ответа — единственная зелёная: деления на прямой серые
+      answerLabels: [...svg.querySelectorAll('text')]
+        .filter(t => t.getAttribute('fill') === '#4ADE80').map(t => t.textContent)
+    };
+  });
+
+  await page.fill('#guessInput', '10');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const mid = await nl();
+  check('пока идёт партия, ответ на прямой не отмечен', mid.answer === 0, JSON.stringify(mid));
+  check('текущая догадка отмечена залитой точкой', mid.current === 1);
+  check('счётчик показывает остаток попыток',
+    (await page.locator('#attemptsLabel').textContent()).includes('Попыток'));
+
+  // Проигрыш: два холодных хода, потом мимо в последней догадке
+  await page.fill('#guessInput', '90');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(200);
+  await page.fill('#guessInput', '95');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  check('последняя догадка открывает поле ответа', await page.locator('#finalBox').isVisible());
+  check('шкала расстояний ещё раскрыта: партия не кончилась',
+    await page.evaluate(() => document.getElementById('scaleBox').open));
+  await page.fill('#finalInput', '38');
+  await page.click('#tFinalSubmit');
+  await page.waitForTimeout(300);
+
+  const lost = await nl();
+  check('после проигрыша ответ отмечен на прямой', lost.answer === 1, JSON.stringify(lost));
+  check('ответ подписан числом', lost.answerLabels.join() === '40', lost.answerLabels.join(' '));
+  check('залитой точки догадки больше нет', lost.current === 0);
+  check('прошлые догадки остались полыми кружками', lost.hollow === 3, 'кружков ' + lost.hollow);
+  const lostLabel = await page.locator('#attemptsLabel').textContent();
+  check('вместо остатка попыток — сколько ходов ушло', lostLabel.trim() === '4 хода', lostLabel);
+  check('шкала расстояний свернулась на итогах',
+    !(await page.evaluate(() => document.getElementById('scaleBox').open)));
+
+  // Новая игра возвращает шкалу и обычный счётчик
+  await page.click('#resultBox .btn');
+  await page.waitForTimeout(300);
+  check('в новой партии шкала снова раскрыта',
+    await page.evaluate(() => document.getElementById('scaleBox').open));
+  check('в новой партии счётчик снова про попытки',
+    (await page.locator('#attemptsLabel').textContent()).includes('Попыток'));
+
+  // Победа: ответ и догадка — одно и то же число
+  await page.evaluate(() => { secret = 40; renderAll(); });
+  await page.fill('#guessInput', '25');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(200);
+  await page.fill('#guessInput', '40');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(300);
+  const won = await nl();
+  check('после победы ответ отмечен на прямой', won.answer === 1, JSON.stringify(won));
+  check('и подписан он ответом, а не догадкой', won.answerLabels.join() === '40',
+    won.answerLabels.join(' '));
+  const wonLabel = await page.locator('#attemptsLabel').textContent();
+  check('после победы счётчик показывает число ходов', wonLabel.trim() === '2 хода', wonLabel);
+  check('шкала свернулась и после победы',
+    !(await page.evaluate(() => document.getElementById('scaleBox').open)));
+
+  await done(page);
+}
+
+// Свёрнутую вручную шкалу игра не раскрывает обратно
+async function testScaleMemory(browser) {
+  console.log('\nПамять шкалы расстояний');
+  const page = await gameWithStorage(browser, { user: 'Максим' }, { hc_scale_open: '0' });
+  await page.click('#tModeSolo');
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  check('свёрнутая шкала так и остаётся свёрнутой',
+    !(await page.evaluate(() => document.getElementById('scaleBox').open)));
+
+  await page.click('#scaleBox summary');
+  await page.waitForTimeout(200);
+  check('щелчок игрока раскрывает шкалу',
+    await page.evaluate(() => document.getElementById('scaleBox').open));
+  check('и его выбор запоминается',
+    await page.evaluate(() => localStorage.getItem('hc_scale_open')) === '1');
+  await done(page);
+}
+
+// Галочки нарисованы свои: системный чекбокс — белый квадрат на тёмном экране
+async function testCheckboxLook(browser) {
+  console.log('\nВид галочек');
+  const page = await newGame(browser);
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(250);
+
+  const box = await page.evaluate(() => {
+    const el = document.getElementById('frostSetup');
+    const cs = getComputedStyle(el);
+    const rgb = cs.backgroundColor.match(/[\d.]+/g).map(Number);
+    return { appearance: cs.appearance || cs.webkitAppearance, bg: cs.backgroundColor,
+             radius: parseFloat(cs.borderRadius), light: (rgb[0] + rgb[1] + rgb[2]) / 3,
+             alpha: rgb.length > 3 ? rgb[3] : 1 };
+  });
+  check('галочка не системная', box.appearance === 'none', box.appearance);
+  check('в покое галочка не светится белым', box.light < 200 || box.alpha < 0.2, JSON.stringify(box));
+  check('у галочки скруглённый край', box.radius >= 3, box.radius + 'px');
+
+  await page.check('#frostSetup');
+  await page.waitForTimeout(400);
+  const on = await page.evaluate(() => {
+    const el = document.getElementById('frostSetup');
+    const tick = getComputedStyle(el, '::after');
+    return { rgb: getComputedStyle(el).backgroundColor.match(/[\d.]+/g).map(Number),
+             content: tick.content, side: parseFloat(tick.borderBottomWidth),
+             turn: tick.transform };
+  });
+  check('включённая галочка синяя',
+    Math.abs(on.rgb[0] - 99) < 6 && Math.abs(on.rgb[1] - 102) < 6 && Math.abs(on.rgb[2] - 241) < 6,
+    on.rgb.join(','));
+  // Галка — это две стороны рамки, повёрнутые на 45°: проверяем и то и другое
+  check('и в ней есть галка',
+    on.content !== 'none' && on.side >= 1.5 && /matrix/.test(on.turn), JSON.stringify(on));
+  await done(page);
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -1320,6 +1464,9 @@ async function testPinHelp(browser) {
     await testMinusButton(browser);
     await testShortHistory(browser);
     await testBonusMode(browser);
+    await testEndOfRound(browser);
+    await testScaleMemory(browser);
+    await testCheckboxLook(browser);
   } finally {
     await browser.close();
   }
