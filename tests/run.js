@@ -1440,6 +1440,138 @@ async function testCheckboxLook(browser) {
   await done(page);
 }
 
+// Точка на прямой переезжает, а не перепрыгивает
+async function testDotMotion(browser) {
+  console.log('\nДвижение точки на прямой');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(200);
+  await page.selectOption('#rangeMax', '100');
+  await page.waitForTimeout(150);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { secret = 50; MAX_GUESSES = 9; renderAll(); });
+
+  const anim = () => page.evaluate(() => {
+    const dot = [...document.querySelectorAll('#numLineSvg circle')]
+      .find(c => c.getAttribute('fill') === '#0f1430');
+    const label = [...document.querySelectorAll('#numLineSvg text')].pop();
+    const a = dot && dot.querySelector('animate[attributeName="cx"]');
+    return {
+      cx: dot ? dot.getAttribute('cx') : null,
+      from: a ? a.getAttribute('from') : null,
+      to: a ? a.getAttribute('to') : null,
+      fade: !!(dot && dot.querySelector('animate[attributeName="opacity"]')),
+      labelMoves: !!(label && label.querySelector('animate[attributeName="x"]'))
+    };
+  });
+
+  await page.fill('#guessInput', '10');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const first = await anim();
+  check('первый ход не едет — ему неоткуда', first.from === null, JSON.stringify(first));
+  check('зато он проявляется', first.fade, JSON.stringify(first));
+
+  // Меряем не атрибуты, а то, где точка на самом деле: SMIL легко объявить и
+  // не запустить — атрибуты при этом выглядят правильными, а точка не едет
+  await page.fill('#guessInput', '90');
+  const travel = await page.evaluate(() => new Promise(res => {
+    const out = [];
+    const t0 = performance.now();
+    document.getElementById('tSubmitGuess').click();
+    const tick = () => {
+      const dot = [...document.querySelectorAll('#numLineSvg circle')]
+        .find(c => c.getAttribute('fill') === '#0f1430');
+      if (dot) out.push({ now: Math.round(dot.cx.animVal.value), end: Math.round(dot.cx.baseVal.value) });
+      if (performance.now() - t0 < 600) requestAnimationFrame(tick); else res(out);
+    };
+    requestAnimationFrame(tick);
+  }));
+  const second = await anim();
+  const path = travel.map(p => p.now);
+  const end = travel[travel.length - 1];
+  check('второй ход едет от первого', second.from === first.cx, JSON.stringify(second));
+  check('точка действительно двигается, а не появляется на месте',
+    path.length > 3 && end.end - path[0] > 20, path.slice(0, 6).join(' → ') + ' … ' + end.now);
+  check('едет она только вперёд', path.every((v, i) => i === 0 || v >= path[i - 1]),
+    path.join(' '));
+  check('и доезжает ровно до своего места', end.now === end.end, end.now + ' из ' + end.end);
+  check('подпись едет вместе с точкой', second.labelMoves);
+
+  // Перерисовка без хода не должна дёргать прямую
+  await page.waitForTimeout(500);
+  await page.click('#toggleThermoBtn');
+  await page.waitForTimeout(200);
+  const idle = await anim();
+  check('без нового хода точка стоит', idle.from === null && !idle.fade, JSON.stringify(idle));
+  check('и остаётся на месте последнего хода', idle.cx === second.cx);
+  await page.click('#toggleThermoBtn');
+
+  // С отключённой анимацией в системе не двигается ничего
+  await done(page);
+  const calm = await browser.newContext({ viewport: PHONE, reducedMotion: 'reduce' });
+  const p2 = await calm.newPage();
+  await applyStub(p2, { user: 'Максим' });
+  await p2.goto(GAME_URL);
+  await p2.waitForTimeout(300);
+  await p2.click('#tModeSolo');
+  await p2.click('#tStartMatch');
+  await p2.waitForTimeout(300);
+  await p2.evaluate(() => { secret = 500; renderAll(); });
+  for (const g of [100, 900]) {
+    await p2.fill('#guessInput', String(g));
+    await p2.click('#tSubmitGuess');
+    await p2.waitForTimeout(200);
+  }
+  const off = await p2.evaluate(() => document.querySelectorAll('#numLineSvg animate').length);
+  check('при выключенной анимации прямая не двигается', off === 0, 'анимаций ' + off);
+  await calm.close();
+}
+
+// Имя ученика видно на хабе, а не только по нажатию на чип
+async function testHubGreeting(browser) {
+  console.log('\nИмя ученика на хабе');
+  const page = await newGame(browser, { user: 'Александра' });
+  await page.click('#tModeRun');
+  await page.waitForTimeout(400);
+
+  // Читаем через evaluate: если блока нет вовсе, проверка должна упасть, а не
+  // уронить весь прогон ожиданием несуществующего элемента
+  const greet = sel => page.evaluate(s => {
+    const el = document.querySelector(s);
+    return el && el.offsetParent !== null ? el.textContent : null;
+  }, sel);
+
+  check('приветствие видно', (await greet('#runGreeting')) !== null);
+  const text = (await greet('#runGreeting')) || '';
+  check('в нём названо имя', text.includes('Александра'), text);
+  check('имя выделено', (await greet('#runGreeting strong')) === 'Александра');
+
+  await page.selectOption('#langSwitcher', 'en');
+  await page.waitForTimeout(250);
+  const en = (await greet('#runGreeting')) || '';
+  check('при смене языка приветствие переводится', en.includes('Playing as') && en.includes('Александра'), en);
+
+  // Имя не должно ломать строку и не должно выдавливать кнопку
+  await page.selectOption('#langSwitcher', 'ru');
+  await page.waitForTimeout(200);
+  const fit = await page.evaluate(() => {
+    const el = document.getElementById('runGreeting');
+    if (!el) return { lines: -1, overflow: document.documentElement.scrollWidth - innerWidth };
+    return { lines: Math.round(el.getBoundingClientRect().height),
+             overflow: document.documentElement.scrollWidth - innerWidth };
+  });
+  check('приветствие в одну строку', fit.lines > 0 && fit.lines <= 22, fit.lines + 'px');
+  check('и не растягивает экран вбок', fit.overflow === 0);
+
+  // Во время самой игры приветствие не мешается
+  await page.click('#tRunStart');
+  await page.waitForTimeout(300);
+  check('в игре приветствия не видно', (await greet('#runGreeting')) === null);
+  await done(page);
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -1467,6 +1599,8 @@ async function testCheckboxLook(browser) {
     await testEndOfRound(browser);
     await testScaleMemory(browser);
     await testCheckboxLook(browser);
+    await testDotMotion(browser);
+    await testHubGreeting(browser);
   } finally {
     await browser.close();
   }
