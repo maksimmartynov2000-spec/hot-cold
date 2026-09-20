@@ -32,6 +32,16 @@ create table if not exists runs (
 );
 alter table runs enable row level security;
 
+-- Настройки сложности «Игры на рейтинг» живут в базе: их можно менять без деплоя
+create table if not exists game_config (
+  id int primary key default 1,
+  run_config jsonb not null default
+    '{"start_range":10,"growth":2.2,"range_cap":2000,"buffer_start":5,
+      "buffer_shrink":1,"squeeze_start":8,"min_attempts":3}'::jsonb
+);
+insert into game_config(id) values (1) on conflict do nothing;
+alter table game_config enable row level security;
+
 create or replace function check_student_pin(p_username text, p_pin text)
 returns text
 language plpgsql
