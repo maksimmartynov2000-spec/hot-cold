@@ -690,6 +690,15 @@
       font-size: 14px;
       color: #fbbf24;
     }
+    .match-note {
+      margin: 0 0 8px;
+      padding: 7px 12px;
+      border-radius: 12px;
+      background: rgba(248, 113, 113, 0.12);
+      border: 1px solid rgba(248, 113, 113, 0.45);
+      font-size: 13px;
+      color: #f87171;
+    }
     .bonus-line .b-name { font-weight: 700; }
     .bonus-line .b-desc { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
     /* Пустая строка помех не должна занимать место: без бонусов её просто нет */
@@ -1133,6 +1142,10 @@
 
         <div class="turn-banner hidden" id="turnBanner"></div>
 
+        <!-- Что сказал сервер: отказ в ходе, обрыв связи. Отрисовка доски это
+             место не трогает, иначе сообщение пропадало бы на первом же кадре -->
+        <div class="match-note hidden" id="matchNote"></div>
+
         <!-- Итог раунда стоит выше градусника и прямой: когда партия кончилась,
              первое, что нужно увидеть, — чем она кончилась, а не чем мерили -->
         <div class="result-box hidden" id="resultBox"></div>
@@ -1248,6 +1261,40 @@
     <div id="searchResults" class="friend-list"></div>
 
     <div class="fr-block">
+      <div class="lb-title" id="tGamesTitle">Games</div>
+      <div class="fr-note hidden" id="gamesNote"></div>
+      <div id="gamesList" class="friend-list"></div>
+    </div>
+
+    <div class="fr-block hidden" id="challengeBox">
+      <div class="lb-title" id="challengeTitle"></div>
+      <div class="setup-field tight">
+        <label id="tChRange">Range</label>
+        <select class="field" id="chRange">
+          <option value="10">1–10</option>
+          <option value="100" selected>1–100</option>
+          <option value="1000">1–1000</option>
+        </select>
+      </div>
+      <label class="frost-row">
+        <input type="checkbox" id="chFrost" />
+        <span id="tChFrost"></span>
+      </label>
+      <div class="setup-field">
+        <label id="tChWins">Play until how many wins</label>
+        <select class="field" id="chWins">
+          <option value="1">1</option>
+          <option value="3" selected>3</option>
+          <option value="5">5</option>
+        </select>
+      </div>
+      <div class="row">
+        <button class="btn-ghost" id="tChCancel" onclick="closeChallenge()">Cancel</button>
+        <button class="btn btn-block" id="tChSend" onclick="sendChallenge()">Send</button>
+      </div>
+    </div>
+
+    <div class="fr-block">
       <div class="lb-title" id="tFriendsTitle">Friends</div>
       <div class="fr-note hidden" id="friendsNote"></div>
       <div id="friendsList" class="friend-list"></div>
@@ -1335,6 +1382,22 @@
         errSelf: "You cannot add yourself",
         errDeclined: "The request was declined \u2014 try tomorrow",
         errTooMany: "Too many requests are waiting",
+        games: "\ud83c\udfae Games", noGames: "No games yet \u2014 challenge a friend",
+        challenge: "Challenge", play: "Continue", cancelGame: "Cancel",
+        yourTurn: "your turn", theirTurn: "their turn",
+        chTitle: "Challenge {name}", chRange: "Range", chWins: "Play until how many wins",
+        chSend: "Send the challenge", chCancel: "Cancel",
+        sentGame: "Challenge sent to {name}", backToFriends: "To friends",
+        errNotYourTurn: "It is the other player\u2019s turn",
+        errRoundOver: "The round is already over",
+        errOutOfRange: "That number is outside the range",
+        errNoTokens: "No tokens left",
+        errFirstMove: "Not on the first move of a round",
+        errLive: "A game with this player is already running",
+        errNotFriend: "Only friends can be challenged",
+        errInviteGone: "That challenge is gone",
+        errNoMatch: "No such game",
+        errNotPlaying: "The game is not running",
         errNoRequest: "That request is gone"
       },
       bonusLabel: "Bonuses", bonusNear: "something is near", lblBonusCount: "Bonuses on the board", bonusAuto: "as usual ({n})",
@@ -1447,6 +1510,22 @@
         errSelf: "Себя добавить нельзя",
         errDeclined: "Заявку отклонили — попробуйте завтра",
         errTooMany: "Слишком много заявок ждёт ответа",
+        games: "\ud83c\udfae Игры", noGames: "Игр пока нет — вызовите друга",
+        challenge: "Вызвать", play: "Продолжить", cancelGame: "Отменить",
+        yourTurn: "ваш ход", theirTurn: "ходит соперник",
+        chTitle: "Вызов: {name}", chRange: "Диапазон", chWins: "Играем до скольких побед",
+        chSend: "Отправить вызов", chCancel: "Отмена",
+        sentGame: "Вызов отправлен: {name}", backToFriends: "К друзьям",
+        errNotYourTurn: "Сейчас ходит соперник",
+        errRoundOver: "Раунд уже закончился",
+        errOutOfRange: "Число вне диапазона",
+        errNoTokens: "Жетонов не осталось",
+        errFirstMove: "Первым ходом раунда жетон не взвести",
+        errLive: "С этим игроком уже идёт игра",
+        errNotFriend: "Вызвать можно только друга",
+        errInviteGone: "Вызова больше нет",
+        errNoMatch: "Такой игры нет",
+        errNotPlaying: "Игра не идёт",
         errNoRequest: "Заявки больше нет"
       },
       bonusLabel: "Бонусы", bonusNear: "рядом что-то есть", lblBonusCount: "Бонусов на поле", bonusAuto: "как обычно ({n})",
@@ -1559,6 +1638,22 @@
         errSelf: "Vous ne pouvez pas vous ajouter",
         errDeclined: "La demande a \u00e9t\u00e9 refus\u00e9e \u2014 r\u00e9essayez demain",
         errTooMany: "Trop de demandes en attente",
+        games: "\ud83c\udfae Parties", noGames: "Pas encore de partie \u2014 d\u00e9fiez un ami",
+        challenge: "D\u00e9fier", play: "Continuer", cancelGame: "Annuler",
+        yourTurn: "\u00e0 vous", theirTurn: "\u00e0 l\u2019adversaire",
+        chTitle: "D\u00e9fi \u00e0 {name}", chRange: "Plage", chWins: "Jouer jusqu\u2019\u00e0 combien de victoires",
+        chSend: "Envoyer le d\u00e9fi", chCancel: "Annuler",
+        sentGame: "D\u00e9fi envoy\u00e9 \u00e0 {name}", backToFriends: "Aux amis",
+        errNotYourTurn: "C\u2019est \u00e0 l\u2019adversaire de jouer",
+        errRoundOver: "La manche est d\u00e9j\u00e0 termin\u00e9e",
+        errOutOfRange: "Ce nombre est hors de la plage",
+        errNoTokens: "Plus de jetons",
+        errFirstMove: "Pas au premier coup d\u2019une manche",
+        errLive: "Une partie avec ce joueur est d\u00e9j\u00e0 en cours",
+        errNotFriend: "On ne peut d\u00e9fier qu\u2019un ami",
+        errInviteGone: "Ce d\u00e9fi n\u2019existe plus",
+        errNoMatch: "Cette partie n\u2019existe pas",
+        errNotPlaying: "La partie n\u2019est pas en cours",
         errNoRequest: "Cette demande n\u2019existe plus"
       },
       bonusLabel: "Bonus", bonusNear: "quelque chose est tout près", lblBonusCount: "Bonus sur le plateau", bonusAuto: "comme d\u2019habitude ({n})",
@@ -1671,6 +1766,22 @@
         errSelf: "Du kannst dich nicht selbst hinzuf\u00fcgen",
         errDeclined: "Die Anfrage wurde abgelehnt \u2014 versuch es morgen",
         errTooMany: "Zu viele Anfragen warten",
+        games: "\ud83c\udfae Partien", noGames: "Noch keine Partie \u2014 fordere einen Freund heraus",
+        challenge: "Herausfordern", play: "Weiter", cancelGame: "Abbrechen",
+        yourTurn: "du bist dran", theirTurn: "Gegner ist dran",
+        chTitle: "Herausforderung an {name}", chRange: "Bereich", chWins: "Spiel bis wie viele Siege",
+        chSend: "Herausforderung senden", chCancel: "Abbrechen",
+        sentGame: "Herausforderung an {name} gesendet", backToFriends: "Zu den Freunden",
+        errNotYourTurn: "Der Gegner ist am Zug",
+        errRoundOver: "Die Runde ist schon vorbei",
+        errOutOfRange: "Diese Zahl liegt au\u00dferhalb des Bereichs",
+        errNoTokens: "Keine Marken mehr",
+        errFirstMove: "Nicht im ersten Zug einer Runde",
+        errLive: "Mit diesem Spieler l\u00e4uft schon eine Partie",
+        errNotFriend: "Nur Freunde k\u00f6nnen herausgefordert werden",
+        errInviteGone: "Diese Herausforderung gibt es nicht mehr",
+        errNoMatch: "Diese Partie gibt es nicht",
+        errNotPlaying: "Die Partie l\u00e4uft nicht",
         errNoRequest: "Diese Anfrage gibt es nicht mehr"
       },
       bonusLabel: "Boni", bonusNear: "etwas ist in der Nähe", lblBonusCount: "Boni auf dem Feld", bonusAuto: "wie üblich ({n})",
@@ -2177,6 +2288,12 @@
     document.getElementById('tFindBtn').textContent = L.online.findBtn;
     document.getElementById('tFriendsTitle').textContent = L.online.friends;
     document.getElementById('tOnlineBack').textContent = L.online.back;
+    document.getElementById('tGamesTitle').textContent = L.online.games;
+    document.getElementById('tChRange').textContent = L.online.chRange;
+    document.getElementById('tChFrost').textContent = L.frostLabel;
+    document.getElementById('tChWins').textContent = L.online.chWins;
+    document.getElementById('tChSend').textContent = L.online.chSend;
+    document.getElementById('tChCancel').textContent = L.online.chCancel;
     document.getElementById('friendSearch').placeholder = L.online.searchPh;
     document.getElementById('tRunChoiceLogin').textContent = L.run.choiceLogin;
     document.getElementById('tRunChoiceLoginSub').textContent = L.run.choiceLoginSub;
@@ -2249,6 +2366,7 @@
   // Выход с игрового экрана: в режиме на рейтинг это отказ от текущей игры —
   // возвращаемся в хаб режима, а не в главное меню
   function leaveGame() {
+    if (online) return backToOnline();
     if (mode === 'run') { openPause(); return; }
     quitToMenu();
   }
@@ -2395,6 +2513,7 @@
   }
 
   function handleGuess() {
+    if (online) return onlineGuess();
     if (mode === 'duel') return duelGuess();
     if (mode === 'run') return runGuess();
     if (gameOver) return;
@@ -2493,6 +2612,7 @@
   }
 
   function nextRound() {
+    if (online) return onlineNextRound();
     D.round++;
     if (D.handicap !== 3 && D.handicap !== 4) D.starter = 1 - D.starter;
     startRound();
@@ -2509,6 +2629,7 @@
   function useToken(p) {
     if (mode !== 'duel' || D.roundOver || D.matchOver) return;
     if (p !== D.cur) return;
+    if (online) { if (p === online.seat) onlineToken(); return; }
     if (D.armed) {
       D.armed = false;
       D.tokens[p]++;
@@ -2647,6 +2768,11 @@
     return (last && !hiddenRow(last.p)) ? last : null;
   }
 
+  // Попал или нет — видно по поясу, а не по расстоянию. В онлайне расстояния
+  // нет вовсе: сервер его не отдаёт, потому что догадка вместе с расстоянием
+  // выдаёт ответ с точностью до двух вариантов
+  function isHit(h) { return !!(h && h.meta && h.meta.labelIndex === 8); }
+
   function getFeedback(distance) {
     return FEEDBACK_META.find(f => distance >= f.min && distance <= f.max) || FEEDBACK_META[0];
   }
@@ -2724,7 +2850,7 @@
     // Пояс — помощь для тренировки: там учатся. В игре с другом и в рейтинге его
     // нет, иначе это преимущество, а не учёба
     const band = document.getElementById('feedbackBand');
-    const showBand = distanceHint && last.distance > 0;
+    const showBand = distanceHint && !isHit(last);
     band.classList.toggle('hidden', !showBand);
     band.textContent = showBand ? last.meta.rangeSign : '';
     band.style.color = last.meta.color;
@@ -2745,7 +2871,7 @@
     if (!last) {
       pct = 8;
       color = TIER_COLORS[0].color;
-    } else if (last.distance === 0) {
+    } else if (isHit(last)) {
       pct = 100;
       color = BULLSEYE_TIER.color;
     } else {
@@ -2758,7 +2884,7 @@
     bulb.style.background = color;
     bulb.style.boxShadow = '0 0 18px 2px ' + color + '59';
 
-    if (last && last.distance === 0) {
+    if (isHit(last)) {
       bulb.classList.remove('pulse');
       void bulb.offsetWidth; // перезапуск анимации при повторной победе
       bulb.classList.add('pulse');
@@ -2926,7 +3052,7 @@
     let dotX = null;
 
     if (last && !revealed) {
-      const color = last.distance === 0 ? BULLSEYE_TIER.color : last.meta.color;
+      const color = isHit(last) ? BULLSEYE_TIER.color : last.meta.color;
       const p = nlPos(last.guess);
       dotX = p;
       // Ехать есть откуда только со второго хода: первому не от чего отталкиваться
@@ -2978,7 +3104,8 @@
         banner.style.color = P_COLORS[D.cur];
       }
       document.getElementById('finalBox').classList.add('hidden');
-      document.getElementById('guessSection').classList.toggle('hidden', D.roundOver || !!forcedTurn());
+      document.getElementById('guessSection').classList.toggle('hidden',
+        D.roundOver || !!forcedTurn() || (online && D.cur !== online.seat));
     } else {
       banner.classList.add('hidden');
       // Партия кончилась — «осталось попыток» уже ничего не значит и читается
@@ -3044,8 +3171,11 @@
       const actions = document.createElement('div');
       actions.className = 'r-actions';
       if (D.matchOver) {
-        actions.innerHTML = '<button class="btn" onclick="newMatch()">' + L.newMatch + '</button>' +
-                            '<button class="btn-ghost" onclick="quitToMenu()">' + L.toMenu + '</button>';
+        // Онлайн-матч переиграть на месте нельзя: новый — это новый вызов
+        actions.innerHTML = online
+          ? '<button class="btn" onclick="backToOnline()">' + L.online.backToFriends + '</button>'
+          : '<button class="btn" onclick="newMatch()">' + L.newMatch + '</button>' +
+            '<button class="btn-ghost" onclick="quitToMenu()">' + L.toMenu + '</button>';
       } else {
         actions.innerHTML = '<button class="btn" onclick="nextRound()">' + L.nextRound + '</button>';
       }
@@ -3596,16 +3726,21 @@
     document.getElementById('friendSearch').value = '';
     setNote('searchNote', '');
     setNote('friendsNote', '');
+    setNote('gamesNote', '');
+    closeChallenge();
     applyTranslations();
     showScreen('online');
     startFriendsPoll();
     loadFriends();
+    loadMatches();
   }
 
   function startFriendsPoll() {
     stopFriendsPoll();
     friendsTimer = setInterval(() => {
-      if (screen === 'online') loadFriends(true); else stopFriendsPoll();
+      if (screen !== 'online') return stopFriendsPoll();
+      loadFriends(true);
+      loadMatches(true);
     }, FRIENDS_POLL_MS);
   }
 
@@ -3677,6 +3812,7 @@
       button(L.accept, 'yes', () => respondFriend(name, true));
       button(L.decline, 'no', () => respondFriend(name, false));
     } else if (relation === 'friend') {
+      button(L.challenge, 'yes', () => openChallenge(name));
       button(L.remove, '', () => removeFriend(name));
     } else if (relation === 'outgoing') {
       const wait = document.createElement('span');
@@ -3711,6 +3847,107 @@
       if (!quiet) setNote('friendsNote', friendErrorText(e.message), true);
     } finally {
       friendsBusy = false;
+    }
+  }
+
+  // Игры и заявки на игру живут рядом с друзьями и обновляются тем же опросом
+  function matchRow(m) {
+    const L = t().online;
+    const row = document.createElement('div');
+    row.className = 'friend-row';
+    row.dataset.id = m.id;
+    row.dataset.state = m.status === 'invited' ? (m.seat === 1 ? 'incoming' : 'outgoing') : 'active';
+
+    const who = document.createElement('span');
+    who.className = 'fr-name';
+    who.textContent = m.other;
+    row.appendChild(who);
+
+    const button = (label, cls, fn) => {
+      const b = document.createElement('button');
+      b.className = 'fr-btn' + (cls ? ' ' + cls : '');
+      b.textContent = label;
+      b.onclick = fn;
+      row.appendChild(b);
+    };
+    const note = text => {
+      const el = document.createElement('span');
+      el.className = 'fr-wait';
+      el.textContent = text;
+      row.appendChild(el);
+    };
+
+    if (m.status === 'invited' && m.seat === 1) {
+      button(L.accept, 'yes', () => answerChallenge(m.id, true));
+      button(L.decline, 'no', () => answerChallenge(m.id, false));
+    } else if (m.status === 'invited') {
+      note(L.waiting);
+      button(L.cancelGame, '', () => dropMatch(m.id));
+    } else {
+      note(m.my_turn ? L.yourTurn : L.theirTurn);
+      button(L.play, m.my_turn ? 'yes' : '', () => openMatch(m.id));
+    }
+    return row;
+  }
+
+  async function loadMatches(quiet) {
+    try {
+      const rows = (await friendRpc('list_matches')) || [];
+      const box = document.getElementById('gamesList');
+      box.innerHTML = '';
+      rows.forEach(m => box.appendChild(matchRow(m)));
+      setNote('gamesNote', rows.length ? '' : t().online.noGames);
+    } catch (e) {
+      if (!quiet) setNote('gamesNote', onlineMatchError(e.message), true);
+    }
+  }
+
+  function openChallenge(name) {
+    const box = document.getElementById('challengeBox');
+    box.dataset.name = name;
+    document.getElementById('challengeTitle').textContent =
+      t().online.chTitle.replace('{name}', name);
+    box.classList.remove('hidden');
+  }
+
+  function closeChallenge() {
+    document.getElementById('challengeBox').classList.add('hidden');
+  }
+
+  async function sendChallenge() {
+    const box = document.getElementById('challengeBox');
+    const name = box.dataset.name;
+    try {
+      await friendRpc('challenge_friend', {
+        p_to: name,
+        p_range: parseInt(document.getElementById('chRange').value),
+        p_frost: document.getElementById('chFrost').checked,
+        p_wins: parseInt(document.getElementById('chWins').value)
+      });
+      closeChallenge();
+      await loadMatches();
+      setNote('gamesNote', t().online.sentGame.replace('{name}', name));
+    } catch (e) {
+      setNote('gamesNote', onlineMatchError(e.message), true);
+    }
+  }
+
+  async function answerChallenge(id, accept) {
+    try {
+      const status = await friendRpc('respond_challenge', { p_match_id: id, p_accept: !!accept });
+      await loadMatches();
+      if (status === 'active') openMatch(id);
+    } catch (e) {
+      setNote('gamesNote', onlineMatchError(e.message), true);
+    }
+  }
+
+  async function dropMatch(id) {
+    try {
+      await friendRpc('leave_match', { p_match_id: id });
+      await loadMatches();
+    } catch (e) {
+      setNote('gamesNote', onlineMatchError(e.message), true);
     }
   }
 
@@ -3756,6 +3993,168 @@
     } catch (e) {
       setNote('friendsNote', friendErrorText(e.message), true);
     }
+  }
+
+  // ================= ОНЛАЙН: МАТЧ =================
+  // Играется он тем же экраном и той же отрисовкой, что дуэль за одним
+  // телефоном: mode остаётся 'duel', а online хранит то, чего у местной игры
+  // нет — номер матча и своё место за доской. Ветвится только ввод: ход, жетон
+  // и следующий раунд уходят на сервер, а не считаются здесь
+  const MATCH_POLL_MS = 2000;
+  let online = null;
+  let matchTimer = null;
+  let matchBusy = false;
+
+  function onlineMatchError(message) {
+    const L = t();
+    const m = String(message || '');
+    if (m.indexOf('not_your_turn') >= 0) return L.online.errNotYourTurn;
+    if (m.indexOf('round_over') >= 0) return L.online.errRoundOver;
+    if (m.indexOf('out_of_range') >= 0) return L.online.errOutOfRange;
+    if (m.indexOf('no_tokens') >= 0) return L.online.errNoTokens;
+    if (m.indexOf('not_first_move') >= 0) return L.online.errFirstMove;
+    if (m.indexOf('match_already_live') >= 0) return L.online.errLive;
+    if (m.indexOf('not_a_friend') >= 0) return L.online.errNotFriend;
+    if (m.indexOf('invite_closed') >= 0) return L.online.errInviteGone;
+    if (m.indexOf('no_such_match') >= 0) return L.online.errNoMatch;
+    if (m.indexOf('not_playing') >= 0) return L.online.errNotPlaying;
+    return friendErrorText(m);
+  }
+
+  // Состояние с сервера — единственный источник правды: всё, что рисуется,
+  // берётся отсюда, и ничего не досчитывается на месте
+  function applyMatchState(st) {
+    if (!st) return;
+    online.seat = st.seat;
+    online.status = st.status;
+    mode = 'duel';
+    RANGE_MIN = st.rangeMin;
+    RANGE_MAX = st.rangeMax;
+    frostMode = !!st.frost;
+    FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
+
+    D.names = st.names.slice();
+    D.winsNeeded = st.winsNeeded;
+    D.wins = st.wins.slice();
+    D.round = st.round;
+    D.cur = st.cur;
+    D.tokens = st.tokens.slice();
+    D.armed = !!st.armed;
+    D.roundOver = !!st.roundOver;
+    D.roundWinner = st.roundWinner;
+    D.matchOver = !!st.matchOver;
+    // Помех в онлайне пока нет, но отрисовка их спрашивает
+    D.fog = [false, false];
+    D.blind = [false, false];
+    D.autoLava = [false, false];
+    D.skip = [false, false];
+    D.shortMemory = [false, false];
+    D.nearBonus = false;
+    D.lastBonus = null;
+    D.bonuses = [];
+
+    // Расстояния сервер не присылает: пояс — это всё, что известно
+    history = (st.moves || []).map(mv => ({
+      guess: mv.guess, distance: null, meta: FEEDBACK_META[mv.tier], p: mv.seat
+    }));
+    secret = (st.secret === null || st.secret === undefined) ? 0 : st.secret;
+    applyRangeToInputs();
+    renderAll();
+  }
+
+  async function refreshMatch(quiet) {
+    if (!online || matchBusy) return;
+    matchBusy = true;
+    try {
+      const st = await friendRpc('match_state', { p_match_id: online.id });
+      applyMatchState(st);
+      if (!quiet) setMatchNote('');
+    } catch (e) {
+      if (!quiet) setMatchNote(onlineMatchError(e.message));
+    } finally {
+      matchBusy = false;
+    }
+  }
+
+  // Строка связи живёт в той же полоске, что и бонусы: отдельного места для
+  // неё на экране нет, а во время онлайн-матча бонусов всё равно не бывает
+  function setMatchNote(text) {
+    const box = document.getElementById('matchNote');
+    if (!box) return;
+    box.textContent = text ? '\u26a0\ufe0f ' + text : '';
+    box.classList.toggle('hidden', !text);
+  }
+
+  function startMatchPoll() {
+    stopMatchPoll();
+    matchTimer = setInterval(() => {
+      if (online && screen === 'game') refreshMatch(true); else stopMatchPoll();
+    }, MATCH_POLL_MS);
+  }
+
+  function stopMatchPoll() {
+    if (matchTimer) { clearInterval(matchTimer); matchTimer = null; }
+  }
+
+  async function openMatch(id) {
+    online = { id: id, seat: 0, status: 'active' };
+    stopFriendsPoll();
+    try {
+      const st = await friendRpc('match_state', { p_match_id: id });
+      applyMatchState(st);
+    } catch (e) {
+      online = null;
+      setNote('friendsNote', onlineMatchError(e.message), true);
+      return;
+    }
+    applyTranslations();
+    showScreen('game');
+    renderAll();
+    startMatchPoll();
+  }
+
+  async function onlineGuess() {
+    const input = document.getElementById('guessInput');
+    const guess = parseInt(input.value);
+    if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
+    if (D.cur !== online.seat) return setMatchNote(t().online.errNotYourTurn);
+    input.value = '';
+    try {
+      await friendRpc('match_guess', { p_match_id: online.id, p_guess: guess });
+      await refreshMatch();
+    } catch (e) {
+      setMatchNote(onlineMatchError(e.message));
+      await refreshMatch(true);
+    }
+  }
+
+  async function onlineToken() {
+    try {
+      await friendRpc('use_match_token', { p_match_id: online.id, p_arm: !D.armed });
+      await refreshMatch();
+    } catch (e) {
+      setMatchNote(onlineMatchError(e.message));
+    }
+  }
+
+  async function onlineNextRound() {
+    try {
+      await friendRpc('next_match_round', { p_match_id: online.id });
+      await refreshMatch();
+    } catch (e) {
+      setMatchNote(onlineMatchError(e.message));
+      await refreshMatch(true);
+    }
+  }
+
+  // Уход с экрана матч не закрывает: к начатой игре можно вернуться
+  function backToOnline() {
+    stopMatchPoll();
+    setMatchNote('');
+    online = null;
+    mode = null;
+    setMatchNote('');
+    openOnline();
   }
 
   // ================= ПАУЗА И СОХРАНЁННАЯ ИГРА =================
