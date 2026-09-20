@@ -207,3 +207,61 @@ begin
 end $$;
 commit;
 \echo ok
+
+\echo === 13. ходы раунда возвращаются, чтобы забег можно было продолжить
+do $$
+declare st jsonb; r run_sessions; g int;
+begin
+  st := run_start('Лев','1234',false,true);
+  select * into r from run_sessions where username = 'Лев';
+  g := case when r.secret = r.range_min then r.range_max else r.range_min end;
+  perform run_guess('Лев','1234', g);
+  st := run_state('Лев','1234');
+  if jsonb_array_length(st -> 'movesLog') <> 1 then
+    raise exception 'ОШИБКА: ход не попал в состояние — %', st -> 'movesLog';
+  end if;
+  if (st -> 'movesLog' -> 0 ->> 'guess')::int <> g then
+    raise exception 'ОШИБКА: в состоянии не то число';
+  end if;
+  if not (st -> 'movesLog' -> 0) ? 'tier' then raise exception 'ОШИБКА: пояс не сохранён'; end if;
+  if (st -> 'movesLog' -> 0) ? 'distance' then raise exception 'УТЕЧКА: расстояние в ходе'; end if;
+end $$;
+\echo ok
+
+\echo === 14. новый раунд обнуляет список ходов
+do $$
+declare st jsonb; r run_sessions;
+begin
+  select * into r from run_sessions where username = 'Лев';
+  perform run_guess('Лев','1234', r.secret);
+  st := run_state('Лев','1234');
+  if jsonb_array_length(st -> 'movesLog') <> 0 then
+    raise exception 'ОШИБКА: ходы прошлого раунда остались';
+  end if;
+end $$;
+\echo ok
+
+\echo === 15. забег находится по имени в любом регистре
+do $$
+declare st jsonb;
+begin
+  perform run_start('Лев','1234',false,true);
+  st := run_state('лЕв','1234');
+  if not (st ->> 'active')::boolean then
+    raise exception 'ОШИБКА: по имени в другом регистре забег не нашёлся';
+  end if;
+  if (st ->> 'round')::int <> 1 then raise exception 'ОШИБКА: нашёлся не тот забег'; end if;
+end $$;
+\echo ok
+
+\echo === 16. чужой забег через своё имя не достать
+do $$
+declare st jsonb;
+begin
+  perform run_start('Лев','1234',false,true);
+  update run_sessions set score = 5555 where username = 'Лев';
+  delete from run_sessions where username = 'Кира';
+  st := run_state('Кира','4321');
+  if (st ->> 'active')::boolean then raise exception 'ОШИБКА: чужой забег показан своим'; end if;
+end $$;
+\echo ok

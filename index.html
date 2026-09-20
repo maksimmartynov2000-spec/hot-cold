@@ -1334,6 +1334,7 @@
   <div id="screenRunHub" class="hidden">
     <div class="run-greeting hidden" id="runGreeting"></div>
     <div id="runHubMessage"></div>
+    <div class="fr-note hidden" id="runNote"></div>
     <div class="run-result hidden" id="unfinishedBox">
       <div class="rr-title" id="tUnfinished"></div>
       <p id="unfinishedInfo"></p>
@@ -3716,9 +3717,11 @@
     if (!auth) return showScreen('authChoice');
     renderGreeting(auth.username);
     document.getElementById('runHubMessage').innerHTML = message || '';
+    setNote('runNote', '');
     renderUnfinished();
-    await renderRunLeaderboard();
     showScreen('runHub');
+    await loadRunPending();
+    await renderRunLeaderboard();
   }
 
   function renderGreeting(name) {
@@ -4289,93 +4292,59 @@
   // ================= ПАУЗА И СОХРАНЁННАЯ ИГРА =================
   // Состояние пишется после каждого хода, поэтому закрытая вкладка, севший телефон
   // или случайный выход не стоят игроку результата: игра ждёт его на том же месте.
+  // Забег больше не хранится в браузере. Ключ остаётся только чтобы убрать
+  // то, что успели сохранить прежние версии
   const RUN_STATE_KEY = 'hc_run_state';
 
-  function saveRunState() {
-    if (!RUN) return;
+  // Незаконченный забег живёт на сервере, а не в браузере: он переживает
+  // закрытую вкладку и находится с другого устройства. Локальной копии нет
+  // намеренно — она разошлась бы с сервером и дала бы второй, «свой» счёт
+  let runPending = null;
+
+  async function loadRunPending() {
+    runPending = null;
     try {
-      localStorage.setItem(RUN_STATE_KEY, JSON.stringify({
-        round: RUN.round,
-        totalScore: RUN.totalScore,
-        range: RANGE_MAX,
-        rangeMin: RANGE_MIN,
-        allowed: MAX_GUESSES,
-        secret: secret,
-        history: history.map(h => ({ guess: h.guess, distance: h.distance })),
-        user: (runAuth() || {}).username || ''
-      }));
-    } catch (e) {}
-  }
-
-  function loadRunState() {
-    try {
-      const raw = localStorage.getItem(RUN_STATE_KEY);
-      if (!raw) return null;
-      const st = JSON.parse(raw);
-      if (!st || typeof st.round !== 'number' || typeof st.secret !== 'number') return null;
-      // Игра принадлежит тому, кто её начал. Регистр не учитываем: сервер пускает
-      // «аню» в аккаунт «Ани», и незаконченная игра должна найтись так же
-      const auth = runAuth();
-      if (st.user && auth &&
-          String(st.user).toLowerCase() !== auth.username.toLowerCase()) return null;
-      return st;
-    } catch (e) { return null; }
-  }
-
-  function clearRunState() {
-    try { localStorage.removeItem(RUN_STATE_KEY); } catch (e) {}
-  }
-
-  // Восстанавливаем прерванную игру ровно в том виде, в каком её оставили
-  function applyRunState(st) {
-    RUN = { round: st.round, totalScore: st.totalScore, locked: false };
-    mode = 'run';
-    RANGE_MAX = st.range;
-    // игры, сохранённые до появления «мороза и жары», нижней границы не знают
-    RANGE_MIN = (typeof st.rangeMin === 'number') ? st.rangeMin : 1;
-    MAX_GUESSES = st.allowed;
-    FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
-    secret = st.secret;
-    history = (st.history || []).map(h => ({
-      guess: h.guess, distance: h.distance, meta: getFeedback(h.distance), p: null
-    }));
-    gameOver = false;
-    gameOverType = null;
-    document.getElementById('guessInput').value = '';
-    applyRangeToInputs();
+      const st = await friendRpc('run_state');
+      if (st && st.active) runPending = st;
+      setNote('runNote', '');
+    } catch (e) {
+      // Забег теперь считает сервер, значит без сети режим не работает.
+      // Молчать об этом нельзя: иначе экран выглядит рабочим, а кнопка не пойдёт
+      setNote('runNote', friendErrorText(e.message), true);
+    }
+    renderUnfinished();
   }
 
   function resumeSavedRun() {
-    const st = loadRunState();
-    if (!st) { renderUnfinished(); return; }
-    applyRunState(st);
-    applyTranslations();
-    showScreen('game');
+    startRun(false);
   }
 
   // «Завершить» из хаба: доигрывать не хочется, но результат должен засчитаться
-  function finishSavedRun() {
-    const st = loadRunState();
-    if (!st) { renderUnfinished(); return; }
-    applyRunState(st);
-    clearRunState();
-    endRun();
+  async function finishSavedRun() {
+    try {
+      const res = await friendRpc('run_give_up');
+      RUN = { round: (res.rounds || 0) + 1, totalScore: res.score || 0, locked: true };
+      mode = 'run';
+      secret = res.secret;
+      await endRun({ score: res.score, rounds: res.rounds, secret: res.secret });
+    } catch (e) {
+      setNote('runNote', friendErrorText(e.message), true);
+    }
   }
 
   function renderUnfinished() {
     const L = t();
-    const st = loadRunState();
+    const st = runPending;
     const box = document.getElementById('unfinishedBox');
     box.classList.toggle('hidden', !st);
     // пока игра не закончена, новую не предлагаем — иначе она молча потеряется
     document.getElementById('tRunStart').classList.toggle('hidden', !!st);
     if (!st) return;
     document.getElementById('unfinishedInfo').textContent =
-      L.run.unfinishedInfo.replace('{round}', st.round).replace('{score}', formatNum(st.totalScore));
+      L.run.unfinishedInfo.replace('{round}', st.round).replace('{score}', formatNum(st.score));
   }
 
   function openPause() {
-    saveRunState();
     document.getElementById('pauseModal').classList.remove('hidden');
   }
 
@@ -4383,19 +4352,23 @@
     document.getElementById('pauseModal').classList.add('hidden');
   }
 
+  // Уход с паузы забег не заканчивает: он ждёт на сервере
   function pauseAndLeave() {
     closePause();
-    saveRunState();
     RUN = null;
     mode = null;
     applyTranslations();
     openRunHub();
   }
 
-  function giveUpRun() {
+  async function giveUpRun() {
     closePause();
-    clearRunState();
-    endRun();
+    try {
+      const res = await friendRpc('run_give_up');
+      await endRun({ score: res.score, rounds: res.rounds, secret: res.secret });
+    } catch (e) {
+      setMatchNote(friendErrorText(e.message));
+    }
   }
 
   // Поделиться результатом: системное окно «Поделиться» там, где оно есть
@@ -4454,90 +4427,115 @@
 
   // Режим на рейтинг играется на том же экране, что и одиночная игра:
   // термометр, история попыток и шкала берутся оттуда как есть
-  function startRun() {
-    RUN = { round: 1, totalScore: 0, locked: false };
-    mode = 'run';
-    startRunRound();
-    applyTranslations();
-    showScreen('game');
+  // Забег считает сервер: число, раунды, бюджет попыток и очки живут там.
+  // Клиент только показывает то, что ему прислали, и отправляет догадки
+  async function startRun(fresh) {
+    const L = t();
+    try {
+      const st = await friendRpc('run_start',
+        { p_frost: !!frostMode, p_fresh: !!fresh });
+      RUN = { round: 1, totalScore: 0, locked: false };
+      mode = 'run';
+      applyRunSnapshot(st);
+      applyTranslations();
+      showScreen('game');
+      renderAll();
+    } catch (e) {
+      setNote('runNote', friendErrorText(e.message), true);
+    }
   }
 
-  function startRunRound() {
-    if (!RUN) return;
-    applyBounds(runRangeForRound(RUN.round));
-    MAX_GUESSES = runAttemptsForRound(RUN.round, rangeCount());
-    secret = RANGE_MIN + Math.floor(Math.random() * rangeCount());
-    history = [];
+  // Единственный источник правды — снимок с сервера. Догадки клиент рисует из
+  // присланного списка: своих чисел он не помнит, чтобы после продолжения на
+  // другом устройстве история была та же самая
+  function applyRunSnapshot(st) {
+    if (!st || !RUN) return;
+    RANGE_MIN = st.rangeMin;
+    RANGE_MAX = st.rangeMax;
+    frostMode = !!st.frost;
+    MAX_GUESSES = st.allowed;
+    FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
+    RUN.round = st.round;
+    RUN.totalScore = st.score;
+    RUN.locked = false;
+    if (typeof st.best === 'number') rememberRunBest(st.best);
+    history = (st.movesLog || []).map(mv => ({
+      guess: mv.guess, distance: null, meta: FEEDBACK_META[mv.tier], p: null
+    }));
     gameOver = false;
     gameOverType = null;
-    RUN.locked = false;
+    secret = 0;
     document.getElementById('guessInput').value = '';
     applyRangeToInputs();
-    applyTranslations();
-    saveRunState();
   }
 
-  function runGuess() {
-    // locked — пауза между раундами: иначе можно ввести уже угаданное число ещё раз и получить очки повторно
+  async function runGuess() {
+    // locked — пауза между раундами: иначе можно успеть отправить ещё один ход,
+    // пока на экране висит «+очки»
     if (!RUN || RUN.locked) return;
     const input = document.getElementById('guessInput');
     const guess = parseInt(input.value);
     if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
-
-    const distance = Math.abs(guess - secret);
-    const meta = getFeedback(distance);
-    history.push({ guess, distance, meta, p: null });
+    RUN.locked = true;
     input.value = '';
+
+    let res;
+    try {
+      res = await friendRpc('run_guess', { p_guess: guess });
+    } catch (e) {
+      RUN.locked = false;
+      setMatchNote(friendErrorText(e.message));
+      return;
+    }
+    setMatchNote('');
+
+    const meta = FEEDBACK_META[res.tier];
+    history.push({ guess: guess, distance: null, meta: meta, p: null });
     soundForGuess(meta);
 
-    if (distance === 0) {
-      const roundPoints = Math.round(100 * RUN.round * (minAttempts(rangeCount()) / history.length));
-      RUN.totalScore += roundPoints;
-      RUN.locked = true;
-      RUN.round++;
-      renderAll();
-      saveRunState();
-      const L = t();
-      document.getElementById('feedbackLabel').textContent =
-        L.labels[8] + '  +' + withPlural(roundPoints, L.run.pointForms);
-      setTimeout(startRunRound, 900);
-    } else if (history.length >= MAX_GUESSES) {
+    if (res.over) {
       gameOver = true;
       soundGameOver();
       renderAll();
-      endRun();
-    } else {
-      renderAll();
-      saveRunState();
+      return endRun(res);
     }
+
+    if (res.roundWon) {
+      RUN.totalScore = res.state.score;
+      renderAll();
+      const L = t();
+      document.getElementById('feedbackLabel').textContent =
+        L.labels[8] + '  +' + withPlural(res.points, L.run.pointForms);
+      setTimeout(() => { applyRunSnapshot(res.state); applyTranslations(); renderAll(); }, 900);
+      return;
+    }
+
+    RUN.locked = false;
+    applyRunSnapshot(res.state);
+    history = (res.state.movesLog || []).map(mv => ({
+      guess: mv.guess, distance: null, meta: FEEDBACK_META[mv.tier], p: null
+    }));
+    renderAll();
   }
 
-  async function endRun() {
+  // Результат уже записан сервером: отправлять нечего, остаётся показать
+  async function endRun(res) {
     const L = t();
-    clearRunState();
-    const finalScore = RUN.totalScore;
-    const roundsSurvived = RUN.round - 1;
-    const secretWas = secret;
+    const finalScore = (res && typeof res.score === 'number') ? res.score : (RUN ? RUN.totalScore : 0);
+    const roundsSurvived = (res && typeof res.rounds === 'number')
+      ? res.rounds : (RUN ? RUN.round - 1 : 0);
+    const secretWas = (res && typeof res.secret === 'number') ? res.secret : secret;
     RUN = null;
     let resultHtml = '<div class="rr-title">' + L.run.over + '</div>' +
       '<p>' + L.run.secretWas + '<strong>' + secretWas + '</strong></p>' +
       '<p>' + L.run.roundsDone + '<strong>' + roundsSurvived + '</strong></p>' +
       '<p>' + L.run.finalScore + '<strong>' + finalScore + '</strong></p>';
-    const auth = runAuth();
-    if (auth && sb) {
-      try {
-        const { data, error } = await sb.rpc('submit_run_score', {
-          p_username: auth.username, p_pin: auth.pin, p_score: finalScore, p_rounds: roundsSurvived
-        });
-        if (error) {
-          resultHtml += '<p class="rr-error">' + L.run.errNoSave + escapeHtml(runAuthErrorText(error.message)) + '</p>';
-        } else if (data && data.length) {
-          rememberRunBest(data[0].best_score);
-          if (data[0].is_best) resultHtml += '<p class="rr-best">' + L.run.newBest + '</p>';
-        }
-      } catch (e) {
-        resultHtml += '<p class="rr-error">' + L.run.errNoSave + L.run.errNoConn + '</p>';
-      }
+    // Счёт записан там же, где считался. Рекорд узнаём из состояния, а не
+    // из ответа на отправку: отправлять больше нечего
+    const wasBest = finalScore > 0 && finalScore >= runBest();
+    if (wasBest) {
+      rememberRunBest(finalScore);
+      resultHtml += '<p class="rr-best">' + L.run.newBest + '</p>';
     }
     resultHtml = '<div class="run-result">' + resultHtml +
       '<button class="btn-ghost" id="shareBtn" onclick="shareRunResult(' +
@@ -4569,6 +4567,10 @@
   // Приписать его текущему аккаунту нельзя: именно так и появлялся чужой рекорд.
   // Убираем; свой вернётся с сервера после первой же доигранной партии
   try { localStorage.removeItem('hc_run_best'); } catch (e) {}
+
+  // Прежние версии держали незаконченный забег в браузере. Теперь он на
+  // сервере, и локальная копия только сбивала бы с толку
+  try { localStorage.removeItem('hc_run_state'); } catch (e) {}
 
   // Подписи на прямой расставляются по ширине экрана, поэтому поворот телефона
   // или смена размера окна требуют пересчёта

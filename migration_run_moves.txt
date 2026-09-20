@@ -1,0 +1,101 @@
+alter table run_sessions add column if not exists moves_log jsonb not null default '[]'::jsonb;
+
+create or replace function run_deal_round(p_username text, p_round int, p_frost boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare size int; lo int; hi int; half int;
+begin
+  size := run_range_for_round(p_round);
+  if p_frost then
+    half := size / 2; lo := -half; hi := half;
+  else
+    lo := 1; hi := size;
+  end if;
+  update run_sessions
+  set round = p_round,
+      range_min = lo,
+      range_max = hi,
+      allowed = run_attempts_for_round(p_round, hi - lo + 1),
+      secret = lo + floor(random() * (hi - lo + 1))::int,
+      moves = 0,
+      moves_log = '[]'::jsonb,
+      updated_at = now()
+  where username = p_username;
+end;
+$$;
+
+create or replace function run_snapshot(p_username text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare r run_sessions; best int;
+begin
+  select * into r from run_sessions where username = p_username;
+  if r.username is null then return jsonb_build_object('active', false); end if;
+  select best_run_score into best from students where username = p_username;
+  return jsonb_build_object(
+    'active', r.status = 'active',
+    'round', r.round,
+    'score', r.score,
+    'rangeMin', r.range_min,
+    'rangeMax', r.range_max,
+    'allowed', r.allowed,
+    'moves', r.moves,
+    'movesLog', r.moves_log,
+    'frost', r.frost,
+    'best', coalesce(best, 0));
+end;
+$$;
+
+create or replace function run_guess(p_username text, p_pin text, p_guess int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; r run_sessions; dist int; band int; span int; points int; out_secret int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into r from run_sessions where username = me for update;
+  if r.username is null or r.status <> 'active' then raise exception 'no_run'; end if;
+  if p_guess is null or p_guess < r.range_min or p_guess > r.range_max then
+    raise exception 'out_of_range';
+  end if;
+
+  span := r.range_max - r.range_min + 1;
+  dist := abs(p_guess - r.secret);
+  band := feedback_tier(span, dist);
+
+  update run_sessions
+  set moves = r.moves + 1,
+      moves_log = r.moves_log || jsonb_build_object('guess', p_guess, 'tier', band),
+      updated_at = now()
+  where username = me;
+  r.moves := r.moves + 1;
+
+  if dist = 0 then
+    points := round(100.0 * r.round * (min_attempts(span)::numeric / r.moves));
+    update run_sessions set score = r.score + points where username = me;
+    perform run_deal_round(me, r.round + 1, r.frost);
+    return jsonb_build_object('tier', band, 'roundWon', true, 'points', points,
+                              'secret', r.secret, 'state', run_snapshot(me));
+  end if;
+
+  if r.moves >= r.allowed then
+    out_secret := r.secret;
+    perform run_finish(me);
+    return jsonb_build_object('tier', band, 'over', true, 'secret', out_secret,
+                              'score', r.score, 'rounds', greatest(0, r.round - 1),
+                              'state', run_snapshot(me));
+  end if;
+
+  return jsonb_build_object('tier', band, 'state', run_snapshot(me));
+end;
+$$;

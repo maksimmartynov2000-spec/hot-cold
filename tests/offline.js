@@ -89,6 +89,22 @@ function serve() {
   await page.click('#tOnlineBack');
   await page.waitForTimeout(300);
 
+  // Рейтинг тоже перестал работать без сети: забег считает сервер. Это
+  // сознательная потеря, и она должна быть сказана вслух, а не проявиться
+  // молчащей кнопкой
+  await page.click('#tModeRun');
+  await page.waitForTimeout(800);
+  const runOffline = await page.evaluate(() => {
+    const el = document.getElementById('runNote');
+    return { open: !document.getElementById('screenRunHub').classList.contains('hidden'),
+             note: el ? el.textContent : '', bad: el ? el.classList.contains('bad') : false };
+  });
+  check('без сети рейтинг сразу говорит про связь',
+    runOffline.open && runOffline.bad && runOffline.note.length > 0,
+    JSON.stringify(runOffline));
+  await page.click('#tRunToMenu');
+  await page.waitForTimeout(300);
+
   // тренировка должна полностью работать офлайн
   await page.click('#tModeSolo');
   await page.click('#tStartMatch');
