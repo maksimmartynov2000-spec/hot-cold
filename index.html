@@ -644,6 +644,23 @@
     .p-effects:empty { display: none; }
     .history-item .h-masked { opacity: 0.45; }
 
+    /* Панель отнятого хода живёт на месте поля ввода и выглядит так же
+       заметно: этот ход — событие, а не пауза */
+    .forced-turn {
+      background: rgba(251, 146, 60, 0.12);
+      border: 1px solid rgba(251, 146, 60, 0.5);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .forced-turn p {
+      margin: 0 0 12px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.85);
+      line-height: 1.4;
+    }
+
     .final-box {
       background: rgba(251, 191, 36, 0.1);
       border: 1px solid #fbbf24;
@@ -970,7 +987,7 @@
   <div id="screenSetup" class="hidden">
     <div class="setup-field tight">
       <label id="tLblRange">Range</label>
-      <select class="field" id="rangeMax" onchange="buildAttemptsOptions()"></select>
+      <select class="field" id="rangeMax" onchange="onRangeChange()"></select>
     </div>
 
     <label class="frost-row">
@@ -988,6 +1005,11 @@
         <input type="checkbox" id="bonusSetup" onchange="setBonusMode(this.checked)" />
         <span id="tBonusSetup"></span>
       </label>
+
+      <div class="setup-field hidden" id="bonusCountField">
+        <label id="tLblBonusCount">Bonuses</label>
+        <select class="field" id="bonusCount" onchange="setBonusCount(this.value)"></select>
+      </div>
 
       <div class="setup-field">
         <label id="tLblP1">Player 1</label>
@@ -1079,6 +1101,13 @@
             <input type="text" id="finalInput" placeholder="" inputmode="numeric" autocomplete="off" />
             <button class="btn-yellow" onclick="submitFinal()" id="tFinalSubmit">Submit</button>
           </div>
+        </div>
+
+        <!-- Ход, отнятый бонусом: вместо поля ввода — кнопка. Нажимает её тот,
+             у кого ход отняли, поэтому видно, что произошло и с кем -->
+        <div class="forced-turn hidden" id="forcedTurn">
+          <p id="forcedText"></p>
+          <button class="btn-yellow btn-block" id="forcedBtn" onclick="doForcedTurn()"></button>
         </div>
 
         <div class="guess-section" id="guessSection">
@@ -1210,9 +1239,11 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
       frostLabel: "Frost and Heat",
-      bonusLabel: "Bonuses", bonusNear: "near",
-      bonusNames: { extra: "Extra turn", fog: "Fog", blind: "Blind turn", lava: "Lava toss" },
-      bonusDesc: { extra: "{a} goes again", fog: "{b} cannot see the other\u2019s moves", blind: "{b} moves without hints", lava: "chance moves for {b}" },
+      bonusLabel: "Bonuses", bonusNear: "something is near", lblBonusCount: "Bonuses on the board", bonusAuto: "as usual ({n})",
+      bonusNames: { extra: "Two in reserve", fog: "Fog", blind: "Blind move", lava: "Lava toss", skip: "Skipped turn", gift: "Gift to the rival", memory: "Short memory" },
+      bonusDesc: { extra: "{a} gets two tokens", fog: "{b} cannot see the other\u2019s moves", blind: "{b} cannot see their own moves", lava: "chance moves for {b}", skip: "{a} loses the next turn", gift: "{b} gets a token", memory: "{a} sees only the last two moves" },
+      forced: { skip: "\u23ed Skipped turn \u2014 you lose this move", lava: "\ud83c\udf0b Lava toss \u2014 chance moves for you" },
+      forcedBtn: { skip: "Skip", lava: "Throw" },
       hintLabel: "Distance hint",
       vizThermo: "Thermometer", vizLine: "Number line",
       enterGuess: "Enter a number", placeholderTpl: "from {a} to {b}", submitGuess: "Check",
@@ -1304,9 +1335,11 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
       frostLabel: "Мороз и Жара",
-      bonusLabel: "Бонусы", bonusNear: "рядом",
-      bonusNames: { extra: "Ещё ход", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву" },
-      bonusDesc: { extra: "{a} ходит ещё раз", fog: "{b} не видит чужие ходы", blind: "{b} — ход без подсказок", lava: "за {b} сходит случай" },
+      bonusLabel: "Бонусы", bonusNear: "рядом что-то есть", lblBonusCount: "Бонусов на поле", bonusAuto: "как обычно ({n})",
+      bonusNames: { extra: "Два про запас", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву", skip: "Пропуск хода", gift: "Подарок сопернику", memory: "Короткая память" },
+      bonusDesc: { extra: "{a} получает два жетона", fog: "{b} не видит чужие ходы", blind: "{b} не видит свои ходы", lava: "{b} — ход делает случай", skip: "{a} пропускает следующий ход", gift: "{b} получает жетон", memory: "{a} видит только два последних хода" },
+      forced: { skip: "\u23ed Пропуск хода \u2014 этот ход вы пропускаете", lava: "\ud83c\udf0b Бросок в лаву \u2014 за вас ходит случай" },
+      forcedBtn: { skip: "Пропустить", lava: "Бросить" },
       hintLabel: "Подсказка: расстояние",
       vizThermo: "Градусник", vizLine: "Числовая прямая",
       enterGuess: "Введите число", placeholderTpl: "от {a} до {b}", submitGuess: "Проверить",
@@ -1398,9 +1431,11 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
       frostLabel: "Gel et Chaleur",
-      bonusLabel: "Bonus", bonusNear: "tout près",
-      bonusNames: { extra: "Tour en plus", fog: "Brouillard", blind: "Tour aveugle", lava: "Jet de lave" },
-      bonusDesc: { extra: "{a} rejoue", fog: "{b} ne voit plus les coups adverses", blind: "{b} joue sans indices", lava: "le hasard joue pour {b}" },
+      bonusLabel: "Bonus", bonusNear: "quelque chose est tout près", lblBonusCount: "Bonus sur le plateau", bonusAuto: "comme d\u2019habitude ({n})",
+      bonusNames: { extra: "Deux en réserve", fog: "Brouillard", blind: "Coup aveugle", lava: "Jet de lave", skip: "Tour perdu", gift: "Cadeau à l\u2019adversaire", memory: "Mémoire courte" },
+      bonusDesc: { extra: "{a} reçoit deux jetons", fog: "{b} ne voit plus les coups adverses", blind: "{b} ne voit plus ses propres coups", lava: "le hasard joue pour {b}", skip: "{a} perd son prochain tour", gift: "{b} reçoit un jeton", memory: "{a} ne voit que les deux derniers coups" },
+      forced: { skip: "\u23ed Tour perdu \u2014 vous passez ce tour", lava: "\ud83c\udf0b Jet de lave \u2014 le hasard joue pour vous" },
+      forcedBtn: { skip: "Passer", lava: "Lancer" },
       hintLabel: "Indice de distance",
       vizThermo: "Thermomètre", vizLine: "Droite numérique",
       enterGuess: "Entrez un nombre", placeholderTpl: "de {a} à {b}", submitGuess: "Vérifier",
@@ -1492,9 +1527,11 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze",
-      bonusLabel: "Boni", bonusNear: "in der Nähe",
-      bonusNames: { extra: "Extrazug", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf" },
-      bonusDesc: { extra: "{a} zieht noch einmal", fog: "{b} sieht fremde Züge nicht", blind: "{b} zieht ohne Hinweise", lava: "der Zufall zieht für {b}" },
+      bonusLabel: "Boni", bonusNear: "etwas ist in der Nähe", lblBonusCount: "Boni auf dem Feld", bonusAuto: "wie üblich ({n})",
+      bonusNames: { extra: "Zwei in Reserve", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf", skip: "Zug verloren", gift: "Geschenk an den Gegner", memory: "Kurzes Gedächtnis" },
+      bonusDesc: { extra: "{a} bekommt zwei Marken", fog: "{b} sieht fremde Züge nicht", blind: "{b} sieht eigene Züge nicht", lava: "der Zufall zieht für {b}", skip: "{a} setzt den nächsten Zug aus", gift: "{b} bekommt eine Marke", memory: "{a} sieht nur die letzten zwei Züge" },
+      forced: { skip: "\u23ed Zug verloren \u2014 du setzt diesen Zug aus", lava: "\ud83c\udf0b Lavawurf \u2014 der Zufall zieht für dich" },
+      forcedBtn: { skip: "Aussetzen", lava: "Werfen" },
       hintLabel: "Abstandshinweis",
       vizThermo: "Thermometer", vizLine: "Zahlenstrahl",
       enterGuess: "Gib eine Zahl ein", placeholderTpl: "von {a} bis {b}", submitGuess: "Prüfen",
@@ -1753,6 +1790,14 @@
   }
 
   function rangeCount() { return RANGE_MAX - RANGE_MIN + 1; }
+
+  // Сколько последних ходов видно тому, кто сейчас смотрит на экран. Ловушка
+  // «короткая память» режет это вдвое — и в списке, и на прямой, иначе прямая
+  // показывала бы то, что из истории убрали
+  function historyVisible() {
+    return (mode === 'duel' && !D.roundOver && D.shortMemory[D.cur])
+      ? HISTORY_SHORT : HISTORY_VISIBLE;
+  }
   function maxDistance() { return RANGE_MAX - RANGE_MIN; }
 
   // Сколько чисел получится из выбранного размера диапазона
@@ -1795,6 +1840,7 @@
   // Сколько последних ходов остаётся на виду — и в истории, и на прямой.
   // Остальное игрок помнит сам: в этом и смысл
   const HISTORY_VISIBLE = 4;
+  const HISTORY_SHORT = 2;
 
   let currentLang = localStorage.getItem('hc_lang') || 'en';
 
@@ -1825,48 +1871,81 @@
 
     // Бонусы раунда и наложенные ими помехи. Всё живёт только внутри раунда
     bonuses: [],              // { value, type, taken }
-    fog: [false, false],      // не видит ходы соперника до конца раунда
-    blind: [null, null],      // 'own' | 'rival' — на один свой ход
-    autoLava: [false, false], // следующий ход сделает случай
+    fog: [false, false],        // не видит ЧУЖИЕ ходы до конца раунда
+    blind: [false, false],      // не видит СВОИ ходы до конца раунда
+    autoLava: [false, false],   // следующий ход за него сделает случай
+    skip: [false, false],       // пропускает свой следующий ход
+    shortMemory: [false, false],// видит вдвое меньше ходов до конца раунда
     nearBonus: false,         // последний ход прошёл рядом с бонусом
     lastBonus: null,          // что сработало, для строки под подсказкой
     lastBonusBy: 0            // кто его взял — чтобы назвать игроков поимённо
   };
 
-  // Бонус чувствуется за три клетки, а срабатывает только при точном попадании
-  const BONUS_NEAR = 3;
-  const BONUS_TYPES = ['extra', 'fog', 'blind', 'lava'];
+  // Бонус срабатывает только при точном попадании, а за несколько клеток до него
+  // загорается сигнал. Радиус сигнала зависит от диапазона: фиксированные три
+  // клетки накрывали почти весь десяток и не значили ничего на тысяче
+  function bonusNearRadius() {
+    const n = rangeCount();
+    return n <= 20 ? 1 : (n <= 200 ? 3 : 5);
+  }
+
+  // Полезные бонусы и ловушки. Ловушка бьёт по тому, кто на неё наступил, —
+  // из-за этого сигнал «рядом» перестаёт быть приманкой и становится выбором
+  const BONUS_GOOD = ['extra', 'fog', 'blind', 'lava'];
+  const BONUS_TRAP = ['skip', 'gift', 'memory'];
+  const BONUS_TYPES = BONUS_GOOD.concat(BONUS_TRAP);
+  const BONUS_TRAP_SHARE = 1 / 3;
+
   let bonusMode = localStorage.getItem('hc_bonus') === '1';
+  let bonusCountChoice = parseInt(localStorage.getItem('hc_bonus_n')) || 0;  // 0 — «как обычно»
 
   function setBonusMode(on) {
     bonusMode = !!on;
     try { localStorage.setItem('hc_bonus', bonusMode ? '1' : '0'); } catch (e) {}
+    renderBonusSetup();
   }
 
-  // Сколько бонусов на раунд. Растёт медленнее диапазона: на тысяче их должно
-  // быть заметно больше, чем на сотне, но не в сто раз. На тесных диапазонах
-  // удваивать нельзя — зона «рядом» в семь чисел накроет половину прямой,
-  // и сигнал перестанет что-либо значить
-  function bonusCount() {
-    const n = rangeCount();
+  function setBonusCount(v) {
+    bonusCountChoice = parseInt(v) || 0;
+    try { localStorage.setItem('hc_bonus_n', String(bonusCountChoice)); } catch (e) {}
+  }
+
+  // Сколько бонусов ставить, если игрок не выбирал сам. Растёт медленнее
+  // диапазона: на тысяче их должно быть заметно больше, чем на сотне, но не в
+  // сто раз. На тесных диапазонах удваивать нельзя — зона «рядом» накроет
+  // половину прямой, и сигнал перестанет что-либо значить
+  function autoBonusCountFor(n) {
     const base = Math.max(1, Math.ceil(Math.sqrt(n) / 4));
     const roomy = Math.max(1, Math.floor(n * 0.086));
     return Math.max(base, Math.min(base * 2, 12, roomy));
   }
 
+  // Больше, чем чисел без загаданного, на доску не поместится при всём желании
+  function bonusCount() {
+    const n = rangeCount();
+    return Math.max(1, Math.min(bonusCountChoice || autoBonusCountFor(n), n - 1));
+  }
+
   // Бонусы ложатся куда угодно — на любое число, кроме загаданного и кроме
-  // уже занятого другим бонусом. Больше никаких правил: пусть решает случай
+  // уже занятого другим бонусом. Ловушек примерно треть: они должны попадаться,
+  // но не решать, кто выиграл раунд
   function placeBonuses() {
     D.bonuses = [];
     if (!bonusMode) return;
     const count = bonusCount();
-    const types = BONUS_TYPES.slice().sort(() => Math.random() - 0.5);
+    const traps = Math.round(count * BONUS_TRAP_SHARE);
+    const good = BONUS_GOOD.slice().sort(() => Math.random() - 0.5);
+    const trap = BONUS_TRAP.slice().sort(() => Math.random() - 0.5);
+    const pool = [];
+    for (let i = 0; i < count - traps; i++) pool.push(good[i % good.length]);
+    for (let i = 0; i < traps; i++) pool.push(trap[i % trap.length]);
+    pool.sort(() => Math.random() - 0.5);
     const used = new Set([secret]);
     for (let guard = 0; guard < 800 && D.bonuses.length < count; guard++) {
       const v = RANGE_MIN + Math.floor(Math.random() * rangeCount());
       if (used.has(v)) continue;
       used.add(v);
-      D.bonuses.push({ value: v, type: types[D.bonuses.length % types.length], taken: false });
+      D.bonuses.push({ value: v, type: pool[D.bonuses.length], taken: false });
     }
   }
 
@@ -1938,6 +2017,9 @@
     document.getElementById('tFrostSetup').textContent = L.frostLabel;
     document.getElementById('tBonusSetup').textContent = L.bonusLabel;
     document.getElementById('bonusSetup').checked = bonusMode;
+    document.getElementById('tLblBonusCount').textContent = L.lblBonusCount;
+    buildBonusCountOptions();
+    renderBonusSetup();
     document.getElementById('tFrostRun').textContent = L.frostLabel;
     renderFrostToggles();
 
@@ -2025,6 +2107,7 @@
     document.getElementById('tStartMatch').textContent = (m === 'duel') ? L.startMatch : L.startGame;
     buildRangeOptions();
     if (m === 'duel') buildHandicapOptions();
+    renderBonusSetup();
     showScreen('setup');
   }
 
@@ -2041,6 +2124,39 @@
     });
     sel.value = RANGE_PRESETS.includes(parseInt(prev)) ? prev : '1000';
     buildAttemptsOptions();
+    buildBonusCountOptions();
+  }
+
+  function onRangeChange() {
+    buildAttemptsOptions();
+    buildBonusCountOptions();
+  }
+
+  // Лесенкой, а не полем ввода: настройку открывают дети и родители, вызывать
+  // тут клавиатуру незачем — а тем более давать ввести семьсот бонусов на
+  // диапазоне из десяти чисел
+  function buildBonusCountOptions() {
+    const sel = document.getElementById('bonusCount');
+    if (!sel) return;
+    const rangeSel = document.getElementById('rangeMax');
+    const n = countFor(parseInt(rangeSel && rangeSel.value) || 1000);
+    const auto = autoBonusCountFor(n);
+    const values = [...new Set([1, 2, 3, 6, 12, 25, 50, 100, auto, n - 1])]
+      .filter(v => v >= 1 && v <= n - 1)
+      .sort((a, b) => a - b);
+    sel.innerHTML = '';
+    values.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = (v === auto) ? t().bonusAuto.replace('{n}', v) : String(v);
+      sel.appendChild(o);
+    });
+    sel.value = String(Math.max(1, Math.min(bonusCountChoice || auto, n - 1)));
+  }
+
+  function renderBonusSetup() {
+    const f = document.getElementById('bonusCountField');
+    if (f) f.classList.toggle('hidden', !bonusMode);
   }
 
   function buildAttemptsOptions() {
@@ -2210,8 +2326,10 @@
     D.roundOver = false;
     D.roundWinner = null;
     D.fog = [false, false];
-    D.blind = [null, null];
+    D.blind = [false, false];
     D.autoLava = [false, false];
+    D.skip = [false, false];
+    D.shortMemory = [false, false];
     D.nearBonus = false;
     D.lastBonus = null;
     placeBonuses();
@@ -2264,17 +2382,18 @@
     history.push({ guess, distance, meta, p: D.cur });
     soundForGuess(meta);
 
-    // Ход сделан — помеха «слепой ход» на нём и кончается
-    D.blind[D.cur] = null;
-
     const hit = D.bonuses.find(b => !b.taken && b.value === guess);
-    D.nearBonus = !hit && D.bonuses.some(b => !b.taken && Math.abs(b.value - guess) <= BONUS_NEAR);
-    D.lastBonus = hit ? hit.type : null;
+    const radius = bonusNearRadius();
+    D.nearBonus = !hit && D.bonuses.some(b => !b.taken && Math.abs(b.value - guess) <= radius);
+    // Помеха, которая ослепила бы игрока полностью, на месте превращается в
+    // запас ходов — и ровно это игрок и увидит в строке под подсказкой
+    let type = hit ? hit.type : null;
+    if (type && bonusBlocked(type, 1 - D.cur)) type = 'extra';
+    D.lastBonus = type;
     D.lastBonusBy = D.cur;
-    let extraTurn = false;
     if (hit) {
       hit.taken = true;
-      extraTurn = applyBonus(hit.type, D.cur);
+      applyBonus(type, D.cur);
     }
 
     const usedDouble = D.armed;
@@ -2285,30 +2404,46 @@
       D.roundWinner = D.cur;
       D.wins[D.cur]++;
       if (D.wins[D.cur] >= D.winsNeeded) D.matchOver = true;
-    } else if (!usedDouble && !extraTurn) {
+    } else if (!usedDouble) {
       D.cur = 1 - D.cur;
     }
     renderAll();
-    maybeAutoMove();
   }
 
-  // Возвращает true, если ход остаётся за тем, кто взял бонус
-  function applyBonus(type, by) {
-    const rival = 1 - by;
-    if (type === 'extra') return true;
-    if (type === 'fog') D.fog[rival] = true;
-    if (type === 'blind') D.blind[rival] = Math.random() < 0.5 ? 'own' : 'rival';
-    if (type === 'lava') D.autoLava[rival] = true;
+  // Туман закрывает чужие ходы, слепой — свои. Вместе они не оставляют игроку
+  // ничего: до конца раунда он не видит ни одной подсказки и просто перебирает
+  // числа. Второй такой бонус на того же игрока не ложится
+  function bonusBlocked(type, victim) {
+    if (type === 'fog') return D.blind[victim];
+    if (type === 'blind') return D.fog[victim];
     return false;
   }
 
-  // «Бросок в лаву»: ход за игрока делает случай — случайное число в самом
-  // горячем поясе, но не само загаданное, иначе бонус дарил бы сопернику победу
-  function maybeAutoMove() {
-    if (mode !== 'duel' || D.roundOver || D.matchOver) return;
-    const p = D.cur;
-    if (!D.autoLava[p]) return;
-    D.autoLava[p] = false;
+  // Полезные бонусы бьют по сопернику, ловушки — по тому, кто наступил
+  function applyBonus(type, by) {
+    const rival = 1 - by;
+    if (type === 'extra') D.tokens[by] += 2;
+    if (type === 'fog') D.fog[rival] = true;
+    if (type === 'blind') D.blind[rival] = true;
+    if (type === 'lava') D.autoLava[rival] = true;
+    if (type === 'skip') D.skip[by] = true;
+    if (type === 'gift') D.tokens[rival] += 1;
+    if (type === 'memory') D.shortMemory[by] = true;
+  }
+
+  // Ход отнят бонусом: игрок не вводит число, а нажимает кнопку. Раньше ход за
+  // него делался сам через секунду — экран менялся, и в моменте никто не
+  // понимал, что произошло и кто это сделал
+  function forcedTurn() {
+    if (mode !== 'duel' || D.roundOver || D.matchOver) return null;
+    if (D.skip[D.cur]) return 'skip';
+    if (D.autoLava[D.cur]) return 'lava';
+    return null;
+  }
+
+  // Случайное число в самом горячем поясе, но не само загаданное: иначе бонус
+  // дарил бы победу тому, за кого ходит случай
+  function lavaThrow() {
     const lava = FEEDBACK_META[7];
     const options = [];
     for (let d = lava.min; d <= lava.max; d++) {
@@ -2316,11 +2451,24 @@
         if (v >= RANGE_MIN && v <= RANGE_MAX && v !== secret) options.push(v);
       });
     }
-    if (!options.length) return;
-    const value = options[Math.floor(Math.random() * options.length)];
-    setTimeout(() => {
-      if (mode === 'duel' && !D.roundOver && !D.matchOver) duelPlay(value);
-    }, 1100);
+    return options.length ? options[Math.floor(Math.random() * options.length)] : null;
+  }
+
+  function doForcedTurn() {
+    const kind = forcedTurn();
+    if (!kind) return;
+    // Жетон на отнятом ходе не сгорает
+    if (D.armed) { D.armed = false; D.tokens[D.cur]++; }
+    if (kind === 'skip') {
+      D.skip[D.cur] = false;
+      D.cur = 1 - D.cur;
+      renderAll();
+      return;
+    }
+    D.autoLava[D.cur] = false;
+    const value = lavaThrow();
+    if (value === null) { D.cur = 1 - D.cur; renderAll(); return; }
+    duelPlay(value);
   }
 
   // ================= РЕНДЕР =================
@@ -2332,8 +2480,7 @@
     const viewer = D.cur;
     const mine = ownerP === viewer;
     if (D.fog[viewer] && !mine) return true;
-    if (D.blind[viewer] === 'own' && mine) return true;
-    if (D.blind[viewer] === 'rival' && !mine) return true;
+    if (D.blind[viewer] && mine) return true;
     return false;
   }
 
@@ -2369,6 +2516,7 @@
     renderResult();
     renderHistory();
     renderBonusLine();
+    renderForcedTurn();
     syncScaleBox();
     if (duel) renderPlayers();
   }
@@ -2377,17 +2525,35 @@
     const box = document.getElementById('bonusLine');
     if (!box) return;
     const L = t();
-    const show = mode === 'duel' && bonusMode && !D.roundOver && (D.lastBonus || D.nearBonus);
+    // Если панель отнятого хода уже сказала то же самое, строка не нужна:
+    // два одинаковых сообщения подряд занимают пол-экрана телефона
+    const show = mode === 'duel' && bonusMode && !D.roundOver &&
+                 (D.lastBonus || D.nearBonus) &&
+                 !(D.lastBonus && forcedTurn() === D.lastBonus);
     box.classList.toggle('hidden', !show);
     if (!show) return;
     const by = D.lastBonusBy, rival = 1 - by;
     const desc = (L.bonusDesc[D.lastBonus] || '')
       .replace('{a}', escapeHtml(D.names[by]))
       .replace('{b}', escapeHtml(D.names[rival]));
+    // Рядом может лежать и ловушка, поэтому значок нейтральный: сигнал больше
+    // не «иди сюда», а «здесь что-то есть — решай сам»
     box.innerHTML = D.lastBonus
       ? '<span class="b-name">🎁 ' + L.bonusNames[D.lastBonus] + '</span>' +
         '<span class="b-desc">' + desc + '</span>'
-      : '<span class="b-name">🎁 ' + L.bonusNear + '</span>';
+      : '<span class="b-name">❓ ' + L.bonusNear + '</span>';
+  }
+
+  function renderForcedTurn() {
+    const box = document.getElementById('forcedTurn');
+    if (!box) return;
+    const kind = forcedTurn();
+    box.classList.toggle('hidden', !kind);
+    if (!kind) return;
+    const L = t();
+    document.getElementById('forcedText').textContent =
+      L.forced[kind].replace('{a}', D.names[D.cur]);
+    document.getElementById('forcedBtn').textContent = L.forcedBtn[kind];
   }
 
   function renderFeedback() {
@@ -2524,7 +2690,7 @@
     const span = Math.max(1, RANGE_MAX - RANGE_MIN);
     // Закрытые ходы на прямой не отмечаем, а залитой точкой обозначаем только
     // настоящий последний ход — если он виден
-    const visible = history.slice(-HISTORY_VISIBLE).filter(h => !hiddenRow(h.p));
+    const visible = history.slice(-historyVisible()).filter(h => !hiddenRow(h.p));
     const last = currentMove();
     const rings = last ? visible.filter(h => h !== last) : visible;
     let out = '';
@@ -2643,7 +2809,7 @@
         banner.style.color = P_COLORS[D.cur];
       }
       document.getElementById('finalBox').classList.add('hidden');
-      document.getElementById('guessSection').classList.toggle('hidden', D.roundOver);
+      document.getElementById('guessSection').classList.toggle('hidden', D.roundOver || !!forcedTurn());
     } else {
       banner.classList.add('hidden');
       // Партия кончилась — «осталось попыток» уже ничего не значит и читается
@@ -2764,7 +2930,7 @@
 
       const btn = document.getElementById('ptoken' + p);
       const isArmedByMe = D.armed && D.cur === p;
-      const canArm = !D.armed && D.tokens[p] > 0 && history.length > 0;
+      const canArm = !D.armed && D.tokens[p] > 0 && history.length > 0 && !forcedTurn();
       const canUse = !D.roundOver && !D.matchOver && D.cur === p && (isArmedByMe || canArm);
       btn.disabled = !canUse;
       btn.classList.toggle('armed', isArmedByMe);
@@ -2772,12 +2938,15 @@
       btn.textContent = (D.armed && D.cur === p) ? L.tokenArmed
                         : (D.tokens[p] === 0 ? L.tokenSpent : L.tokenBtn + count);
 
-      // Что на игроке висит: туман, слепой ход, бросок в лаву
-      const marks = (D.fog[p] ? '🙈' : '') + (D.blind[p] ? '🌫️' : '') + (D.autoLava[p] ? '🌋' : '');
+      // Что на игроке висит — значками, с полными названиями по наведению
+      const flags = [[D.fog[p], '🙈', L.bonusNames.fog],
+                     [D.blind[p], '🌫️', L.bonusNames.blind],
+                     [D.autoLava[p], '🌋', L.bonusNames.lava],
+                     [D.skip[p], '⏭', L.bonusNames.skip],
+                     [D.shortMemory[p], '🧠', L.bonusNames.memory]].filter(f => f[0]);
       const eff = document.getElementById('peff' + p);
-      eff.textContent = marks;
-      eff.title = marks ? [D.fog[p] && L.bonusNames.fog, D.blind[p] && L.bonusNames.blind,
-                           D.autoLava[p] && L.bonusNames.lava].filter(Boolean).join(', ') : '';
+      eff.textContent = flags.map(f => f[1]).join('');
+      eff.title = flags.map(f => f[2]).join(', ');
     }
   }
 
@@ -2790,7 +2959,7 @@
 
     // Видны только последние ходы: остальное игрок держит в голове. Номера
     // остаются настоящими, поэтому пропуск виден и без пояснений
-    history.slice(-HISTORY_VISIBLE).reverse().forEach((h, i) => {
+    history.slice(-historyVisible()).reverse().forEach((h, i) => {
       const realIndex = history.length - i;
       const item = document.createElement('div');
       item.className = 'history-item';
