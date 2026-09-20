@@ -21,6 +21,10 @@
     :root {
       --p0: #6366f1;
       --p1: #fbbf24;
+      /* Градусник и точка на прямой показывают один и тот же ход, поэтому едут
+         одинаково долго. Отсюда же длительность берёт и анимация в SVG,
+         см. moveDur() — чтобы значение было ровно одно на всю игру */
+      --move-dur: 0.9s;
     }
 
     html {
@@ -488,7 +492,8 @@
       bottom: 0; left: 0; width: 100%;
       height: 8%;
       background: #93C5FD;
-      transition: height 0.65s cubic-bezier(.4,0,.2,1), background-color 0.6s ease;
+      transition: height var(--move-dur) cubic-bezier(.4,0,.2,1),
+                  background-color var(--move-dur) ease;
       z-index: 1;
     }
     .thermo-fill::after {
@@ -508,7 +513,7 @@
       background: #93C5FD;
       border: 2px solid rgba(255,255,255,0.32);
       box-shadow: 0 0 18px 2px rgba(147,197,253,0.35);
-      transition: background-color 0.6s ease, box-shadow 0.6s ease;
+      transition: background-color var(--move-dur) ease, box-shadow var(--move-dur) ease;
       z-index: 2;
     }
     .thermo-bulb::after {
@@ -2647,15 +2652,29 @@
   // begin="indefinite" — обязательное: отсчёт SMIL идёт от загрузки страницы,
   // и «begin=0s» на только что вставленном элементе означает «уже давно кончилось».
   // Запускаем вручную сразу после вставки разметки, см. nlPlay()
+  // Длительность живёт в CSS, рядом с переходом градусника: одно значение на
+  // оба движения, иначе они разъедутся при первой же правке
+  let moveDurCache = null;
+  function moveDur() {
+    if (moveDurCache === null) {
+      const v = getComputedStyle(document.documentElement).getPropertyValue('--move-dur');
+      moveDurCache = parseFloat(v) || 0.9;
+    }
+    return moveDurCache;
+  }
+
   function nlSlide(attr, from, to) {
     return '<animate attributeName="' + attr + '" from="' + from + '%" to="' + to +
-           '%" dur="0.34s" begin="indefinite" fill="freeze" calcMode="spline" ' +
-           'keyTimes="0;1" keySplines="0.22 0.61 0.36 1" />';
+           '%" dur="' + moveDur() + 's" begin="indefinite" fill="freeze" ' +
+           // та же кривая, что у перехода градусника (cubic-bezier(.4,0,.2,1)):
+           // одинаковой длительности мало, с разной плавностью они всё равно
+           // приходят в разное время
+           'calcMode="spline" keyTimes="0;1" keySplines="0.4 0 0.2 1" />';
   }
 
   function nlFade() {
-    return '<animate attributeName="opacity" from="0" to="1" dur="0.3s" ' +
-           'begin="indefinite" fill="freeze" />';
+    return '<animate attributeName="opacity" from="0" to="1" dur="' + moveDur() +
+           's" begin="indefinite" fill="freeze" />';
   }
 
   function nlPlay(svg) {

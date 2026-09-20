@@ -1629,7 +1629,9 @@ async function testDotMotion(browser) {
   await page.waitForTimeout(150);
   await page.click('#tStartMatch');
   await page.waitForTimeout(300);
-  await page.evaluate(() => { secret = 50; MAX_GUESSES = 9; renderAll(); });
+  // Ответ намеренно не посередине: иначе догадки 10 и 90 дают одно и то же
+  // расстояние, столбик не двигается, и сверять его с точкой не в чем
+  await page.evaluate(() => { secret = 20; MAX_GUESSES = 9; renderAll(); });
 
   const anim = () => page.evaluate(() => {
     const dot = [...document.querySelectorAll('#numLineSvg circle')]
@@ -1662,8 +1664,12 @@ async function testDotMotion(browser) {
     const tick = () => {
       const dot = [...document.querySelectorAll('#numLineSvg circle')]
         .find(c => c.getAttribute('fill') === '#0f1430');
-      if (dot) out.push({ now: Math.round(dot.cx.animVal.value), end: Math.round(dot.cx.baseVal.value) });
-      if (performance.now() - t0 < 600) requestAnimationFrame(tick); else res(out);
+      if (dot) out.push({ t: Math.round(performance.now() - t0),
+                          now: Math.round(dot.cx.animVal.value),
+                          end: Math.round(dot.cx.baseVal.value),
+                          h: document.getElementById('thermoFill')
+                               .getBoundingClientRect().height });
+      if (performance.now() - t0 < 1100) requestAnimationFrame(tick); else res(out);
     };
     requestAnimationFrame(tick);
   }));
@@ -1677,6 +1683,42 @@ async function testDotMotion(browser) {
     path.join(' '));
   check('и доезжает ровно до своего места', end.now === end.end, end.now + ' из ' + end.end);
   check('подпись едет вместе с точкой', second.labelMoves);
+
+  // Раньше точка проскакивала за треть секунды — второкласснику не уследить
+  const at300 = travel.find(p => p.t >= 300) || end;
+  check('через треть секунды точка ещё в пути', at300.now < end.end,
+    at300.now + ' из ' + end.end + ' на ' + at300.t + 'мс');
+
+  // Градусник и точка показывают один и тот же ход. Сравнивать момент приезда
+  // нельзя: у столбика ход всего в десяток пикселей, и последний из них
+  // достигается заметно раньше конца кривой. Сравниваем долю пройденного пути
+  // в один и тот же момент — это и есть «едут вместе»
+  const from = travel[0], to = travel[travel.length - 1];
+  const mid = travel.find(p => p.t >= 300) || to;
+  const part = (a, b, c) => (b - a) === 0 ? null : (c - a) / (b - a);
+  const dotPart = part(from.now, to.now, mid.now);
+  const thermoPart = part(from.h, to.h, mid.h);
+  check('столбику градусника было что показать', thermoPart !== null,
+    Math.round(from.h) + 'px → ' + Math.round(to.h) + 'px');
+  check('градусник и точка идут в ногу', Math.abs(dotPart - thermoPart) <= 0.1,
+    'на ' + mid.t + 'мс точка прошла ' + Math.round(100 * dotPart) +
+    '%, градусник ' + Math.round(100 * thermoPart) + '%');
+
+  // Длительность задана в одном месте — в CSS, рядом с переходом градусника
+  const dur = await page.evaluate(() => {
+    const css = parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue('--move-dur'));
+    const thermo = parseFloat(getComputedStyle(document.getElementById('thermoFill'))
+      .transitionDuration);
+    const svg = [...document.querySelectorAll('#numLineSvg animate')]
+      .map(a => parseFloat(a.getAttribute('dur')));
+    return { css, thermo, svg };
+  });
+  check('градусник берёт длительность из общей переменной', dur.thermo === dur.css,
+    JSON.stringify(dur));
+  check('и движение на прямой — оттуда же',
+    dur.svg.length === 0 || dur.svg.every(v => v === dur.css), JSON.stringify(dur));
+  check('движение заметно дольше трети секунды', dur.css >= 0.6, dur.css + 'с');
 
   // Перерисовка без хода не должна дёргать прямую
   await page.waitForTimeout(500);
