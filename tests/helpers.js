@@ -59,6 +59,14 @@ function stubSupabase(opts) {
             M.tokens[M.seat] += args.p_arm ? -1 : 1;
             return { data: M.armed, error: null };
           }
+          if (name === 'do_forced_turn') {
+            const M = window.__match;
+            const kind = M.forced;
+            M.forced = null;
+            if (kind === 'skip') { M.moves.push({ seat: M.cur, timeout: false, guess: 0, tier: 0 }); }
+            M.cur = 1 - M.cur;
+            return { data: kind, error: null };
+          }
           if (name === 'next_match_round') {
             const M = window.__match;
             M.round++; M.roundOver = false; M.roundWinner = null;
@@ -83,8 +91,20 @@ function stubSupabase(opts) {
         winsNeeded: M.winsNeeded, rangeMin: M.rangeMin, rangeMax: M.rangeMax, frost: M.frost,
         round: M.round, wins: M.wins, cur: M.cur, tokens: M.tokens, armed: M.armed,
         roundOver: M.roundOver, roundWinner: M.roundWinner, matchOver: M.matchOver,
-        moves: M.moves.map(mv => ({ seat: mv.seat, guess: mv.guess, tier: mv.tier })),
-        secret: open ? null : M.secret, updatedAt: '2026-01-01T00:00:00Z' };
+        moves: M.moves.map(mv => mv.timeout
+          ? { seat: mv.seat, timeout: true }
+          : (mv.hidden ? { seat: mv.seat, hidden: true }
+                       : { seat: mv.seat, guess: mv.guess, tier: mv.tier })),
+        secret: open ? null : M.secret,
+        bonusesOn: !!M.bonusesOn, fog: M.fog || [false, false],
+        blind: M.blind || [false, false], autoLava: M.autoLava || [false, false],
+        skip: M.skip || [false, false], shortMemory: M.shortMemory || [false, false],
+        rush: M.rush || [0, 0], nearBonus: !!M.nearBonus,
+        lastBonus: M.lastBonus || null, lastBonusBy: M.lastBonusBy || 0,
+        lastTimeout: !!M.lastTimeout, forced: M.forced || null,
+        turnSeconds: M.turnSeconds || 30,
+        secondsLeft: M.secondsLeft === undefined ? 30 : M.secondsLeft,
+        updatedAt: '2026-01-01T00:00:00Z' };
     };
 
     if (opts.user) {

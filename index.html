@@ -690,6 +690,17 @@
       font-size: 14px;
       color: #fbbf24;
     }
+    .turn-clock {
+      margin: 0 0 8px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: rgba(255, 255, 255, 0.55);
+      transition: color 0.2s;
+    }
+    .turn-clock.low { color: #fb923c; }
+    .turn-clock.out { color: #f87171; }
     .match-note {
       margin: 0 0 8px;
       padding: 7px 12px;
@@ -1142,6 +1153,10 @@
 
         <div class="turn-banner hidden" id="turnBanner"></div>
 
+        <!-- Обратный отсчёт хода. Тикает своим таймером: состояние приходит раз
+             в две секунды, и без него секунды прыгали бы через одну -->
+        <div class="turn-clock hidden" id="turnClock"></div>
+
         <!-- Что сказал сервер: отказ в ходе, обрыв связи. Отрисовка доски это
              место не трогает, иначе сообщение пропадало бы на первом же кадре -->
         <div class="match-note hidden" id="matchNote"></div>
@@ -1270,7 +1285,7 @@
       <div class="lb-title" id="challengeTitle"></div>
       <div class="setup-field tight">
         <label id="tChRange">Range</label>
-        <select class="field" id="chRange">
+        <select class="field" id="chRange" onchange="renderChallengeBonuses()">
           <option value="10">1–10</option>
           <option value="100" selected>1–100</option>
           <option value="1000">1–1000</option>
@@ -1280,6 +1295,14 @@
         <input type="checkbox" id="chFrost" />
         <span id="tChFrost"></span>
       </label>
+      <label class="frost-row">
+        <input type="checkbox" id="chBonuses" onchange="renderChallengeBonuses()" />
+        <span id="tChBonuses"></span>
+      </label>
+      <div class="setup-field hidden" id="chBonusCountField">
+        <label id="tChBonusCount">Bonuses on the board</label>
+        <select class="field" id="chBonusCount"></select>
+      </div>
       <div class="setup-field">
         <label id="tChWins">Play until how many wins</label>
         <select class="field" id="chWins">
@@ -1399,12 +1422,14 @@
         errNotFriend: "Only friends can be challenged",
         errInviteGone: "That challenge is gone",
         errNoMatch: "No such game",
+        timedOut: "out of time", clockMine: "Your turn: {n}s", clockTheirs: "Their turn: {n}s",
+        chBonuses: "Bonuses", chBonusCount: "Bonuses on the board",
         errNotPlaying: "The game is not running",
         errNoRequest: "That request is gone"
       },
       bonusLabel: "Bonuses", bonusNear: "something is near", lblBonusCount: "Bonuses on the board", bonusAuto: "as usual ({n})",
-      bonusNames: { extra: "Two in reserve", fog: "Fog", blind: "Blind move", lava: "Lava toss", skip: "Skipped turn", gift: "Gift to the rival", memory: "Short memory" },
-      bonusDesc: { extra: "{a} gets two tokens", fog: "{b} cannot see the other\u2019s moves", blind: "{b} cannot see their own moves", lava: "chance moves for {b}", skip: "{a} loses the next turn", gift: "{b} gets a token", memory: "{a} sees only the last two moves" },
+      bonusNames: { extra: "Two in reserve", fog: "Fog", blind: "Blind move", lava: "Lava toss", skip: "Skipped turn", gift: "Gift to the rival", memory: "Short memory", rush: "Rush" },
+      bonusDesc: { extra: "{a} gets two tokens", fog: "{b} cannot see the other\u2019s moves", blind: "{b} cannot see their own moves", lava: "chance moves for {b}", skip: "{a} loses the next turn", gift: "{b} gets a token", memory: "{a} sees only the last two moves", rush: "{b} \u2014 3 seconds less per turn" },
       forced: { skip: "\u23ed Skipped turn \u2014 you lose this move", lava: "\ud83c\udf0b Lava toss \u2014 chance moves for you" },
       forcedBtn: { skip: "Skip", lava: "Throw" },
       hintLabel: "Distance hint",
@@ -1527,12 +1552,14 @@
         errNotFriend: "Вызвать можно только друга",
         errInviteGone: "Вызова больше нет",
         errNoMatch: "Такой игры нет",
+        timedOut: "время вышло", clockMine: "Ваш ход: {n} с", clockTheirs: "Ход соперника: {n} с",
+        chBonuses: "Бонусы", chBonusCount: "Бонусов на поле",
         errNotPlaying: "Игра не идёт",
         errNoRequest: "Заявки больше нет"
       },
       bonusLabel: "Бонусы", bonusNear: "рядом что-то есть", lblBonusCount: "Бонусов на поле", bonusAuto: "как обычно ({n})",
-      bonusNames: { extra: "Два про запас", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву", skip: "Пропуск хода", gift: "Подарок сопернику", memory: "Короткая память" },
-      bonusDesc: { extra: "{a} получает два жетона", fog: "{b} не видит чужие ходы", blind: "{b} не видит свои ходы", lava: "{b} — ход делает случай", skip: "{a} пропускает следующий ход", gift: "{b} получает жетон", memory: "{a} видит только два последних хода" },
+      bonusNames: { extra: "Два про запас", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву", skip: "Пропуск хода", gift: "Подарок сопернику", memory: "Короткая память", rush: "Спешка" },
+      bonusDesc: { extra: "{a} получает два жетона", fog: "{b} не видит чужие ходы", blind: "{b} не видит свои ходы", lava: "{b} — ход делает случай", skip: "{a} пропускает следующий ход", gift: "{b} получает жетон", memory: "{a} видит только два последних хода", rush: "{b} \u2014 минус 3 секунды на ход" },
       forced: { skip: "\u23ed Пропуск хода \u2014 этот ход вы пропускаете", lava: "\ud83c\udf0b Бросок в лаву \u2014 за вас ходит случай" },
       forcedBtn: { skip: "Пропустить", lava: "Бросить" },
       hintLabel: "Подсказка: расстояние",
@@ -1655,12 +1682,14 @@
         errNotFriend: "On ne peut d\u00e9fier qu\u2019un ami",
         errInviteGone: "Ce d\u00e9fi n\u2019existe plus",
         errNoMatch: "Cette partie n\u2019existe pas",
+        timedOut: "temps \u00e9coul\u00e9", clockMine: "\u00c0 vous : {n} s", clockTheirs: "Adversaire : {n} s",
+        chBonuses: "Bonus", chBonusCount: "Bonus sur le plateau",
         errNotPlaying: "La partie n\u2019est pas en cours",
         errNoRequest: "Cette demande n\u2019existe plus"
       },
       bonusLabel: "Bonus", bonusNear: "quelque chose est tout près", lblBonusCount: "Bonus sur le plateau", bonusAuto: "comme d\u2019habitude ({n})",
-      bonusNames: { extra: "Deux en réserve", fog: "Brouillard", blind: "Coup aveugle", lava: "Jet de lave", skip: "Tour perdu", gift: "Cadeau à l\u2019adversaire", memory: "Mémoire courte" },
-      bonusDesc: { extra: "{a} reçoit deux jetons", fog: "{b} ne voit plus les coups adverses", blind: "{b} ne voit plus ses propres coups", lava: "le hasard joue pour {b}", skip: "{a} perd son prochain tour", gift: "{b} reçoit un jeton", memory: "{a} ne voit que les deux derniers coups" },
+      bonusNames: { extra: "Deux en réserve", fog: "Brouillard", blind: "Coup aveugle", lava: "Jet de lave", skip: "Tour perdu", gift: "Cadeau à l\u2019adversaire", memory: "Mémoire courte", rush: "Hâte" },
+      bonusDesc: { extra: "{a} reçoit deux jetons", fog: "{b} ne voit plus les coups adverses", blind: "{b} ne voit plus ses propres coups", lava: "le hasard joue pour {b}", skip: "{a} perd son prochain tour", gift: "{b} reçoit un jeton", memory: "{a} ne voit que les deux derniers coups", rush: "{b} \u2014 3 secondes de moins par tour" },
       forced: { skip: "\u23ed Tour perdu \u2014 vous passez ce tour", lava: "\ud83c\udf0b Jet de lave \u2014 le hasard joue pour vous" },
       forcedBtn: { skip: "Passer", lava: "Lancer" },
       hintLabel: "Indice de distance",
@@ -1783,12 +1812,14 @@
         errNotFriend: "Nur Freunde k\u00f6nnen herausgefordert werden",
         errInviteGone: "Diese Herausforderung gibt es nicht mehr",
         errNoMatch: "Diese Partie gibt es nicht",
+        timedOut: "Zeit um", clockMine: "Du: {n} s", clockTheirs: "Gegner: {n} s",
+        chBonuses: "Boni", chBonusCount: "Boni auf dem Feld",
         errNotPlaying: "Die Partie l\u00e4uft nicht",
         errNoRequest: "Diese Anfrage gibt es nicht mehr"
       },
       bonusLabel: "Boni", bonusNear: "etwas ist in der Nähe", lblBonusCount: "Boni auf dem Feld", bonusAuto: "wie üblich ({n})",
-      bonusNames: { extra: "Zwei in Reserve", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf", skip: "Zug verloren", gift: "Geschenk an den Gegner", memory: "Kurzes Gedächtnis" },
-      bonusDesc: { extra: "{a} bekommt zwei Marken", fog: "{b} sieht fremde Züge nicht", blind: "{b} sieht eigene Züge nicht", lava: "der Zufall zieht für {b}", skip: "{a} setzt den nächsten Zug aus", gift: "{b} bekommt eine Marke", memory: "{a} sieht nur die letzten zwei Züge" },
+      bonusNames: { extra: "Zwei in Reserve", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf", skip: "Zug verloren", gift: "Geschenk an den Gegner", memory: "Kurzes Gedächtnis", rush: "Hetze" },
+      bonusDesc: { extra: "{a} bekommt zwei Marken", fog: "{b} sieht fremde Züge nicht", blind: "{b} sieht eigene Züge nicht", lava: "der Zufall zieht für {b}", skip: "{a} setzt den nächsten Zug aus", gift: "{b} bekommt eine Marke", memory: "{a} sieht nur die letzten zwei Züge", rush: "{b} \u2014 3 Sekunden weniger pro Zug" },
       forced: { skip: "\u23ed Zug verloren \u2014 du setzt diesen Zug aus", lava: "\ud83c\udf0b Lavawurf \u2014 der Zufall zieht für dich" },
       forcedBtn: { skip: "Aussetzen", lava: "Werfen" },
       hintLabel: "Abstandshinweis",
@@ -2295,6 +2326,8 @@
     document.getElementById('tChFrost').textContent = L.frostLabel;
     document.getElementById('tChWins').textContent = L.online.chWins;
     document.getElementById('tChSend').textContent = L.online.chSend;
+    document.getElementById('tChBonuses').textContent = L.online.chBonuses;
+    document.getElementById('tChBonusCount').textContent = L.online.chBonusCount;
     document.getElementById('tChCancel').textContent = L.online.chCancel;
     document.getElementById('friendSearch').placeholder = L.online.searchPh;
     document.getElementById('tRunChoiceLogin').textContent = L.run.choiceLogin;
@@ -2714,6 +2747,8 @@
   // понимал, что произошло и кто это сделал
   function forcedTurn() {
     if (mode !== 'duel' || D.roundOver || D.matchOver) return null;
+    // Онлайн: решает сервер, и только для того, чей сейчас ход
+    if (online) return (D.cur === online.seat) ? online.forced : null;
     if (D.skip[D.cur]) return 'skip';
     if (D.autoLava[D.cur]) return 'lava';
     return null;
@@ -2732,9 +2767,20 @@
     return options.length ? options[Math.floor(Math.random() * options.length)] : null;
   }
 
+  async function onlineForcedTurn() {
+    try {
+      await friendRpc('do_forced_turn', { p_match_id: online.id });
+      await refreshMatch();
+    } catch (e) {
+      setMatchNote(onlineMatchError(e.message));
+      await refreshMatch(true);
+    }
+  }
+
   function doForcedTurn() {
     const kind = forcedTurn();
     if (!kind) return;
+    if (online) return onlineForcedTurn();
     // Жетон на отнятом ходе не сгорает
     if (D.armed) { D.armed = false; D.tokens[D.cur]++; }
     if (kind === 'skip') {
@@ -2752,7 +2798,10 @@
   // ================= РЕНДЕР =================
   // Помехи из бонусов прячут чужие или свои ходы от того, чей сейчас ход.
   // Когда раунд окончен, прячется всё равно нечего — показываем как есть
-  function hiddenRow(ownerP) {
+  function hiddenRow(ownerP, h) {
+    // В онлайне сервер уже решил, что показывать: закрытый ход приезжает без
+    // числа, и гадать на месте нечего
+    if (online) return !!(h && h.masked);
     if (mode !== 'duel' || D.roundOver || D.matchOver) return false;
     if (ownerP === null || ownerP === undefined) return false;
     const viewer = D.cur;
@@ -2767,7 +2816,8 @@
   // откатываться на ход раньше нельзя, старая подсказка прочитается как свежая
   function currentMove() {
     const last = history[history.length - 1];
-    return (last && !hiddenRow(last.p)) ? last : null;
+    if (!last || last.timeout) return null;
+    return hiddenRow(last.p, last) ? null : last;
   }
 
   // Попал или нет — видно по поясу, а не по расстоянию. В онлайне расстояния
@@ -2800,6 +2850,7 @@
     renderHistory();
     renderBonusLine();
     renderForcedTurn();
+    renderClock();
     syncScaleBox();
     if (duel) renderPlayers();
   }
@@ -2825,6 +2876,35 @@
       ? '<span class="b-name">🎁 ' + L.bonusNames[D.lastBonus] + '</span>' +
         '<span class="b-desc">' + desc + '</span>'
       : '<span class="b-name">❓ ' + L.bonusNear + '</span>';
+  }
+
+  // Часы идут на месте: сервер присылает остаток раз в две секунды, а между
+  // посылками секунды отсчитывает браузер — иначе цифра прыгала бы через одну
+  let clockTimer = null;
+
+  function renderClock() {
+    const box = document.getElementById('turnClock');
+    if (!box) return;
+    const show = online && !D.roundOver && !D.matchOver && online.deadlineAt;
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const left = Math.max(0, Math.ceil((online.deadlineAt - Date.now()) / 1000));
+    const mine = D.cur === online.seat;
+    const L = t().online;
+    box.textContent = (mine ? L.clockMine : L.clockTheirs).replace('{n}', left);
+    box.classList.toggle('low', left <= 10 && left > 0);
+    box.classList.toggle('out', left === 0);
+  }
+
+  function startClock() {
+    stopClock();
+    clockTimer = setInterval(() => {
+      if (online && screen === 'game') renderClock(); else stopClock();
+    }, 250);
+  }
+
+  function stopClock() {
+    if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
   }
 
   function renderForcedTurn() {
@@ -2987,7 +3067,8 @@
     const span = Math.max(1, RANGE_MAX - RANGE_MIN);
     // Закрытые ходы на прямой не отмечаем, а залитой точкой обозначаем только
     // настоящий последний ход — если он виден
-    const visible = history.slice(-historyVisible()).filter(h => !hiddenRow(h.p));
+    const visible = history.slice(-historyVisible())
+      .filter(h => !hiddenRow(h.p, h) && !h.timeout);
     const last = currentMove();
     const rings = last ? visible.filter(h => h !== last) : visible;
     let out = '';
@@ -3264,14 +3345,18 @@
       const realIndex = history.length - i;
       const item = document.createElement('div');
       item.className = 'history-item';
-      const masked = hiddenRow(h.p);
+      const masked = hiddenRow(h.p, h);
       const accent = masked ? 'rgba(255,255,255,0.2)'
                             : ((h.p === null || h.p === undefined) ? h.meta.color : P_COLORS[h.p]);
       item.style.borderLeft = '3px solid ' + accent;
       const who = (h.p === null || h.p === undefined)
         ? ''
         : '<span class="h-who" style="color:' + P_COLORS[h.p] + '">' + escapeHtml(D.names[h.p]) + '</span>';
-      item.innerHTML = masked
+      item.innerHTML = h.timeout
+        ? '<span class="h-num">#' + realIndex + '</span>' + who +
+          '<span class="h-guess h-masked">—</span>' +
+          '<span class="h-label h-masked">\u23f1\ufe0f ' + t().online.timedOut + '</span>'
+        : masked
         ? '<span class="h-num">#' + realIndex + '</span>' + who +
           '<span class="h-guess h-masked">•••</span><span class="h-label h-masked">🙈</span>'
         : '<span class="h-num">#' + realIndex + '</span>' + who +
@@ -3904,9 +3989,33 @@
     }
   }
 
+  // Лесенка числа бонусов та же, что в местной дуэли, но считается от
+  // выбранного здесь диапазона, а не от того, во что играли в прошлый раз
+  function renderChallengeBonuses() {
+    const on = document.getElementById('chBonuses').checked;
+    document.getElementById('chBonusCountField').classList.toggle('hidden', !on);
+    if (!on) return;
+    const sel = document.getElementById('chBonusCount');
+    const n = parseInt(document.getElementById('chRange').value) || 100;
+    const auto = autoBonusCountFor(n);
+    const prev = parseInt(sel.value);
+    const values = [...new Set([1, 2, 3, 6, 12, 25, 50, 100, auto, n - 1])]
+      .filter(v => v >= 1 && v <= n - 1)
+      .sort((a, b) => a - b);
+    sel.innerHTML = '';
+    values.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = (v === auto) ? t().bonusAuto.replace('{n}', v) : String(v);
+      sel.appendChild(o);
+    });
+    sel.value = String(values.includes(prev) ? prev : auto);
+  }
+
   function openChallenge(name) {
     const box = document.getElementById('challengeBox');
     box.dataset.name = name;
+    renderChallengeBonuses();
     document.getElementById('challengeTitle').textContent =
       t().online.chTitle.replace('{name}', name);
     box.classList.remove('hidden');
@@ -3920,11 +4029,16 @@
     const box = document.getElementById('challengeBox');
     const name = box.dataset.name;
     try {
+      const withBonuses = document.getElementById('chBonuses').checked;
       await friendRpc('challenge_friend', {
         p_to: name,
         p_range: parseInt(document.getElementById('chRange').value),
         p_frost: document.getElementById('chFrost').checked,
-        p_wins: parseInt(document.getElementById('chWins').value)
+        p_wins: parseInt(document.getElementById('chWins').value),
+        p_bonuses: withBonuses,
+        p_bonus_count: withBonuses
+          ? parseInt(document.getElementById('chBonusCount').value) || null
+          : null
       });
       closeChallenge();
       await loadMatches();
@@ -4045,19 +4159,30 @@
     D.roundOver = !!st.roundOver;
     D.roundWinner = st.roundWinner;
     D.matchOver = !!st.matchOver;
-    // Помех в онлайне пока нет, но отрисовка их спрашивает
-    D.fog = [false, false];
-    D.blind = [false, false];
-    D.autoLava = [false, false];
-    D.skip = [false, false];
-    D.shortMemory = [false, false];
-    D.nearBonus = false;
-    D.lastBonus = null;
+    D.fog = (st.fog || [false, false]).slice();
+    D.blind = (st.blind || [false, false]).slice();
+    D.autoLava = (st.autoLava || [false, false]).slice();
+    D.skip = (st.skip || [false, false]).slice();
+    D.shortMemory = (st.shortMemory || [false, false]).slice();
+    D.rush = (st.rush || [0, 0]).slice();
+    D.nearBonus = !!st.nearBonus;
+    D.lastBonus = st.lastBonus || null;
+    D.lastBonusBy = st.lastBonusBy || 0;
     D.bonuses = [];
+    bonusMode = !!st.bonusesOn;
+    online.forced = st.forced || null;
+    online.turnSeconds = st.turnSeconds || 30;
+    online.secondsLeft = st.secondsLeft;
+    online.deadlineAt = (st.secondsLeft === null || st.secondsLeft === undefined)
+      ? null : Date.now() + st.secondsLeft * 1000;
 
-    // Расстояния сервер не присылает: пояс — это всё, что известно
+    // Расстояния сервер не присылает: пояс — это всё, что известно. Закрытый
+    // ход приезжает без числа, потерянный по времени — как отдельная строка
     history = (st.moves || []).map(mv => ({
-      guess: mv.guess, distance: null, meta: FEEDBACK_META[mv.tier], p: mv.seat
+      guess: mv.guess, distance: null, p: mv.seat,
+      timeout: !!mv.timeout,
+      masked: !!mv.hidden,
+      meta: (mv.tier === null || mv.tier === undefined) ? FEEDBACK_META[0] : FEEDBACK_META[mv.tier]
     }));
     secret = (st.secret === null || st.secret === undefined) ? 0 : st.secret;
     applyRangeToInputs();
@@ -4113,6 +4238,7 @@
     showScreen('game');
     renderAll();
     startMatchPoll();
+    startClock();
   }
 
   async function onlineGuess() {
@@ -4152,6 +4278,7 @@
   // Уход с экрана матч не закрывает: к начатой игре можно вернуться
   function backToOnline() {
     stopMatchPoll();
+    stopClock();
     setMatchNote('');
     online = null;
     mode = null;

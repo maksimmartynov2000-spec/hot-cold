@@ -259,3 +259,43 @@ begin
 end $$;
 commit;
 \echo ok
+
+\echo === 15. потерянный по времени ход остаётся в истории
+do $$
+declare mid bigint := current_setting('t.b')::bigint; st jsonb; m matches; n1 int; n2 int;
+begin
+  update matches set round_over = false, match_over = false, status = 'active',
+                     cur = 0, fog = array[false, false], blind = array[false, false],
+                     short_memory = array[false, false],
+                     skip_turn = array[false, false], auto_lava = array[false, false],
+                     turn_deadline = now() - interval '1 second' where id = mid;
+  select * into m from matches where id = mid;
+  select count(*) into n1 from match_moves where match_id = mid and round = m.round;
+  st := match_state('Кира','4321',mid);
+  select count(*) into n2 from match_moves where match_id = mid and round = m.round;
+  if n2 <> n1 + 1 then raise exception 'ОШИБКА: пропуск не записан в историю'; end if;
+  if not ((st -> 'moves' -> -1) ? 'timeout') then
+    raise exception 'ОШИБКА: пропуск не виден в состоянии — %', st -> 'moves';
+  end if;
+  if (st -> 'moves' -> -1 ->> 'seat')::int <> 0 then
+    raise exception 'ОШИБКА: пропуск записан не тому игроку';
+  end if;
+end $$;
+\echo ok
+
+\echo === 16. два клиента одновременно не делают двух пропусков
+do $$
+declare mid bigint := current_setting('t.b')::bigint; m matches; n1 int; n2 int;
+begin
+  update matches set turn_deadline = now() - interval '1 second' where id = mid;
+  select * into m from matches where id = mid;
+  select count(*) into n1 from match_moves where match_id = mid and round = m.round;
+  perform match_state('Лев','1234',mid);
+  perform match_state('Кира','4321',mid);
+  perform match_state('Лев','1234',mid);
+  select count(*) into n2 from match_moves where match_id = mid and round = m.round;
+  if n2 <> n1 + 1 then
+    raise exception 'ОШИБКА: пропусков записано % вместо одного', n2 - n1;
+  end if;
+end $$;
+\echo ok
