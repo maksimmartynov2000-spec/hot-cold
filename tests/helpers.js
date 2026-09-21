@@ -109,6 +109,15 @@ function stubSupabase(opts) {
             M.tokens[M.seat] += args.p_arm ? -1 : 1;
             return { data: M.armed, error: null };
           }
+          if (name === 'send_phrase') {
+            const M = window.__match;
+            if (['hi','hot','cold','nice','wow','think','hurry','gg'].indexOf(args.p_code) < 0) {
+              return { data: null, error: { message: 'bad_phrase' } };
+            }
+            M.chat = M.chat || [];
+            M.chat.push({ id: M.chat.length + 1, seat: M.seat, code: args.p_code, ago: 0 });
+            return { data: true, error: null };
+          }
           if (name === 'do_forced_turn') {
             const M = window.__match;
             const kind = M.forced;
@@ -186,7 +195,7 @@ function stubSupabase(opts) {
         skip: M.skip || [false, false], shortMemory: M.shortMemory || [false, false],
         rush: M.rush || [0, 0], nearBonus: !!M.nearBonus,
         lastBonus: M.lastBonus || null, lastBonusBy: M.lastBonusBy || 0,
-        lastTimeout: !!M.lastTimeout, forced: M.forced || null,
+        lastTimeout: !!M.lastTimeout, forced: M.forced || null, chat: M.chat || [],
         turnSeconds: M.turnSeconds || 30,
         secondsLeft: M.secondsLeft === undefined ? 30 : M.secondsLeft,
         updatedAt: '2026-01-01T00:00:00Z' };

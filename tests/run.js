@@ -2330,6 +2330,90 @@ async function testOnlineClock(browser) {
   await done(p4);
 }
 
+// Онлайн: готовые фразы
+async function testPhrases(browser) {
+  console.log('\nОнлайн: готовые фразы');
+
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' }];
+    window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
+                          round: 1, wins: [0, 0], my_turn: true }];
+  });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.click('#gamesList .friend-row .fr-btn');
+  await page.waitForTimeout(600);
+
+  check('кнопка фраз появилась в матче', await page.locator('#sayBtn').isVisible());
+  check('палитра закрыта, пока её не открыли', !(await page.locator('#sayPad').isVisible()));
+
+  await page.click('#sayBtn');
+  await page.waitForTimeout(250);
+  const pad = await page.evaluate(() => ({
+    open: !document.getElementById('sayPad').classList.contains('hidden'),
+    codes: [...document.querySelectorAll('#sayPad button[data-code]')].map(b => b.dataset.code),
+    texts: [...document.querySelectorAll('#sayPad button[data-code]')].map(b => b.textContent),
+    mute: !!document.getElementById('sayMuteBtn')
+  }));
+  check('палитра открывается кнопкой', pad.open);
+  check('в ней восемь фраз', pad.codes.length === 8, pad.codes.join(','));
+  check('фразы про эту игру, а не общие',
+    pad.texts.some(t => t.indexOf('теплее') >= 0) && pad.texts.some(t => t.indexOf('холод') >= 0),
+    pad.texts.join(' | '));
+  check('есть кнопка «скрыть фразы»', pad.mute);
+
+  // Отправка
+  await page.click('#sayPad button[data-code="hot"]');
+  await page.waitForTimeout(500);
+  const sent = await page.evaluate(() => ({
+    args: (window.__rpcCalls.filter(c => c.name === 'send_phrase').pop() || {}).args,
+    bubble: document.getElementById('sayBubble').textContent,
+    shown: !document.getElementById('sayBubble').classList.contains('hidden')
+  }));
+  check('фраза ушла кодом, а не текстом',
+    sent.args.p_code === 'hot' && sent.args.p_match_id === 1, JSON.stringify(sent.args));
+  check('своя фраза видна на доске', sent.shown && sent.bubble.indexOf('теплее') >= 0, sent.bubble);
+  check('и подписана именем', sent.bubble.indexOf('Лев') >= 0, sent.bubble);
+
+  // Фраза соперника приходит опросом
+  await page.evaluate(() => {
+    window.__match.chat.push({ id: 99, seat: 1, code: 'wow', ago: 0 });
+  });
+  await page.waitForTimeout(2600);
+  const from = await page.evaluate(() => document.getElementById('sayBubble').textContent);
+  check('фраза соперника приходит сама', from.indexOf('Кира') >= 0, from);
+
+  // Со временем гаснет
+  await page.evaluate(() => { sayShownUntil = Date.now() - 1; renderSayBubble(); });
+  await page.waitForTimeout(200);
+  check('реплика гаснет, а не висит весь раунд',
+    !(await page.locator('#sayBubble').isVisible()));
+
+  // Выключение
+  await page.click('#sayMuteBtn');
+  await page.waitForTimeout(200);
+  check('выбор «скрыть» записан в память',
+    await page.evaluate(() => localStorage.getItem('hc_mute')) === '1');
+  await page.evaluate(() => {
+    window.__match.chat.push({ id: 100, seat: 1, code: 'hurry', ago: 0 });
+  });
+  await page.waitForTimeout(2600);
+  check('с выключенными фразами чужая реплика не показывается',
+    !(await page.locator('#sayBubble').isVisible()));
+  await done(page);
+
+  // В местной игре фраз нет: там соперник рядом
+  const solo = await newGame(browser, { user: 'Лев' });
+  await solo.click('#tModeDuel');
+  await solo.waitForTimeout(200);
+  await solo.click('#tStartMatch');
+  await solo.waitForTimeout(300);
+  check('в игре за одним телефоном кнопки фраз нет',
+    !(await solo.locator('#sayBtn').isVisible()));
+  await done(solo);
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -2363,6 +2447,7 @@ async function testOnlineClock(browser) {
     await testFriends(browser);
     await testOnlineMatch(browser);
     await testOnlineClock(browser);
+    await testPhrases(browser);
   } finally {
     await browser.close();
   }
