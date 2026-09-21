@@ -2449,6 +2449,139 @@ async function testPhrases(browser) {
   await done(solo);
 }
 
+// ---------------------------------------------------------------- рейтинг онлайн
+async function testRanked(browser) {
+  console.log('\nОнлайн: рейтинг');
+
+  let page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__rankedQ.elo = 1180;
+    window.__rankedQ.games = 7;
+    window.__rankedQ.lastAgo = 240;
+    window.__eloTop = [{ username: 'Кира', elo: 1300, games: 9 },
+                       { username: 'Лев', elo: 1180, games: 7 }];
+  });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(500);
+
+  const hub = await page.evaluate(() => ({
+    elo: document.getElementById('rkElo').textContent.replace(/[\s\u00a0\u202f]/g, ''),
+    rules: document.getElementById('tRkRules').textContent,
+    last: document.getElementById('rkLast').textContent,
+    play: document.getElementById('tRkPlay').textContent,
+    waiting: !document.getElementById('rkWaitBox').classList.contains('hidden'),
+    top: [...document.querySelectorAll('#rkTopList .lb-row')].map(r => r.textContent),
+    // Рейтинг стоит выше вызова друга: за ним пришли в первую очередь
+    rankedFirst: document.querySelector('.rk-block').compareDocumentPosition(
+      document.getElementById('gamesList')) & Node.DOCUMENT_POSITION_FOLLOWING
+  }));
+  check('свой рейтинг и число игр видны', hub.elo.indexOf('1180') >= 0 && hub.elo.indexOf('7') >= 0, hub.elo);
+  check('условия рейтинговой игры названы',
+    hub.rules.indexOf('100') >= 0 && hub.rules.indexOf('3') >= 0, hub.rules);
+  check('видно, когда в рейтинге играли',
+    hub.last.indexOf('4 мин назад') >= 0, hub.last);
+  check('кнопка предлагает играть, а не продолжать', hub.play === 'Играть на рейтинг', hub.play);
+  check('ожидания нет, пока не нажали', !hub.waiting);
+  check('в топе те, кто сыграл достаточно',
+    hub.top.length === 2 && hub.top[0].indexOf('Кира') >= 0, hub.top.join(' | '));
+  check('рейтинг стоит выше списка игр', !!hub.rankedFirst);
+
+  // Очередь: кнопка сменяется ожиданием, и в нём написано, что происходит
+  await page.click('#tRkPlay');
+  await page.waitForTimeout(400);
+  const queued = await page.evaluate(() => ({
+    waiting: !document.getElementById('rkWaitBox').classList.contains('hidden'),
+    playHidden: document.getElementById('tRkPlay').classList.contains('hidden'),
+    text: document.getElementById('rkWaitText').textContent,
+    cancel: document.getElementById('tRkCancel').textContent
+  }));
+  check('после нажатия видно ожидание', queued.waiting && queued.playHidden);
+  check('в ожидании сказано, что соперника ищут и сколько ждём',
+    queued.text.indexOf('Ищем соперника') >= 0 && queued.text.indexOf('в очереди') >= 0, queued.text);
+  check('и что пока никого нет', queued.text.indexOf('только вы') >= 0, queued.text);
+  check('поиск можно отменить', queued.cancel === 'Отменить поиск', queued.cancel);
+
+  // Соперник нашёлся — на доску переносит сам опрос, без нажатий
+  await page.evaluate(() => {
+    window.__rankedQ.matchId = 7;
+    window.__match.id = 7;
+    window.__match.ranked = true;
+    window.__match.names = ['Кира', 'Лев'];
+    window.__match.seat = 1;
+  });
+  await page.waitForTimeout(4200);
+  const onBoard = await page.locator('#screenGame').isVisible();
+  check('подбор сам открывает доску', onBoard);
+  check('клиент знает, что игра рейтинговая',
+    await page.evaluate(() => !!online && online.ranked === true));
+
+  // Выход из рейтинговой игры спрашивает, а не выходит молча. Если на доску так
+  // и не попали, дальше идти некуда — но провал уже назван выше
+  if (onBoard) await page.click('#tMenu');
+  await page.waitForTimeout(300);
+  const ask = await page.evaluate(() => ({
+    open: !document.getElementById('resignModal').classList.contains('hidden'),
+    text: document.getElementById('tResignTitle').textContent,
+    stay: document.getElementById('tResignStay').textContent,
+    go: document.getElementById('tResignGo').textContent,
+    still: !document.getElementById('screenGame').classList.contains('hidden')
+  }));
+  check('выход из рейтинга спрашивает подтверждение', ask.open);
+  check('и объясняет, что это поражение', ask.text.indexOf('поражение') >= 0, ask.text);
+  check('можно остаться', ask.stay === 'Остаться в игре', ask.stay);
+  check('или сдаться', ask.go === 'Сдаться', ask.go);
+  check('доска пока на месте', ask.still);
+
+  if (ask.open) await page.click('#tResignStay');
+  await page.waitForTimeout(200);
+  check('отказ от выхода возвращает к игре',
+    onBoard && (await page.locator('#screenGame').isVisible()) &&
+    !(await page.locator('#resignModal').isVisible()));
+  await done(page);
+
+  // Итог по уходу соперника: названо имя и изменение рейтинга
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__rankedQ.matchId = 7;
+    window.__matches = [{ id: 7, other: 'Кира', seat: 1, status: 'active',
+                          round: 1, wins: [0, 0], my_turn: true, ranked: true }];
+    Object.assign(window.__match, {
+      id: 7, ranked: true, names: ['Кира', 'Лев'], seat: 1, cur: 1,
+      roundOver: true, roundWinner: 1, matchOver: true, wins: [0, 3],
+      forfeitBy: 0, eloDelta: [-18, 18], elo: 1198, secret: 42
+    });
+  });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(500);
+  const row = await page.evaluate(() => {
+    const r = document.querySelector('#gamesList .friend-row');
+    return { tag: r ? (r.querySelector('.rk-row-tag') || {}).textContent : null };
+  });
+  check('в списке игр рейтинговая помечена', row.tag === 'рейтинг', String(row.tag));
+
+  await page.click('#gamesList .friend-row .fr-btn');
+  await page.waitForTimeout(700);
+  // Число в карточке разбито пробелами по-русски — сравниваем без них
+  const card = await page.evaluate(() =>
+    document.getElementById('resultBox').textContent.replace(/[\s\u00a0\u202f]/g, ''));
+  check('сказано, что соперник вышел из игры',
+    card.indexOf('Киравышелизигры') >= 0, card);
+  check('показан новый рейтинг и прибавка',
+    card.indexOf('1198') >= 0 && card.indexOf('(+18)') >= 0, card);
+
+  // Продолжение начатой игры: кнопка меняет смысл, а не молча уносит на доску
+  await page.click('.r-actions .btn');
+  await page.waitForTimeout(600);
+  const resume = await page.evaluate(() => ({
+    online: !document.getElementById('screenOnline').classList.contains('hidden'),
+    play: document.getElementById('tRkPlay').textContent
+  }));
+  check('после матча вернулись в онлайн, а не провалились обратно', resume.online);
+  check('незакрытая рейтинговая игра предлагает продолжить',
+    resume.play === 'Рейтинговая игра уже идёт', resume.play);
+  await done(page);
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -2483,6 +2616,7 @@ async function testPhrases(browser) {
     await testOnlineMatch(browser);
     await testOnlineClock(browser);
     await testPhrases(browser);
+    await testRanked(browser);
   } finally {
     await browser.close();
   }

@@ -355,6 +355,50 @@
     }
     .fr-note.bad { color: #f87171; }
 
+    /* ---------- Рейтинговый онлайн ---------- */
+    .rk-block {
+      margin-top: 0;
+      background: rgba(251, 191, 36, 0.07);
+      border: 1px solid rgba(251, 191, 36, 0.22);
+      border-radius: 14px;
+      padding: 16px 14px 14px;
+    }
+    .rk-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .rk-head .lb-title { margin-bottom: 0; }
+    .rk-elo { font-size: 15px; font-weight: 700; color: #fbbf24; white-space: nowrap; }
+    .rk-rules {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      margin: 6px 0 12px;
+      line-height: 1.4;
+    }
+    .rk-wait { margin-top: 10px; }
+    /* Пока ищем соперника, единственное, что меняется, — это строка ожидания.
+       Она должна быть заметна, но не мигать: точки дорисовываются в тексте */
+    .rk-wait-text {
+      font-size: 13px;
+      color: #fbbf24;
+      text-align: center;
+      padding: 6px 0 10px;
+    }
+    .rk-row-tag {
+      font-size: 11px;
+      font-weight: 700;
+      color: #fbbf24;
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      border-radius: 6px;
+      padding: 1px 5px;
+      margin-left: 6px;
+      white-space: nowrap;
+    }
+    .r-elo { font-size: 15px; font-weight: 700; color: #fbbf24; margin-top: 8px; }
+    .r-forfeit { font-size: 13px; color: rgba(255, 255, 255, 0.55); margin-top: 6px; }
+
     /* ---------- Настройка дуэли ---------- */
     .setup-field { margin-bottom: 20px; }
     /* Поле, под которым стоит своя галочка: она должна держаться за него,
@@ -1311,6 +1355,27 @@
   <div id="screenOnline" class="hidden">
     <div class="run-greeting hidden" id="onlineGreeting"></div>
 
+    <!-- Рейтинг стоит первым: это ответ на «хочу играть прямо сейчас».
+         Вызов друга ниже — он требует, чтобы друг был на связи -->
+    <div class="fr-block rk-block">
+      <div class="rk-head">
+        <div class="lb-title" id="tRkTitle"></div>
+        <div class="rk-elo" id="rkElo"></div>
+      </div>
+      <div class="rk-rules" id="tRkRules"></div>
+      <div class="rk-rules" id="rkLast"></div>
+      <div class="fr-note hidden" id="rkNote"></div>
+      <button class="btn btn-block" id="tRkPlay" onclick="startRanked()"></button>
+      <div class="rk-wait hidden" id="rkWaitBox">
+        <div class="rk-wait-text" id="rkWaitText"></div>
+        <button class="btn-ghost btn-block" id="tRkCancel" onclick="cancelRanked()"></button>
+      </div>
+      <div class="lb-wrap">
+        <div class="lb-title" id="tRkTop"></div>
+        <div id="rkTopList" class="lb-list"></div>
+      </div>
+    </div>
+
     <div class="setup-field">
       <label id="tLblFindFriend">Find a player</label>
       <div class="row">
@@ -1415,6 +1480,15 @@
   </div>
 </div>
 
+<!-- Выход из рейтинговой игры: спрашиваем, потому что это поражение -->
+<div class="modal-backdrop hidden" id="resignModal">
+  <div class="modal-card">
+    <div class="modal-text" id="tResignTitle"></div>
+    <button class="btn btn-block" id="tResignStay" onclick="closeResign()"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="tResignGo" onclick="resignMatch()"></button>
+  </div>
+</div>
+
 <!-- Аккаунт: имя, свой PIN и выход -->
 <div class="modal-backdrop hidden" id="logoutModal">
   <div class="modal-card">
@@ -1482,7 +1556,32 @@
         whoPlays: "Recently playing \u2014 add anyone you like",
         nobodyYet: "Nobody else has played yet",
         errNotPlaying: "The game is not running",
-        errNoRequest: "That request is gone"
+        errNoRequest: "The request is gone",
+        rkTitle: "\ud83c\udfc6 Ranked",
+        rkRules: "1\u2013100, first to 3 wins, no bonuses, 30 s per move. Miss two moves in a row and the game is lost.",
+        rkPlay: "Play ranked",
+        rkElo: "{n} \u00b7 {g} games",
+        rkSearching: "Looking for an opponent",
+        rkWaited: "{n} s in the queue",
+        rkQueueOne: "you are the only one waiting",
+        rkQueueMany: "waiting: {n}",
+        rkCancel: "Stop looking",
+        rkLastPlayed: "someone played ranked {n}",
+        rkStay: "Keep playing",
+        rkLastNever: "no ranked games yet",
+        rkAgoMin: "{n} min ago",
+        rkAgoHour: "{n} h ago",
+        rkAgoDay: "{n} d ago",
+        rkAgoNow: "just now",
+        rkTop: "Ranked top",
+        rkTopEmpty: "Nobody has played three ranked games yet",
+        rkBadge: "ranked",
+        rkResume: "A ranked game is already on",
+        rkLeftThem: "{name} left the game",
+        rkLeftYou: "You left the game",
+        rkDelta: "Rating: {n} ({d})",
+        rkResign: "Resign",
+        rkResignAsk: "Leaving a ranked game counts as a loss. Sure?"
       },
       bonusLabel: "Bonuses", bonusNear: "something is near", lblBonusCount: "Bonuses on the board", bonusAuto: "as usual ({n})",
       bonusNames: { extra: "Two in reserve", fog: "Fog", blind: "Blind move", lava: "Lava toss", skip: "Skipped turn", gift: "Gift to the rival", memory: "Short memory", rush: "Rush" },
@@ -1626,7 +1725,32 @@
         whoPlays: "Недавно играли — можно добавить любого",
         nobodyYet: "Пока больше никто не играл",
         errNotPlaying: "Игра не идёт",
-        errNoRequest: "Заявки больше нет"
+        errNoRequest: "Заявки больше нет",
+        rkTitle: "\ud83c\udfc6 Рейтинг",
+        rkRules: "1\u2013100, до 3 побед, без бонусов, 30 с на ход. Два пропущенных хода подряд — поражение.",
+        rkPlay: "Играть на рейтинг",
+        rkElo: "{n} \u00b7 игр: {g}",
+        rkSearching: "Ищем соперника",
+        rkWaited: "в очереди {n} с",
+        rkQueueOne: "пока ждёте только вы",
+        rkQueueMany: "ищут игру: {n}",
+        rkCancel: "Отменить поиск",
+        rkLastPlayed: "в рейтинге играли {n}",
+        rkStay: "Остаться в игре",
+        rkLastNever: "рейтинговых игр ещё не было",
+        rkAgoMin: "{n} мин назад",
+        rkAgoHour: "{n} ч назад",
+        rkAgoDay: "{n} дн назад",
+        rkAgoNow: "только что",
+        rkTop: "Топ по рейтингу",
+        rkTopEmpty: "Пока никто не сыграл трёх рейтинговых игр",
+        rkBadge: "рейтинг",
+        rkResume: "Рейтинговая игра уже идёт",
+        rkLeftThem: "{name} вышел из игры",
+        rkLeftYou: "Вы вышли из игры",
+        rkDelta: "Рейтинг: {n} ({d})",
+        rkResign: "Сдаться",
+        rkResignAsk: "Выйти из рейтинговой игры — это поражение. Точно?"
       },
       bonusLabel: "Бонусы", bonusNear: "рядом что-то есть", lblBonusCount: "Бонусов на поле", bonusAuto: "как обычно ({n})",
       bonusNames: { extra: "Два про запас", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву", skip: "Пропуск хода", gift: "Подарок сопернику", memory: "Короткая память", rush: "Спешка" },
@@ -1770,7 +1894,32 @@
         whoPlays: "Ont jou\u00e9 r\u00e9cemment \u2014 ajoutez qui vous voulez",
         nobodyYet: "Personne d\u2019autre n\u2019a encore jou\u00e9",
         errNotPlaying: "La partie n\u2019est pas en cours",
-        errNoRequest: "Cette demande n\u2019existe plus"
+        errNoRequest: "La demande n'existe plus",
+        rkTitle: "\ud83c\udfc6 Class\u00e9",
+        rkRules: "1\u2013100, en 3 manches gagnantes, sans bonus, 30 s par coup. Deux coups manqu\u00e9s de suite : partie perdue.",
+        rkPlay: "Jouer en class\u00e9",
+        rkElo: "{n} \u00b7 {g} parties",
+        rkSearching: "Recherche d'un adversaire",
+        rkWaited: "{n} s dans la file",
+        rkQueueOne: "vous \u00eates seul \u00e0 attendre",
+        rkQueueMany: "en attente : {n}",
+        rkCancel: "Arr\u00eater la recherche",
+        rkLastPlayed: "quelqu'un a jou\u00e9 en class\u00e9 {n}",
+        rkStay: "Rester dans la partie",
+        rkLastNever: "aucune partie class\u00e9e pour l'instant",
+        rkAgoMin: "il y a {n} min",
+        rkAgoHour: "il y a {n} h",
+        rkAgoDay: "il y a {n} j",
+        rkAgoNow: "\u00e0 l'instant",
+        rkTop: "Classement",
+        rkTopEmpty: "Personne n'a encore jou\u00e9 trois parties class\u00e9es",
+        rkBadge: "class\u00e9",
+        rkResume: "Une partie class\u00e9e est d\u00e9j\u00e0 en cours",
+        rkLeftThem: "{name} a quitt\u00e9 la partie",
+        rkLeftYou: "Vous avez quitt\u00e9 la partie",
+        rkDelta: "Classement : {n} ({d})",
+        rkResign: "Abandonner",
+        rkResignAsk: "Quitter une partie class\u00e9e compte comme une d\u00e9faite. C'est s\u00fbr ?"
       },
       bonusLabel: "Bonus", bonusNear: "quelque chose est tout près", lblBonusCount: "Bonus sur le plateau", bonusAuto: "comme d\u2019habitude ({n})",
       bonusNames: { extra: "Deux en réserve", fog: "Brouillard", blind: "Coup aveugle", lava: "Jet de lave", skip: "Tour perdu", gift: "Cadeau à l\u2019adversaire", memory: "Mémoire courte", rush: "Hâte" },
@@ -1914,7 +2063,32 @@
         whoPlays: "K\u00fcrzlich gespielt \u2014 f\u00fcg hinzu, wen du willst",
         nobodyYet: "Sonst hat noch niemand gespielt",
         errNotPlaying: "Die Partie l\u00e4uft nicht",
-        errNoRequest: "Diese Anfrage gibt es nicht mehr"
+        errNoRequest: "Die Anfrage gibt es nicht mehr",
+        rkTitle: "\ud83c\udfc6 Rangliste",
+        rkRules: "1\u2013100, bis 3 Siege, ohne Boni, 30 s pro Zug. Zwei verpasste Z\u00fcge hintereinander: Partie verloren.",
+        rkPlay: "Um Punkte spielen",
+        rkElo: "{n} \u00b7 {g} Partien",
+        rkSearching: "Gegner wird gesucht",
+        rkWaited: "{n} s in der Warteschlange",
+        rkQueueOne: "nur Sie warten gerade",
+        rkQueueMany: "warten: {n}",
+        rkCancel: "Suche abbrechen",
+        rkLastPlayed: "Rangliste gespielt {n}",
+        rkStay: "Weiterspielen",
+        rkLastNever: "noch keine Ranglistenpartien",
+        rkAgoMin: "vor {n} Min",
+        rkAgoHour: "vor {n} Std",
+        rkAgoDay: "vor {n} T",
+        rkAgoNow: "gerade eben",
+        rkTop: "Ranglisten-Top",
+        rkTopEmpty: "Noch niemand hat drei Ranglistenpartien gespielt",
+        rkBadge: "Rangliste",
+        rkResume: "Eine Ranglistenpartie l\u00e4uft schon",
+        rkLeftThem: "{name} hat die Partie verlassen",
+        rkLeftYou: "Sie haben die Partie verlassen",
+        rkDelta: "Punkte: {n} ({d})",
+        rkResign: "Aufgeben",
+        rkResignAsk: "Eine Ranglistenpartie zu verlassen z\u00e4hlt als Niederlage. Sicher?"
       },
       bonusLabel: "Boni", bonusNear: "etwas ist in der Nähe", lblBonusCount: "Boni auf dem Feld", bonusAuto: "wie üblich ({n})",
       bonusNames: { extra: "Zwei in Reserve", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf", skip: "Zug verloren", gift: "Geschenk an den Gegner", memory: "Kurzes Gedächtnis", rush: "Hetze" },
@@ -2426,6 +2600,11 @@
     document.getElementById('tFriendsTitle').textContent = L.online.friends;
     document.getElementById('tOnlineBack').textContent = L.online.back;
     document.getElementById('tGamesTitle').textContent = L.online.games;
+    document.getElementById('tRkTitle').textContent = L.online.rkTitle;
+    document.getElementById('tRkRules').textContent = L.online.rkRules;
+    document.getElementById('tRkPlay').textContent = L.online.rkPlay;
+    document.getElementById('tRkCancel').textContent = L.online.rkCancel;
+    document.getElementById('tRkTop').textContent = L.online.rkTop;
     document.getElementById('tChRange').textContent = L.online.chRange;
     document.getElementById('tChFrost').textContent = L.frostLabel;
     document.getElementById('tChWins').textContent = L.online.chWins;
@@ -2505,6 +2684,8 @@
   // Выход с игрового экрана: в режиме на рейтинг это отказ от текущей игры —
   // возвращаемся в хаб режима, а не в главное меню
   function leaveGame() {
+    // Из рейтинговой игры так просто не выйти: сначала вопрос
+    if (online && online.ranked && !D.matchOver) return openResign();
     if (online) return backToOnline();
     if (mode === 'run') { openPause(); return; }
     quitToMenu();
@@ -3357,6 +3538,28 @@
       secretLine.className = 'r-secret';
       secretLine.textContent = L.secretWas + secret;
 
+      // Рейтинговый матч заканчивается двумя способами, и второй надо назвать
+      // словами: иначе победа «из ничего» выглядит ошибкой
+      let forfeitLine = null;
+      let eloLine = null;
+      if (online && online.ranked) {
+        if (online.forfeitBy !== null && online.forfeitBy !== undefined) {
+          forfeitLine = document.createElement('div');
+          forfeitLine.className = 'r-forfeit';
+          forfeitLine.textContent = online.forfeitBy === online.seat
+            ? L.online.rkLeftYou
+            : L.online.rkLeftThem.replace('{name}', D.names[online.forfeitBy]);
+        }
+        if (D.matchOver && online.eloDelta) {
+          const d = online.eloDelta[online.seat];
+          eloLine = document.createElement('div');
+          eloLine.className = 'r-elo';
+          eloLine.textContent = L.online.rkDelta
+            .replace('{n}', formatNum(online.elo))
+            .replace('{d}', (d > 0 ? '+' : '') + d);
+        }
+      }
+
       const actions = document.createElement('div');
       actions.className = 'r-actions';
       if (D.matchOver) {
@@ -3368,8 +3571,14 @@
       } else {
         actions.innerHTML = '<button class="btn" onclick="nextRound()">' + L.nextRound + '</button>';
       }
-      box.appendChild(icon); box.appendChild(title); box.appendChild(score);
-      box.appendChild(secretLine); box.appendChild(actions);
+      // Причина стоит сразу под заголовком: иначе «выигрывает игру» рядом со
+      // счётом 0:0 читается как ошибка, а не как сдача соперника
+      box.appendChild(icon); box.appendChild(title);
+      if (forfeitLine) box.appendChild(forfeitLine);
+      box.appendChild(score);
+      box.appendChild(secretLine);
+      if (eloLine) box.appendChild(eloLine);
+      box.appendChild(actions);
       box.classList.remove('hidden');
       return;
     }
@@ -3929,6 +4138,8 @@
     loadFriends();
     loadMatches();
     loadSuggestions();
+    loadRanked();
+    loadEloTop();
   }
 
   function startFriendsPoll() {
@@ -3937,6 +4148,7 @@
       if (screen !== 'online') return stopFriendsPoll();
       loadFriends(true);
       loadMatches(true);
+      if (!rankedInQueue) loadRanked(true);
     }, FRIENDS_POLL_MS);
   }
 
@@ -4072,6 +4284,13 @@
       el.textContent = text;
       row.appendChild(el);
     };
+
+    if (m.ranked) {
+      const tag = document.createElement('span');
+      tag.className = 'rk-row-tag';
+      tag.textContent = L.rkBadge;
+      who.appendChild(tag);
+    }
 
     if (m.status === 'invited' && m.seat === 1) {
       button(L.accept, 'yes', () => answerChallenge(m.id, true));
@@ -4260,6 +4479,165 @@
   // нет — номер матча и своё место за доской. Ветвится только ввод: ход, жетон
   // и следующий раунд уходят на сервер, а не считаются здесь
   const MATCH_POLL_MS = 2000;
+  // ================= РЕЙТИНГОВЫЙ ОНЛАЙН =================
+  // Условия здесь не настраиваются: 1–100, до трёх побед, без бонусов. Иначе
+  // рейтинг сравнивал бы игры, которые не сравнимы. Настройки остались у вызова
+  // друга — там играют для интереса, а не ради числа
+  const RANKED_POLL_MS = 3000;
+  let rankedTimer = null;
+  let rankedBusy = false;
+  let rankedInQueue = false;
+  let rankedMatchId = null;
+
+  function startRankedPoll() {
+    stopRankedPoll();
+    rankedTimer = setInterval(() => {
+      if (screen === 'online' && rankedInQueue) loadRanked(true);
+      else stopRankedPoll();
+    }, RANKED_POLL_MS);
+  }
+
+  function stopRankedPoll() {
+    if (rankedTimer) { clearInterval(rankedTimer); rankedTimer = null; }
+  }
+
+  // Давность в человеческих словах. Меньше полутора минут — «только что»:
+  // точнее незачем, решение «ждать или не ждать» от секунд не зависит
+  function rankedAgoText(seconds) {
+    const L = t().online;
+    if (seconds === null || seconds === undefined) return L.rkLastNever;
+    if (seconds < 90) return L.rkLastPlayed.replace('{n}', L.rkAgoNow);
+    if (seconds < 5400) return L.rkLastPlayed.replace('{n}', L.rkAgoMin.replace('{n}', Math.round(seconds / 60)));
+    if (seconds < 172800) return L.rkLastPlayed.replace('{n}', L.rkAgoHour.replace('{n}', Math.round(seconds / 3600)));
+    return L.rkLastPlayed.replace('{n}', L.rkAgoDay.replace('{n}', Math.round(seconds / 86400)));
+  }
+
+  function renderRanked(st) {
+    const L = t().online;
+    document.getElementById('rkElo').textContent =
+      L.rkElo.replace('{n}', formatNum(st.elo)).replace('{g}', st.games);
+    document.getElementById('rkLast').textContent = rankedAgoText(st.lastAgo);
+
+    const play = document.getElementById('tRkPlay');
+    play.textContent = rankedMatchId ? L.rkResume : L.rkPlay;
+    play.classList.toggle('hidden', rankedInQueue);
+    document.getElementById('rkWaitBox').classList.toggle('hidden', !rankedInQueue);
+    if (!rankedInQueue) return;
+
+    // Точки в конце — единственная живая деталь на экране ожидания: по ней
+    // видно, что опрос идёт, а не подвис
+    const dots = '.'.repeat(1 + (Math.floor(st.waited / 3) % 3));
+    document.getElementById('rkWaitText').textContent = [
+      L.rkSearching + dots,
+      L.rkWaited.replace('{n}', st.waited),
+      st.queue > 1 ? L.rkQueueMany.replace('{n}', st.queue) : L.rkQueueOne
+    ].join(' · ');
+  }
+
+  async function loadRanked(quiet) {
+    try {
+      const st = await friendRpc('ranked_status');
+      if (!st) return;
+      const wasQueued = rankedInQueue;
+      rankedMatchId = st.matchId || null;
+      rankedInQueue = !!st.inQueue;
+      // В матч затягиваем только того, кто стоял в очереди и ждал именно этого.
+      // Иначе с экрана начатой игры было бы не уйти: он открывался бы заново
+      if (rankedMatchId && wasQueued) {
+        rankedInQueue = false;
+        stopRankedPoll();
+        return openMatch(rankedMatchId);
+      }
+      if (rankedInQueue && !rankedTimer) startRankedPoll();
+      renderRanked(st);
+      if (!quiet) setNote('rkNote', '');
+    } catch (e) {
+      if (!quiet) setNote('rkNote', onlineMatchError(e.message), true);
+    }
+  }
+
+  async function startRanked() {
+    if (rankedBusy) return;
+    if (rankedMatchId) return openMatch(rankedMatchId);
+    rankedBusy = true;
+    setNote('rkNote', '');
+    try {
+      const r = await friendRpc('join_ranked_queue');
+      if (r && r.matchId) {
+        rankedInQueue = false;
+        rankedMatchId = r.matchId;
+        stopRankedPoll();
+        rankedBusy = false;
+        return openMatch(r.matchId);
+      }
+      rankedInQueue = true;
+      startRankedPoll();
+      await loadRanked(true);
+    } catch (e) {
+      setNote('rkNote', onlineMatchError(e.message), true);
+    } finally {
+      rankedBusy = false;
+    }
+  }
+
+  async function cancelRanked() {
+    rankedInQueue = false;
+    stopRankedPoll();
+    try {
+      await friendRpc('leave_ranked_queue');
+    } catch (e) {
+      setNote('rkNote', onlineMatchError(e.message), true);
+    }
+    await loadRanked(true);
+  }
+
+  async function loadEloTop() {
+    if (!sb) return;
+    const box = document.getElementById('rkTopList');
+    if (!box) return;
+    try {
+      const { data, error } = await sb.rpc('elo_leaderboard');
+      if (error) throw new Error(error.message);
+      const rows = data || [];
+      const me = (runAuth() || {}).username;
+      if (!rows.length) {
+        box.innerHTML = '<div class="fr-note">' + escapeHtml(t().online.rkTopEmpty) + '</div>';
+        return;
+      }
+      box.innerHTML = rows.map((r, i) => {
+        const style = r.username === me ? ' style="color:#fbbf24;font-weight:700"' : '';
+        return '<div class="lb-row"' + style + '><span>' + (i + 1) + '. ' +
+               escapeHtml(r.username) + '</span><span>' + formatNum(r.elo) + '</span></div>';
+      }).join('');
+    } catch (e) {}
+  }
+
+  // Выход из рейтинговой игры — поражение, и спросить об этом надо до того,
+  // как оно случится: сервер потом уже ничего не отменит
+  function openResign() {
+    const L = t().online;
+    document.getElementById('tResignTitle').textContent = L.rkResignAsk;
+    document.getElementById('tResignStay').textContent = L.rkStay;
+    document.getElementById('tResignGo').textContent = L.rkResign;
+    document.getElementById('resignModal').classList.remove('hidden');
+  }
+
+  function closeResign() {
+    document.getElementById('resignModal').classList.add('hidden');
+  }
+
+  async function resignMatch() {
+    closeResign();
+    const id = online && online.id;
+    if (!id) return backToOnline();
+    try {
+      await friendRpc('leave_match', { p_match_id: id });
+      await refreshMatch(true);
+    } catch (e) {
+      setMatchNote(onlineMatchError(e.message));
+    }
+  }
+
   let online = null;
   let matchTimer = null;
   let matchBusy = false;
@@ -4286,6 +4664,10 @@
     if (!st) return;
     online.seat = st.seat;
     online.status = st.status;
+    online.ranked = !!st.ranked;
+    online.forfeitBy = (st.forfeitBy === null || st.forfeitBy === undefined) ? null : st.forfeitBy;
+    online.eloDelta = st.eloDelta || null;
+    online.elo = st.elo;
     mode = 'duel';
     RANGE_MIN = st.rangeMin;
     RANGE_MAX = st.rangeMax;

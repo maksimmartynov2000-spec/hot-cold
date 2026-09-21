@@ -133,6 +133,21 @@ function stubSupabase(opts) {
             M.moves = []; M.tokens = [1, 1]; M.cur = 1 - M.starter; M.starter = M.cur;
             return { data: true, error: null };
           }
+          // Рейтинговый онлайн: очередь и подбор живут в window.__rankedQ,
+          // тест сам решает, когда соперник «нашёлся»
+          if (name === 'ranked_status') return { data: window.__ranked(), error: null };
+          if (name === 'join_ranked_queue') {
+            const Q = window.__rankedQ;
+            if (Q.matchId) return { data: { matchId: Q.matchId }, error: null };
+            Q.inQueue = true;
+            Q.joined = Date.now();
+            return { data: { matchId: null, waiting: true }, error: null };
+          }
+          if (name === 'leave_ranked_queue') {
+            window.__rankedQ.inQueue = false;
+            return { data: true, error: null };
+          }
+          if (name === 'elo_leaderboard') return { data: window.__eloTop || [], error: null };
           if (name === 'get_pin_hint') return { data: opts.hint === undefined ? 'номер дома' : opts.hint, error: null };
           return { data: true, error: null };
         }
@@ -173,6 +188,15 @@ function stubSupabase(opts) {
                movesLog: R.movesLog.slice(), frost: R.frost, best: R.best };
     };
 
+    window.__rankedQ = { inQueue: false, matchId: null, queue: 1, elo: 1000,
+                         games: 0, lastAgo: null, joined: 0 };
+    window.__ranked = function () {
+      const Q = window.__rankedQ;
+      return { matchId: Q.matchId, inQueue: Q.inQueue && !Q.matchId,
+               waited: Q.inQueue ? Math.floor((Date.now() - Q.joined) / 1000) : 0,
+               queue: Q.queue, elo: Q.elo, games: Q.games, lastAgo: Q.lastAgo };
+    };
+
     // Сервер отдаёт число только когда раунд кончился — заглушка обязана так же,
     // иначе проверка «ответ не виден» пройдёт впустую
     window.__match = { id: 1, seat: 0, status: 'active', names: ['Лев', 'Кира'],
@@ -197,6 +221,10 @@ function stubSupabase(opts) {
         rush: M.rush || [0, 0], nearBonus: !!M.nearBonus,
         lastBonus: M.lastBonus || null, lastBonusBy: M.lastBonusBy || 0,
         lastTimeout: !!M.lastTimeout, forced: M.forced || null, chat: M.chat || [],
+        ranked: !!M.ranked,
+        forfeitBy: M.forfeitBy === undefined ? null : M.forfeitBy,
+        eloDelta: M.eloDelta || null,
+        elo: M.elo === undefined ? 1000 : M.elo,
         turnSeconds: M.turnSeconds || 30,
         secondsLeft: M.secondsLeft === undefined ? 30 : M.secondsLeft,
         updatedAt: '2026-01-01T00:00:00Z' };
