@@ -42,9 +42,12 @@ async function testModes(browser) {
   const names = await page.evaluate(() => [
     document.getElementById('tModeSolo').textContent,
     document.getElementById('tModeDuel').textContent,
-    document.getElementById('tModeRun').textContent
+    document.getElementById('tModeRun').textContent,
+    document.getElementById('tModeOnline').textContent
   ]);
-  check('в меню три режима с названиями', names.every(n => n && n.trim()), names.join(' / '));
+  check('в меню четыре режима с названиями', names.every(n => n && n.trim()), names.join(' / '));
+  check('карточек в меню тоже четыре',
+    await page.evaluate(() => document.querySelectorAll('#screenMode .mode-btn').length) === 4);
 
   // Тренировка
   await page.click('#tModeSolo');
@@ -137,15 +140,15 @@ async function testScoringAndSubmit(browser) {
   await page.click('#tRunStart');
   await page.waitForTimeout(250);
 
-  const s = await page.evaluate(() => ({ secret, RANGE_MAX, MAX_GUESSES }));
-  await page.fill('#guessInput', String(s.secret));
+  const s = await page.evaluate(() => ({ secret: window.__run.secret, RANGE_MAX, MAX_GUESSES }));
+  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(150);
   const afterWin = await page.evaluate(() => ({ score: RUN.totalScore, locked: RUN.locked }));
   check('за угаданный раунд начисляются очки', afterWin.score > 0, String(afterWin.score));
 
   // повторный ввод того же числа в паузе не должен давать очки снова
-  await page.fill('#guessInput', String(s.secret));
+  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(100);
   check('в паузе между раундами очки не накручиваются',
@@ -153,7 +156,7 @@ async function testScoringAndSubmit(browser) {
 
   // сливаем раунд -> игра заканчивается и результат уходит на сервер
   await page.waitForTimeout(900);
-  const s2 = await page.evaluate(() => ({ secret, RANGE_MAX, MAX_GUESSES }));
+  const s2 = await page.evaluate(() => ({ secret: window.__run.secret, RANGE_MAX, MAX_GUESSES }));
   for (let i = 0; i < s2.MAX_GUESSES; i++) {
     let wrong = ((s2.secret + i) % s2.RANGE_MAX) + 1;
     if (wrong === s2.secret) wrong = (wrong % s2.RANGE_MAX) + 1;
@@ -165,8 +168,14 @@ async function testScoringAndSubmit(browser) {
   check('после проигрыша возвращаемся в хаб', await page.locator('#screenRunHub').isVisible());
   const msg = (await page.locator('#runHubMessage').textContent()).replace(/\s+/g, ' ');
   check('в итогах показано загаданное число', msg.includes('Загаданное число'));
-  const calls = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'submit_run_score'));
-  check('результат отправлен на сервер', calls.length === 1, JSON.stringify(calls[0] && calls[0].args));
+  // Отправлять результат больше нечего: его считал и записал сервер. Проверяем,
+  // что игра шла через него и что забег на сервере закрыт
+  const calls = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'run_guess'));
+  check('ходы шли через сервер', calls.length > 1, String(calls.length));
+  check('клиент не отправляет итог сам',
+    await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'submit_run_score').length) === 0);
+  check('забег на сервере закрыт',
+    await page.evaluate(() => window.__run.active === false));
 
   await done(page);
 }
@@ -321,7 +330,7 @@ async function testSoundAndShare(browser) {
 
   // Личный рекорд в строке статуса
   await page.evaluate(() => localStorage.setItem(runBestKey(), '4200'));
-  await page.fill('#guessInput', String(s.secret));
+  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(1200);
   // toLocaleString ставит неразрывный пробел — сравниваем по цифрам
@@ -336,7 +345,7 @@ async function testSoundAndShare(browser) {
   await page.waitForTimeout(600);
   await page.click('#tRunStart');
   await page.waitForTimeout(250);
-  const s2 = await page.evaluate(() => ({ secret, RANGE_MAX, MAX_GUESSES }));
+  const s2 = await page.evaluate(() => ({ secret: window.__run.secret, RANGE_MAX, MAX_GUESSES }));
   for (let i = 0; i < s2.MAX_GUESSES; i++) {
     let w = ((s2.secret + i) % s2.RANGE_MAX) + 1;
     if (w === s2.secret) w = (w % s2.RANGE_MAX) + 1;
@@ -383,13 +392,14 @@ async function testPauseAndGiveUp(browser) {
   await page.waitForTimeout(250);
 
   // выигрываем раунд, чтобы было что сохранять
-  const s = await page.evaluate(() => secret);
+  const s = await page.evaluate(() => window.__run.secret);
   await page.fill('#guessInput', String(s));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(1200);
   const scoreBefore = await page.evaluate(() => RUN.totalScore);
-  check('игра сохраняется по ходу дела',
-    !!(await page.evaluate(() => localStorage.getItem('hc_run_state'))));
+  check('забег живёт на сервере, а не в браузере',
+    await page.evaluate(() => window.__run.active === true && window.__run.round === 2),
+    await page.evaluate(() => JSON.stringify({ active: window.__run.active, round: window.__run.round })));
 
   // кнопка в игре открывает паузу, а не выбрасывает молча
   await page.click('#tMenu');
@@ -432,11 +442,10 @@ async function testPauseAndGiveUp(browser) {
   await page.waitForTimeout(200);
   await page.click('#tPauseGiveUp');
   await page.waitForTimeout(600);
-  const sent = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'submit_run_score'));
-  check('«сдаться» записывает текущий результат',
-    sent.length === 1 && sent[0].args.p_score === scoreBefore,
-    JSON.stringify(sent[0] && sent[0].args));
-  check('после «сдаться» сохранение очищено',
+  const sent = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'run_give_up'));
+  check('«сдаться» уходит на сервер', sent.length === 1, String(sent.length));
+  check('и забег там закрыт', await page.evaluate(() => window.__run.active === false));
+  check('в браузере забег не хранится',
     !(await page.evaluate(() => localStorage.getItem('hc_run_state'))));
   check('после «сдаться» снова можно начать игру', await page.locator('#tRunStart').isVisible());
 
@@ -490,30 +499,35 @@ async function testBestPerAccount(browser) {
 
   await done(page2);
 
-  // Сервер пускает «аню» в аккаунт «Ани» — незаконченная игра должна найтись так же
+  // Незаконченный забег приезжает с сервера, а не лежит в браузере. Кому он
+  // принадлежит, решает тот же check_student_pin, что и всё остальное, —
+  // и регистр имени там уже проверен сценариями в базе
   const page3 = await newGame(browser, { user: 'Аня' });
   await page3.evaluate(() => {
-    localStorage.setItem('hc_run_state', JSON.stringify({
-      round: 3, totalScore: 900, range: 50, rangeMin: 1, allowed: 9,
-      secret: 7, history: [], user: 'АНЯ'
-    }));
+    window.__run.active = true;
+    window.__run.round = 3;
+    window.__run.score = 700;
+    window.__runSave();
   });
   await page3.click('#tModeRun');
-  await page3.waitForTimeout(400);
-  check('игра находится, даже если имя набрано в другом регистре',
+  await page3.waitForTimeout(500);
+  check('незаконченный забег предлагают продолжить',
     await page3.locator('#tUnfinishedResume').isVisible());
+  check('его состояние спрошено у сервера',
+    await page3.evaluate(() => window.__rpcCalls.filter(c => c.name === 'run_state').length) > 0);
+  check('в браузере забег не хранится',
+    !(await page3.evaluate(() => localStorage.getItem('hc_run_state'))));
+  const card = await page3.locator('#unfinishedInfo').textContent();
+  check('в карточке видны раунд и очки с сервера',
+    /Раунд\s*3/.test(card) && /700/.test(card), card.trim());
 
-  // а чужую игру по-прежнему не отдаём
-  await page3.evaluate(() => {
-    const st = JSON.parse(localStorage.getItem('hc_run_state'));
-    st.user = 'Максим';
-    localStorage.setItem('hc_run_state', JSON.stringify(st));
-  });
+  // Закрываем забег на сервере и заходим заново: из хаба в меню не выйти
+  await page3.evaluate(() => { window.__run.active = false; window.__runSave(); });
   await page3.reload();
-  await page3.waitForTimeout(300);
-  await page3.click('#tModeRun');
   await page3.waitForTimeout(400);
-  check('чужая незаконченная игра не показывается',
+  await page3.click('#tModeRun');
+  await page3.waitForTimeout(500);
+  check('законченный забег продолжать не предлагают',
     !(await page3.locator('#tUnfinishedResume').isVisible()));
 
   await done(page3);
@@ -537,7 +551,17 @@ async function testFrostMode(browser) {
     labels: [...document.querySelectorAll('#rangeMax option')].map(o => o.textContent),
     attempts: [...document.querySelectorAll('#attemptsCount option')].map(o => o.textContent)
   }));
-  check('с морозом границы симметричные', after.labels[1] === '-50…+50', after.labels.join(' '));
+  check('с морозом границы симметричные',
+    after.labels.includes('-50…+50') && after.labels.includes('-5…+5') &&
+    after.labels.every(l => l.indexOf('-') === 0), after.labels.join(' '));
+  // toLocaleString ставит неразрывный пробел — сравниваем после нормализации
+  const plain = arr => arr.map(l => l.replace(/\s/g, ' '));
+  check('новые диапазоны на месте',
+    ['1–20', '1–200', '1–2 000'].every(v => plain(before.labels).includes(v)),
+    plain(before.labels).join(' '));
+  check('и у них симметричная пара',
+    ['-10…+10', '-100…+100', '-1 000…+1 000'].every(v => plain(after.labels).includes(v)),
+    plain(after.labels).join(' '));
   // чисел столько же, значит и попыток должно предлагаться столько же
   check('попыток предлагается столько же', after.attempts.join() === before.attempts.join(),
     before.attempts.join() + ' → ' + after.attempts.join());
@@ -608,9 +632,11 @@ async function testFrostMode(browser) {
     await page3.evaluate(() => frostMode === true));
   await page3.click('#tModeSolo');
   await page3.waitForTimeout(200);
+  const startLabels = await page3.evaluate(() =>
+    [...document.querySelectorAll('#rangeMax option')].map(o => o.textContent));
   check('и границы сразу симметричные',
-    (await page3.evaluate(() =>
-      [...document.querySelectorAll('#rangeMax option')].map(o => o.textContent)))[1] === '-50…+50');
+    startLabels.length > 0 && startLabels.every(l => l.indexOf('-') === 0),
+    startLabels.join(' '));
   await done(page3);
 }
 
@@ -918,8 +944,11 @@ async function testShortHistory(browser) {
       await page.waitForTimeout(350);
       await page.click('#tRunStart');
       await page.waitForTimeout(300);
-      // в рейтинге раунд короткий — расширяем, чтобы успеть сделать семь ходов
-      await page.evaluate(() => { MAX_GUESSES = 20; renderAll(); });
+      // Раунд в рейтинге короткий, а его длину теперь задаёт сервер — правим
+      // там же, где он живёт, и оттуда же берём загаданное число
+      await page.evaluate(() => {
+        window.__run.allowed = 20; window.__run.secret = 10; window.__runSave();
+      });
     } else {
       await page.click(kind === 'solo' ? '#tModeSolo' : '#tModeDuel');
       await page.waitForTimeout(200);
@@ -928,7 +957,7 @@ async function testShortHistory(browser) {
     }
     // В рейтинге первый раунд узкий, туда крупные числа просто не пройдут
     const guesses = kind === 'run' ? [1, 2, 3, 4, 5, 6, 7] : [100, 200, 300, 400, 500, 600, 700];
-    await page.evaluate(v => { secret = v; }, kind === 'run' ? 10 : -999999);
+    if (kind !== 'run') await page.evaluate(() => { secret = -999999; });
 
     for (const g of guesses) {
       await page.fill('#guessInput', String(g));
@@ -1882,6 +1911,509 @@ async function testResultPlacement(browser) {
   await small.close();
 }
 
+// Онлайн: друзья
+async function testFriends(browser) {
+  console.log('\nОнлайн: друзья');
+
+  // Без аккаунта режим ведёт на вход, а после входа — обратно в онлайн
+  let page = await newGame(browser);
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(250);
+  check('без аккаунта просят войти', await page.locator('#screenAuthChoice').isVisible());
+  await page.click('#tRunChoiceRegister');
+  await page.waitForTimeout(200);
+  await page.fill('#runUsername', 'Лев');
+  await page.fill('#runPin', '1234');
+  await page.click('#runAuthSubmitBtn');
+  await page.waitForTimeout(400);
+  check('после входа возвращаемся в онлайн, а не в рейтинг',
+    await page.locator('#screenOnline').isVisible());
+  check('на экране написано, кто играет',
+    (await page.locator('#onlineGreeting').textContent()).includes('Лев'));
+  check('пустой список объясняет себя',
+    (await page.locator('#friendsNote').textContent()).length > 0,
+    await page.locator('#friendsNote').textContent());
+  await done(page);
+
+  // Поиск
+  page = await newGame(browser, { user: 'Лев' });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  check('со входом сразу открывается онлайн', await page.locator('#screenOnline').isVisible());
+
+  await page.fill('#friendSearch', 'к');
+  await page.click('#tFindBtn');
+  await page.waitForTimeout(200);
+  const short = await page.locator('#searchNote').textContent();
+  check('одна буква — поиска нет', short.length > 0 && (await page.evaluate(() =>
+    window.__rpcCalls.filter(c => c.name === 'find_students').length)) === 0, short);
+
+  await page.evaluate(() => {
+    window.__found = [{ username: 'Кира', best_run_score: 5200, relation: null },
+                      { username: 'Ким', best_run_score: 0, relation: 'friend' },
+                      { username: 'Кузя', best_run_score: 10, relation: 'outgoing' }];
+  });
+  await page.fill('#friendSearch', 'ки');
+  await page.click('#tFindBtn');
+  await page.waitForTimeout(300);
+  const search = await page.evaluate(() => ({
+    sent: (window.__rpcCalls.filter(c => c.name === 'find_students').pop() || {}).args,
+    rows: [...document.querySelectorAll('#searchResults .friend-row')].map(r => ({
+      name: r.dataset.name, rel: r.dataset.relation,
+      btns: [...r.querySelectorAll('.fr-btn')].map(b => b.textContent)
+    }))
+  }));
+  check('запрос ушёл с именем и PIN',
+    search.sent.p_query === 'ки' && search.sent.p_username === 'Лев' && search.sent.p_pin === '1234',
+    JSON.stringify(search.sent));
+  check('найденных показали троих', search.rows.length === 3, JSON.stringify(search.rows));
+  check('незнакомого можно добавить',
+    search.rows[0].btns.join() === 'Добавить', JSON.stringify(search.rows[0]));
+  check('другу предлагают вызвать и убрать, а не добавить',
+    search.rows[1].btns.join() === 'Вызвать,Убрать', JSON.stringify(search.rows[1]));
+  check('на висящую заявку кнопки нет',
+    search.rows[2].btns.length === 0, JSON.stringify(search.rows[2]));
+
+  // Добавление
+  await page.evaluate(() => { window.__found[0].relation = 'outgoing'; });
+  await page.click('#searchResults .friend-row:first-child .fr-btn');
+  await page.waitForTimeout(400);
+  const added = await page.evaluate(() => ({
+    sent: (window.__rpcCalls.filter(c => c.name === 'send_friend_request').pop() || {}).args,
+    note: document.getElementById('searchNote').textContent,
+    rel: document.querySelector('#searchResults .friend-row').dataset.relation
+  }));
+  check('заявка ушла на выбранное имя', added.sent.p_to === 'Кира', JSON.stringify(added.sent));
+  check('игроку сказали, что заявка ушла', added.note.includes('Кира'), added.note);
+  check('строка сразу перерисовалась в «ждёт ответа»', added.rel === 'outgoing', added.rel);
+  await done(page);
+
+  // Список: входящие первыми
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Яна', relation: 'outgoing' },
+                        { username: 'Аня', relation: 'friend' },
+                        { username: 'Кира', relation: 'incoming' },
+                        { username: 'Боря', relation: 'friend' }];
+  });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  const list = await page.evaluate(() =>
+    [...document.querySelectorAll('#friendsList .friend-row')].map(r => r.dataset.name + ':' + r.dataset.relation));
+  check('входящие заявки стоят первыми',
+    list.join(' ') === 'Кира:incoming Аня:friend Боря:friend Яна:outgoing', list.join(' '));
+
+  // Принять
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' },
+                        { username: 'Аня', relation: 'friend' },
+                        { username: 'Боря', relation: 'friend' },
+                        { username: 'Яна', relation: 'outgoing' }];
+  });
+  await page.click('#friendsList .friend-row:first-child .fr-btn.yes');
+  await page.waitForTimeout(400);
+  const accepted = await page.evaluate(() => ({
+    sent: (window.__rpcCalls.filter(c => c.name === 'respond_friend_request').pop() || {}).args,
+    rel: document.querySelector('#friendsList .friend-row').dataset.relation
+  }));
+  check('принятие ушло на сервер с согласием',
+    accepted.sent.p_from === 'Кира' && accepted.sent.p_accept === true, JSON.stringify(accepted.sent));
+  check('список обновился сам', accepted.rel === 'friend', accepted.rel);
+  await done(page);
+
+  // Ошибки сервера читаются по-человечески
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__found = [{ username: 'Максим', best_run_score: 0, relation: null }];
+  });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.fill('#friendSearch', 'ма');
+  await page.click('#tFindBtn');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    window.__rpcError = { name: 'send_friend_request', message: 'recently_declined' };
+  });
+  await page.click('#searchResults .friend-row:first-child .fr-btn');
+  await page.waitForTimeout(400);
+  const err = await page.locator('#searchNote').textContent();
+  check('отказ объясняют словами, а не кодом',
+    err.indexOf('Заявку отклонили') >= 0 && err.indexOf('recently_declined') < 0, err);
+  check('строка ошибки подсвечена',
+    await page.locator('#searchNote').evaluate(e => e.classList.contains('bad')));
+  await done(page);
+
+  // Опрос идёт только пока экран открыт
+  page = await newGame(browser, { user: 'Лев' });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  check('опрос запущен', await page.evaluate(() => friendsTimer !== null));
+  await page.click('#tOnlineBack');
+  await page.waitForTimeout(300);
+  check('после выхода опрос остановлен', await page.evaluate(() => friendsTimer === null));
+  check('вышли в меню', await page.locator('#screenMode').isVisible());
+  await done(page);
+}
+
+// Онлайн: сам матч
+async function testOnlineMatch(browser) {
+  console.log('\nОнлайн: матч');
+
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' }];
+    window.__matches = [{ id: 1, other: 'Кира', seat: 1, status: 'invited',
+                          round: 1, wins: [0, 0], my_turn: false }];
+  });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+
+  // Вызов приходит и его можно принять
+  const invite = await page.evaluate(() => {
+    const r = document.querySelector('#gamesList .friend-row');
+    return { state: r && r.dataset.state,
+             btns: r ? [...r.querySelectorAll('.fr-btn')].map(b => b.textContent) : [] };
+  });
+  check('входящий вызов виден', invite.state === 'incoming', JSON.stringify(invite));
+  check('и его можно принять или отклонить',
+    invite.btns.join() === 'Принять,Отклонить', invite.btns.join());
+
+  await page.click('#gamesList .friend-row .fr-btn.yes');
+  await page.waitForTimeout(500);
+  check('после принятия открывается матч', await page.locator('#screenGame').isVisible());
+  check('на доске имена обоих',
+    (await page.locator('#pname0').textContent()).includes('Лев') &&
+    (await page.locator('#pname1').textContent()).includes('Кира'));
+
+  // Ответ не виден, пока раунд идёт
+  const hidden = await page.evaluate(() => ({ secret: secret, seat: online.seat, cur: D.cur }));
+  check('загаданное число клиенту не известно', hidden.secret === 0, String(hidden.secret));
+  check('своё место за доской известно', hidden.seat === 0);
+
+  // Ход
+  await page.fill('#guessInput', '40');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(400);
+  const moved = await page.evaluate(() => ({
+    rows: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent),
+    cur: D.cur,
+    inputHidden: document.getElementById('guessSection').classList.contains('hidden'),
+    distance: history[0].distance,
+    label: document.getElementById('feedbackLabel').textContent
+  }));
+  check('ход записан', moved.rows.join() === '40', moved.rows.join());
+  check('очередь перешла к сопернику', moved.cur === 1, String(moved.cur));
+  check('пока ходит соперник, поля ввода нет', moved.inputHidden);
+  check('расстояние клиенту не приходит', moved.distance === null, String(moved.distance));
+  check('пояс при этом показан', moved.label.length > 0, moved.label);
+
+  // Отказ сервера должен быть виден. Экран сам по себе уже не даёт сходить не в
+  // свою очередь — поле ввода спрятано, — поэтому расходим клиент с сервером:
+  // клиент думает, что его очередь, а сервер считает иначе
+  await page.evaluate(() => {
+    window.__match.cur = 1;   // на сервере ходит соперник
+    D.cur = 0;                // а клиент думает, что ходит он
+    renderAll();
+    document.getElementById('guessInput').value = '50';
+    onlineGuess();
+  });
+  await page.waitForTimeout(400);
+  const refused = await page.evaluate(() => ({
+    note: document.getElementById('matchNote').textContent,
+    shown: !document.getElementById('matchNote').classList.contains('hidden'),
+    moves: window.__match.moves.length
+  }));
+  check('отказ сервера объясняется словами',
+    refused.shown && refused.note.indexOf('соперник') >= 0, JSON.stringify(refused));
+  check('и ход на сервере не появился', refused.moves === 1, String(refused.moves));
+
+  // Победа открывает число
+  await page.evaluate(() => { window.__match.cur = 0; D.cur = 0; renderAll(); });
+  await page.fill('#guessInput', '42');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(500);
+  const won = await page.evaluate(() => ({
+    secret: secret, over: D.roundOver, winner: D.roundWinner,
+    result: document.getElementById('resultBox').textContent
+  }));
+  check('после победы число открывается', won.secret === 42, String(won.secret));
+  check('раунд закрыт и победитель назван', won.over && won.winner === 0, JSON.stringify(won));
+  check('итог раунда показан', won.result.indexOf('42') >= 0, won.result);
+
+  // Следующий раунд
+  await page.click('#resultBox .btn');
+  await page.waitForTimeout(500);
+  const next = await page.evaluate(() => ({
+    round: D.round, over: D.roundOver, secret: secret,
+    moves: history.length, tokens: D.tokens.slice()
+  }));
+  check('следующий раунд начался', next.round === 2 && !next.over, JSON.stringify(next));
+  check('и число снова спрятано', next.secret === 0, String(next.secret));
+  check('ходы прошлого раунда убраны', next.moves === 0);
+  check('жетоны вернулись', next.tokens.join() === '1,1', next.tokens.join());
+
+  // Опрос идёт, пока открыт матч, и прекращается при выходе
+  check('матч опрашивается', await page.evaluate(() => matchTimer !== null));
+  await page.click('#tMenu');
+  await page.waitForTimeout(400);
+  check('выход возвращает к друзьям, а не в меню',
+    await page.locator('#screenOnline').isVisible());
+  check('опрос матча остановлен', await page.evaluate(() => matchTimer === null));
+  check('матч при этом не закрыт',
+    await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'leave_match').length) === 0);
+  await done(page);
+
+  // Вызов друга
+  const p2 = await newGame(browser, { user: 'Лев' });
+  await p2.evaluate(() => { window.__friends = [{ username: 'Кира', relation: 'friend' }]; });
+  await p2.click('#tModeOnline');
+  await p2.waitForTimeout(400);
+  check('окно вызова закрыто, пока не позвали',
+    !(await p2.locator('#challengeBox').isVisible()));
+  await p2.click('#friendsList .friend-row .fr-btn.yes');
+  await p2.waitForTimeout(250);
+  check('кнопка «Вызвать» открывает настройку', await p2.locator('#challengeBox').isVisible());
+  check('в заголовке названо имя',
+    (await p2.locator('#challengeTitle').textContent()).includes('Кира'));
+
+  await p2.selectOption('#chRange', '1000');
+  await p2.check('#chFrost');
+  await p2.selectOption('#chWins', '5');
+  await p2.click('#tChSend');
+  await p2.waitForTimeout(400);
+  const sent = await p2.evaluate(() =>
+    (window.__rpcCalls.filter(c => c.name === 'challenge_friend').pop() || {}).args);
+  check('вызов ушёл с выбранными условиями',
+    sent.p_to === 'Кира' && sent.p_range === 1000 && sent.p_frost === true && sent.p_wins === 5,
+    JSON.stringify(sent));
+  check('окно настройки закрылось', !(await p2.locator('#challengeBox').isVisible()));
+  await done(p2);
+}
+
+// Онлайн: часы, потерянный ход и бонусы
+async function testOnlineClock(browser) {
+  console.log('\nОнлайн: часы и бонусы');
+
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' }];
+    window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
+                          round: 1, wins: [0, 0], my_turn: true }];
+  });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.click('#gamesList .friend-row .fr-btn');
+  await page.waitForTimeout(600);
+
+  // Часы
+  const clock = await page.evaluate(() => ({
+    shown: !document.getElementById('turnClock').classList.contains('hidden'),
+    text: document.getElementById('turnClock').textContent,
+    seconds: online.turnSeconds
+  }));
+  check('часы хода видны', clock.shown, JSON.stringify(clock));
+  check('на ход тридцать секунд', clock.seconds === 30, String(clock.seconds));
+  check('написано, что ход ваш', clock.text.indexOf('Ваш ход') >= 0, clock.text);
+
+  // Часы тикают между ответами сервера
+  const before = await page.evaluate(() => document.getElementById('turnClock').textContent);
+  await page.waitForTimeout(1300);
+  const after = await page.evaluate(() => document.getElementById('turnClock').textContent);
+  check('секунды идут, не дожидаясь сервера', before !== after, before + ' → ' + after);
+
+  // Мало времени — цвет меняется. Опрос останавливаем: он вернул бы полные
+  // тридцать секунд и перебил подставленный срок
+  await page.evaluate(() => { stopMatchPoll(); online.deadlineAt = Date.now() + 5000; renderClock(); });
+  await page.waitForTimeout(100);
+  check('под конец часы краснеют',
+    await page.locator('#turnClock').evaluate(e => e.classList.contains('low')));
+
+  // Ход соперника подписан иначе
+  await page.evaluate(() => { D.cur = 1; renderClock(); });
+  check('чужой ход подписан иначе',
+    (await page.locator('#turnClock').textContent()).indexOf('соперник') >= 0);
+
+  // Потерянный по времени ход виден в истории
+  await page.evaluate(() => {
+    window.__match.moves = [{ seat: 1, timeout: true }, { seat: 0, guess: 30, tier: 5 }];
+    window.__match.cur = 0;
+    refreshMatch();
+  });
+  await page.waitForTimeout(400);
+  const rows = await page.evaluate(() => ({
+    labels: [...document.querySelectorAll('.history-item .h-label')].map(e => e.textContent),
+    guesses: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent),
+    dots: document.querySelectorAll('#numLineSvg circle').length
+  }));
+  check('пропуск по времени показан строкой',
+    rows.labels.some(l => l.indexOf('время вышло') >= 0), rows.labels.join(' / '));
+  check('вместо числа у него прочерк', rows.guesses.indexOf('—') >= 0, rows.guesses.join());
+  check('на прямой пропуск точкой не рисуется', rows.dots === 1, String(rows.dots));
+  await done(page);
+
+  // Закрытый ход приезжает без числа, и клиент его не выдумывает
+  const p2 = await newGame(browser, { user: 'Лев' });
+  await p2.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' }];
+    window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
+                          round: 1, wins: [0, 0], my_turn: true }];
+    window.__match.moves = [{ seat: 1, hidden: true }];
+    window.__match.fog = [true, false];
+    window.__match.cur = 0;
+  });
+  await p2.click('#tModeOnline');
+  await p2.waitForTimeout(400);
+  await p2.click('#gamesList .friend-row .fr-btn');
+  await p2.waitForTimeout(600);
+  const fog = await p2.evaluate(() => ({
+    guesses: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent),
+    known: history.map(h => h.guess),
+    panel: !document.getElementById('feedbackPanel').classList.contains('hidden'),
+    mark: document.getElementById('peff0').textContent
+  }));
+  check('закрытый ход показан точками', fog.guesses.join() === '•••', fog.guesses.join());
+  check('числа закрытого хода клиент не знает вовсе',
+    fog.known.every(g => g === undefined || g === null), JSON.stringify(fog.known));
+  check('подсказки по закрытому ходу нет', fog.panel === false);
+  check('на карточке видно, что висит туман', fog.mark.indexOf('🙈') >= 0, fog.mark);
+  await done(p2);
+
+  // Вынужденный ход в онлайне идёт на сервер
+  const p3 = await newGame(browser, { user: 'Лев' });
+  await p3.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' }];
+    window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
+                          round: 1, wins: [0, 0], my_turn: true }];
+    window.__match.forced = 'lava';
+    window.__match.cur = 0;
+  });
+  await p3.click('#tModeOnline');
+  await p3.waitForTimeout(400);
+  await p3.click('#gamesList .friend-row .fr-btn');
+  await p3.waitForTimeout(600);
+  check('вынужденный ход объявлен', await p3.locator('#forcedTurn').isVisible());
+  check('поля ввода при этом нет',
+    !(await p3.locator('#guessSection').isVisible()));
+  await p3.click('#forcedBtn');
+  await p3.waitForTimeout(500);
+  check('кнопка отправила вынужденный ход на сервер',
+    await p3.evaluate(() => window.__rpcCalls.filter(c => c.name === 'do_forced_turn').length) === 1);
+  await done(p3);
+
+  // Бонусы в окне вызова
+  const p4 = await newGame(browser, { user: 'Лев' });
+  await p4.evaluate(() => { window.__friends = [{ username: 'Кира', relation: 'friend' }]; });
+  await p4.click('#tModeOnline');
+  await p4.waitForTimeout(400);
+  await p4.click('#friendsList .friend-row .fr-btn.yes');
+  await p4.waitForTimeout(250);
+  check('без галочки числа бонусов не спрашивают',
+    !(await p4.locator('#chBonusCountField').isVisible()));
+  await p4.check('#chBonuses');
+  await p4.waitForTimeout(200);
+  check('с галочкой появляется выбор числа',
+    await p4.locator('#chBonusCountField').isVisible());
+  await p4.selectOption('#chRange', '10');
+  await p4.waitForTimeout(200);
+  const ladder = await p4.evaluate(() =>
+    [...document.querySelectorAll('#chBonusCount option')].map(o => +o.value));
+  check('лесенка считается от выбранного диапазона',
+    Math.max(...ladder) === 9, ladder.join(','));
+
+  await p4.selectOption('#chBonusCount', '3');
+  await p4.click('#tChSend');
+  await p4.waitForTimeout(400);
+  const sent = await p4.evaluate(() =>
+    (window.__rpcCalls.filter(c => c.name === 'challenge_friend').pop() || {}).args);
+  check('вызов ушёл с бонусами и их числом',
+    sent.p_bonuses === true && sent.p_bonus_count === 3, JSON.stringify(sent));
+  await done(p4);
+}
+
+// Онлайн: готовые фразы
+async function testPhrases(browser) {
+  console.log('\nОнлайн: готовые фразы');
+
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' }];
+    window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
+                          round: 1, wins: [0, 0], my_turn: true }];
+  });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.click('#gamesList .friend-row .fr-btn');
+  await page.waitForTimeout(600);
+
+  check('кнопка фраз появилась в матче', await page.locator('#sayBtn').isVisible());
+  check('палитра закрыта, пока её не открыли', !(await page.locator('#sayPad').isVisible()));
+
+  await page.click('#sayBtn');
+  await page.waitForTimeout(250);
+  const pad = await page.evaluate(() => ({
+    open: !document.getElementById('sayPad').classList.contains('hidden'),
+    codes: [...document.querySelectorAll('#sayPad button[data-code]')].map(b => b.dataset.code),
+    texts: [...document.querySelectorAll('#sayPad button[data-code]')].map(b => b.textContent),
+    mute: !!document.getElementById('sayMuteBtn')
+  }));
+  check('палитра открывается кнопкой', pad.open);
+  check('в ней восемь фраз', pad.codes.length === 8, pad.codes.join(','));
+  check('фразы про эту игру, а не общие',
+    pad.texts.some(t => t.indexOf('теплее') >= 0) && pad.texts.some(t => t.indexOf('холод') >= 0),
+    pad.texts.join(' | '));
+  check('есть кнопка «скрыть фразы»', pad.mute);
+
+  // Отправка
+  await page.click('#sayPad button[data-code="hot"]');
+  await page.waitForTimeout(500);
+  const sent = await page.evaluate(() => ({
+    args: (window.__rpcCalls.filter(c => c.name === 'send_phrase').pop() || {}).args,
+    bubble: document.getElementById('sayBubble').textContent,
+    shown: !document.getElementById('sayBubble').classList.contains('hidden')
+  }));
+  check('фраза ушла кодом, а не текстом',
+    sent.args.p_code === 'hot' && sent.args.p_match_id === 1, JSON.stringify(sent.args));
+  check('своя фраза видна на доске', sent.shown && sent.bubble.indexOf('теплее') >= 0, sent.bubble);
+  check('и подписана именем', sent.bubble.indexOf('Лев') >= 0, sent.bubble);
+
+  // Фраза соперника приходит опросом
+  await page.evaluate(() => {
+    window.__match.chat.push({ id: 99, seat: 1, code: 'wow', ago: 0 });
+  });
+  await page.waitForTimeout(2600);
+  const from = await page.evaluate(() => document.getElementById('sayBubble').textContent);
+  check('фраза соперника приходит сама', from.indexOf('Кира') >= 0, from);
+
+  // Со временем гаснет
+  await page.evaluate(() => { sayShownUntil = Date.now() - 1; renderSayBubble(); });
+  await page.waitForTimeout(200);
+  check('реплика гаснет, а не висит весь раунд',
+    !(await page.locator('#sayBubble').isVisible()));
+
+  // Выключение
+  await page.click('#sayMuteBtn');
+  await page.waitForTimeout(200);
+  check('выбор «скрыть» записан в память',
+    await page.evaluate(() => localStorage.getItem('hc_mute')) === '1');
+  await page.evaluate(() => {
+    window.__match.chat.push({ id: 100, seat: 1, code: 'hurry', ago: 0 });
+  });
+  await page.waitForTimeout(2600);
+  check('с выключенными фразами чужая реплика не показывается',
+    !(await page.locator('#sayBubble').isVisible()));
+  await done(page);
+
+  // В местной игре фраз нет: там соперник рядом
+  const solo = await newGame(browser, { user: 'Лев' });
+  await solo.click('#tModeDuel');
+  await solo.waitForTimeout(200);
+  await solo.click('#tStartMatch');
+  await solo.waitForTimeout(300);
+  check('в игре за одним телефоном кнопки фраз нет',
+    !(await solo.locator('#sayBtn').isVisible()));
+  await done(solo);
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -1912,6 +2444,10 @@ async function testResultPlacement(browser) {
     await testDotMotion(browser);
     await testHubGreeting(browser);
     await testResultPlacement(browser);
+    await testFriends(browser);
+    await testOnlineMatch(browser);
+    await testOnlineClock(browser);
+    await testPhrases(browser);
   } finally {
     await browser.close();
   }

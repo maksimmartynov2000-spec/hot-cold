@@ -1,0 +1,490 @@
+alter table matches add column if not exists bonuses_on boolean not null default false;
+alter table matches add column if not exists bonus_count int;
+alter table matches add column if not exists turn_deadline timestamptz;
+alter table matches add column if not exists rush int[] not null default array[0, 0];
+alter table matches add column if not exists fog boolean[] not null default array[false, false];
+alter table matches add column if not exists blind boolean[] not null default array[false, false];
+alter table matches add column if not exists auto_lava boolean[] not null default array[false, false];
+alter table matches add column if not exists skip_turn boolean[] not null default array[false, false];
+alter table matches add column if not exists short_memory boolean[] not null default array[false, false];
+alter table matches add column if not exists near_bonus boolean not null default false;
+alter table matches add column if not exists last_bonus text;
+alter table matches add column if not exists last_bonus_by int;
+alter table matches add column if not exists last_timeout boolean not null default false;
+
+create table if not exists match_bonuses (
+  match_id bigint not null references matches(id) on delete cascade,
+  round int not null,
+  value int not null,
+  type text not null,
+  taken boolean not null default false,
+  primary key (match_id, round, value)
+);
+alter table match_bonuses enable row level security;
+
+create or replace function turn_seconds(m matches)
+returns int
+language sql
+immutable
+as $$
+  select greatest(10, 30 - m.rush[m.cur + 1]);
+$$;
+
+create or replace function bonus_near_radius(p_span int)
+returns int
+language sql
+immutable
+as $$
+  select case when p_span <= 20 then 1 when p_span <= 200 then 3 else 5 end;
+$$;
+
+create or replace function auto_bonus_count(p_span int)
+returns int
+language sql
+immutable
+as $$
+  select greatest(
+    greatest(1, ceil(sqrt(p_span) / 4)::int),
+    least(greatest(1, ceil(sqrt(p_span) / 4)::int) * 2, 12,
+          greatest(1, floor(p_span * 0.086)::int)));
+$$;
+
+create or replace function place_match_bonuses(p_match_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  m matches;
+  good text[] := array['extra', 'fog', 'blind', 'lava', 'rush'];
+  trap text[] := array['skip', 'gift', 'memory'];
+  total int; traps int; i int; v int; guard int := 0;
+  pool text[] := '{}';
+  used int[] := '{}';
+begin
+  select * into m from matches where id = p_match_id;
+  delete from match_bonuses where match_id = p_match_id and round = m.round;
+  if not m.bonuses_on then return; end if;
+
+  total := least(coalesce(m.bonus_count, auto_bonus_count(match_span(m))), match_span(m) - 1);
+  total := greatest(1, total);
+  traps := round(total / 3.0);
+
+  select array_agg(x order by random()) into good from unnest(good) x;
+  select array_agg(x order by random()) into trap from unnest(trap) x;
+  for i in 1..(total - traps) loop pool := pool || good[((i - 1) % 5) + 1]; end loop;
+  for i in 1..traps loop pool := pool || trap[((i - 1) % 3) + 1]; end loop;
+  select array_agg(x order by random()) into pool from unnest(pool) x;
+
+  used := array[m.secret];
+  i := 0;
+  while i < total and guard < 800 loop
+    guard := guard + 1;
+    v := m.range_min + floor(random() * match_span(m))::int;
+    if not (v = any(used)) then
+      used := used || v;
+      i := i + 1;
+      insert into match_bonuses(match_id, round, value, type)
+      values (p_match_id, m.round, v, pool[i]);
+    end if;
+  end loop;
+end;
+$$;
+
+create or replace function match_bonus_blocked(m matches, p_type text, p_victim int)
+returns boolean
+language sql
+immutable
+as $$
+  select case
+    when p_type = 'fog' then m.blind[p_victim + 1]
+    when p_type = 'blind' then m.fog[p_victim + 1]
+    else false
+  end;
+$$;
+
+create or replace function lava_value(m matches)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare hottest int; options int[] := '{}'; d int; v int;
+begin
+  hottest := (tier_upper(match_span(m)))[8];
+  for d in 1..hottest loop
+    foreach v in array array[m.secret - d, m.secret + d] loop
+      if v >= m.range_min and v <= m.range_max and v <> m.secret then
+        options := options || v;
+      end if;
+    end loop;
+  end loop;
+  if array_length(options, 1) is null then return null; end if;
+  return options[1 + floor(random() * array_length(options, 1))::int];
+end;
+$$;
+
+create or replace function start_match_round(p_match_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches;
+begin
+  select * into m from matches where id = p_match_id;
+  update matches
+  set secret = m.range_min + floor(random() * (m.range_max - m.range_min + 1))::int,
+      tokens = array[1, 1],
+      cur = m.starter,
+      armed = false,
+      round_over = false,
+      round_winner = null,
+      rush = array[0, 0],
+      fog = array[false, false],
+      blind = array[false, false],
+      auto_lava = array[false, false],
+      skip_turn = array[false, false],
+      short_memory = array[false, false],
+      near_bonus = false,
+      last_bonus = null,
+      last_bonus_by = null,
+      last_timeout = false,
+      updated_at = now()
+  where id = p_match_id;
+  perform place_match_bonuses(p_match_id);
+  select * into m from matches where id = p_match_id;
+  update matches set turn_deadline = now() + make_interval(secs => turn_seconds(m))
+  where id = p_match_id;
+end;
+$$;
+
+create or replace function pass_turn(p_match_id bigint, p_timeout boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches;
+begin
+  select * into m from matches where id = p_match_id;
+  update matches
+  set cur = 1 - m.cur,
+      armed = false,
+      tokens[m.cur + 1] = case when m.armed then m.tokens[m.cur + 1] + 1 else m.tokens[m.cur + 1] end,
+      last_timeout = coalesce(p_timeout, false),
+      updated_at = now()
+  where id = p_match_id;
+  select * into m from matches where id = p_match_id;
+  update matches set turn_deadline = now() + make_interval(secs => turn_seconds(m))
+  where id = p_match_id;
+end;
+$$;
+
+create or replace function apply_turn_timeout(p_match_id bigint)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches;
+begin
+  select * into m from matches where id = p_match_id;
+  if m.status <> 'active' or m.round_over or m.match_over then return false; end if;
+  if m.turn_deadline is null or m.turn_deadline > now() then return false; end if;
+
+  update matches
+  set skip_turn[m.cur + 1] = false,
+      auto_lava[m.cur + 1] = false
+  where id = p_match_id;
+  perform pass_turn(p_match_id, true);
+  return true;
+end;
+$$;
+
+create or replace function apply_match_bonus(p_match_id bigint, p_type text, p_by int)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; rival int;
+begin
+  select * into m from matches where id = p_match_id;
+  rival := 1 - p_by;
+  if p_type = 'extra' then
+    update matches set tokens[p_by + 1] = m.tokens[p_by + 1] + 2 where id = p_match_id;
+  elsif p_type = 'fog' then
+    update matches set fog[rival + 1] = true where id = p_match_id;
+  elsif p_type = 'blind' then
+    update matches set blind[rival + 1] = true where id = p_match_id;
+  elsif p_type = 'lava' then
+    update matches set auto_lava[rival + 1] = true where id = p_match_id;
+  elsif p_type = 'rush' then
+    update matches set rush[rival + 1] = m.rush[rival + 1] + 3 where id = p_match_id;
+  elsif p_type = 'skip' then
+    update matches set skip_turn[p_by + 1] = true where id = p_match_id;
+  elsif p_type = 'gift' then
+    update matches set tokens[rival + 1] = m.tokens[rival + 1] + 1 where id = p_match_id;
+  elsif p_type = 'memory' then
+    update matches set short_memory[p_by + 1] = true where id = p_match_id;
+  end if;
+end;
+$$;
+
+create or replace function challenge_friend(p_username text, p_pin text, p_to text,
+                                            p_range int, p_frost boolean, p_wins int,
+                                            p_bonuses boolean, p_bonus_count int)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; other text; lo int; hi int; new_id bigint; live int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select s.username into other from students s where s.username_lower = lower(trim(p_to));
+  if other is null then raise exception 'no_such_student'; end if;
+  if friend_status(me, other) is distinct from 'friend' then raise exception 'not_a_friend'; end if;
+  if p_range not in (10, 100, 1000) then raise exception 'bad_range'; end if;
+  if p_wins not in (1, 3, 5, 7, 9) then raise exception 'bad_wins'; end if;
+
+  perform expire_stale_matches();
+
+  select count(*) into live from matches
+  where status in ('invited', 'active')
+    and ((p0 = me and p1 = other) or (p0 = other and p1 = me));
+  if live > 0 then raise exception 'match_already_live'; end if;
+
+  if p_frost then hi := p_range / 2; lo := -hi; else lo := 1; hi := p_range; end if;
+
+  insert into matches(p0, p1, wins_needed, range_min, range_max, frost, bonuses_on, bonus_count)
+  values (me, other, p_wins, lo, hi, coalesce(p_frost, false),
+          coalesce(p_bonuses, false),
+          case when p_bonus_count is null or p_bonus_count < 1 then null
+               else least(p_bonus_count, hi - lo) end)
+  returning id into new_id;
+  return new_id;
+end;
+$$;
+
+create or replace function challenge_friend(p_username text, p_pin text, p_to text,
+                                            p_range int, p_frost boolean, p_wins int)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+begin
+  return challenge_friend(p_username, p_pin, p_to, p_range, p_frost, p_wins, false, null);
+end;
+$$;
+
+create or replace function match_guess(p_username text, p_pin text,
+                                       p_match_id bigint, p_guess int)
+returns int
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; seat int; dist int; band int; used_double boolean;
+        hit record; btype text; radius int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  seat := match_seat(m, me);
+  if seat is null then raise exception 'not_your_match'; end if;
+  if m.status <> 'active' then raise exception 'not_playing'; end if;
+  if m.round_over or m.match_over then raise exception 'round_over'; end if;
+  if m.cur <> seat then raise exception 'not_your_turn'; end if;
+  if m.skip_turn[seat + 1] or m.auto_lava[seat + 1] then raise exception 'forced_turn'; end if;
+  if p_guess is null or p_guess < m.range_min or p_guess > m.range_max then
+    raise exception 'out_of_range';
+  end if;
+
+  dist := abs(p_guess - m.secret);
+  band := feedback_tier(match_span(m), dist);
+  insert into match_moves(match_id, round, seat, guess, tier)
+  values (p_match_id, m.round, seat, p_guess, band);
+
+  radius := bonus_near_radius(match_span(m));
+  select * into hit from match_bonuses b
+  where b.match_id = p_match_id and b.round = m.round and not b.taken and b.value = p_guess;
+
+  btype := null;
+  if hit.type is not null then
+    btype := hit.type;
+    if match_bonus_blocked(m, btype, 1 - seat) then btype := 'extra'; end if;
+    update match_bonuses set taken = true
+    where match_id = p_match_id and round = m.round and value = p_guess;
+  end if;
+
+  update matches
+  set last_bonus = btype,
+      last_bonus_by = seat,
+      last_timeout = false,
+      near_bonus = (btype is null and exists (
+        select 1 from match_bonuses b
+        where b.match_id = p_match_id and b.round = m.round and not b.taken
+          and abs(b.value - p_guess) <= radius))
+  where id = p_match_id;
+
+  if btype is not null then perform apply_match_bonus(p_match_id, btype, seat); end if;
+
+  select * into m from matches where id = p_match_id;
+  used_double := m.armed;
+
+  if dist = 0 then
+    update matches
+    set round_over = true, round_winner = seat,
+        wins[seat + 1] = m.wins[seat + 1] + 1,
+        match_over = (m.wins[seat + 1] + 1) >= m.wins_needed,
+        status = case when (m.wins[seat + 1] + 1) >= m.wins_needed then 'finished' else status end,
+        armed = false, turn_deadline = null, updated_at = now()
+    where id = p_match_id;
+  elsif used_double then
+    update matches set armed = false, updated_at = now() where id = p_match_id;
+    select * into m from matches where id = p_match_id;
+    update matches set turn_deadline = now() + make_interval(secs => turn_seconds(m))
+    where id = p_match_id;
+  else
+    perform pass_turn(p_match_id, false);
+  end if;
+
+  return band;
+end;
+$$;
+
+create or replace function forced_turn_kind(m matches)
+returns text
+language sql
+immutable
+as $$
+  select case
+    when m.status <> 'active' or m.round_over or m.match_over then null
+    when m.skip_turn[m.cur + 1] then 'skip'
+    when m.auto_lava[m.cur + 1] then 'lava'
+    else null
+  end;
+$$;
+
+create or replace function do_forced_turn(p_username text, p_pin text, p_match_id bigint)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; seat int; kind text; v int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  seat := match_seat(m, me);
+  if seat is null then raise exception 'not_your_match'; end if;
+  kind := forced_turn_kind(m);
+  if kind is null then raise exception 'nothing_forced'; end if;
+  if m.cur <> seat then raise exception 'not_your_turn'; end if;
+
+  if kind = 'skip' then
+    update matches set skip_turn[seat + 1] = false where id = p_match_id;
+    perform pass_turn(p_match_id, false);
+    return 'skip';
+  end if;
+
+  update matches set auto_lava[seat + 1] = false where id = p_match_id;
+  select * into m from matches where id = p_match_id;
+  v := lava_value(m);
+  if v is null then
+    perform pass_turn(p_match_id, false);
+    return 'lava';
+  end if;
+  perform match_guess(p_username, p_pin, p_match_id, v);
+  return 'lava';
+end;
+$$;
+
+create or replace function match_state(p_username text, p_pin text, p_match_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; my_seat int; moves jsonb; reveal boolean;
+        visible int; hide_mine boolean; hide_theirs boolean;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  my_seat := match_seat(m, me);
+  if my_seat is null then raise exception 'not_your_match'; end if;
+
+  reveal := m.round_over or m.match_over or m.status <> 'active';
+  -- Закрытые ходы не просто не рисуются, а не уезжают к игроку вовсе: иначе их
+  -- видно в ответе сервера, и помеха ничего не стоит
+  hide_mine := (not reveal) and m.blind[my_seat + 1] and m.cur = my_seat;
+  hide_theirs := (not reveal) and m.fog[my_seat + 1] and m.cur = my_seat;
+  visible := case when (not reveal) and m.short_memory[my_seat + 1] and m.cur = my_seat then 2 else 4 end;
+
+  select coalesce(jsonb_agg(x order by x_id), '[]'::jsonb) into moves from (
+    select mv.id as x_id,
+           case when (mv.seat = my_seat and hide_mine) or (mv.seat <> my_seat and hide_theirs)
+                then jsonb_build_object('seat', mv.seat, 'hidden', true)
+                else jsonb_build_object('seat', mv.seat, 'guess', mv.guess, 'tier', mv.tier)
+           end as x
+    from (select * from match_moves mv2
+          where mv2.match_id = p_match_id and mv2.round = m.round
+          order by mv2.id desc limit visible) mv
+  ) q;
+
+  return jsonb_build_object(
+    'id', m.id, 'seat', my_seat,
+    'names', jsonb_build_array(m.p0, m.p1),
+    'status', m.status, 'winsNeeded', m.wins_needed,
+    'rangeMin', m.range_min, 'rangeMax', m.range_max, 'frost', m.frost,
+    'round', m.round, 'wins', m.wins, 'cur', m.cur, 'tokens', m.tokens, 'armed', m.armed,
+    'roundOver', m.round_over, 'roundWinner', m.round_winner, 'matchOver', m.match_over,
+    'moves', moves,
+    'secret', case when reveal then to_jsonb(m.secret) else 'null'::jsonb end,
+    'bonusesOn', m.bonuses_on,
+    'fog', m.fog, 'blind', m.blind, 'autoLava', m.auto_lava,
+    'skip', m.skip_turn, 'shortMemory', m.short_memory, 'rush', m.rush,
+    'nearBonus', m.near_bonus, 'lastBonus', m.last_bonus, 'lastBonusBy', m.last_bonus_by,
+    'lastTimeout', m.last_timeout,
+    'forced', forced_turn_kind(m),
+    'turnSeconds', turn_seconds(m),
+    'secondsLeft', case when m.turn_deadline is null then null
+                        else greatest(0, ceil(extract(epoch from (m.turn_deadline - now()))))::int end,
+    'updatedAt', m.updated_at
+  );
+end;
+$$;
+
+revoke execute on function turn_seconds(matches) from public, anon;
+revoke execute on function bonus_near_radius(int) from public, anon;
+revoke execute on function auto_bonus_count(int) from public, anon;
+revoke execute on function place_match_bonuses(bigint) from public, anon;
+revoke execute on function match_bonus_blocked(matches, text, int) from public, anon;
+revoke execute on function lava_value(matches) from public, anon;
+revoke execute on function pass_turn(bigint, boolean) from public, anon;
+revoke execute on function apply_turn_timeout(bigint) from public, anon;
+revoke execute on function apply_match_bonus(bigint, text, int) from public, anon;
+revoke execute on function forced_turn_kind(matches) from public, anon;
+grant execute on function challenge_friend(text, text, text, int, boolean, int, boolean, int) to anon;
+grant execute on function do_forced_turn(text, text, bigint) to anon;

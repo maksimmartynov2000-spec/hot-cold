@@ -35,12 +35,21 @@ function serve() {
   const browser = await chromium.launch(launchOptions());
   const context = await browser.newContext({ viewport: { width: 430, height: 850 } });
   const page = await context.newPage();
-  await page.addInitScript(() => localStorage.setItem('hc_lang', 'ru'));
+  await page.addInitScript(() => {
+    localStorage.setItem('hc_lang', 'ru');
+    // Аккаунт нужен, чтобы дойти до экрана онлайна: без него проверка
+    // упиралась бы в форму входа и ничего про сеть не говорила
+    localStorage.setItem('hc_run_user', 'Лев');
+    localStorage.setItem('hc_run_pin', '1234');
+  });
 
   // supabase-js берётся с CDN, которого в тесте нет — подменяем заглушкой,
   // чтобы проверять именно офлайн-загрузку страницы, а не сеть до Supabase
   await page.route('**/supabase-js*', route =>
-    route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.supabase={createClient:()=>({from:()=>({select:()=>({eq:()=>({single:async()=>({data:null,error:1})})})}),rpc:async()=>({data:[],error:null})})};' }));
+    route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.supabase={createClient:()=>({from:()=>({select:()=>({eq:()=>({single:async()=>({data:null,error:1})})})}),' +
+            // без сети настоящий supabase-js падает на fetch — заглушка должна вести себя так же,
+            // иначе офлайн-проверка получит успешный ответ и ничего не проверит
+            'rpc:async()=>{if(!navigator.onLine)throw new Error("Failed to fetch");return {data:[],error:null};}})};' }));
 
   await page.goto(url);
   await page.waitForTimeout(500);
@@ -59,8 +68,42 @@ function serve() {
   await page.waitForTimeout(600);
 
   check('без сети страница открывается', await page.locator('#screenMode').isVisible());
-  check('без сети видны все три режима',
-    (await page.locator('#screenMode .mode-btn').count()) === 3);
+  check('без сети видны все четыре режима',
+    (await page.locator('#screenMode .mode-btn').count()) === 4);
+
+  // Онлайн — первый режим, которому сеть нужна по существу. Он должен сказать
+  // об этом словами, а не молча зависнуть на пустом списке
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(600);
+  const offlineNote = await page.evaluate(() => {
+    const el = document.getElementById('friendsNote');
+    return { open: !document.getElementById('screenOnline').classList.contains('hidden'),
+             note: el ? el.textContent : '',
+             bad: el ? el.classList.contains('bad') : false };
+  });
+  check('без сети онлайн говорит про связь, а не молчит',
+    offlineNote.open && offlineNote.bad && offlineNote.note.length > 0,
+    JSON.stringify(offlineNote));
+  check('и не показывает сырую ошибку fetch',
+    offlineNote.note.indexOf('fetch') < 0, offlineNote.note);
+  await page.click('#tOnlineBack');
+  await page.waitForTimeout(300);
+
+  // Рейтинг тоже перестал работать без сети: забег считает сервер. Это
+  // сознательная потеря, и она должна быть сказана вслух, а не проявиться
+  // молчащей кнопкой
+  await page.click('#tModeRun');
+  await page.waitForTimeout(800);
+  const runOffline = await page.evaluate(() => {
+    const el = document.getElementById('runNote');
+    return { open: !document.getElementById('screenRunHub').classList.contains('hidden'),
+             note: el ? el.textContent : '', bad: el ? el.classList.contains('bad') : false };
+  });
+  check('без сети рейтинг сразу говорит про связь',
+    runOffline.open && runOffline.bad && runOffline.note.length > 0,
+    JSON.stringify(runOffline));
+  await page.click('#tRunToMenu');
+  await page.waitForTimeout(300);
 
   // тренировка должна полностью работать офлайн
   await page.click('#tModeSolo');

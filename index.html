@@ -306,6 +306,54 @@
     .mode-btn.duel { border-left: 3px solid var(--p1); }
     .mode-btn.solo { border-left: 3px solid var(--p0); }
     .mode-btn.run { border-left: 3px solid #4ade80; }
+    .mode-btn.online { border-left: 3px solid #38bdf8; }
+
+    /* ---------- Онлайн: друзья ---------- */
+    .friend-list { margin-bottom: 4px; }
+    .friend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 2px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 14px;
+    }
+    .friend-row:last-child { border-bottom: none; }
+    /* Имя забирает всё свободное место и обрезается само: кнопки справа должны
+       стоять на одном месте, каким бы длинным ни было имя */
+    .friend-row .fr-name {
+      flex: 1;
+      min-width: 0;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .friend-row .fr-wait { font-size: 12px; color: rgba(255, 255, 255, 0.4); }
+    .fr-btn {
+      flex: 0 0 auto;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.85);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .fr-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+    .fr-btn:disabled { opacity: 0.45; cursor: default; }
+    .fr-btn.yes { background: rgba(74, 222, 128, 0.18); border-color: rgba(74, 222, 128, 0.5); color: #4ade80; }
+    .fr-btn.no { background: rgba(248, 113, 113, 0.14); border-color: rgba(248, 113, 113, 0.4); color: #f87171; }
+    .fr-block { margin-top: 22px; }
+    .fr-note {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.45);
+      padding: 8px 2px;
+    }
+    .fr-note.bad { color: #f87171; }
 
     /* ---------- Настройка дуэли ---------- */
     .setup-field { margin-bottom: 20px; }
@@ -641,6 +689,63 @@
       border: 1px solid rgba(251, 191, 36, 0.45);
       font-size: 14px;
       color: #fbbf24;
+    }
+    /* Реплика соперника: цвет берёт от того, кто сказал */
+    .say-bubble {
+      margin: 0 0 8px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      font-size: 14px;
+      text-align: center;
+      animation: pop 0.25s ease;
+    }
+    .say-bubble .s-who { font-weight: 700; margin-right: 6px; }
+
+    .say-pad {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      margin: 0 0 10px;
+    }
+    @media (min-width: 520px) {
+      .say-pad { grid-template-columns: repeat(4, 1fr); }
+    }
+    .say-pad button {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: rgba(255, 255, 255, 0.85);
+      border-radius: 10px;
+      padding: 8px 6px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .say-pad button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+    .say-pad button:disabled { opacity: 0.4; cursor: default; }
+    .say-pad button.mute { grid-column: 1 / -1; color: rgba(255, 255, 255, 0.5); }
+
+    .turn-clock {
+      margin: 0 0 8px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: rgba(255, 255, 255, 0.55);
+      transition: color 0.2s;
+    }
+    .turn-clock.low { color: #fb923c; }
+    .turn-clock.out { color: #f87171; }
+    .match-note {
+      margin: 0 0 8px;
+      padding: 7px 12px;
+      border-radius: 12px;
+      background: rgba(248, 113, 113, 0.12);
+      border: 1px solid rgba(248, 113, 113, 0.45);
+      font-size: 13px;
+      color: #f87171;
     }
     .bonus-line .b-name { font-weight: 700; }
     .bonus-line .b-desc { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
@@ -985,6 +1090,10 @@
       <button class="mode-btn run" onclick="openRunEntry()">
         <div class="m-title" id="tModeRun"></div>
       </button>
+      <button class="mode-btn online" onclick="openOnlineEntry()">
+        <div class="m-title" id="tModeOnline"></div>
+        <div class="m-sub" id="tModeOnlineSub"></div>
+      </button>
     </div>
   </div>
 
@@ -1075,11 +1184,28 @@
             <button class="mini-toggle" id="toggleThermoBtn" onclick="toggleThermo()">🌡️</button>
             <button class="mini-toggle" id="toggleLineBtn" onclick="toggleLine()">📏</button>
             <button class="mini-toggle" id="toggleHintBtn" onclick="toggleHint()">💡</button>
+            <button class="mini-toggle hidden" id="sayBtn" onclick="toggleSayPad()">💬</button>
             <button class="btn-reset" onclick="leaveGame()" id="tMenu">Menu</button>
           </span>
         </div>
 
         <div class="turn-banner hidden" id="turnBanner"></div>
+
+        <!-- Обратный отсчёт хода. Тикает своим таймером: состояние приходит раз
+             в две секунды, и без него секунды прыгали бы через одну -->
+        <div class="turn-clock hidden" id="turnClock"></div>
+
+        <!-- Что сказал сервер: отказ в ходе, обрыв связи. Отрисовка доски это
+             место не трогает, иначе сообщение пропадало бы на первом же кадре -->
+        <div class="match-note hidden" id="matchNote"></div>
+
+        <!-- Что сказал соперник. Живёт несколько секунд и гаснет: это реплика,
+             а не переписка, перечитывать её незачем -->
+        <div class="say-bubble hidden" id="sayBubble"></div>
+
+        <!-- Готовые фразы. Открываются кнопкой в строке статуса и занимают
+             место только когда открыты -->
+        <div class="say-pad hidden" id="sayPad"></div>
 
         <!-- Итог раунда стоит выше градусника и прямой: когда партия кончилась,
              первое, что нужно увидеть, — чем она кончилась, а не чем мерили -->
@@ -1181,10 +1307,76 @@
     </div>
   </div>
 
+  <!-- ЭКРАН: онлайн. Сейчас это друзья; вызовы на игру встанут сюда же -->
+  <div id="screenOnline" class="hidden">
+    <div class="run-greeting hidden" id="onlineGreeting"></div>
+
+    <div class="setup-field">
+      <label id="tLblFindFriend">Find a player</label>
+      <div class="row">
+        <input type="text" id="friendSearch" maxlength="20" autocomplete="off" />
+        <button class="btn" id="tFindBtn" onclick="searchStudents()">Find</button>
+      </div>
+    </div>
+    <div class="fr-note hidden" id="searchNote"></div>
+    <div id="searchResults" class="friend-list"></div>
+
+    <div class="fr-block">
+      <div class="lb-title" id="tGamesTitle">Games</div>
+      <div class="fr-note hidden" id="gamesNote"></div>
+      <div id="gamesList" class="friend-list"></div>
+    </div>
+
+    <div class="fr-block hidden" id="challengeBox">
+      <div class="lb-title" id="challengeTitle"></div>
+      <div class="setup-field tight">
+        <label id="tChRange">Range</label>
+        <select class="field" id="chRange" onchange="renderChallengeBonuses()"></select>
+      </div>
+      <label class="frost-row">
+        <input type="checkbox" id="chFrost" onchange="buildChallengeRanges()" />
+        <span id="tChFrost"></span>
+      </label>
+      <label class="frost-row">
+        <input type="checkbox" id="chBonuses" onchange="renderChallengeBonuses()" />
+        <span id="tChBonuses"></span>
+      </label>
+      <div class="setup-field hidden" id="chBonusCountField">
+        <label id="tChBonusCount">Bonuses on the board</label>
+        <select class="field" id="chBonusCount"></select>
+      </div>
+      <div class="setup-field">
+        <label id="tChWins">Play until how many wins</label>
+        <select class="field" id="chWins">
+          <option value="1">1</option>
+          <option value="3" selected>3</option>
+          <option value="5">5</option>
+          <option value="7">7</option>
+          <option value="9">9</option>
+        </select>
+      </div>
+      <div class="row">
+        <button class="btn-ghost" id="tChCancel" onclick="closeChallenge()">Cancel</button>
+        <button class="btn btn-block" id="tChSend" onclick="sendChallenge()">Send</button>
+      </div>
+    </div>
+
+    <div class="fr-block">
+      <div class="lb-title" id="tFriendsTitle">Friends</div>
+      <div class="fr-note hidden" id="friendsNote"></div>
+      <div id="friendsList" class="friend-list"></div>
+    </div>
+
+    <div class="run-hub-actions">
+      <button class="btn-ghost btn-block" id="tOnlineBack" onclick="quitToMenu()">Menu</button>
+    </div>
+  </div>
+
   <!-- ЭКРАН: хаб режима на рейтинг (старт/результат/топ) -->
   <div id="screenRunHub" class="hidden">
     <div class="run-greeting hidden" id="runGreeting"></div>
     <div id="runHubMessage"></div>
+    <div class="fr-note hidden" id="runNote"></div>
     <div class="run-result hidden" id="unfinishedBox">
       <div class="rr-title" id="tUnfinished"></div>
       <p id="unfinishedInfo"></p>
@@ -1244,9 +1436,55 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
       frostLabel: "Frost and Heat",
+      say: {
+        hi: "\ud83d\udc4b Hello!",
+        hot: "\ud83d\udd25 Getting warm\u2026",
+        cold: "\ud83e\uddca Ice cold!",
+        nice: "\ud83c\udfaf Nice guess!",
+        wow: "\ud83d\ude2e How did you do that?",
+        think: "\ud83e\udd14 Let me think\u2026",
+        hurry: "\u23f1\ufe0f Clock is running!",
+        gg: "\ud83e\udd1d Good game!",
+        mute: "\ud83d\udd07 Hide phrases",
+        unmute: "\ud83d\udd0a Show phrases"
+      },
+      online: {
+        mode: "Online", modeSub: "Friends and challenges",
+        find: "Find a player", findBtn: "Find", searchPh: "name",
+        friends: "\ud83d\udc65 Friends", back: "Menu",
+        searching: "Searching\u2026", nobody: "Nobody found",
+        noFriends: "No friends yet \u2014 find someone by name",
+        add: "Add", accept: "Accept", decline: "Decline", remove: "Remove", waiting: "waiting",
+        sent: "Request sent to {name}",
+        errAuth: "Could not confirm your account",
+        errShort: "At least two letters, please",
+        errNoStudent: "No such player",
+        errSelf: "You cannot add yourself",
+        errDeclined: "The request was declined \u2014 try tomorrow",
+        errTooMany: "Too many requests are waiting",
+        games: "\ud83c\udfae Games", noGames: "No games yet \u2014 challenge a friend",
+        challenge: "Challenge", play: "Continue", cancelGame: "Cancel",
+        yourTurn: "your turn", theirTurn: "their turn",
+        chTitle: "Challenge {name}", chRange: "Range", chWins: "Play until how many wins",
+        chSend: "Send the challenge", chCancel: "Cancel",
+        sentGame: "Challenge sent to {name}", backToFriends: "To friends",
+        errNotYourTurn: "It is the other player\u2019s turn",
+        errRoundOver: "The round is already over",
+        errOutOfRange: "That number is outside the range",
+        errNoTokens: "No tokens left",
+        errFirstMove: "Not on the first move of a round",
+        errLive: "A game with this player is already running",
+        errNotFriend: "Only friends can be challenged",
+        errInviteGone: "That challenge is gone",
+        errNoMatch: "No such game",
+        timedOut: "out of time", clockMine: "Your turn: {n}s", clockTheirs: "Their turn: {n}s",
+        chBonuses: "Bonuses", chBonusCount: "Bonuses on the board",
+        errNotPlaying: "The game is not running",
+        errNoRequest: "That request is gone"
+      },
       bonusLabel: "Bonuses", bonusNear: "something is near", lblBonusCount: "Bonuses on the board", bonusAuto: "as usual ({n})",
-      bonusNames: { extra: "Two in reserve", fog: "Fog", blind: "Blind move", lava: "Lava toss", skip: "Skipped turn", gift: "Gift to the rival", memory: "Short memory" },
-      bonusDesc: { extra: "{a} gets two tokens", fog: "{b} cannot see the other\u2019s moves", blind: "{b} cannot see their own moves", lava: "chance moves for {b}", skip: "{a} loses the next turn", gift: "{b} gets a token", memory: "{a} sees only the last two moves" },
+      bonusNames: { extra: "Two in reserve", fog: "Fog", blind: "Blind move", lava: "Lava toss", skip: "Skipped turn", gift: "Gift to the rival", memory: "Short memory", rush: "Rush" },
+      bonusDesc: { extra: "{a} gets two tokens", fog: "{b} cannot see the other\u2019s moves", blind: "{b} cannot see their own moves", lava: "chance moves for {b}", skip: "{a} loses the next turn", gift: "{b} gets a token", memory: "{a} sees only the last two moves", rush: "{b} \u2014 3 seconds less per turn" },
       forced: { skip: "\u23ed Skipped turn \u2014 you lose this move", lava: "\ud83c\udf0b Lava toss \u2014 chance moves for you" },
       forcedBtn: { skip: "Skip", lava: "Throw" },
       hintLabel: "Distance hint",
@@ -1340,9 +1578,55 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
       frostLabel: "Мороз и Жара",
+      say: {
+        hi: "\ud83d\udc4b Привет!",
+        hot: "\ud83d\udd25 Уже теплее\u2026",
+        cold: "\ud83e\uddca Ледяной холод!",
+        nice: "\ud83c\udfaf Хороший ход!",
+        wow: "\ud83d\ude2e Как ты это сделал?",
+        think: "\ud83e\udd14 Дай подумать\u2026",
+        hurry: "\u23f1\ufe0f Время идёт!",
+        gg: "\ud83e\udd1d Хорошая игра!",
+        mute: "\ud83d\udd07 Скрыть фразы",
+        unmute: "\ud83d\udd0a Показывать фразы"
+      },
+      online: {
+        mode: "Игра онлайн", modeSub: "Друзья и вызовы",
+        find: "Найти игрока", findBtn: "Найти", searchPh: "имя",
+        friends: "\ud83d\udc65 Друзья", back: "В меню",
+        searching: "Ищем\u2026", nobody: "Никого не нашлось",
+        noFriends: "Друзей пока нет — найдите кого-нибудь по имени",
+        add: "Добавить", accept: "Принять", decline: "Отклонить", remove: "Убрать", waiting: "ждёт ответа",
+        sent: "Заявка отправлена: {name}",
+        errAuth: "Не получилось подтвердить аккаунт",
+        errShort: "Нужно хотя бы две буквы",
+        errNoStudent: "Такого игрока нет",
+        errSelf: "Себя добавить нельзя",
+        errDeclined: "Заявку отклонили — попробуйте завтра",
+        errTooMany: "Слишком много заявок ждёт ответа",
+        games: "\ud83c\udfae Игры", noGames: "Игр пока нет — вызовите друга",
+        challenge: "Вызвать", play: "Продолжить", cancelGame: "Отменить",
+        yourTurn: "ваш ход", theirTurn: "ходит соперник",
+        chTitle: "Вызов: {name}", chRange: "Диапазон", chWins: "Играем до скольких побед",
+        chSend: "Отправить вызов", chCancel: "Отмена",
+        sentGame: "Вызов отправлен: {name}", backToFriends: "К друзьям",
+        errNotYourTurn: "Сейчас ходит соперник",
+        errRoundOver: "Раунд уже закончился",
+        errOutOfRange: "Число вне диапазона",
+        errNoTokens: "Жетонов не осталось",
+        errFirstMove: "Первым ходом раунда жетон не взвести",
+        errLive: "С этим игроком уже идёт игра",
+        errNotFriend: "Вызвать можно только друга",
+        errInviteGone: "Вызова больше нет",
+        errNoMatch: "Такой игры нет",
+        timedOut: "время вышло", clockMine: "Ваш ход: {n} с", clockTheirs: "Ход соперника: {n} с",
+        chBonuses: "Бонусы", chBonusCount: "Бонусов на поле",
+        errNotPlaying: "Игра не идёт",
+        errNoRequest: "Заявки больше нет"
+      },
       bonusLabel: "Бонусы", bonusNear: "рядом что-то есть", lblBonusCount: "Бонусов на поле", bonusAuto: "как обычно ({n})",
-      bonusNames: { extra: "Два про запас", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву", skip: "Пропуск хода", gift: "Подарок сопернику", memory: "Короткая память" },
-      bonusDesc: { extra: "{a} получает два жетона", fog: "{b} не видит чужие ходы", blind: "{b} не видит свои ходы", lava: "{b} — ход делает случай", skip: "{a} пропускает следующий ход", gift: "{b} получает жетон", memory: "{a} видит только два последних хода" },
+      bonusNames: { extra: "Два про запас", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву", skip: "Пропуск хода", gift: "Подарок сопернику", memory: "Короткая память", rush: "Спешка" },
+      bonusDesc: { extra: "{a} получает два жетона", fog: "{b} не видит чужие ходы", blind: "{b} не видит свои ходы", lava: "{b} — ход делает случай", skip: "{a} пропускает следующий ход", gift: "{b} получает жетон", memory: "{a} видит только два последних хода", rush: "{b} \u2014 минус 3 секунды на ход" },
       forced: { skip: "\u23ed Пропуск хода \u2014 этот ход вы пропускаете", lava: "\ud83c\udf0b Бросок в лаву \u2014 за вас ходит случай" },
       forcedBtn: { skip: "Пропустить", lava: "Бросить" },
       hintLabel: "Подсказка: расстояние",
@@ -1436,9 +1720,55 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
       frostLabel: "Gel et Chaleur",
+      say: {
+        hi: "\ud83d\udc4b Salut !",
+        hot: "\ud83d\udd25 \u00c7a chauffe\u2026",
+        cold: "\ud83e\uddca Glacial !",
+        nice: "\ud83c\udfaf Beau coup !",
+        wow: "\ud83d\ude2e Comment as-tu fait ?",
+        think: "\ud83e\udd14 Je r\u00e9fl\u00e9chis\u2026",
+        hurry: "\u23f1\ufe0f Le temps passe !",
+        gg: "\ud83e\udd1d Belle partie !",
+        mute: "\ud83d\udd07 Masquer les phrases",
+        unmute: "\ud83d\udd0a Afficher les phrases"
+      },
+      online: {
+        mode: "Jouer en ligne", modeSub: "Amis et d\u00e9fis",
+        find: "Trouver un joueur", findBtn: "Chercher", searchPh: "nom",
+        friends: "\ud83d\udc65 Amis", back: "Menu",
+        searching: "Recherche\u2026", nobody: "Aucun joueur trouv\u00e9",
+        noFriends: "Pas encore d\u2019amis \u2014 cherchez quelqu\u2019un par son nom",
+        add: "Ajouter", accept: "Accepter", decline: "Refuser", remove: "Retirer", waiting: "en attente",
+        sent: "Demande envoy\u00e9e \u00e0 {name}",
+        errAuth: "Impossible de v\u00e9rifier votre compte",
+        errShort: "Au moins deux lettres",
+        errNoStudent: "Ce joueur n\u2019existe pas",
+        errSelf: "Vous ne pouvez pas vous ajouter",
+        errDeclined: "La demande a \u00e9t\u00e9 refus\u00e9e \u2014 r\u00e9essayez demain",
+        errTooMany: "Trop de demandes en attente",
+        games: "\ud83c\udfae Parties", noGames: "Pas encore de partie \u2014 d\u00e9fiez un ami",
+        challenge: "D\u00e9fier", play: "Continuer", cancelGame: "Annuler",
+        yourTurn: "\u00e0 vous", theirTurn: "\u00e0 l\u2019adversaire",
+        chTitle: "D\u00e9fi \u00e0 {name}", chRange: "Plage", chWins: "Jouer jusqu\u2019\u00e0 combien de victoires",
+        chSend: "Envoyer le d\u00e9fi", chCancel: "Annuler",
+        sentGame: "D\u00e9fi envoy\u00e9 \u00e0 {name}", backToFriends: "Aux amis",
+        errNotYourTurn: "C\u2019est \u00e0 l\u2019adversaire de jouer",
+        errRoundOver: "La manche est d\u00e9j\u00e0 termin\u00e9e",
+        errOutOfRange: "Ce nombre est hors de la plage",
+        errNoTokens: "Plus de jetons",
+        errFirstMove: "Pas au premier coup d\u2019une manche",
+        errLive: "Une partie avec ce joueur est d\u00e9j\u00e0 en cours",
+        errNotFriend: "On ne peut d\u00e9fier qu\u2019un ami",
+        errInviteGone: "Ce d\u00e9fi n\u2019existe plus",
+        errNoMatch: "Cette partie n\u2019existe pas",
+        timedOut: "temps \u00e9coul\u00e9", clockMine: "\u00c0 vous : {n} s", clockTheirs: "Adversaire : {n} s",
+        chBonuses: "Bonus", chBonusCount: "Bonus sur le plateau",
+        errNotPlaying: "La partie n\u2019est pas en cours",
+        errNoRequest: "Cette demande n\u2019existe plus"
+      },
       bonusLabel: "Bonus", bonusNear: "quelque chose est tout près", lblBonusCount: "Bonus sur le plateau", bonusAuto: "comme d\u2019habitude ({n})",
-      bonusNames: { extra: "Deux en réserve", fog: "Brouillard", blind: "Coup aveugle", lava: "Jet de lave", skip: "Tour perdu", gift: "Cadeau à l\u2019adversaire", memory: "Mémoire courte" },
-      bonusDesc: { extra: "{a} reçoit deux jetons", fog: "{b} ne voit plus les coups adverses", blind: "{b} ne voit plus ses propres coups", lava: "le hasard joue pour {b}", skip: "{a} perd son prochain tour", gift: "{b} reçoit un jeton", memory: "{a} ne voit que les deux derniers coups" },
+      bonusNames: { extra: "Deux en réserve", fog: "Brouillard", blind: "Coup aveugle", lava: "Jet de lave", skip: "Tour perdu", gift: "Cadeau à l\u2019adversaire", memory: "Mémoire courte", rush: "Hâte" },
+      bonusDesc: { extra: "{a} reçoit deux jetons", fog: "{b} ne voit plus les coups adverses", blind: "{b} ne voit plus ses propres coups", lava: "le hasard joue pour {b}", skip: "{a} perd son prochain tour", gift: "{b} reçoit un jeton", memory: "{a} ne voit que les deux derniers coups", rush: "{b} \u2014 3 secondes de moins par tour" },
       forced: { skip: "\u23ed Tour perdu \u2014 vous passez ce tour", lava: "\ud83c\udf0b Jet de lave \u2014 le hasard joue pour vous" },
       forcedBtn: { skip: "Passer", lava: "Lancer" },
       hintLabel: "Indice de distance",
@@ -1532,9 +1862,55 @@
       title: "Hot or Cold", docTitle: "Hot or Cold",
       confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze",
+      say: {
+        hi: "\ud83d\udc4b Hallo!",
+        hot: "\ud83d\udd25 Es wird w\u00e4rmer\u2026",
+        cold: "\ud83e\uddca Eiskalt!",
+        nice: "\ud83c\udfaf Guter Zug!",
+        wow: "\ud83d\ude2e Wie hast du das gemacht?",
+        think: "\ud83e\udd14 Lass mich denken\u2026",
+        hurry: "\u23f1\ufe0f Die Zeit l\u00e4uft!",
+        gg: "\ud83e\udd1d Gutes Spiel!",
+        mute: "\ud83d\udd07 Spr\u00fcche ausblenden",
+        unmute: "\ud83d\udd0a Spr\u00fcche zeigen"
+      },
+      online: {
+        mode: "Online spielen", modeSub: "Freunde und Herausforderungen",
+        find: "Spieler finden", findBtn: "Suchen", searchPh: "Name",
+        friends: "\ud83d\udc65 Freunde", back: "Men\u00fc",
+        searching: "Suche\u2026", nobody: "Niemand gefunden",
+        noFriends: "Noch keine Freunde \u2014 such jemanden \u00fcber den Namen",
+        add: "Hinzuf\u00fcgen", accept: "Annehmen", decline: "Ablehnen", remove: "Entfernen", waiting: "wartet",
+        sent: "Anfrage an {name} gesendet",
+        errAuth: "Konto konnte nicht best\u00e4tigt werden",
+        errShort: "Mindestens zwei Buchstaben",
+        errNoStudent: "Diesen Spieler gibt es nicht",
+        errSelf: "Du kannst dich nicht selbst hinzuf\u00fcgen",
+        errDeclined: "Die Anfrage wurde abgelehnt \u2014 versuch es morgen",
+        errTooMany: "Zu viele Anfragen warten",
+        games: "\ud83c\udfae Partien", noGames: "Noch keine Partie \u2014 fordere einen Freund heraus",
+        challenge: "Herausfordern", play: "Weiter", cancelGame: "Abbrechen",
+        yourTurn: "du bist dran", theirTurn: "Gegner ist dran",
+        chTitle: "Herausforderung an {name}", chRange: "Bereich", chWins: "Spiel bis wie viele Siege",
+        chSend: "Herausforderung senden", chCancel: "Abbrechen",
+        sentGame: "Herausforderung an {name} gesendet", backToFriends: "Zu den Freunden",
+        errNotYourTurn: "Der Gegner ist am Zug",
+        errRoundOver: "Die Runde ist schon vorbei",
+        errOutOfRange: "Diese Zahl liegt au\u00dferhalb des Bereichs",
+        errNoTokens: "Keine Marken mehr",
+        errFirstMove: "Nicht im ersten Zug einer Runde",
+        errLive: "Mit diesem Spieler l\u00e4uft schon eine Partie",
+        errNotFriend: "Nur Freunde k\u00f6nnen herausgefordert werden",
+        errInviteGone: "Diese Herausforderung gibt es nicht mehr",
+        errNoMatch: "Diese Partie gibt es nicht",
+        timedOut: "Zeit um", clockMine: "Du: {n} s", clockTheirs: "Gegner: {n} s",
+        chBonuses: "Boni", chBonusCount: "Boni auf dem Feld",
+        errNotPlaying: "Die Partie l\u00e4uft nicht",
+        errNoRequest: "Diese Anfrage gibt es nicht mehr"
+      },
       bonusLabel: "Boni", bonusNear: "etwas ist in der Nähe", lblBonusCount: "Boni auf dem Feld", bonusAuto: "wie üblich ({n})",
-      bonusNames: { extra: "Zwei in Reserve", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf", skip: "Zug verloren", gift: "Geschenk an den Gegner", memory: "Kurzes Gedächtnis" },
-      bonusDesc: { extra: "{a} bekommt zwei Marken", fog: "{b} sieht fremde Züge nicht", blind: "{b} sieht eigene Züge nicht", lava: "der Zufall zieht für {b}", skip: "{a} setzt den nächsten Zug aus", gift: "{b} bekommt eine Marke", memory: "{a} sieht nur die letzten zwei Züge" },
+      bonusNames: { extra: "Zwei in Reserve", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf", skip: "Zug verloren", gift: "Geschenk an den Gegner", memory: "Kurzes Gedächtnis", rush: "Hetze" },
+      bonusDesc: { extra: "{a} bekommt zwei Marken", fog: "{b} sieht fremde Züge nicht", blind: "{b} sieht eigene Züge nicht", lava: "der Zufall zieht für {b}", skip: "{a} setzt den nächsten Zug aus", gift: "{b} bekommt eine Marke", memory: "{a} sieht nur die letzten zwei Züge", rush: "{b} \u2014 3 Sekunden weniger pro Zug" },
       forced: { skip: "\u23ed Zug verloren \u2014 du setzt diesen Zug aus", lava: "\ud83c\udf0b Lavawurf \u2014 der Zufall zieht für dich" },
       forcedBtn: { skip: "Aussetzen", lava: "Werfen" },
       hintLabel: "Abstandshinweis",
@@ -1648,7 +2024,9 @@
     100:     [100, 60, 30, 15, 8, 4, 2, 1],
     1000:    [1000, 500, 200, 100, 50, 20, 10, 3],
   };
-  const RANGE_PRESETS = [10, 100, 1000];
+  // Между десяткой и сотней (и дальше) шаг был слишком большим: двадцать и
+  // двести дают промежуточную ступень, которой не хватало младшим
+  const RANGE_PRESETS = [10, 20, 100, 200, 1000, 2000];
 
   // Горячий конец шкалы не растёт вместе с диапазоном: жарко/горячо/очень горячо/лава
   // всегда означают одни и те же расстояния. Именно по горячим поясам игрок и вычисляет
@@ -1820,11 +2198,14 @@
     FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
   }
 
-  function boundsLabel(size) {
+  // Вызов онлайн выбирает мороз своей галочкой, а не общей настройкой, поэтому
+  // подпись умеет принимать его отдельно
+  function boundsLabel(size, frost) {
     const half = Math.floor(size / 2);
+    const cold = (frost === undefined) ? frostMode : frost;
     // Минус берём обычный, с клавиатуры: ребёнок увидит ровно то, что ему набирать
-    return frostMode ? (formatNum(-half) + '…+' + formatNum(half))
-                     : ('1–' + formatNum(size));
+    return cold ? (formatNum(-half) + '…+' + formatNum(half))
+                : ('1–' + formatNum(size));
   }
 
   function renderFrostToggles() {
@@ -2030,6 +2411,21 @@
 
     // экраны режима на рейтинг
     document.getElementById('tModeRun').textContent = L.run.mode;
+    document.getElementById('tModeOnline').textContent = L.online.mode;
+    document.getElementById('tModeOnlineSub').textContent = L.online.modeSub;
+    document.getElementById('tLblFindFriend').textContent = L.online.find;
+    document.getElementById('tFindBtn').textContent = L.online.findBtn;
+    document.getElementById('tFriendsTitle').textContent = L.online.friends;
+    document.getElementById('tOnlineBack').textContent = L.online.back;
+    document.getElementById('tGamesTitle').textContent = L.online.games;
+    document.getElementById('tChRange').textContent = L.online.chRange;
+    document.getElementById('tChFrost').textContent = L.frostLabel;
+    document.getElementById('tChWins').textContent = L.online.chWins;
+    document.getElementById('tChSend').textContent = L.online.chSend;
+    document.getElementById('tChBonuses').textContent = L.online.chBonuses;
+    document.getElementById('tChBonusCount').textContent = L.online.chBonusCount;
+    document.getElementById('tChCancel').textContent = L.online.chCancel;
+    document.getElementById('friendSearch').placeholder = L.online.searchPh;
     document.getElementById('tRunChoiceLogin').textContent = L.run.choiceLogin;
     document.getElementById('tRunChoiceLoginSub').textContent = L.run.choiceLoginSub;
     document.getElementById('tRunChoiceRegister').textContent = L.run.choiceRegister;
@@ -2082,6 +2478,8 @@
     document.getElementById('screenAuthChoice').classList.toggle('hidden', name !== 'authChoice');
     document.getElementById('screenAuth').classList.toggle('hidden', name !== 'auth');
     document.getElementById('screenRunHub').classList.toggle('hidden', name !== 'runHub');
+    document.getElementById('screenOnline').classList.toggle('hidden', name !== 'online');
+    if (name !== 'online') stopFriendsPoll();
     document.getElementById('card').classList.toggle('wide', name === 'game' && mode === 'duel');
     document.getElementById('card').classList.toggle('solo-game', name === 'game' && mode !== 'duel');
     document.querySelector('.header').classList.toggle('compact', name === 'game');
@@ -2099,6 +2497,7 @@
   // Выход с игрового экрана: в режиме на рейтинг это отказ от текущей игры —
   // возвращаемся в хаб режима, а не в главное меню
   function leaveGame() {
+    if (online) return backToOnline();
     if (mode === 'run') { openPause(); return; }
     quitToMenu();
   }
@@ -2245,6 +2644,7 @@
   }
 
   function handleGuess() {
+    if (online) return onlineGuess();
     if (mode === 'duel') return duelGuess();
     if (mode === 'run') return runGuess();
     if (gameOver) return;
@@ -2343,6 +2743,7 @@
   }
 
   function nextRound() {
+    if (online) return onlineNextRound();
     D.round++;
     if (D.handicap !== 3 && D.handicap !== 4) D.starter = 1 - D.starter;
     startRound();
@@ -2359,6 +2760,7 @@
   function useToken(p) {
     if (mode !== 'duel' || D.roundOver || D.matchOver) return;
     if (p !== D.cur) return;
+    if (online) { if (p === online.seat) onlineToken(); return; }
     if (D.armed) {
       D.armed = false;
       D.tokens[p]++;
@@ -2441,6 +2843,8 @@
   // понимал, что произошло и кто это сделал
   function forcedTurn() {
     if (mode !== 'duel' || D.roundOver || D.matchOver) return null;
+    // Онлайн: решает сервер, и только для того, чей сейчас ход
+    if (online) return (D.cur === online.seat) ? online.forced : null;
     if (D.skip[D.cur]) return 'skip';
     if (D.autoLava[D.cur]) return 'lava';
     return null;
@@ -2459,9 +2863,20 @@
     return options.length ? options[Math.floor(Math.random() * options.length)] : null;
   }
 
+  async function onlineForcedTurn() {
+    try {
+      await friendRpc('do_forced_turn', { p_match_id: online.id });
+      await refreshMatch();
+    } catch (e) {
+      setMatchNote(onlineMatchError(e.message));
+      await refreshMatch(true);
+    }
+  }
+
   function doForcedTurn() {
     const kind = forcedTurn();
     if (!kind) return;
+    if (online) return onlineForcedTurn();
     // Жетон на отнятом ходе не сгорает
     if (D.armed) { D.armed = false; D.tokens[D.cur]++; }
     if (kind === 'skip') {
@@ -2479,7 +2894,10 @@
   // ================= РЕНДЕР =================
   // Помехи из бонусов прячут чужие или свои ходы от того, чей сейчас ход.
   // Когда раунд окончен, прячется всё равно нечего — показываем как есть
-  function hiddenRow(ownerP) {
+  function hiddenRow(ownerP, h) {
+    // В онлайне сервер уже решил, что показывать: закрытый ход приезжает без
+    // числа, и гадать на месте нечего
+    if (online) return !!(h && h.masked);
     if (mode !== 'duel' || D.roundOver || D.matchOver) return false;
     if (ownerP === null || ownerP === undefined) return false;
     const viewer = D.cur;
@@ -2494,8 +2912,14 @@
   // откатываться на ход раньше нельзя, старая подсказка прочитается как свежая
   function currentMove() {
     const last = history[history.length - 1];
-    return (last && !hiddenRow(last.p)) ? last : null;
+    if (!last || last.timeout) return null;
+    return hiddenRow(last.p, last) ? null : last;
   }
+
+  // Попал или нет — видно по поясу, а не по расстоянию. В онлайне расстояния
+  // нет вовсе: сервер его не отдаёт, потому что догадка вместе с расстоянием
+  // выдаёт ответ с точностью до двух вариантов
+  function isHit(h) { return !!(h && h.meta && h.meta.labelIndex === 8); }
 
   function getFeedback(distance) {
     return FEEDBACK_META.find(f => distance >= f.min && distance <= f.max) || FEEDBACK_META[0];
@@ -2522,6 +2946,9 @@
     renderHistory();
     renderBonusLine();
     renderForcedTurn();
+    renderClock();
+    renderSayPad();
+    renderSayBubble();
     syncScaleBox();
     if (duel) renderPlayers();
   }
@@ -2549,6 +2976,35 @@
       : '<span class="b-name">❓ ' + L.bonusNear + '</span>';
   }
 
+  // Часы идут на месте: сервер присылает остаток раз в две секунды, а между
+  // посылками секунды отсчитывает браузер — иначе цифра прыгала бы через одну
+  let clockTimer = null;
+
+  function renderClock() {
+    const box = document.getElementById('turnClock');
+    if (!box) return;
+    const show = online && !D.roundOver && !D.matchOver && online.deadlineAt;
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const left = Math.max(0, Math.ceil((online.deadlineAt - Date.now()) / 1000));
+    const mine = D.cur === online.seat;
+    const L = t().online;
+    box.textContent = (mine ? L.clockMine : L.clockTheirs).replace('{n}', left);
+    box.classList.toggle('low', left <= 10 && left > 0);
+    box.classList.toggle('out', left === 0);
+  }
+
+  function startClock() {
+    stopClock();
+    clockTimer = setInterval(() => {
+      if (online && screen === 'game') { renderClock(); renderSayBubble(); } else stopClock();
+    }, 250);
+  }
+
+  function stopClock() {
+    if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
+  }
+
   function renderForcedTurn() {
     const box = document.getElementById('forcedTurn');
     if (!box) return;
@@ -2574,7 +3030,7 @@
     // Пояс — помощь для тренировки: там учатся. В игре с другом и в рейтинге его
     // нет, иначе это преимущество, а не учёба
     const band = document.getElementById('feedbackBand');
-    const showBand = distanceHint && last.distance > 0;
+    const showBand = distanceHint && !isHit(last);
     band.classList.toggle('hidden', !showBand);
     band.textContent = showBand ? last.meta.rangeSign : '';
     band.style.color = last.meta.color;
@@ -2595,7 +3051,7 @@
     if (!last) {
       pct = 8;
       color = TIER_COLORS[0].color;
-    } else if (last.distance === 0) {
+    } else if (isHit(last)) {
       pct = 100;
       color = BULLSEYE_TIER.color;
     } else {
@@ -2608,7 +3064,7 @@
     bulb.style.background = color;
     bulb.style.boxShadow = '0 0 18px 2px ' + color + '59';
 
-    if (last && last.distance === 0) {
+    if (isHit(last)) {
       bulb.classList.remove('pulse');
       void bulb.offsetWidth; // перезапуск анимации при повторной победе
       bulb.classList.add('pulse');
@@ -2709,7 +3165,8 @@
     const span = Math.max(1, RANGE_MAX - RANGE_MIN);
     // Закрытые ходы на прямой не отмечаем, а залитой точкой обозначаем только
     // настоящий последний ход — если он виден
-    const visible = history.slice(-historyVisible()).filter(h => !hiddenRow(h.p));
+    const visible = history.slice(-historyVisible())
+      .filter(h => !hiddenRow(h.p, h) && !h.timeout);
     const last = currentMove();
     const rings = last ? visible.filter(h => h !== last) : visible;
     let out = '';
@@ -2776,7 +3233,7 @@
     let dotX = null;
 
     if (last && !revealed) {
-      const color = last.distance === 0 ? BULLSEYE_TIER.color : last.meta.color;
+      const color = isHit(last) ? BULLSEYE_TIER.color : last.meta.color;
       const p = nlPos(last.guess);
       dotX = p;
       // Ехать есть откуда только со второго хода: первому не от чего отталкиваться
@@ -2828,7 +3285,8 @@
         banner.style.color = P_COLORS[D.cur];
       }
       document.getElementById('finalBox').classList.add('hidden');
-      document.getElementById('guessSection').classList.toggle('hidden', D.roundOver || !!forcedTurn());
+      document.getElementById('guessSection').classList.toggle('hidden',
+        D.roundOver || !!forcedTurn() || (online && D.cur !== online.seat));
     } else {
       banner.classList.add('hidden');
       // Партия кончилась — «осталось попыток» уже ничего не значит и читается
@@ -2894,8 +3352,11 @@
       const actions = document.createElement('div');
       actions.className = 'r-actions';
       if (D.matchOver) {
-        actions.innerHTML = '<button class="btn" onclick="newMatch()">' + L.newMatch + '</button>' +
-                            '<button class="btn-ghost" onclick="quitToMenu()">' + L.toMenu + '</button>';
+        // Онлайн-матч переиграть на месте нельзя: новый — это новый вызов
+        actions.innerHTML = online
+          ? '<button class="btn" onclick="backToOnline()">' + L.online.backToFriends + '</button>'
+          : '<button class="btn" onclick="newMatch()">' + L.newMatch + '</button>' +
+            '<button class="btn-ghost" onclick="quitToMenu()">' + L.toMenu + '</button>';
       } else {
         actions.innerHTML = '<button class="btn" onclick="nextRound()">' + L.nextRound + '</button>';
       }
@@ -2982,14 +3443,18 @@
       const realIndex = history.length - i;
       const item = document.createElement('div');
       item.className = 'history-item';
-      const masked = hiddenRow(h.p);
+      const masked = hiddenRow(h.p, h);
       const accent = masked ? 'rgba(255,255,255,0.2)'
                             : ((h.p === null || h.p === undefined) ? h.meta.color : P_COLORS[h.p]);
       item.style.borderLeft = '3px solid ' + accent;
       const who = (h.p === null || h.p === undefined)
         ? ''
         : '<span class="h-who" style="color:' + P_COLORS[h.p] + '">' + escapeHtml(D.names[h.p]) + '</span>';
-      item.innerHTML = masked
+      item.innerHTML = h.timeout
+        ? '<span class="h-num">#' + realIndex + '</span>' + who +
+          '<span class="h-guess h-masked">—</span>' +
+          '<span class="h-label h-masked">\u23f1\ufe0f ' + t().online.timedOut + '</span>'
+        : masked
         ? '<span class="h-num">#' + realIndex + '</span>' + who +
           '<span class="h-guess h-masked">•••</span><span class="h-label h-masked">🙈</span>'
         : '<span class="h-num">#' + realIndex + '</span>' + who +
@@ -3181,7 +3646,7 @@
   function updateAccountChip() {
     const chip = document.getElementById('accountChip');
     const auth = runAuth();
-    const show = !!auth && screen === 'runHub';
+    const show = !!auth && (screen === 'runHub' || screen === 'online');
     chip.classList.toggle('hidden', !show);
     if (show) document.getElementById('accountChipName').textContent = auth.username;
   }
@@ -3211,8 +3676,22 @@
 
   let runAuthMode = 'login';
 
+  // Куда вернуться после входа: аккаунт нужен и рейтингу, и онлайну
+  let authReturn = 'runHub';
+
+  function afterAuth() {
+    if (authReturn === 'online') return openOnline();
+    return openRunHub();
+  }
+
   function openRunEntry() {
+    authReturn = 'runHub';
     if (runAuth()) openRunHub(); else showScreen('authChoice');
+  }
+
+  function openOnlineEntry() {
+    authReturn = 'online';
+    if (runAuth()) openOnline(); else showScreen('authChoice');
   }
 
   // Открывает форму заново: поля чистые, ошибок нет
@@ -3278,7 +3757,7 @@
       if (data === false) return runAuthError(L.run.errTaken);
       localStorage.setItem('hc_run_user', username);
       localStorage.setItem('hc_run_pin', pin);
-      openRunHub();
+      afterAuth();
     } catch (e) {
       runAuthError(L.run.errNoConn);
     } finally {
@@ -3299,7 +3778,7 @@
       if (data !== true) return runAuthError(L.run.errBadLogin);
       localStorage.setItem('hc_run_user', username);
       localStorage.setItem('hc_run_pin', pin);
-      openRunHub();
+      afterAuth();
     } catch (e) {
       runAuthError(L.run.errNoConn);
     } finally {
@@ -3335,16 +3814,21 @@
     if (!auth) return showScreen('authChoice');
     renderGreeting(auth.username);
     document.getElementById('runHubMessage').innerHTML = message || '';
+    setNote('runNote', '');
     renderUnfinished();
-    await renderRunLeaderboard();
     showScreen('runHub');
+    await loadRunPending();
+    await renderRunLeaderboard();
   }
 
   function renderGreeting(name) {
-    const el = document.getElementById('runGreeting');
-    if (!el) return;
-    el.classList.toggle('hidden', !name);
-    if (name) el.innerHTML = t().run.greeting.replace('{name}', '<strong>' + escapeHtml(name) + '</strong>');
+    const html = name
+      ? t().run.greeting.replace('{name}', '<strong>' + escapeHtml(name) + '</strong>')
+      : '';
+    document.querySelectorAll('.run-greeting').forEach(el => {
+      el.classList.toggle('hidden', !name);
+      if (name) el.innerHTML = html;
+    });
   }
 
   // Личный рекорд знаем из двух бесплатных источников: ответа сервера при отправке
@@ -3413,96 +3897,671 @@
     } catch (e) {}
   }
 
+  // ================= ОНЛАЙН: ДРУЗЬЯ =================
+  // Список опрашивается, пока экран открыт: входящая заявка должна появиться
+  // сама, без перезахода. Раз в десять секунд — заметить успеваешь, а нагрузка
+  // остаётся крошечной: два запроса в минуту на одного открытого игрока
+  const FRIENDS_POLL_MS = 10000;
+  let friendsTimer = null;
+  let friendsBusy = false;
+
+  function openOnline() {
+    const auth = runAuth();
+    if (!auth) { authReturn = 'online'; return showScreen('authChoice'); }
+    renderGreeting(auth.username);
+    document.getElementById('searchResults').innerHTML = '';
+    document.getElementById('friendSearch').value = '';
+    setNote('searchNote', '');
+    setNote('friendsNote', '');
+    setNote('gamesNote', '');
+    closeChallenge();
+    applyTranslations();
+    showScreen('online');
+    startFriendsPoll();
+    loadFriends();
+    loadMatches();
+  }
+
+  function startFriendsPoll() {
+    stopFriendsPoll();
+    friendsTimer = setInterval(() => {
+      if (screen !== 'online') return stopFriendsPoll();
+      loadFriends(true);
+      loadMatches(true);
+    }, FRIENDS_POLL_MS);
+  }
+
+  function stopFriendsPoll() {
+    if (friendsTimer) { clearInterval(friendsTimer); friendsTimer = null; }
+  }
+
+  function setNote(id, text, bad) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('hidden', !text);
+    el.classList.toggle('bad', !!bad);
+  }
+
+  // Сервер отвечает кодом, игрок должен прочитать человеческую фразу
+  function friendErrorText(message) {
+    const L = t();
+    const m = String(message || '');
+    // Сеть отвалилась: supabase-js бросает «Failed to fetch» и подобное, и это
+    // не ошибка сервера, а её отсутствие — игрок должен прочитать про связь
+    if (m.indexOf('no_conn') >= 0) return L.run.errNoConn;
+    if (/fetch|network|offline|Load failed/i.test(m)) return L.run.errNoConn;
+    if (m.indexOf('auth_failed') >= 0) return L.online.errAuth;
+    if (m.indexOf('locked_out') >= 0) return L.run.errLocked;
+    if (m.indexOf('query_too_short') >= 0) return L.online.errShort;
+    if (m.indexOf('no_such_student') >= 0) return L.online.errNoStudent;
+    if (m.indexOf('cannot_friend_self') >= 0) return L.online.errSelf;
+    if (m.indexOf('recently_declined') >= 0) return L.online.errDeclined;
+    if (m.indexOf('too_many_requests') >= 0) return L.online.errTooMany;
+    if (m.indexOf('no_such_request') >= 0) return L.online.errNoRequest;
+    return L.run.errServer + m;
+  }
+
+  // Имя и PIN подставляются сами: руками их не передаёт ни один вызов
+  async function friendRpc(name, args) {
+    const auth = runAuth();
+    if (!auth || !sb) throw new Error('no_conn');
+    const { data, error } = await sb.rpc(name,
+      Object.assign({ p_username: auth.username, p_pin: auth.pin }, args || {}));
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // Входящие заявки первыми: это единственное, что требует действия
+  const FRIEND_ORDER = { incoming: 0, friend: 1, outgoing: 2 };
+
+  function friendRow(name, relation) {
+    const L = t().online;
+    const row = document.createElement('div');
+    row.className = 'friend-row';
+    row.dataset.name = name;
+    row.dataset.relation = relation || 'none';
+
+    const who = document.createElement('span');
+    who.className = 'fr-name';
+    who.textContent = name;
+    row.appendChild(who);
+
+    const button = (label, cls, fn) => {
+      const b = document.createElement('button');
+      b.className = 'fr-btn' + (cls ? ' ' + cls : '');
+      b.textContent = label;
+      b.onclick = fn;
+      row.appendChild(b);
+    };
+
+    if (relation === 'incoming') {
+      button(L.accept, 'yes', () => respondFriend(name, true));
+      button(L.decline, 'no', () => respondFriend(name, false));
+    } else if (relation === 'friend') {
+      button(L.challenge, 'yes', () => openChallenge(name));
+      button(L.remove, '', () => removeFriend(name));
+    } else if (relation === 'outgoing') {
+      const wait = document.createElement('span');
+      wait.className = 'fr-wait';
+      wait.textContent = L.waiting;
+      row.appendChild(wait);
+    } else if (relation !== 'declined') {
+      button(L.add, '', () => addFriend(name));
+    }
+    return row;
+  }
+
+  function renderFriends(rows) {
+    const box = document.getElementById('friendsList');
+    box.innerHTML = '';
+    rows.slice()
+      .sort((a, b) => (FRIEND_ORDER[a.relation] - FRIEND_ORDER[b.relation]) ||
+                      String(a.username).localeCompare(String(b.username)))
+      .forEach(r => box.appendChild(friendRow(r.username, r.relation)));
+  }
+
+  // quiet — это опрос по таймеру: молча, иначе на экране будет мигать ошибка
+  // связи каждые десять секунд
+  async function loadFriends(quiet) {
+    if (friendsBusy) return;
+    friendsBusy = true;
+    try {
+      const rows = (await friendRpc('list_friends')) || [];
+      renderFriends(rows);
+      setNote('friendsNote', rows.length ? '' : t().online.noFriends);
+    } catch (e) {
+      if (!quiet) setNote('friendsNote', friendErrorText(e.message), true);
+    } finally {
+      friendsBusy = false;
+    }
+  }
+
+  // Игры и заявки на игру живут рядом с друзьями и обновляются тем же опросом
+  function matchRow(m) {
+    const L = t().online;
+    const row = document.createElement('div');
+    row.className = 'friend-row';
+    row.dataset.id = m.id;
+    row.dataset.state = m.status === 'invited' ? (m.seat === 1 ? 'incoming' : 'outgoing') : 'active';
+
+    const who = document.createElement('span');
+    who.className = 'fr-name';
+    who.textContent = m.other;
+    row.appendChild(who);
+
+    const button = (label, cls, fn) => {
+      const b = document.createElement('button');
+      b.className = 'fr-btn' + (cls ? ' ' + cls : '');
+      b.textContent = label;
+      b.onclick = fn;
+      row.appendChild(b);
+    };
+    const note = text => {
+      const el = document.createElement('span');
+      el.className = 'fr-wait';
+      el.textContent = text;
+      row.appendChild(el);
+    };
+
+    if (m.status === 'invited' && m.seat === 1) {
+      button(L.accept, 'yes', () => answerChallenge(m.id, true));
+      button(L.decline, 'no', () => answerChallenge(m.id, false));
+    } else if (m.status === 'invited') {
+      note(L.waiting);
+      button(L.cancelGame, '', () => dropMatch(m.id));
+    } else {
+      note(m.my_turn ? L.yourTurn : L.theirTurn);
+      button(L.play, m.my_turn ? 'yes' : '', () => openMatch(m.id));
+    }
+    return row;
+  }
+
+  async function loadMatches(quiet) {
+    try {
+      const rows = (await friendRpc('list_matches')) || [];
+      const box = document.getElementById('gamesList');
+      box.innerHTML = '';
+      rows.forEach(m => box.appendChild(matchRow(m)));
+      setNote('gamesNote', rows.length ? '' : t().online.noGames);
+    } catch (e) {
+      if (!quiet) setNote('gamesNote', onlineMatchError(e.message), true);
+    }
+  }
+
+  // Лесенка числа бонусов та же, что в местной дуэли, но считается от
+  // выбранного здесь диапазона, а не от того, во что играли в прошлый раз
+  function renderChallengeBonuses() {
+    const on = document.getElementById('chBonuses').checked;
+    document.getElementById('chBonusCountField').classList.toggle('hidden', !on);
+    if (!on) return;
+    const sel = document.getElementById('chBonusCount');
+    const n = parseInt(document.getElementById('chRange').value) || 100;
+    const auto = autoBonusCountFor(n);
+    const prev = parseInt(sel.value);
+    const values = [...new Set([1, 2, 3, 6, 12, 25, 50, 100, auto, n - 1])]
+      .filter(v => v >= 1 && v <= n - 1)
+      .sort((a, b) => a - b);
+    sel.innerHTML = '';
+    values.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = (v === auto) ? t().bonusAuto.replace('{n}', v) : String(v);
+      sel.appendChild(o);
+    });
+    sel.value = String(values.includes(prev) ? prev : auto);
+  }
+
+  // Список диапазонов один на всю игру: собирать его руками в двух местах —
+  // значит однажды забыть про одно из них
+  function buildChallengeRanges() {
+    const sel = document.getElementById('chRange');
+    if (!sel) return;
+    const prev = sel.value;
+    const frost = document.getElementById('chFrost').checked;
+    sel.innerHTML = '';
+    RANGE_PRESETS.forEach(n => {
+      const o = document.createElement('option');
+      o.value = n;
+      o.textContent = boundsLabel(n, frost);
+      sel.appendChild(o);
+    });
+    sel.value = RANGE_PRESETS.includes(parseInt(prev)) ? prev : '100';
+  }
+
+  function openChallenge(name) {
+    const box = document.getElementById('challengeBox');
+    box.dataset.name = name;
+    buildChallengeRanges();
+    renderChallengeBonuses();
+    document.getElementById('challengeTitle').textContent =
+      t().online.chTitle.replace('{name}', name);
+    box.classList.remove('hidden');
+  }
+
+  function closeChallenge() {
+    document.getElementById('challengeBox').classList.add('hidden');
+  }
+
+  async function sendChallenge() {
+    const box = document.getElementById('challengeBox');
+    const name = box.dataset.name;
+    try {
+      const withBonuses = document.getElementById('chBonuses').checked;
+      await friendRpc('challenge_friend', {
+        p_to: name,
+        p_range: parseInt(document.getElementById('chRange').value),
+        p_frost: document.getElementById('chFrost').checked,
+        p_wins: parseInt(document.getElementById('chWins').value),
+        p_bonuses: withBonuses,
+        p_bonus_count: withBonuses
+          ? parseInt(document.getElementById('chBonusCount').value) || null
+          : null
+      });
+      closeChallenge();
+      await loadMatches();
+      setNote('gamesNote', t().online.sentGame.replace('{name}', name));
+    } catch (e) {
+      setNote('gamesNote', onlineMatchError(e.message), true);
+    }
+  }
+
+  async function answerChallenge(id, accept) {
+    try {
+      const status = await friendRpc('respond_challenge', { p_match_id: id, p_accept: !!accept });
+      await loadMatches();
+      if (status === 'active') openMatch(id);
+    } catch (e) {
+      setNote('gamesNote', onlineMatchError(e.message), true);
+    }
+  }
+
+  async function dropMatch(id) {
+    try {
+      await friendRpc('leave_match', { p_match_id: id });
+      await loadMatches();
+    } catch (e) {
+      setNote('gamesNote', onlineMatchError(e.message), true);
+    }
+  }
+
+  async function searchStudents() {
+    const q = (document.getElementById('friendSearch').value || '').trim();
+    const box = document.getElementById('searchResults');
+    box.innerHTML = '';
+    if (q.length < 2) return setNote('searchNote', t().online.errShort, true);
+    setNote('searchNote', t().online.searching);
+    try {
+      const rows = (await friendRpc('find_students', { p_query: q })) || [];
+      rows.forEach(r => box.appendChild(friendRow(r.username, r.relation)));
+      setNote('searchNote', rows.length ? '' : t().online.nobody);
+    } catch (e) {
+      setNote('searchNote', friendErrorText(e.message), true);
+    }
+  }
+
+  async function addFriend(name) {
+    try {
+      await friendRpc('send_friend_request', { p_to: name });
+      await searchStudents();
+      setNote('searchNote', t().online.sent.replace('{name}', name));
+      loadFriends(true);
+    } catch (e) {
+      setNote('searchNote', friendErrorText(e.message), true);
+    }
+  }
+
+  async function respondFriend(name, accept) {
+    try {
+      await friendRpc('respond_friend_request', { p_from: name, p_accept: !!accept });
+      await loadFriends();
+    } catch (e) {
+      setNote('friendsNote', friendErrorText(e.message), true);
+    }
+  }
+
+  async function removeFriend(name) {
+    try {
+      await friendRpc('remove_friend', { p_other: name });
+      await loadFriends();
+    } catch (e) {
+      setNote('friendsNote', friendErrorText(e.message), true);
+    }
+  }
+
+  // ================= ОНЛАЙН: МАТЧ =================
+  // Играется он тем же экраном и той же отрисовкой, что дуэль за одним
+  // телефоном: mode остаётся 'duel', а online хранит то, чего у местной игры
+  // нет — номер матча и своё место за доской. Ветвится только ввод: ход, жетон
+  // и следующий раунд уходят на сервер, а не считаются здесь
+  const MATCH_POLL_MS = 2000;
+  let online = null;
+  let matchTimer = null;
+  let matchBusy = false;
+
+  function onlineMatchError(message) {
+    const L = t();
+    const m = String(message || '');
+    if (m.indexOf('not_your_turn') >= 0) return L.online.errNotYourTurn;
+    if (m.indexOf('round_over') >= 0) return L.online.errRoundOver;
+    if (m.indexOf('out_of_range') >= 0) return L.online.errOutOfRange;
+    if (m.indexOf('no_tokens') >= 0) return L.online.errNoTokens;
+    if (m.indexOf('not_first_move') >= 0) return L.online.errFirstMove;
+    if (m.indexOf('match_already_live') >= 0) return L.online.errLive;
+    if (m.indexOf('not_a_friend') >= 0) return L.online.errNotFriend;
+    if (m.indexOf('invite_closed') >= 0) return L.online.errInviteGone;
+    if (m.indexOf('no_such_match') >= 0) return L.online.errNoMatch;
+    if (m.indexOf('not_playing') >= 0) return L.online.errNotPlaying;
+    return friendErrorText(m);
+  }
+
+  // Состояние с сервера — единственный источник правды: всё, что рисуется,
+  // берётся отсюда, и ничего не досчитывается на месте
+  function applyMatchState(st) {
+    if (!st) return;
+    online.seat = st.seat;
+    online.status = st.status;
+    mode = 'duel';
+    RANGE_MIN = st.rangeMin;
+    RANGE_MAX = st.rangeMax;
+    frostMode = !!st.frost;
+    FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
+
+    D.names = st.names.slice();
+    D.winsNeeded = st.winsNeeded;
+    D.wins = st.wins.slice();
+    D.round = st.round;
+    D.cur = st.cur;
+    D.tokens = st.tokens.slice();
+    D.armed = !!st.armed;
+    D.roundOver = !!st.roundOver;
+    D.roundWinner = st.roundWinner;
+    D.matchOver = !!st.matchOver;
+    D.fog = (st.fog || [false, false]).slice();
+    D.blind = (st.blind || [false, false]).slice();
+    D.autoLava = (st.autoLava || [false, false]).slice();
+    D.skip = (st.skip || [false, false]).slice();
+    D.shortMemory = (st.shortMemory || [false, false]).slice();
+    D.rush = (st.rush || [0, 0]).slice();
+    D.nearBonus = !!st.nearBonus;
+    D.lastBonus = st.lastBonus || null;
+    D.lastBonusBy = st.lastBonusBy || 0;
+    D.bonuses = [];
+    bonusMode = !!st.bonusesOn;
+    online.forced = st.forced || null;
+    online.turnSeconds = st.turnSeconds || 30;
+    online.secondsLeft = st.secondsLeft;
+    online.deadlineAt = (st.secondsLeft === null || st.secondsLeft === undefined)
+      ? null : Date.now() + st.secondsLeft * 1000;
+    applyChat(st.chat);
+
+    // Расстояния сервер не присылает: пояс — это всё, что известно. Закрытый
+    // ход приезжает без числа, потерянный по времени — как отдельная строка
+    history = (st.moves || []).map(mv => ({
+      guess: mv.guess, distance: null, p: mv.seat,
+      timeout: !!mv.timeout,
+      masked: !!mv.hidden,
+      meta: (mv.tier === null || mv.tier === undefined) ? FEEDBACK_META[0] : FEEDBACK_META[mv.tier]
+    }));
+    secret = (st.secret === null || st.secret === undefined) ? 0 : st.secret;
+    applyRangeToInputs();
+    renderAll();
+  }
+
+  async function refreshMatch(quiet) {
+    if (!online || matchBusy) return;
+    matchBusy = true;
+    try {
+      const st = await friendRpc('match_state', { p_match_id: online.id });
+      applyMatchState(st);
+      if (!quiet) setMatchNote('');
+    } catch (e) {
+      if (!quiet) setMatchNote(onlineMatchError(e.message));
+    } finally {
+      matchBusy = false;
+    }
+  }
+
+  // Строка связи живёт в той же полоске, что и бонусы: отдельного места для
+  // неё на экране нет, а во время онлайн-матча бонусов всё равно не бывает
+  function setMatchNote(text) {
+    const box = document.getElementById('matchNote');
+    if (!box) return;
+    box.textContent = text ? '\u26a0\ufe0f ' + text : '';
+    box.classList.toggle('hidden', !text);
+  }
+
+  function startMatchPoll() {
+    stopMatchPoll();
+    matchTimer = setInterval(() => {
+      if (online && screen === 'game') refreshMatch(true); else stopMatchPoll();
+    }, MATCH_POLL_MS);
+  }
+
+  function stopMatchPoll() {
+    if (matchTimer) { clearInterval(matchTimer); matchTimer = null; }
+  }
+
+  async function openMatch(id) {
+    online = { id: id, seat: 0, status: 'active' };
+    sayLastId = 0;
+    sayShownUntil = 0;
+    sayPadOpen = false;
+    hideSayBubble();
+    stopFriendsPoll();
+    try {
+      const st = await friendRpc('match_state', { p_match_id: id });
+      applyMatchState(st);
+    } catch (e) {
+      online = null;
+      setNote('friendsNote', onlineMatchError(e.message), true);
+      return;
+    }
+    applyTranslations();
+    showScreen('game');
+    renderAll();
+    startMatchPoll();
+    startClock();
+  }
+
+  async function onlineGuess() {
+    const input = document.getElementById('guessInput');
+    const guess = parseInt(input.value);
+    if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
+    if (D.cur !== online.seat) return setMatchNote(t().online.errNotYourTurn);
+    input.value = '';
+    try {
+      await friendRpc('match_guess', { p_match_id: online.id, p_guess: guess });
+      await refreshMatch();
+    } catch (e) {
+      setMatchNote(onlineMatchError(e.message));
+      await refreshMatch(true);
+    }
+  }
+
+  async function onlineToken() {
+    try {
+      await friendRpc('use_match_token', { p_match_id: online.id, p_arm: !D.armed });
+      await refreshMatch();
+    } catch (e) {
+      setMatchNote(onlineMatchError(e.message));
+    }
+  }
+
+  async function onlineNextRound() {
+    try {
+      await friendRpc('next_match_round', { p_match_id: online.id });
+      await refreshMatch();
+    } catch (e) {
+      setMatchNote(onlineMatchError(e.message));
+      await refreshMatch(true);
+    }
+  }
+
+  // Уход с экрана матч не закрывает: к начатой игре можно вернуться
+  function backToOnline() {
+    stopMatchPoll();
+    stopClock();
+    setMatchNote('');
+    online = null;
+    mode = null;
+    setMatchNote('');
+    openOnline();
+  }
+
+  // ================= ГОТОВЫЕ ФРАЗЫ =================
+  // Свободного текста нет намеренно: играют дети из разных стран, которых никто
+  // не сводил лично. Восемь фраз переводятся на все языки сами, так что ответ
+  // приходит на языке читающего, а не пишущего
+  const SAY_CODES = ['hi', 'hot', 'cold', 'nice', 'wow', 'think', 'hurry', 'gg'];
+  const SAY_SHOW_MS = 6000;
+  let sayMuted = localStorage.getItem('hc_mute') === '1';
+  let sayPadOpen = false;
+  let sayLastId = 0;
+  let sayShownUntil = 0;
+  let sayBusy = false;
+
+  function toggleSayPad() {
+    sayPadOpen = !sayPadOpen;
+    renderSayPad();
+  }
+
+  function toggleMute() {
+    sayMuted = !sayMuted;
+    try { localStorage.setItem('hc_mute', sayMuted ? '1' : '0'); } catch (e) {}
+    if (sayMuted) hideSayBubble();
+    renderSayPad();
+  }
+
+  function renderSayPad() {
+    const btn = document.getElementById('sayBtn');
+    const pad = document.getElementById('sayPad');
+    if (!btn || !pad) return;
+    const inMatch = !!online && !D.matchOver;
+    btn.classList.toggle('hidden', !inMatch);
+    btn.classList.toggle('on', sayPadOpen);
+    pad.classList.toggle('hidden', !(inMatch && sayPadOpen));
+    if (!(inMatch && sayPadOpen)) return;
+
+    const L = t().say;
+    pad.innerHTML = '';
+    SAY_CODES.forEach(code => {
+      const b = document.createElement('button');
+      b.textContent = L[code];
+      b.dataset.code = code;
+      b.disabled = sayBusy;
+      b.onclick = () => sendPhrase(code);
+      pad.appendChild(b);
+    });
+    const mute = document.createElement('button');
+    mute.className = 'mute';
+    mute.id = 'sayMuteBtn';
+    mute.textContent = sayMuted ? L.unmute : L.mute;
+    mute.onclick = toggleMute;
+    pad.appendChild(mute);
+  }
+
+  async function sendPhrase(code) {
+    if (!online || sayBusy) return;
+    sayBusy = true;
+    renderSayPad();
+    try {
+      await friendRpc('send_phrase', { p_match_id: online.id, p_code: code });
+      await refreshMatch();
+    } catch (e) {
+      setMatchNote(onlineMatchError(e.message));
+    } finally {
+      sayBusy = false;
+      renderSayPad();
+    }
+  }
+
+  function hideSayBubble() {
+    const box = document.getElementById('sayBubble');
+    if (box) box.classList.add('hidden');
+  }
+
+  // Показываем только свежую реплику и только пока она свежая: иначе фраза
+  // висела бы весь раунд и читалась как подпись к чужому ходу
+  function applyChat(list) {
+    if (!Array.isArray(list) || !list.length) return;
+    const last = list[list.length - 1];
+    if (!last || last.id <= sayLastId) return;
+    sayLastId = last.id;
+    if (sayMuted && last.seat !== online.seat) return;
+    if (typeof last.ago === 'number' && last.ago * 1000 > SAY_SHOW_MS) return;
+    sayShownUntil = Date.now() + SAY_SHOW_MS - (last.ago || 0) * 1000;
+
+    const box = document.getElementById('sayBubble');
+    if (!box) return;
+    box.innerHTML = '<span class="s-who" style="color:' + P_COLORS[last.seat] + '">' +
+      escapeHtml(D.names[last.seat]) + '</span>' + escapeHtml(t().say[last.code] || '');
+    box.style.borderColor = P_COLORS[last.seat];
+    box.classList.remove('hidden');
+  }
+
+  function renderSayBubble() {
+    const box = document.getElementById('sayBubble');
+    if (!box) return;
+    if (!online || Date.now() > sayShownUntil) box.classList.add('hidden');
+  }
+
   // ================= ПАУЗА И СОХРАНЁННАЯ ИГРА =================
   // Состояние пишется после каждого хода, поэтому закрытая вкладка, севший телефон
   // или случайный выход не стоят игроку результата: игра ждёт его на том же месте.
+  // Забег больше не хранится в браузере. Ключ остаётся только чтобы убрать
+  // то, что успели сохранить прежние версии
   const RUN_STATE_KEY = 'hc_run_state';
 
-  function saveRunState() {
-    if (!RUN) return;
+  // Незаконченный забег живёт на сервере, а не в браузере: он переживает
+  // закрытую вкладку и находится с другого устройства. Локальной копии нет
+  // намеренно — она разошлась бы с сервером и дала бы второй, «свой» счёт
+  let runPending = null;
+
+  async function loadRunPending() {
+    runPending = null;
     try {
-      localStorage.setItem(RUN_STATE_KEY, JSON.stringify({
-        round: RUN.round,
-        totalScore: RUN.totalScore,
-        range: RANGE_MAX,
-        rangeMin: RANGE_MIN,
-        allowed: MAX_GUESSES,
-        secret: secret,
-        history: history.map(h => ({ guess: h.guess, distance: h.distance })),
-        user: (runAuth() || {}).username || ''
-      }));
-    } catch (e) {}
-  }
-
-  function loadRunState() {
-    try {
-      const raw = localStorage.getItem(RUN_STATE_KEY);
-      if (!raw) return null;
-      const st = JSON.parse(raw);
-      if (!st || typeof st.round !== 'number' || typeof st.secret !== 'number') return null;
-      // Игра принадлежит тому, кто её начал. Регистр не учитываем: сервер пускает
-      // «аню» в аккаунт «Ани», и незаконченная игра должна найтись так же
-      const auth = runAuth();
-      if (st.user && auth &&
-          String(st.user).toLowerCase() !== auth.username.toLowerCase()) return null;
-      return st;
-    } catch (e) { return null; }
-  }
-
-  function clearRunState() {
-    try { localStorage.removeItem(RUN_STATE_KEY); } catch (e) {}
-  }
-
-  // Восстанавливаем прерванную игру ровно в том виде, в каком её оставили
-  function applyRunState(st) {
-    RUN = { round: st.round, totalScore: st.totalScore, locked: false };
-    mode = 'run';
-    RANGE_MAX = st.range;
-    // игры, сохранённые до появления «мороза и жары», нижней границы не знают
-    RANGE_MIN = (typeof st.rangeMin === 'number') ? st.rangeMin : 1;
-    MAX_GUESSES = st.allowed;
-    FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
-    secret = st.secret;
-    history = (st.history || []).map(h => ({
-      guess: h.guess, distance: h.distance, meta: getFeedback(h.distance), p: null
-    }));
-    gameOver = false;
-    gameOverType = null;
-    document.getElementById('guessInput').value = '';
-    applyRangeToInputs();
+      const st = await friendRpc('run_state');
+      if (st && st.active) runPending = st;
+      setNote('runNote', '');
+    } catch (e) {
+      // Забег теперь считает сервер, значит без сети режим не работает.
+      // Молчать об этом нельзя: иначе экран выглядит рабочим, а кнопка не пойдёт
+      setNote('runNote', friendErrorText(e.message), true);
+    }
+    renderUnfinished();
   }
 
   function resumeSavedRun() {
-    const st = loadRunState();
-    if (!st) { renderUnfinished(); return; }
-    applyRunState(st);
-    applyTranslations();
-    showScreen('game');
+    startRun(false);
   }
 
   // «Завершить» из хаба: доигрывать не хочется, но результат должен засчитаться
-  function finishSavedRun() {
-    const st = loadRunState();
-    if (!st) { renderUnfinished(); return; }
-    applyRunState(st);
-    clearRunState();
-    endRun();
+  async function finishSavedRun() {
+    try {
+      const res = await friendRpc('run_give_up');
+      RUN = { round: (res.rounds || 0) + 1, totalScore: res.score || 0, locked: true };
+      mode = 'run';
+      secret = res.secret;
+      await endRun({ score: res.score, rounds: res.rounds, secret: res.secret });
+    } catch (e) {
+      setNote('runNote', friendErrorText(e.message), true);
+    }
   }
 
   function renderUnfinished() {
     const L = t();
-    const st = loadRunState();
+    const st = runPending;
     const box = document.getElementById('unfinishedBox');
     box.classList.toggle('hidden', !st);
     // пока игра не закончена, новую не предлагаем — иначе она молча потеряется
     document.getElementById('tRunStart').classList.toggle('hidden', !!st);
     if (!st) return;
     document.getElementById('unfinishedInfo').textContent =
-      L.run.unfinishedInfo.replace('{round}', st.round).replace('{score}', formatNum(st.totalScore));
+      L.run.unfinishedInfo.replace('{round}', st.round).replace('{score}', formatNum(st.score));
   }
 
   function openPause() {
-    saveRunState();
     document.getElementById('pauseModal').classList.remove('hidden');
   }
 
@@ -3510,19 +4569,23 @@
     document.getElementById('pauseModal').classList.add('hidden');
   }
 
+  // Уход с паузы забег не заканчивает: он ждёт на сервере
   function pauseAndLeave() {
     closePause();
-    saveRunState();
     RUN = null;
     mode = null;
     applyTranslations();
     openRunHub();
   }
 
-  function giveUpRun() {
+  async function giveUpRun() {
     closePause();
-    clearRunState();
-    endRun();
+    try {
+      const res = await friendRpc('run_give_up');
+      await endRun({ score: res.score, rounds: res.rounds, secret: res.secret });
+    } catch (e) {
+      setMatchNote(friendErrorText(e.message));
+    }
   }
 
   // Поделиться результатом: системное окно «Поделиться» там, где оно есть
@@ -3581,90 +4644,115 @@
 
   // Режим на рейтинг играется на том же экране, что и одиночная игра:
   // термометр, история попыток и шкала берутся оттуда как есть
-  function startRun() {
-    RUN = { round: 1, totalScore: 0, locked: false };
-    mode = 'run';
-    startRunRound();
-    applyTranslations();
-    showScreen('game');
+  // Забег считает сервер: число, раунды, бюджет попыток и очки живут там.
+  // Клиент только показывает то, что ему прислали, и отправляет догадки
+  async function startRun(fresh) {
+    const L = t();
+    try {
+      const st = await friendRpc('run_start',
+        { p_frost: !!frostMode, p_fresh: !!fresh });
+      RUN = { round: 1, totalScore: 0, locked: false };
+      mode = 'run';
+      applyRunSnapshot(st);
+      applyTranslations();
+      showScreen('game');
+      renderAll();
+    } catch (e) {
+      setNote('runNote', friendErrorText(e.message), true);
+    }
   }
 
-  function startRunRound() {
-    if (!RUN) return;
-    applyBounds(runRangeForRound(RUN.round));
-    MAX_GUESSES = runAttemptsForRound(RUN.round, rangeCount());
-    secret = RANGE_MIN + Math.floor(Math.random() * rangeCount());
-    history = [];
+  // Единственный источник правды — снимок с сервера. Догадки клиент рисует из
+  // присланного списка: своих чисел он не помнит, чтобы после продолжения на
+  // другом устройстве история была та же самая
+  function applyRunSnapshot(st) {
+    if (!st || !RUN) return;
+    RANGE_MIN = st.rangeMin;
+    RANGE_MAX = st.rangeMax;
+    frostMode = !!st.frost;
+    MAX_GUESSES = st.allowed;
+    FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
+    RUN.round = st.round;
+    RUN.totalScore = st.score;
+    RUN.locked = false;
+    if (typeof st.best === 'number') rememberRunBest(st.best);
+    history = (st.movesLog || []).map(mv => ({
+      guess: mv.guess, distance: null, meta: FEEDBACK_META[mv.tier], p: null
+    }));
     gameOver = false;
     gameOverType = null;
-    RUN.locked = false;
+    secret = 0;
     document.getElementById('guessInput').value = '';
     applyRangeToInputs();
-    applyTranslations();
-    saveRunState();
   }
 
-  function runGuess() {
-    // locked — пауза между раундами: иначе можно ввести уже угаданное число ещё раз и получить очки повторно
+  async function runGuess() {
+    // locked — пауза между раундами: иначе можно успеть отправить ещё один ход,
+    // пока на экране висит «+очки»
     if (!RUN || RUN.locked) return;
     const input = document.getElementById('guessInput');
     const guess = parseInt(input.value);
     if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
-
-    const distance = Math.abs(guess - secret);
-    const meta = getFeedback(distance);
-    history.push({ guess, distance, meta, p: null });
+    RUN.locked = true;
     input.value = '';
+
+    let res;
+    try {
+      res = await friendRpc('run_guess', { p_guess: guess });
+    } catch (e) {
+      RUN.locked = false;
+      setMatchNote(friendErrorText(e.message));
+      return;
+    }
+    setMatchNote('');
+
+    const meta = FEEDBACK_META[res.tier];
+    history.push({ guess: guess, distance: null, meta: meta, p: null });
     soundForGuess(meta);
 
-    if (distance === 0) {
-      const roundPoints = Math.round(100 * RUN.round * (minAttempts(rangeCount()) / history.length));
-      RUN.totalScore += roundPoints;
-      RUN.locked = true;
-      RUN.round++;
-      renderAll();
-      saveRunState();
-      const L = t();
-      document.getElementById('feedbackLabel').textContent =
-        L.labels[8] + '  +' + withPlural(roundPoints, L.run.pointForms);
-      setTimeout(startRunRound, 900);
-    } else if (history.length >= MAX_GUESSES) {
+    if (res.over) {
       gameOver = true;
       soundGameOver();
       renderAll();
-      endRun();
-    } else {
-      renderAll();
-      saveRunState();
+      return endRun(res);
     }
+
+    if (res.roundWon) {
+      RUN.totalScore = res.state.score;
+      renderAll();
+      const L = t();
+      document.getElementById('feedbackLabel').textContent =
+        L.labels[8] + '  +' + withPlural(res.points, L.run.pointForms);
+      setTimeout(() => { applyRunSnapshot(res.state); applyTranslations(); renderAll(); }, 900);
+      return;
+    }
+
+    RUN.locked = false;
+    applyRunSnapshot(res.state);
+    history = (res.state.movesLog || []).map(mv => ({
+      guess: mv.guess, distance: null, meta: FEEDBACK_META[mv.tier], p: null
+    }));
+    renderAll();
   }
 
-  async function endRun() {
+  // Результат уже записан сервером: отправлять нечего, остаётся показать
+  async function endRun(res) {
     const L = t();
-    clearRunState();
-    const finalScore = RUN.totalScore;
-    const roundsSurvived = RUN.round - 1;
-    const secretWas = secret;
+    const finalScore = (res && typeof res.score === 'number') ? res.score : (RUN ? RUN.totalScore : 0);
+    const roundsSurvived = (res && typeof res.rounds === 'number')
+      ? res.rounds : (RUN ? RUN.round - 1 : 0);
+    const secretWas = (res && typeof res.secret === 'number') ? res.secret : secret;
     RUN = null;
     let resultHtml = '<div class="rr-title">' + L.run.over + '</div>' +
       '<p>' + L.run.secretWas + '<strong>' + secretWas + '</strong></p>' +
       '<p>' + L.run.roundsDone + '<strong>' + roundsSurvived + '</strong></p>' +
       '<p>' + L.run.finalScore + '<strong>' + finalScore + '</strong></p>';
-    const auth = runAuth();
-    if (auth && sb) {
-      try {
-        const { data, error } = await sb.rpc('submit_run_score', {
-          p_username: auth.username, p_pin: auth.pin, p_score: finalScore, p_rounds: roundsSurvived
-        });
-        if (error) {
-          resultHtml += '<p class="rr-error">' + L.run.errNoSave + escapeHtml(runAuthErrorText(error.message)) + '</p>';
-        } else if (data && data.length) {
-          rememberRunBest(data[0].best_score);
-          if (data[0].is_best) resultHtml += '<p class="rr-best">' + L.run.newBest + '</p>';
-        }
-      } catch (e) {
-        resultHtml += '<p class="rr-error">' + L.run.errNoSave + L.run.errNoConn + '</p>';
-      }
+    // Счёт записан там же, где считался. Рекорд узнаём из состояния, а не
+    // из ответа на отправку: отправлять больше нечего
+    const wasBest = finalScore > 0 && finalScore >= runBest();
+    if (wasBest) {
+      rememberRunBest(finalScore);
+      resultHtml += '<p class="rr-best">' + L.run.newBest + '</p>';
     }
     resultHtml = '<div class="run-result">' + resultHtml +
       '<button class="btn-ghost" id="shareBtn" onclick="shareRunResult(' +
@@ -3696,6 +4784,10 @@
   // Приписать его текущему аккаунту нельзя: именно так и появлялся чужой рекорд.
   // Убираем; свой вернётся с сервера после первой же доигранной партии
   try { localStorage.removeItem('hc_run_best'); } catch (e) {}
+
+  // Прежние версии держали незаконченный забег в браузере. Теперь он на
+  // сервере, и локальная копия только сбивала бы с толку
+  try { localStorage.removeItem('hc_run_state'); } catch (e) {}
 
   // Подписи на прямой расставляются по ширине экрана, поэтому поворот телефона
   // или смена размера окна требуют пересчёта
