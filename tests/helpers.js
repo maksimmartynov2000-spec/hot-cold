@@ -124,7 +124,9 @@ function stubSupabase(opts) {
             const kind = M.forced;
             M.forced = null;
             if (kind === 'skip') { M.moves.push({ seat: M.cur, timeout: false, guess: 0, tier: 0 }); }
-            M.cur = 1 - M.cur;
+            // Взведённый жетон оставляет ход за игроком — так же, как на сервере
+            if (M.armed) M.armed = false;
+            else M.cur = 1 - M.cur;
             return { data: kind, error: null };
           }
           if (name === 'next_match_round') {
