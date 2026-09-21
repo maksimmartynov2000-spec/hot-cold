@@ -1,0 +1,30 @@
+create or replace function suggest_students(p_username text, p_pin text)
+returns table(username text, best_run_score int, last_seen timestamptz)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  return query
+  select s.username, s.best_run_score, act.seen
+  from students s
+  cross join lateral (
+    select greatest(
+      s.created_at,
+      coalesce((select max(r.created_at) from runs r where r.username = s.username), s.created_at),
+      coalesce((select max(m.updated_at) from matches m
+                where m.p0 = s.username or m.p1 = s.username), s.created_at)
+    ) as seen
+  ) act
+  where s.username <> me
+    and friend_status(me, s.username) is null
+  order by act.seen desc, s.username
+  limit 10;
+end;
+$$;
+
+grant execute on function suggest_students(text, text) to anon;

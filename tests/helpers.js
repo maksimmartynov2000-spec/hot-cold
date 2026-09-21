@@ -31,6 +31,7 @@ function stubSupabase(opts) {
           }
           if (name === 'list_friends') return { data: window.__friends || [], error: null };
           if (name === 'find_students') return { data: window.__found || [], error: null };
+          if (name === 'suggest_students') return { data: window.__suggested || [], error: null };
           if (name === 'send_friend_request') return { data: 'outgoing', error: null };
           if (name === 'respond_friend_request') return { data: args.p_accept ? 'friend' : 'declined', error: null };
           if (name === 'remove_friend') return { data: true, error: null };
