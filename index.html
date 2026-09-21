@@ -356,12 +356,53 @@
     .fr-note.bad { color: #f87171; }
 
     /* ---------- Рейтинговый онлайн ---------- */
-    .rk-block {
-      margin-top: 0;
-      background: rgba(251, 191, 36, 0.07);
-      border: 1px solid rgba(251, 191, 36, 0.22);
-      border-radius: 14px;
-      padding: 16px 14px 14px;
+    /* Две вкладки на весь экран: играть сейчас или звать знакомого */
+    .ol-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 18px;
+    }
+    .ol-tab {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.55);
+      border-radius: 12px;
+      padding: 10px 6px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .ol-tab.active {
+      background: rgba(251, 191, 36, 0.14);
+      border-color: rgba(251, 191, 36, 0.5);
+      color: #fbbf24;
+    }
+    /* Разновидности рейтинга. Подпись на кнопке и есть описание правил:
+       «−100…100 · бонусы» говорит ровно то, что нужно знать до игры */
+    .rk-modes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .rk-mode {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.6);
+      border-radius: 10px;
+      padding: 8px 6px;
+      font-family: inherit;
+      cursor: pointer;
+      text-align: center;
+    }
+    .rk-mode .rm-name { font-size: 12px; font-weight: 700; }
+    .rk-mode .rm-elo { font-size: 11px; opacity: 0.6; margin-top: 2px; }
+    .rk-mode.active {
+      background: rgba(251, 191, 36, 0.14);
+      border-color: rgba(251, 191, 36, 0.5);
+      color: #fbbf24;
     }
     .rk-head {
       display: flex;
@@ -369,14 +410,9 @@
       justify-content: space-between;
       gap: 10px;
     }
-    .rk-head .lb-title { margin-bottom: 0; }
+    .rk-head { margin-bottom: 12px; }
+    .rk-head .lb-title { margin-bottom: 0; font-size: 13px; color: rgba(255, 255, 255, 0.75); }
     .rk-elo { font-size: 15px; font-weight: 700; color: #fbbf24; white-space: nowrap; }
-    .rk-rules {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.4);
-      margin: 6px 0 12px;
-      line-height: 1.4;
-    }
     .rk-wait { margin-top: 10px; }
     /* Пока ищем соперника, единственное, что меняется, — это строка ожидания.
        Она должна быть заметна, но не мигать: точки дорисовываются в тексте */
@@ -384,7 +420,13 @@
       font-size: 13px;
       color: #fbbf24;
       text-align: center;
-      padding: 6px 0 10px;
+      padding: 6px 0 2px;
+    }
+    .rk-wait-sub {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      text-align: center;
+      padding-bottom: 10px;
     }
     .rk-row-tag {
       font-size: 11px;
@@ -1355,20 +1397,30 @@
   <div id="screenOnline" class="hidden">
     <div class="run-greeting hidden" id="onlineGreeting"></div>
 
-    <!-- Рейтинг стоит первым: это ответ на «хочу играть прямо сейчас».
-         Вызов друга ниже — он требует, чтобы друг был на связи -->
-    <div class="fr-block rk-block">
+    <!-- Две разные вещи: сыграть прямо сейчас с кем угодно и позвать знакомого.
+         На одном экране они мешали друг другу -->
+    <div class="ol-tabs">
+      <button class="ol-tab" id="tTabRanked" onclick="setOnlineTab('ranked')"></button>
+      <button class="ol-tab" id="tTabFriends" onclick="setOnlineTab('friends')"></button>
+    </div>
+
+    <div id="olRanked">
+      <div class="rk-modes" id="rkModes"></div>
       <div class="rk-head">
-        <div class="lb-title" id="tRkTitle"></div>
+        <div class="lb-title" id="rkModeName"></div>
         <div class="rk-elo" id="rkElo"></div>
       </div>
-      <div class="rk-rules" id="tRkRules"></div>
-      <div class="rk-rules" id="rkLast"></div>
       <div class="fr-note hidden" id="rkNote"></div>
       <button class="btn btn-block" id="tRkPlay" onclick="startRanked()"></button>
       <div class="rk-wait hidden" id="rkWaitBox">
         <div class="rk-wait-text" id="rkWaitText"></div>
+        <div class="rk-wait-sub" id="rkWaitSub"></div>
         <button class="btn-ghost btn-block" id="tRkCancel" onclick="cancelRanked()"></button>
+      </div>
+      <div class="fr-block">
+        <div class="lb-title" id="tRkGames"></div>
+        <div class="fr-note hidden" id="rkGamesNote"></div>
+        <div id="rkGamesList" class="friend-list"></div>
       </div>
       <div class="lb-wrap">
         <div class="lb-title" id="tRkTop"></div>
@@ -1376,6 +1428,7 @@
       </div>
     </div>
 
+    <div id="olFriends" class="hidden">
     <div class="setup-field">
       <label id="tLblFindFriend">Find a player</label>
       <div class="row">
@@ -1430,6 +1483,7 @@
       <div class="lb-title" id="tFriendsTitle">Friends</div>
       <div class="fr-note hidden" id="friendsNote"></div>
       <div id="friendsList" class="friend-list"></div>
+    </div>
     </div>
 
     <div class="run-hub-actions">
@@ -1557,8 +1611,12 @@
         nobodyYet: "Nobody else has played yet",
         errNotPlaying: "The game is not running",
         errNoRequest: "The request is gone",
-        rkTitle: "\ud83c\udfc6 Ranked",
-        rkRules: "1\u2013100, first to 3 wins, no bonuses, 30 s per move. Miss two moves in a row and the game is lost.",
+        tabRanked: "\ud83c\udfc6 Ranked",
+        tabFriends: "\ud83d\udc65 Friends",
+        rkBonusTag: "bonuses",
+        rkGames: "Your ranked games",
+        rkNoGames: "No ranked game going on",
+        rkOtherMode: "You are waiting in {mode} \u2014 pressing Play moves you here",
         rkPlay: "Play ranked",
         rkElo: "{n} \u00b7 {g} games",
         rkSearching: "Looking for an opponent",
@@ -1726,8 +1784,12 @@
         nobodyYet: "Пока больше никто не играл",
         errNotPlaying: "Игра не идёт",
         errNoRequest: "Заявки больше нет",
-        rkTitle: "\ud83c\udfc6 Рейтинг",
-        rkRules: "1\u2013100, до 3 побед, без бонусов, 30 с на ход. Два пропущенных хода подряд — поражение.",
+        tabRanked: "\ud83c\udfc6 Рейтинг",
+        tabFriends: "\ud83d\udc65 С друзьями",
+        rkBonusTag: "бонусы",
+        rkGames: "Ваши рейтинговые игры",
+        rkNoGames: "Рейтинговая игра не идёт",
+        rkOtherMode: "Вы ждёте в режиме {mode} — «Играть» перенесёт сюда",
         rkPlay: "Играть на рейтинг",
         rkElo: "{n} \u00b7 игр: {g}",
         rkSearching: "Ищем соперника",
@@ -1895,8 +1957,12 @@
         nobodyYet: "Personne d\u2019autre n\u2019a encore jou\u00e9",
         errNotPlaying: "La partie n\u2019est pas en cours",
         errNoRequest: "La demande n'existe plus",
-        rkTitle: "\ud83c\udfc6 Class\u00e9",
-        rkRules: "1\u2013100, en 3 manches gagnantes, sans bonus, 30 s par coup. Deux coups manqu\u00e9s de suite : partie perdue.",
+        tabRanked: "\ud83c\udfc6 Class\u00e9",
+        tabFriends: "\ud83d\udc65 Amis",
+        rkBonusTag: "bonus",
+        rkGames: "Vos parties class\u00e9es",
+        rkNoGames: "Aucune partie class\u00e9e en cours",
+        rkOtherMode: "Vous attendez en {mode} \u2014 \u00ab Jouer \u00bb vous d\u00e9place ici",
         rkPlay: "Jouer en class\u00e9",
         rkElo: "{n} \u00b7 {g} parties",
         rkSearching: "Recherche d'un adversaire",
@@ -2064,8 +2130,12 @@
         nobodyYet: "Sonst hat noch niemand gespielt",
         errNotPlaying: "Die Partie l\u00e4uft nicht",
         errNoRequest: "Die Anfrage gibt es nicht mehr",
-        rkTitle: "\ud83c\udfc6 Rangliste",
-        rkRules: "1\u2013100, bis 3 Siege, ohne Boni, 30 s pro Zug. Zwei verpasste Z\u00fcge hintereinander: Partie verloren.",
+        tabRanked: "\ud83c\udfc6 Rangliste",
+        tabFriends: "\ud83d\udc65 Freunde",
+        rkBonusTag: "Boni",
+        rkGames: "Ihre Ranglistenpartien",
+        rkNoGames: "Keine Ranglistenpartie im Gang",
+        rkOtherMode: "Sie warten in {mode} \u2014 \u201eSpielen\u201c verschiebt Sie hierher",
         rkPlay: "Um Punkte spielen",
         rkElo: "{n} \u00b7 {g} Partien",
         rkSearching: "Gegner wird gesucht",
@@ -2600,11 +2670,12 @@
     document.getElementById('tFriendsTitle').textContent = L.online.friends;
     document.getElementById('tOnlineBack').textContent = L.online.back;
     document.getElementById('tGamesTitle').textContent = L.online.games;
-    document.getElementById('tRkTitle').textContent = L.online.rkTitle;
-    document.getElementById('tRkRules').textContent = L.online.rkRules;
+    document.getElementById('tTabRanked').textContent = L.online.tabRanked;
+    document.getElementById('tTabFriends').textContent = L.online.tabFriends;
     document.getElementById('tRkPlay').textContent = L.online.rkPlay;
     document.getElementById('tRkCancel').textContent = L.online.rkCancel;
     document.getElementById('tRkTop').textContent = L.online.rkTop;
+    document.getElementById('tRkGames').textContent = L.online.rkGames;
     document.getElementById('tChRange').textContent = L.online.chRange;
     document.getElementById('tChFrost').textContent = L.frostLabel;
     document.getElementById('tChWins').textContent = L.online.chWins;
@@ -4131,8 +4202,13 @@
     setNote('searchNote', '');
     setNote('friendsNote', '');
     setNote('gamesNote', '');
+    setNote('rkGamesNote', '');
+    setNote('rkNote', '');
     closeChallenge();
     applyTranslations();
+    setOnlineTab(onlineTab);
+    renderRankedModes();
+    renderRanked(null);
     showScreen('online');
     startFriendsPoll();
     loadFriends();
@@ -4308,12 +4384,22 @@
   async function loadMatches(quiet) {
     try {
       const rows = (await friendRpc('list_matches')) || [];
-      const box = document.getElementById('gamesList');
-      box.innerHTML = '';
-      rows.forEach(m => box.appendChild(matchRow(m)));
-      setNote('gamesNote', rows.length ? '' : t().online.noGames);
+      const L = t().online;
+      const split = [
+        { rows: rows.filter(m => !m.ranked), box: 'gamesList', note: 'gamesNote', empty: L.noGames },
+        { rows: rows.filter(m => m.ranked), box: 'rkGamesList', note: 'rkGamesNote', empty: L.rkNoGames }
+      ];
+      split.forEach(part => {
+        const box = document.getElementById(part.box);
+        box.innerHTML = '';
+        part.rows.forEach(m => box.appendChild(matchRow(m)));
+        setNote(part.note, part.rows.length ? '' : part.empty);
+      });
     } catch (e) {
-      if (!quiet) setNote('gamesNote', onlineMatchError(e.message), true);
+      if (!quiet) {
+        setNote('gamesNote', onlineMatchError(e.message), true);
+        setNote('rkGamesNote', onlineMatchError(e.message), true);
+      }
     }
   }
 
@@ -4480,14 +4566,29 @@
   // и следующий раунд уходят на сервер, а не считаются здесь
   const MATCH_POLL_MS = 2000;
   // ================= РЕЙТИНГОВЫЙ ОНЛАЙН =================
-  // Условия здесь не настраиваются: 1–100, до трёх побед, без бонусов. Иначе
-  // рейтинг сравнивал бы игры, которые не сравнимы. Настройки остались у вызова
-  // друга — там играют для интереса, а не ради числа
+  // Четыре разновидности, у каждой свой отдельный рейтинг. Номер режима —
+  // два бита: младший включает мороз и жару, старший — бонусы. Ровно то же
+  // правило действует на сервере, поэтому подпись кнопки всегда совпадает
+  // с тем, во что раздадут играть
   const RANKED_POLL_MS = 3000;
+  const RANKED_MODES = [0, 1, 2, 3];
   let rankedTimer = null;
   let rankedBusy = false;
   let rankedInQueue = false;
   let rankedMatchId = null;
+  let rankedMode = (function () {
+    try {
+      const v = parseInt(localStorage.getItem('hc_rkmode'));
+      return (v >= 0 && v <= 3) ? v : 0;
+    } catch (e) { return 0; }
+  })();
+  let rankedRatings = null;
+  // Вкладка запоминается: возвращаться всегда на рейтинг, когда играешь
+  // только с друзьями, — лишнее нажатие каждый раз
+  let onlineTab = (function () {
+    try { return localStorage.getItem('hc_oltab') === 'friends' ? 'friends' : 'ranked'; }
+    catch (e) { return 'ranked'; }
+  })();
 
   function startRankedPoll() {
     stopRankedPoll();
@@ -4499,6 +4600,59 @@
 
   function stopRankedPoll() {
     if (rankedTimer) { clearInterval(rankedTimer); rankedTimer = null; }
+  }
+
+  function rankedModeFrost(mode) { return (mode & 1) === 1; }
+  function rankedModeBonuses(mode) { return (mode & 2) === 2; }
+
+  function rankedModeLabel(mode) {
+    const L = t().online;
+    const bounds = rankedModeFrost(mode) ? '−100…100' : '1–100';
+    return bounds + (rankedModeBonuses(mode) ? ' · ' + L.rkBonusTag : '');
+  }
+
+  function setOnlineTab(name) {
+    onlineTab = name;
+    try { localStorage.setItem('hc_oltab', name); } catch (e) {}
+    document.getElementById('olRanked').classList.toggle('hidden', name !== 'ranked');
+    document.getElementById('olFriends').classList.toggle('hidden', name !== 'friends');
+    document.getElementById('tTabRanked').classList.toggle('active', name === 'ranked');
+    document.getElementById('tTabFriends').classList.toggle('active', name === 'friends');
+  }
+
+  // Переключение разновидности выводит из очереди: ждать в двух местах нельзя,
+  // иначе человека затянуло бы в две партии сразу
+  async function setRankedMode(mode) {
+    if (mode === rankedMode) return;
+    const wasQueued = rankedInQueue;
+    rankedMode = mode;
+    try { localStorage.setItem('hc_rkmode', String(mode)); } catch (e) {}
+    if (wasQueued) await cancelRanked();
+    renderRankedModes();
+    renderRanked(null);
+    loadEloTop();
+    loadRanked(true);
+  }
+
+  function renderRankedModes() {
+    const box = document.getElementById('rkModes');
+    if (!box) return;
+    box.innerHTML = '';
+    RANKED_MODES.forEach(mode => {
+      const b = document.createElement('button');
+      b.className = 'rk-mode' + (mode === rankedMode ? ' active' : '');
+      b.dataset.mode = mode;
+      const name = document.createElement('div');
+      name.className = 'rm-name';
+      name.textContent = rankedModeLabel(mode);
+      const elo = document.createElement('div');
+      elo.className = 'rm-elo';
+      const r = rankedRatings && rankedRatings[mode];
+      elo.textContent = r ? formatNum(r.elo) : '';
+      b.appendChild(name); b.appendChild(elo);
+      b.onclick = () => setRankedMode(mode);
+      box.appendChild(b);
+    });
   }
 
   // Давность в человеческих словах. Меньше полутора минут — «только что»:
@@ -4514,15 +4668,17 @@
 
   function renderRanked(st) {
     const L = t().online;
-    document.getElementById('rkElo').textContent =
-      L.rkElo.replace('{n}', formatNum(st.elo)).replace('{g}', st.games);
-    document.getElementById('rkLast').textContent = rankedAgoText(st.lastAgo);
+    const mine = rankedRatings && rankedRatings[rankedMode];
+    document.getElementById('rkModeName').textContent = rankedModeLabel(rankedMode);
+    document.getElementById('rkElo').textContent = mine
+      ? L.rkElo.replace('{n}', formatNum(mine.elo)).replace('{g}', mine.games)
+      : '';
 
     const play = document.getElementById('tRkPlay');
     play.textContent = rankedMatchId ? L.rkResume : L.rkPlay;
     play.classList.toggle('hidden', rankedInQueue);
     document.getElementById('rkWaitBox').classList.toggle('hidden', !rankedInQueue);
-    if (!rankedInQueue) return;
+    if (!rankedInQueue || !st) return;
 
     // Точки в конце — единственная живая деталь на экране ожидания: по ней
     // видно, что опрос идёт, а не подвис
@@ -4532,15 +4688,19 @@
       L.rkWaited.replace('{n}', st.waited),
       st.queue > 1 ? L.rkQueueMany.replace('{n}', st.queue) : L.rkQueueOne
     ].join(' · ');
+    // Когда ждёшь один, единственное полезное — давно ли тут вообще играли
+    document.getElementById('rkWaitSub').textContent =
+      st.queue > 1 ? '' : rankedAgoText(st.lastAgo);
   }
 
   async function loadRanked(quiet) {
     try {
-      const st = await friendRpc('ranked_status');
+      const st = await friendRpc('ranked_status', { p_mode: rankedMode });
       if (!st) return;
       const wasQueued = rankedInQueue;
       rankedMatchId = st.matchId || null;
       rankedInQueue = !!st.inQueue;
+      rankedRatings = st.ratings || null;
       // В матч затягиваем только того, кто стоял в очереди и ждал именно этого.
       // Иначе с экрана начатой игры было бы не уйти: он открывался бы заново
       if (rankedMatchId && wasQueued) {
@@ -4549,8 +4709,14 @@
         return openMatch(rankedMatchId);
       }
       if (rankedInQueue && !rankedTimer) startRankedPoll();
+      renderRankedModes();
       renderRanked(st);
-      if (!quiet) setNote('rkNote', '');
+      // Ждём в другой разновидности — об этом надо сказать, иначе «Играть»
+      // здесь выглядит как потеря очереди без причины
+      const other = (st.queueMode === null || st.queueMode === undefined || st.inQueue)
+        ? '' : t().online.rkOtherMode.replace('{mode}', rankedModeLabel(st.queueMode));
+      if (other) setNote('rkNote', other);
+      else if (!quiet) setNote('rkNote', '');
     } catch (e) {
       if (!quiet) setNote('rkNote', onlineMatchError(e.message), true);
     }
@@ -4562,7 +4728,7 @@
     rankedBusy = true;
     setNote('rkNote', '');
     try {
-      const r = await friendRpc('join_ranked_queue');
+      const r = await friendRpc('join_ranked_queue', { p_mode: rankedMode });
       if (r && r.matchId) {
         rankedInQueue = false;
         rankedMatchId = r.matchId;
@@ -4596,7 +4762,7 @@
     const box = document.getElementById('rkTopList');
     if (!box) return;
     try {
-      const { data, error } = await sb.rpc('elo_leaderboard');
+      const { data, error } = await sb.rpc('elo_leaderboard', { p_mode: rankedMode });
       if (error) throw new Error(error.message);
       const rows = data || [];
       const me = (runAuth() || {}).username;

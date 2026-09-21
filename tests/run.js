@@ -1936,7 +1936,7 @@ async function testFriends(browser) {
   await done(page);
 
   // Список тех, кто недавно играл, — на месте пустого поиска
-  page = await newGame(browser, { user: 'Лев' });
+  page = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await page.evaluate(() => {
     window.__suggested = [{ username: 'Гриша', best_run_score: 300 },
                           { username: 'Поля', best_run_score: 0 }];
@@ -1972,7 +1972,7 @@ async function testFriends(browser) {
   await done(page);
 
   // Поиск
-  page = await newGame(browser, { user: 'Лев' });
+  page = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await page.click('#tModeOnline');
   await page.waitForTimeout(400);
 
@@ -2024,7 +2024,7 @@ async function testFriends(browser) {
   await done(page);
 
   // Список: входящие первыми
-  page = await newGame(browser, { user: 'Лев' });
+  page = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await page.evaluate(() => {
     window.__friends = [{ username: 'Яна', relation: 'outgoing' },
                         { username: 'Аня', relation: 'friend' },
@@ -2057,7 +2057,7 @@ async function testFriends(browser) {
   await done(page);
 
   // Ошибки сервера читаются по-человечески
-  page = await newGame(browser, { user: 'Лев' });
+  page = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await page.evaluate(() => {
     window.__found = [{ username: 'Максим', best_run_score: 0, relation: null }];
   });
@@ -2079,7 +2079,7 @@ async function testFriends(browser) {
   await done(page);
 
   // Опрос идёт только пока экран открыт
-  page = await newGame(browser, { user: 'Лев' });
+  page = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await page.click('#tModeOnline');
   await page.waitForTimeout(400);
   check('опрос запущен', await page.evaluate(() => friendsTimer !== null));
@@ -2094,7 +2094,7 @@ async function testFriends(browser) {
 async function testOnlineMatch(browser) {
   console.log('\nОнлайн: матч');
 
-  const page = await newGame(browser, { user: 'Лев' });
+  const page = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await page.evaluate(() => {
     window.__friends = [{ username: 'Кира', relation: 'friend' }];
     window.__matches = [{ id: 1, other: 'Кира', seat: 1, status: 'invited',
@@ -2199,7 +2199,7 @@ async function testOnlineMatch(browser) {
   await done(page);
 
   // Вызов друга
-  const p2 = await newGame(browser, { user: 'Лев' });
+  const p2 = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await p2.evaluate(() => { window.__friends = [{ username: 'Кира', relation: 'friend' }]; });
   await p2.click('#tModeOnline');
   await p2.waitForTimeout(400);
@@ -2229,7 +2229,7 @@ async function testOnlineMatch(browser) {
 async function testOnlineClock(browser) {
   console.log('\nОнлайн: часы и бонусы');
 
-  const page = await newGame(browser, { user: 'Лев' });
+  const page = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await page.evaluate(() => {
     window.__friends = [{ username: 'Кира', relation: 'friend' }];
     window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
@@ -2287,7 +2287,7 @@ async function testOnlineClock(browser) {
   await done(page);
 
   // Закрытый ход приезжает без числа, и клиент его не выдумывает
-  const p2 = await newGame(browser, { user: 'Лев' });
+  const p2 = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await p2.evaluate(() => {
     window.__friends = [{ username: 'Кира', relation: 'friend' }];
     window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
@@ -2314,7 +2314,7 @@ async function testOnlineClock(browser) {
   await done(p2);
 
   // Вынужденный ход в онлайне идёт на сервер
-  const p3 = await newGame(browser, { user: 'Лев' });
+  const p3 = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await p3.evaluate(() => {
     window.__friends = [{ username: 'Кира', relation: 'friend' }];
     window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
@@ -2336,7 +2336,7 @@ async function testOnlineClock(browser) {
   await done(p3);
 
   // Бонусы в окне вызова
-  const p4 = await newGame(browser, { user: 'Лев' });
+  const p4 = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await p4.evaluate(() => { window.__friends = [{ username: 'Кира', relation: 'friend' }]; });
   await p4.click('#tModeOnline');
   await p4.waitForTimeout(400);
@@ -2369,7 +2369,7 @@ async function testOnlineClock(browser) {
 async function testPhrases(browser) {
   console.log('\nОнлайн: готовые фразы');
 
-  const page = await newGame(browser, { user: 'Лев' });
+  const page = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await page.evaluate(() => {
     window.__friends = [{ username: 'Кира', relation: 'friend' }];
     window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
@@ -2439,7 +2439,7 @@ async function testPhrases(browser) {
   await done(page);
 
   // В местной игре фраз нет: там соперник рядом
-  const solo = await newGame(browser, { user: 'Лев' });
+  const solo = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await solo.click('#tModeDuel');
   await solo.waitForTimeout(200);
   await solo.click('#tStartMatch');
@@ -2455,59 +2455,142 @@ async function testRanked(browser) {
 
   let page = await newGame(browser, { user: 'Лев' });
   await page.evaluate(() => {
-    window.__rankedQ.elo = 1180;
-    window.__rankedQ.games = 7;
+    window.__rankedQ.ratings = { 0: { elo: 1180, games: 7 }, 1: { elo: 940, games: 4 },
+                                 2: { elo: 1000, games: 0 }, 3: { elo: 1520, games: 12 } };
     window.__rankedQ.lastAgo = 240;
-    window.__eloTop = [{ username: 'Кира', elo: 1300, games: 9 },
-                       { username: 'Лев', elo: 1180, games: 7 }];
+    window.__eloTop = {
+      0: [{ username: 'Кира', elo: 1300, games: 9 }, { username: 'Лев', elo: 1180, games: 7 }],
+      3: [{ username: 'Лев', elo: 1520, games: 12 }]
+    };
+    window.__matches = [
+      { id: 1, other: 'Кира', seat: 1, status: 'invited', round: 1, wins: [0, 0],
+        my_turn: false, ranked: false },
+      { id: 7, other: 'Гриша', seat: 0, status: 'active', round: 2, wins: [1, 0],
+        my_turn: true, ranked: true }
+    ];
   });
   await page.click('#tModeOnline');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(600);
 
-  const hub = await page.evaluate(() => ({
-    elo: document.getElementById('rkElo').textContent.replace(/[\s\u00a0\u202f]/g, ''),
-    rules: document.getElementById('tRkRules').textContent,
-    last: document.getElementById('rkLast').textContent,
-    play: document.getElementById('tRkPlay').textContent,
-    waiting: !document.getElementById('rkWaitBox').classList.contains('hidden'),
-    top: [...document.querySelectorAll('#rkTopList .lb-row')].map(r => r.textContent),
-    // Рейтинг стоит выше вызова друга: за ним пришли в первую очередь
-    rankedFirst: document.querySelector('.rk-block').compareDocumentPosition(
-      document.getElementById('gamesList')) & Node.DOCUMENT_POSITION_FOLLOWING
+  // Вкладки: рейтинг открыт по умолчанию, друзья спрятаны
+  const tabs = await page.evaluate(() => ({
+    ranked: !document.getElementById('olRanked').classList.contains('hidden'),
+    friends: !document.getElementById('olFriends').classList.contains('hidden'),
+    names: [...document.querySelectorAll('.ol-tab')].map(b => b.textContent),
+    active: [...document.querySelectorAll('.ol-tab')].map(b => b.classList.contains('active'))
   }));
-  check('свой рейтинг и число игр видны', hub.elo.indexOf('1180') >= 0 && hub.elo.indexOf('7') >= 0, hub.elo);
-  check('условия рейтинговой игры названы',
-    hub.rules.indexOf('100') >= 0 && hub.rules.indexOf('3') >= 0, hub.rules);
-  check('видно, когда в рейтинге играли',
-    hub.last.indexOf('4 мин назад') >= 0, hub.last);
-  check('кнопка предлагает играть, а не продолжать', hub.play === 'Играть на рейтинг', hub.play);
-  check('ожидания нет, пока не нажали', !hub.waiting);
-  check('в топе те, кто сыграл достаточно',
-    hub.top.length === 2 && hub.top[0].indexOf('Кира') >= 0, hub.top.join(' | '));
-  check('рейтинг стоит выше списка игр', !!hub.rankedFirst);
+  check('две вкладки с понятными названиями',
+    tabs.names.length === 2 && tabs.names[0].indexOf('Рейтинг') >= 0 &&
+    tabs.names[1].indexOf('друзьями') >= 0, tabs.names.join(' | '));
+  check('по умолчанию открыт рейтинг', tabs.ranked && !tabs.friends);
+  check('и вкладка отмечена активной', tabs.active.join() === 'true,false', tabs.active.join());
 
-  // Очередь: кнопка сменяется ожиданием, и в нём написано, что происходит
-  await page.click('#tRkPlay');
+  // Описание правил убрано: его заменяют подписи разновидностей
+  const modes = await page.evaluate(() => ({
+    names: [...document.querySelectorAll('#rkModes .rm-name')].map(e => e.textContent),
+    elos: [...document.querySelectorAll('#rkModes .rm-elo')].map(e => e.textContent.replace(/[\s  ]/g, '')),
+    active: [...document.querySelectorAll('.rk-mode')].map(b => b.classList.contains('active')),
+    rules: !!document.getElementById('tRkRules'),
+    head: document.getElementById('rkModeName').textContent,
+    elo: document.getElementById('rkElo').textContent.replace(/[\s  ]/g, '')
+  }));
+  check('четыре разновидности с условиями прямо в названии',
+    modes.names.join(' | ') === '1–100 | −100…100 | 1–100 · бонусы | −100…100 · бонусы',
+    modes.names.join(' | '));
+  check('у каждой свой рейтинг прямо на кнопке',
+    modes.elos.join() === '1180,940,1000,1520', modes.elos.join());
+  check('длинного описания правил больше нет', !modes.rules);
+  check('выбрана первая разновидность', modes.active.join() === 'true,false,false,false', modes.active.join());
+  check('в заголовке названа выбранная разновидность и её рейтинг',
+    modes.head === '1–100' && modes.elo.indexOf('1180') >= 0, modes.head + ' / ' + modes.elo);
+
+  const top0 = await page.evaluate(() =>
+    [...document.querySelectorAll('#rkTopList .lb-row')].map(r => r.textContent));
+  check('топ показан для выбранной разновидности',
+    top0.length === 2 && top0[0].indexOf('Кира') >= 0, top0.join(' | '));
+
+  // Переключение разновидности меняет и рейтинг, и топ
+  await page.click('.rk-mode[data-mode="3"]');
+  await page.waitForTimeout(600);
+  const switched = await page.evaluate(() => ({
+    head: document.getElementById('rkModeName').textContent,
+    elo: document.getElementById('rkElo').textContent.replace(/[\s  ]/g, ''),
+    active: [...document.querySelectorAll('.rk-mode')].map(b => b.classList.contains('active')),
+    top: [...document.querySelectorAll('#rkTopList .lb-row')].map(r => r.textContent)
+  }));
+  check('переключение меняет выбранную разновидность',
+    switched.active.join() === 'false,false,false,true', switched.active.join());
+  check('и показывает её рейтинг',
+    switched.head === '−100…100 · бонусы' && switched.elo.indexOf('1520') >= 0,
+    switched.head + ' / ' + switched.elo);
+  check('и её собственный топ',
+    switched.top.length === 1 && switched.top[0].indexOf('Лев') >= 0, switched.top.join(' | '));
+
+  // Списки игр разъехались по вкладкам
+  const lists = await page.evaluate(() => ({
+    rk: [...document.querySelectorAll('#rkGamesList .friend-row')].map(r => r.dataset.id),
+    fr: [...document.querySelectorAll('#gamesList .friend-row')].map(r => r.dataset.id)
+  }));
+  check('рейтинговая игра лежит на вкладке рейтинга', lists.rk.join() === '7', lists.rk.join());
+  check('вызов друга — на вкладке друзей', lists.fr.join() === '1', lists.fr.join());
+
+  await page.click('#tTabFriends');
+  await page.waitForTimeout(250);
+  const onFriends = await page.evaluate(() => ({
+    ranked: !document.getElementById('olRanked').classList.contains('hidden'),
+    friends: !document.getElementById('olFriends').classList.contains('hidden'),
+    search: !!document.querySelector('#olFriends #friendSearch')
+  }));
+  check('вкладка друзей прячет рейтинг', !onFriends.ranked && onFriends.friends);
+  check('и поиск игроков лежит именно на ней', onFriends.search);
+  await done(page);
+
+  // Очередь: своя на каждую разновидность, и стоять можно только в одной
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => { window.__rankedQ.lastAgo = 240; });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(500);
+  await page.click('.rk-mode[data-mode="1"]');
   await page.waitForTimeout(400);
+  await page.click('#tRkPlay');
+  await page.waitForTimeout(500);
   const queued = await page.evaluate(() => ({
     waiting: !document.getElementById('rkWaitBox').classList.contains('hidden'),
     playHidden: document.getElementById('tRkPlay').classList.contains('hidden'),
     text: document.getElementById('rkWaitText').textContent,
-    cancel: document.getElementById('tRkCancel').textContent
+    sub: document.getElementById('rkWaitSub').textContent,
+    mode: window.__rankedQ.mode
   }));
-  check('после нажатия видно ожидание', queued.waiting && queued.playHidden);
-  check('в ожидании сказано, что соперника ищут и сколько ждём',
+  check('встали в очередь выбранной разновидности', queued.mode === 1, String(queued.mode));
+  check('вместо кнопки видно ожидание', queued.waiting && queued.playHidden);
+  check('в ожидании сказано, что ищут и сколько ждём',
     queued.text.indexOf('Ищем соперника') >= 0 && queued.text.indexOf('в очереди') >= 0, queued.text);
   check('и что пока никого нет', queued.text.indexOf('только вы') >= 0, queued.text);
-  check('поиск можно отменить', queued.cancel === 'Отменить поиск', queued.cancel);
+  check('одинокому ожиданию подсказано, давно ли тут играли',
+    queued.sub.indexOf('4 мин назад') >= 0, queued.sub);
+
+  // Переключение разновидности во время ожидания выводит из очереди
+  await page.click('.rk-mode[data-mode="2"]');
+  await page.waitForTimeout(600);
+  const moved = await page.evaluate(() => ({
+    waiting: !document.getElementById('rkWaitBox').classList.contains('hidden'),
+    inQueue: window.__rankedQ.inQueue,
+    active: [...document.querySelectorAll('.rk-mode')].map(b => b.classList.contains('active'))
+  }));
+  check('смена разновидности выводит из очереди', !moved.waiting && moved.inQueue === false);
+  check('и выбирает новую', moved.active.join() === 'false,false,true,false', moved.active.join());
+  await done(page);
 
   // Соперник нашёлся — на доску переносит сам опрос, без нажатий
+  page = await newGame(browser, { user: 'Лев' });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(500);
+  await page.click('#tRkPlay');
+  await page.waitForTimeout(400);
   await page.evaluate(() => {
     window.__rankedQ.matchId = 7;
-    window.__match.id = 7;
-    window.__match.ranked = true;
-    window.__match.names = ['Кира', 'Лев'];
-    window.__match.seat = 1;
+    Object.assign(window.__match, { id: 7, ranked: true, rankedMode: 0,
+                                    names: ['Кира', 'Лев'], seat: 1 });
   });
   await page.waitForTimeout(4200);
   const onBoard = await page.locator('#screenGame').isVisible();
@@ -2515,8 +2598,7 @@ async function testRanked(browser) {
   check('клиент знает, что игра рейтинговая',
     await page.evaluate(() => !!online && online.ranked === true));
 
-  // Выход из рейтинговой игры спрашивает, а не выходит молча. Если на доску так
-  // и не попали, дальше идти некуда — но провал уже назван выше
+  // Выход из рейтинговой игры спрашивает, а не выходит молча
   if (onBoard) await page.click('#tMenu');
   await page.waitForTimeout(300);
   const ask = await page.evaluate(() => ({
@@ -2546,24 +2628,24 @@ async function testRanked(browser) {
     window.__matches = [{ id: 7, other: 'Кира', seat: 1, status: 'active',
                           round: 1, wins: [0, 0], my_turn: true, ranked: true }];
     Object.assign(window.__match, {
-      id: 7, ranked: true, names: ['Кира', 'Лев'], seat: 1, cur: 1,
+      id: 7, ranked: true, rankedMode: 2, names: ['Кира', 'Лев'], seat: 1, cur: 1,
       roundOver: true, roundWinner: 1, matchOver: true, wins: [0, 3],
       forfeitBy: 0, eloDelta: [-18, 18], elo: 1198, secret: 42
     });
   });
   await page.click('#tModeOnline');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(600);
   const row = await page.evaluate(() => {
-    const r = document.querySelector('#gamesList .friend-row');
+    const r = document.querySelector('#rkGamesList .friend-row');
     return { tag: r ? (r.querySelector('.rk-row-tag') || {}).textContent : null };
   });
-  check('в списке игр рейтинговая помечена', row.tag === 'рейтинг', String(row.tag));
+  check('в списке рейтинговых игра помечена', row.tag === 'рейтинг', String(row.tag));
 
-  await page.click('#gamesList .friend-row .fr-btn');
+  await page.click('#rkGamesList .friend-row .fr-btn');
   await page.waitForTimeout(700);
   // Число в карточке разбито пробелами по-русски — сравниваем без них
   const card = await page.evaluate(() =>
-    document.getElementById('resultBox').textContent.replace(/[\s\u00a0\u202f]/g, ''));
+    document.getElementById('resultBox').textContent.replace(/[\s  ]/g, ''));
   check('сказано, что соперник вышел из игры',
     card.indexOf('Киравышелизигры') >= 0, card);
   check('показан новый рейтинг и прибавка',
@@ -2571,7 +2653,7 @@ async function testRanked(browser) {
 
   // Продолжение начатой игры: кнопка меняет смысл, а не молча уносит на доску
   await page.click('.r-actions .btn');
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(700);
   const resume = await page.evaluate(() => ({
     online: !document.getElementById('screenOnline').classList.contains('hidden'),
     play: document.getElementById('tRkPlay').textContent

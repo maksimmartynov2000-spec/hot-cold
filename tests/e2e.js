@@ -128,8 +128,15 @@ async function registerPlayer(p, name, pin) {
   check('оба аккаунта зарегистрированы в настоящей базе',
     (await db.query("select count(*) from students where username in ('Тимур','Лада')")).rows[0].count === '2');
   check('после регистрации открылся онлайн', await A.page.locator('#screenOnline').isVisible());
+  check('по умолчанию открыта вкладка рейтинга',
+    await A.page.locator('#olRanked').isVisible() &&
+    !(await A.page.locator('#olFriends').isVisible()));
 
-  // Дружба
+  // Дружба: всё это живёт на своей вкладке
+  await A.page.click('#tTabFriends');
+  await B.page.click('#tTabFriends');
+  await A.page.waitForTimeout(300);
+  await B.page.waitForTimeout(300);
   await A.page.fill('#friendSearch', 'ла');
   await A.page.click('#tFindBtn');
   await A.page.waitForTimeout(600);
@@ -250,6 +257,16 @@ async function registerPlayer(p, name, pin) {
     (await A.page.locator('#screenOnline').isVisible()) &&
     (await B.page.locator('#screenOnline').isVisible()));
 
+  // Рейтинг: играем разновидность с морозом и бонусами — самую непохожую
+  await A.page.click('#tTabRanked');
+  await B.page.click('#tTabRanked');
+  await A.page.waitForTimeout(300);
+  await B.page.waitForTimeout(300);
+  await A.page.click('.rk-mode[data-mode="3"]');
+  await B.page.click('.rk-mode[data-mode="3"]');
+  await A.page.waitForTimeout(500);
+  await B.page.waitForTimeout(500);
+
   await A.page.click('#tRkPlay');
   await A.page.waitForTimeout(900);
   check('первый встал в очередь и ждёт', await A.page.locator('#rkWaitBox').isVisible());
@@ -262,10 +279,14 @@ async function registerPlayer(p, name, pin) {
   await B.page.click('#tRkPlay');
   await B.page.waitForTimeout(1500);
   const rk = (await db.query('select * from matches where ranked order by id desc limit 1')).rows[0];
-  check('рейтинговый матч создан на фиксированных условиях',
-    rk && rk.status === 'active' && rk.wins_needed === 3 && rk.range_min === 1 &&
-    rk.range_max === 100 && rk.bonuses_on === false && rk.frost === false,
-    JSON.stringify(rk && { s: rk.status, w: rk.wins_needed, r: rk.range_max, b: rk.bonuses_on }));
+  check('матч создан по правилам выбранной разновидности',
+    rk && rk.status === 'active' && rk.wins_needed === 3 && rk.ranked_mode === 3 &&
+    rk.range_min === -100 && rk.range_max === 100 && rk.bonuses_on === true && rk.frost === true,
+    JSON.stringify(rk && { s: rk.status, m: rk.ranked_mode, lo: rk.range_min,
+                           hi: rk.range_max, b: rk.bonuses_on, f: rk.frost }));
+  check('бонусы для этой разновидности действительно разложены',
+    (await db.query('select count(*) from match_bonuses where match_id = $1', [rk.id]))
+      .rows[0].count !== '0');
   check('второму сразу открылась доска', await B.page.locator('#screenGame').isVisible());
 
   // Ждавшего в матч затягивает его же опрос очереди — без нажатий
@@ -288,13 +309,15 @@ async function registerPlayer(p, name, pin) {
     JSON.stringify(gone));
   check('рейтинг посчитан один раз', gone.elo_applied === true);
 
-  const elos = (await db.query("select username, elo, elo_games from students " +
+  const elos = (await db.query("select username, mode, elo, games from elo_ratings " +
                                "where username in ('Тимур','Лада') order by username")).rows;
   const lada = elos.find(r => r.username === 'Лада');
   const timur = elos.find(r => r.username === 'Тимур');
   check('оставшийся вырос, ушедший упал',
-    timur.elo > 1000 && lada.elo < 1000 && timur.elo_games === 1 && lada.elo_games === 1,
-    JSON.stringify(elos));
+    timur && lada && timur.elo > 1000 && lada.elo < 1000 &&
+    timur.games === 1 && lada.games === 1, JSON.stringify(elos));
+  check('рейтинг записан именно в свою разновидность',
+    elos.every(r => r.mode === 3) && elos.length === 2, JSON.stringify(elos));
 
   // В карточке число разделено пробелами по-русски: сравниваем без них
   const card = (await A.page.locator('#resultBox').textContent()).replace(/[\s\u00a0\u202f]/g, '');
@@ -307,7 +330,8 @@ async function registerPlayer(p, name, pin) {
   check('всё шло через настоящие функции базы',
     calls.includes('match_guess') && calls.includes('match_state') &&
     calls.includes('send_phrase') && calls.includes('challenge_friend') &&
-    calls.includes('join_ranked_queue') && calls.includes('ranked_status'),
+    calls.includes('join_ranked_queue') && calls.includes('ranked_status') &&
+    calls.includes('elo_leaderboard'),
     [...new Set(calls)].join(', '));
 
   await browser.close();
