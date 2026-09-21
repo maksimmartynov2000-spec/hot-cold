@@ -43,11 +43,12 @@ async function testModes(browser) {
     document.getElementById('tModeSolo').textContent,
     document.getElementById('tModeDuel').textContent,
     document.getElementById('tModeRun').textContent,
-    document.getElementById('tModeOnline').textContent
+    document.getElementById('tModeOnline').textContent,
+    document.getElementById('tModeFriends').textContent
   ]);
-  check('в меню четыре режима с названиями', names.every(n => n && n.trim()), names.join(' / '));
-  check('карточек в меню тоже четыре',
-    await page.evaluate(() => document.querySelectorAll('#screenMode .mode-btn').length) === 4);
+  check('в меню пять режимов с названиями', names.every(n => n && n.trim()), names.join(' / '));
+  check('карточек в меню тоже пять',
+    await page.evaluate(() => document.querySelectorAll('#screenMode .mode-btn').length) === 5);
 
   // Тренировка
   await page.click('#tModeSolo');
@@ -1976,7 +1977,7 @@ async function testFriends(browser) {
 
   // Без аккаунта режим ведёт на вход, а после входа — обратно в онлайн
   let page = await newGame(browser);
-  await page.click('#tModeOnline');
+  await page.click('#tModeFriends');
   await page.waitForTimeout(250);
   check('без аккаунта просят войти', await page.locator('#screenAuthChoice').isVisible());
   await page.click('#tRunChoiceRegister');
@@ -1985,8 +1986,8 @@ async function testFriends(browser) {
   await page.fill('#runPin', '1234');
   await page.click('#runAuthSubmitBtn');
   await page.waitForTimeout(400);
-  check('после входа возвращаемся в онлайн, а не в рейтинг',
-    await page.locator('#screenOnline').isVisible());
+  check('после входа попадаем туда, откуда пришли',
+    await page.locator('#screenFriends').isVisible());
   check('на экране написано, кто играет',
     (await page.locator('#onlineGreeting').textContent()).includes('Лев'));
   check('пустой список объясняет себя',
@@ -1995,14 +1996,14 @@ async function testFriends(browser) {
   await done(page);
 
   // Список тех, кто недавно играл, — на месте пустого поиска
-  page = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  page = await newGame(browser, { user: 'Лев' });
   await page.evaluate(() => {
     window.__suggested = [{ username: 'Гриша', best_run_score: 300 },
                           { username: 'Поля', best_run_score: 0 }];
   });
-  await page.click('#tModeOnline');
+  await page.click('#tModeFriends');
   await page.waitForTimeout(500);
-  check('со входом сразу открывается онлайн', await page.locator('#screenOnline').isVisible());
+  check('со входом сразу открывается экран друзей', await page.locator('#screenFriends').isVisible());
   const suggested = await page.evaluate(() => ({
     rows: [...document.querySelectorAll('#searchResults .friend-row')].map(r => r.dataset.name),
     btns: [...document.querySelectorAll('#searchResults .fr-btn')].map(b => b.textContent),
@@ -2031,8 +2032,8 @@ async function testFriends(browser) {
   await done(page);
 
   // Поиск
-  page = await newGame(browser, { user: 'Лев', tab: 'friends' });
-  await page.click('#tModeOnline');
+  page = await newGame(browser, { user: 'Лев' });
+  await page.click('#tModeFriends');
   await page.waitForTimeout(400);
 
   await page.fill('#friendSearch', 'к');
@@ -2083,14 +2084,14 @@ async function testFriends(browser) {
   await done(page);
 
   // Список: входящие первыми
-  page = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  page = await newGame(browser, { user: 'Лев' });
   await page.evaluate(() => {
     window.__friends = [{ username: 'Яна', relation: 'outgoing' },
                         { username: 'Аня', relation: 'friend' },
                         { username: 'Кира', relation: 'incoming' },
                         { username: 'Боря', relation: 'friend' }];
   });
-  await page.click('#tModeOnline');
+  await page.click('#tModeFriends');
   await page.waitForTimeout(400);
   const list = await page.evaluate(() =>
     [...document.querySelectorAll('#friendsList .friend-row')].map(r => r.dataset.name + ':' + r.dataset.relation));
@@ -2116,11 +2117,11 @@ async function testFriends(browser) {
   await done(page);
 
   // Ошибки сервера читаются по-человечески
-  page = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  page = await newGame(browser, { user: 'Лев' });
   await page.evaluate(() => {
     window.__found = [{ username: 'Максим', best_run_score: 0, relation: null }];
   });
-  await page.click('#tModeOnline');
+  await page.click('#tModeFriends');
   await page.waitForTimeout(400);
   await page.fill('#friendSearch', 'ма');
   await page.click('#tFindBtn');
@@ -2138,11 +2139,11 @@ async function testFriends(browser) {
   await done(page);
 
   // Опрос идёт только пока экран открыт
-  page = await newGame(browser, { user: 'Лев', tab: 'friends' });
-  await page.click('#tModeOnline');
+  page = await newGame(browser, { user: 'Лев' });
+  await page.click('#tModeFriends');
   await page.waitForTimeout(400);
   check('опрос запущен', await page.evaluate(() => friendsTimer !== null));
-  await page.click('#tOnlineBack');
+  await page.click('#tFriendsBack');
   await page.waitForTimeout(300);
   check('после выхода опрос остановлен', await page.evaluate(() => friendsTimer === null));
   check('вышли в меню', await page.locator('#screenMode').isVisible());
@@ -2153,13 +2154,13 @@ async function testFriends(browser) {
 async function testOnlineMatch(browser) {
   console.log('\nОнлайн: матч');
 
-  const page = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  const page = await newGame(browser, { user: 'Лев' });
   await page.evaluate(() => {
     window.__friends = [{ username: 'Кира', relation: 'friend' }];
     window.__matches = [{ id: 1, other: 'Кира', seat: 1, status: 'invited',
                           round: 1, wins: [0, 0], my_turn: false }];
   });
-  await page.click('#tModeOnline');
+  await page.click('#tModeFriends');
   await page.waitForTimeout(400);
 
   // Вызов приходит и его можно принять
@@ -2250,17 +2251,17 @@ async function testOnlineMatch(browser) {
   check('матч опрашивается', await page.evaluate(() => matchTimer !== null));
   await page.click('#tMenu');
   await page.waitForTimeout(400);
-  check('выход возвращает к друзьям, а не в меню',
-    await page.locator('#screenOnline').isVisible());
+  check('выход из дружеской игры возвращает к друзьям, а не в меню',
+    await page.locator('#screenFriends').isVisible());
   check('опрос матча остановлен', await page.evaluate(() => matchTimer === null));
   check('матч при этом не закрыт',
     await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'leave_match').length) === 0);
   await done(page);
 
   // Вызов друга
-  const p2 = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  const p2 = await newGame(browser, { user: 'Лев' });
   await p2.evaluate(() => { window.__friends = [{ username: 'Кира', relation: 'friend' }]; });
-  await p2.click('#tModeOnline');
+  await p2.click('#tModeFriends');
   await p2.waitForTimeout(400);
   check('окно вызова закрыто, пока не позвали',
     !(await p2.locator('#challengeBox').isVisible()));
@@ -2288,13 +2289,13 @@ async function testOnlineMatch(browser) {
 async function testOnlineClock(browser) {
   console.log('\nОнлайн: часы и бонусы');
 
-  const page = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  const page = await newGame(browser, { user: 'Лев' });
   await page.evaluate(() => {
     window.__friends = [{ username: 'Кира', relation: 'friend' }];
     window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
                           round: 1, wins: [0, 0], my_turn: true }];
   });
-  await page.click('#tModeOnline');
+  await page.click('#tModeFriends');
   await page.waitForTimeout(400);
   await page.click('#gamesList .friend-row .fr-btn');
   await page.waitForTimeout(600);
@@ -2346,7 +2347,7 @@ async function testOnlineClock(browser) {
   await done(page);
 
   // Закрытый ход приезжает без числа, и клиент его не выдумывает
-  const p2 = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  const p2 = await newGame(browser, { user: 'Лев' });
   await p2.evaluate(() => {
     window.__friends = [{ username: 'Кира', relation: 'friend' }];
     window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
@@ -2355,7 +2356,7 @@ async function testOnlineClock(browser) {
     window.__match.fog = [true, false];
     window.__match.cur = 0;
   });
-  await p2.click('#tModeOnline');
+  await p2.click('#tModeFriends');
   await p2.waitForTimeout(400);
   await p2.click('#gamesList .friend-row .fr-btn');
   await p2.waitForTimeout(600);
@@ -2373,7 +2374,7 @@ async function testOnlineClock(browser) {
   await done(p2);
 
   // Вынужденный ход в онлайне идёт на сервер
-  const p3 = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  const p3 = await newGame(browser, { user: 'Лев' });
   await p3.evaluate(() => {
     window.__friends = [{ username: 'Кира', relation: 'friend' }];
     window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
@@ -2381,7 +2382,7 @@ async function testOnlineClock(browser) {
     window.__match.forced = 'lava';
     window.__match.cur = 0;
   });
-  await p3.click('#tModeOnline');
+  await p3.click('#tModeFriends');
   await p3.waitForTimeout(400);
   await p3.click('#gamesList .friend-row .fr-btn');
   await p3.waitForTimeout(600);
@@ -2395,7 +2396,7 @@ async function testOnlineClock(browser) {
   await done(p3);
 
   // Онлайн: на отнятом ходе жетон тоже взводится, и ход остаётся за игроком
-  const p3b = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  const p3b = await newGame(browser, { user: 'Лев' });
   await p3b.evaluate(() => {
     window.__friends = [{ username: 'Кира', relation: 'friend' }];
     window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
@@ -2403,7 +2404,7 @@ async function testOnlineClock(browser) {
     Object.assign(window.__match, { forced: 'skip', cur: 0, seat: 0, tokens: [1, 1],
                                     moves: [{ seat: 1, guess: 20, tier: 3 }] });
   });
-  await p3b.click('#tModeOnline');
+  await p3b.click('#tModeFriends');
   await p3b.waitForTimeout(400);
   await p3b.click('#gamesList .friend-row .fr-btn');
   await p3b.waitForTimeout(600);
@@ -2426,9 +2427,9 @@ async function testOnlineClock(browser) {
   await done(p3b);
 
   // Бонусы в окне вызова
-  const p4 = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  const p4 = await newGame(browser, { user: 'Лев' });
   await p4.evaluate(() => { window.__friends = [{ username: 'Кира', relation: 'friend' }]; });
-  await p4.click('#tModeOnline');
+  await p4.click('#tModeFriends');
   await p4.waitForTimeout(400);
   await p4.click('#friendsList .friend-row .fr-btn.yes');
   await p4.waitForTimeout(250);
@@ -2459,13 +2460,13 @@ async function testOnlineClock(browser) {
 async function testPhrases(browser) {
   console.log('\nОнлайн: готовые фразы');
 
-  const page = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  const page = await newGame(browser, { user: 'Лев' });
   await page.evaluate(() => {
     window.__friends = [{ username: 'Кира', relation: 'friend' }];
     window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
                           round: 1, wins: [0, 0], my_turn: true }];
   });
-  await page.click('#tModeOnline');
+  await page.click('#tModeFriends');
   await page.waitForTimeout(400);
   await page.click('#gamesList .friend-row .fr-btn');
   await page.waitForTimeout(600);
@@ -2529,7 +2530,7 @@ async function testPhrases(browser) {
   await done(page);
 
   // В местной игре фраз нет: там соперник рядом
-  const solo = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  const solo = await newGame(browser, { user: 'Лев' });
   await solo.click('#tModeDuel');
   await solo.waitForTimeout(200);
   await solo.click('#tStartMatch');
@@ -2562,18 +2563,17 @@ async function testRanked(browser) {
   await page.click('#tModeOnline');
   await page.waitForTimeout(600);
 
-  // Вкладки: рейтинг открыт по умолчанию, друзья спрятаны
-  const tabs = await page.evaluate(() => ({
-    ranked: !document.getElementById('olRanked').classList.contains('hidden'),
-    friends: !document.getElementById('olFriends').classList.contains('hidden'),
-    names: [...document.querySelectorAll('.ol-tab')].map(b => b.textContent),
-    active: [...document.querySelectorAll('.ol-tab')].map(b => b.classList.contains('active'))
+  // Рейтинг и друзья — разные экраны, а не вкладки одного
+  const split = await page.evaluate(() => ({
+    ranked: !document.getElementById('screenOnline').classList.contains('hidden'),
+    friends: !document.getElementById('screenFriends').classList.contains('hidden'),
+    tabs: document.querySelectorAll('.ol-tab').length,
+    menu: [...document.querySelectorAll('#screenMode .m-title')].map(e => e.textContent)
   }));
-  check('две вкладки с понятными названиями',
-    tabs.names.length === 2 && tabs.names[0].indexOf('Рейтинг') >= 0 &&
-    tabs.names[1].indexOf('друзьями') >= 0, tabs.names.join(' | '));
-  check('по умолчанию открыт рейтинг', tabs.ranked && !tabs.friends);
-  check('и вкладка отмечена активной', tabs.active.join() === 'true,false', tabs.active.join());
+  check('«Игра онлайн» ведёт сразу на рейтинг', split.ranked && !split.friends);
+  check('вкладок внутри больше нет', split.tabs === 0, String(split.tabs));
+  check('в меню появились «Друзья» отдельным пунктом',
+    split.menu.length === 5 && split.menu[4].indexOf('Друзья') >= 0, split.menu.join(' | '));
 
   // Описание правил убрано: его заменяют подписи разновидностей
   const modes = await page.evaluate(() => ({
@@ -2616,23 +2616,27 @@ async function testRanked(browser) {
   check('и её собственный топ',
     switched.top.length === 1 && switched.top[0].indexOf('Лев') >= 0, switched.top.join(' | '));
 
-  // Списки игр разъехались по вкладкам
+  // Списки игр разъехались по экранам
   const lists = await page.evaluate(() => ({
     rk: [...document.querySelectorAll('#rkGamesList .friend-row')].map(r => r.dataset.id),
     fr: [...document.querySelectorAll('#gamesList .friend-row')].map(r => r.dataset.id)
   }));
-  check('рейтинговая игра лежит на вкладке рейтинга', lists.rk.join() === '7', lists.rk.join());
-  check('вызов друга — на вкладке друзей', lists.fr.join() === '1', lists.fr.join());
+  check('рейтинговая игра лежит на экране рейтинга', lists.rk.join() === '7', lists.rk.join());
+  check('вызов друга — на экране друзей', lists.fr.join() === '1', lists.fr.join());
 
-  await page.click('#tTabFriends');
+  await page.click('#tOnlineBack');
   await page.waitForTimeout(250);
+  await page.click('#tModeFriends');
+  await page.waitForTimeout(500);
   const onFriends = await page.evaluate(() => ({
-    ranked: !document.getElementById('olRanked').classList.contains('hidden'),
-    friends: !document.getElementById('olFriends').classList.contains('hidden'),
-    search: !!document.querySelector('#olFriends #friendSearch')
+    ranked: !document.getElementById('screenOnline').classList.contains('hidden'),
+    friends: !document.getElementById('screenFriends').classList.contains('hidden'),
+    search: !!document.querySelector('#screenFriends #friendSearch'),
+    modes: document.querySelectorAll('#screenFriends .rk-mode').length
   }));
-  check('вкладка друзей прячет рейтинг', !onFriends.ranked && onFriends.friends);
-  check('и поиск игроков лежит именно на ней', onFriends.search);
+  check('экран друзей прячет рейтинг', !onFriends.ranked && onFriends.friends);
+  check('и поиск игроков лежит именно на нём', onFriends.search);
+  check('разновидностей рейтинга у друзей нет', onFriends.modes === 0, String(onFriends.modes));
   await done(page);
 
   // Очередь: своя на каждую разновидность, и стоять можно только в одной
@@ -2741,8 +2745,28 @@ async function testRanked(browser) {
   check('показан новый рейтинг и прибавка',
     card.indexOf('1198') >= 0 && card.indexOf('(+18)') >= 0, card);
 
-  // Продолжение начатой игры: кнопка меняет смысл, а не молча уносит на доску
+  // Реванш: приглашение уходит, но с экрана не уносит — соперник ещё не согласился
+  const beforeBtns = await page.evaluate(() =>
+    [...document.querySelectorAll('.r-actions button')].map(b => b.textContent));
+  check('после матча предлагают реванш и выход',
+    beforeBtns.join(' | ') === 'Реванш | В меню', beforeBtns.join(' | '));
+
   await page.click('.r-actions .btn');
+  await page.waitForTimeout(600);
+  const sent = await page.evaluate(() => ({
+    calls: window.__rpcCalls.filter(c => c.name === 'rematch').length,
+    onBoard: !document.getElementById('screenGame').classList.contains('hidden'),
+    card: document.getElementById('resultBox').textContent,
+    btns: [...document.querySelectorAll('.r-actions button')].map(b => b.textContent)
+  }));
+  check('реванш ушёл на сервер', sent.calls === 1, String(sent.calls));
+  check('и с доски никуда не унесло', sent.onBoard);
+  check('сказано, кому предложен реванш',
+    sent.card.indexOf('Реванш предложен: Кира') >= 0, sent.card);
+  check('кнопки реванша больше нет', sent.btns.join(' | ') === 'В меню', sent.btns.join(' | '));
+
+  // Если с доски всё-таки унесло, дальше идти некуда — провал уже назван выше
+  if (sent.onBoard) await page.click('.r-actions .btn-ghost');
   await page.waitForTimeout(700);
   const resume = await page.evaluate(() => ({
     online: !document.getElementById('screenOnline').classList.contains('hidden'),
@@ -2818,6 +2842,141 @@ async function testRoundCard(browser) {
   await done(page);
 }
 
+// ------------------------------------------------- удаление аккаунта и оклик
+async function testAccountDelete(browser) {
+  console.log('\nУдаление аккаунта');
+
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(500);
+  await page.click('#accountChip');
+  await page.waitForTimeout(250);
+
+  const inAccount = await page.evaluate(() => ({
+    open: !document.getElementById('logoutModal').classList.contains('hidden'),
+    del: document.getElementById('tDeleteAccount').textContent,
+    danger: document.getElementById('tDeleteAccount').classList.contains('danger')
+  }));
+  check('в окне аккаунта есть удаление', inAccount.open && inAccount.del === 'Удалить аккаунт',
+    inAccount.del);
+  check('и оно выделено как опасное', inAccount.danger);
+
+  await page.click('#tDeleteAccount');
+  await page.waitForTimeout(250);
+  const ask = await page.evaluate(() => ({
+    open: !document.getElementById('deleteModal').classList.contains('hidden'),
+    account: !document.getElementById('logoutModal').classList.contains('hidden'),
+    text: document.getElementById('tDeleteAsk').textContent,
+    stay: document.getElementById('tDeleteCancel').textContent,
+    go: document.getElementById('tDeleteGo').textContent
+  }));
+  check('удаление спрашивает отдельным окном', ask.open && !ask.account);
+  check('в вопросе названо имя', ask.text.indexOf('Лев') >= 0, ask.text);
+  check('и сказано, что именно исчезнет',
+    ask.text.indexOf('Рейтинг') >= 0 && ask.text.indexOf('навсегда') >= 0, ask.text);
+  check('и что игры у соперников останутся',
+    ask.text.indexOf('останутся у соперников') >= 0, ask.text);
+  check('уйти из окна можно', ask.stay === 'Отмена', ask.stay);
+  check('кнопка удаления названа прямо', ask.go === 'Удалить навсегда', ask.go);
+
+  // Отказ ничего не делает
+  await page.click('#tDeleteCancel');
+  await page.waitForTimeout(200);
+  check('отказ закрывает окно и никого не удаляет', await page.evaluate(() =>
+    document.getElementById('deleteModal').classList.contains('hidden') &&
+    !window.__deleted && !!localStorage.getItem('hc_run_user')));
+
+  // Согласие удаляет и выкидывает в меню
+  await page.evaluate(() => { window.alert = () => {}; });
+  await page.click('#accountChip');
+  await page.waitForTimeout(200);
+  await page.click('#tDeleteAccount');
+  await page.waitForTimeout(200);
+  await page.click('#tDeleteGo');
+  await page.waitForTimeout(600);
+  const after = await page.evaluate(() => ({
+    called: !!window.__deleted,
+    user: localStorage.getItem('hc_run_user'),
+    menu: !document.getElementById('screenMode').classList.contains('hidden')
+  }));
+  check('удаление ушло на сервер', after.called);
+  check('аккаунт с устройства стёрт', !after.user, String(after.user));
+  check('и человек оказался в меню', after.menu);
+  await done(page);
+
+  // Удалённый соперник показывается словами, а не служебным именем
+  const p2 = await newGame(browser, { user: 'Лев' });
+  await p2.evaluate(() => {
+    window.__matches = [{ id: 5, other: '#12', seat: 0, status: 'active',
+                          round: 1, wins: [0, 0], my_turn: true, ranked: false }];
+  });
+  await p2.click('#tModeFriends');
+  await p2.waitForTimeout(500);
+  const row = await p2.evaluate(() =>
+    (document.querySelector('#gamesList .fr-name') || {}).textContent);
+  check('вместо служебного имени написано «удалённый игрок»',
+    row === 'удалённый игрок', String(row));
+  await done(p2);
+}
+
+// ------------------------------------------------------------------ оклик
+async function testAwayAlerts(browser) {
+  console.log('\nОклик из соседней вкладки');
+
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__friends = [];
+    window.__matches = [];
+  });
+  await page.click('#tModeFriends');
+  await page.waitForTimeout(500);
+  const base = await page.title();
+
+  // Вкладка открыта — молчим
+  await page.evaluate(() => { window.__matches = [{ id: 3, other: 'Кира', seat: 1,
+    status: 'invited', round: 1, wins: [0, 0], my_turn: false, ranked: false }]; });
+  await page.evaluate(() => loadMatches(true));
+  await page.waitForTimeout(400);
+  check('пока вкладка открыта, заголовок не трогаем',
+    (await page.title()) === base, await page.title());
+
+  // Человек ушёл в другую вкладку
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    window.__matches = [{ id: 4, other: 'Кира', seat: 1, status: 'invited',
+                          round: 1, wins: [0, 0], my_turn: false, ranked: false }];
+  });
+  await page.evaluate(() => loadMatches(true));
+  await page.waitForTimeout(400);
+  const away = await page.title();
+  check('вызов в фоне помечается в заголовке',
+    away.indexOf('(1)') === 0 && away.indexOf(base) > 0, away);
+
+  // Тот же вызов второй раз не считается
+  await page.evaluate(() => loadMatches(true));
+  await page.waitForTimeout(300);
+  check('один и тот же вызов не считается дважды',
+    (await page.title()).indexOf('(1)') === 0, await page.title());
+
+  // Заявка в друзья добавляет ещё один
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Гриша', relation: 'incoming' }];
+  });
+  await page.evaluate(() => loadFriends(true));
+  await page.waitForTimeout(400);
+  check('заявка в друзья считается отдельно',
+    (await page.title()).indexOf('(2)') === 0, await page.title());
+
+  // Вернулись — заголовок чистый
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.waitForTimeout(250);
+  check('возвращение очищает заголовок', (await page.title()) === base, await page.title());
+  await done(page);
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -2854,6 +3013,8 @@ async function testRoundCard(browser) {
     await testPhrases(browser);
     await testRanked(browser);
     await testRoundCard(browser);
+    await testAccountDelete(browser);
+    await testAwayAlerts(browser);
   } finally {
     await browser.close();
   }

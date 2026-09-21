@@ -127,16 +127,20 @@ async function registerPlayer(p, name, pin) {
   await registerPlayer(B, 'Лада', '2222');
   check('оба аккаунта зарегистрированы в настоящей базе',
     (await db.query("select count(*) from students where username in ('Тимур','Лада')")).rows[0].count === '2');
-  check('после регистрации открылся онлайн', await A.page.locator('#screenOnline').isVisible());
-  check('по умолчанию открыта вкладка рейтинга',
-    await A.page.locator('#olRanked').isVisible() &&
-    !(await A.page.locator('#olFriends').isVisible()));
+  check('после регистрации открылся рейтинг', await A.page.locator('#screenOnline').isVisible());
 
-  // Дружба: всё это живёт на своей вкладке
-  await A.page.click('#tTabFriends');
-  await B.page.click('#tTabFriends');
+  // Друзья — отдельный экран, к нему идут из меню
+  await A.page.click('#tOnlineBack');
+  await B.page.click('#tOnlineBack');
   await A.page.waitForTimeout(300);
   await B.page.waitForTimeout(300);
+  await A.page.click('#tModeFriends');
+  await B.page.click('#tModeFriends');
+  await A.page.waitForTimeout(500);
+  await B.page.waitForTimeout(500);
+  check('экран друзей отдельный от рейтинга',
+    (await A.page.locator('#screenFriends').isVisible()) &&
+    !(await A.page.locator('#screenOnline').isVisible()));
   await A.page.fill('#friendSearch', 'ла');
   await A.page.click('#tFindBtn');
   await A.page.waitForTimeout(600);
@@ -249,19 +253,24 @@ async function registerPlayer(p, name, pin) {
     JSON.stringify(loserSees));
 
   // ===== Рейтинговый онлайн: очередь, автоматический подбор, сдача по молчанию
-  await A.page.click('.r-actions .btn');
-  await B.page.click('.r-actions .btn');
+  // После дружеской игры кнопка «В меню» возвращает к друзьям
+  await A.page.click('.r-actions .btn-ghost');
+  await B.page.click('.r-actions .btn-ghost');
   await A.page.waitForTimeout(900);
   await B.page.waitForTimeout(900);
-  check('после матча оба вернулись в онлайн',
-    (await A.page.locator('#screenOnline').isVisible()) &&
-    (await B.page.locator('#screenOnline').isVisible()));
+  check('после дружеской игры оба вернулись к друзьям',
+    (await A.page.locator('#screenFriends').isVisible()) &&
+    (await B.page.locator('#screenFriends').isVisible()));
 
   // Рейтинг: играем разновидность с морозом и бонусами — самую непохожую
-  await A.page.click('#tTabRanked');
-  await B.page.click('#tTabRanked');
+  await A.page.click('#tFriendsBack');
+  await B.page.click('#tFriendsBack');
   await A.page.waitForTimeout(300);
   await B.page.waitForTimeout(300);
+  await A.page.click('#tModeOnline');
+  await B.page.click('#tModeOnline');
+  await A.page.waitForTimeout(600);
+  await B.page.waitForTimeout(600);
   await A.page.click('.rk-mode[data-mode="3"]');
   await B.page.click('.rk-mode[data-mode="3"]');
   await A.page.waitForTimeout(500);

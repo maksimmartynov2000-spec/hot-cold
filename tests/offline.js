@@ -68,25 +68,39 @@ function serve() {
   await page.waitForTimeout(600);
 
   check('без сети страница открывается', await page.locator('#screenMode').isVisible());
-  check('без сети видны все четыре режима',
-    (await page.locator('#screenMode .mode-btn').count()) === 4);
+  check('без сети видны все пять режимов',
+    (await page.locator('#screenMode .mode-btn').count()) === 5);
 
-  // Онлайн — первый режим, которому сеть нужна по существу. Он должен сказать
-  // об этом словами, а не молча зависнуть на пустом списке
+  // Онлайн — первый режим, которому сеть нужна по существу. И рейтинг, и друзья
+  // должны сказать об этом словами, а не молча зависнуть на пустом списке
   await page.click('#tModeOnline');
   await page.waitForTimeout(600);
-  const offlineNote = await page.evaluate(() => {
-    const el = document.getElementById('friendsNote');
+  const rankedNote = await page.evaluate(() => {
+    const el = document.getElementById('rkNote');
     return { open: !document.getElementById('screenOnline').classList.contains('hidden'),
              note: el ? el.textContent : '',
              bad: el ? el.classList.contains('bad') : false };
   });
-  check('без сети онлайн говорит про связь, а не молчит',
+  check('без сети рейтинг говорит про связь, а не молчит',
+    rankedNote.open && rankedNote.bad && rankedNote.note.length > 0,
+    JSON.stringify(rankedNote));
+  check('и не показывает сырую ошибку fetch',
+    rankedNote.note.indexOf('fetch') < 0, rankedNote.note);
+  await page.click('#tOnlineBack');
+  await page.waitForTimeout(300);
+
+  await page.click('#tModeFriends');
+  await page.waitForTimeout(600);
+  const offlineNote = await page.evaluate(() => {
+    const el = document.getElementById('friendsNote');
+    return { open: !document.getElementById('screenFriends').classList.contains('hidden'),
+             note: el ? el.textContent : '',
+             bad: el ? el.classList.contains('bad') : false };
+  });
+  check('и друзья тоже говорят про связь',
     offlineNote.open && offlineNote.bad && offlineNote.note.length > 0,
     JSON.stringify(offlineNote));
-  check('и не показывает сырую ошибку fetch',
-    offlineNote.note.indexOf('fetch') < 0, offlineNote.note);
-  await page.click('#tOnlineBack');
+  await page.click('#tFriendsBack');
   await page.waitForTimeout(300);
 
   // Рейтинг тоже перестал работать без сети: забег считает сервер. Это

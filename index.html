@@ -307,6 +307,7 @@
     .mode-btn.solo { border-left: 3px solid var(--p0); }
     .mode-btn.run { border-left: 3px solid #4ade80; }
     .mode-btn.online { border-left: 3px solid #38bdf8; }
+    .mode-btn.friends { border-left: 3px solid #c084fc; }
 
     /* ---------- Онлайн: друзья ---------- */
     .friend-list { margin-bottom: 4px; }
@@ -354,31 +355,10 @@
       padding: 8px 2px;
     }
     .fr-note.bad { color: #f87171; }
+    /* Кнопка, после которой ничего не вернуть, выглядит соответственно */
+    .btn-ghost.danger { color: #f87171; border-color: rgba(248, 113, 113, 0.4); }
 
     /* ---------- Рейтинговый онлайн ---------- */
-    /* Две вкладки на весь экран: играть сейчас или звать знакомого */
-    .ol-tabs {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 18px;
-    }
-    .ol-tab {
-      flex: 1;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: rgba(255, 255, 255, 0.55);
-      border-radius: 12px;
-      padding: 10px 6px;
-      font-size: 14px;
-      font-weight: 700;
-      font-family: inherit;
-      cursor: pointer;
-    }
-    .ol-tab.active {
-      background: rgba(251, 191, 36, 0.14);
-      border-color: rgba(251, 191, 36, 0.5);
-      color: #fbbf24;
-    }
     /* Разновидности рейтинга. Подпись на кнопке и есть описание правил:
        «−100…100 · бонусы» говорит ровно то, что нужно знать до игры */
     .rk-modes {
@@ -1196,6 +1176,10 @@
         <div class="m-title" id="tModeOnline"></div>
         <div class="m-sub" id="tModeOnlineSub"></div>
       </button>
+      <button class="mode-btn friends" onclick="openFriendsEntry()">
+        <div class="m-title" id="tModeFriends"></div>
+        <div class="m-sub" id="tModeFriendsSub"></div>
+      </button>
     </div>
   </div>
 
@@ -1414,13 +1398,6 @@
   <div id="screenOnline" class="hidden">
     <div class="run-greeting hidden" id="onlineGreeting"></div>
 
-    <!-- Две разные вещи: сыграть прямо сейчас с кем угодно и позвать знакомого.
-         На одном экране они мешали друг другу -->
-    <div class="ol-tabs">
-      <button class="ol-tab" id="tTabRanked" onclick="setOnlineTab('ranked')"></button>
-      <button class="ol-tab" id="tTabFriends" onclick="setOnlineTab('friends')"></button>
-    </div>
-
     <div id="olRanked">
       <div class="rk-modes" id="rkModes"></div>
       <div class="rk-head">
@@ -1445,7 +1422,15 @@
       </div>
     </div>
 
-    <div id="olFriends" class="hidden">
+    <div class="run-hub-actions">
+      <button class="btn-ghost btn-block" id="tOnlineBack" onclick="quitToMenu()">Menu</button>
+    </div>
+  </div>
+
+  <!-- ЭКРАН: друзья. Отдельно от рейтинга — это разные занятия -->
+  <div id="screenFriends" class="hidden">
+    <div class="run-greeting hidden" id="friendsGreeting"></div>
+    <div id="olFriends">
     <div class="setup-field">
       <label id="tLblFindFriend">Find a player</label>
       <div class="row">
@@ -1504,7 +1489,7 @@
     </div>
 
     <div class="run-hub-actions">
-      <button class="btn-ghost btn-block" id="tOnlineBack" onclick="quitToMenu()">Menu</button>
+      <button class="btn-ghost btn-block" id="tFriendsBack" onclick="quitToMenu()">Menu</button>
     </div>
   </div>
 
@@ -1571,6 +1556,20 @@
       <button class="btn-ghost btn-block" id="tLogoutCancel" onclick="closeLogoutModal()"></button>
       <button class="btn btn-block" id="tLogoutConfirm" onclick="confirmLogout()"></button>
     </div>
+    <button class="btn-ghost btn-block danger" id="tDeleteAccount" style="margin-top:18px"
+            onclick="openDeleteModal()"></button>
+  </div>
+</div>
+
+<!-- Удаление аккаунта: отдельное окно, потому что это навсегда -->
+<div class="modal-backdrop hidden" id="deleteModal">
+  <div class="modal-card">
+    <div class="modal-text" id="tDeleteAsk"></div>
+    <div class="fr-note hidden" id="deleteNote"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="tDeleteCancel"
+            onclick="closeDeleteModal()"></button>
+    <button class="btn-ghost btn-block danger" style="margin-top:8px" id="tDeleteGo"
+            onclick="confirmDelete()"></button>
   </div>
 </div>
 
@@ -1612,7 +1611,7 @@
         yourTurn: "your turn", theirTurn: "their turn",
         chTitle: "Challenge {name}", chRange: "Range", chWins: "Play until how many wins",
         chSend: "Send the challenge", chCancel: "Cancel",
-        sentGame: "Challenge sent to {name}", backToFriends: "To friends",
+        sentGame: "Challenge sent to {name}",
         errNotYourTurn: "It is the other player\u2019s turn",
         errRoundOver: "The round is already over",
         errOutOfRange: "That number is outside the range",
@@ -1628,8 +1627,15 @@
         nobodyYet: "Nobody else has played yet",
         errNotPlaying: "The game is not running",
         errNoRequest: "The request is gone",
-        tabRanked: "\ud83c\udfc6 Ranked",
-        tabFriends: "\ud83d\udc65 Friends",
+        menuFriends: "\ud83d\udc65 Friends",
+        friendsSub: "Add, challenge, play together",
+        rematch: "Rematch",
+        rematchSent: "Rematch offered to {name}",
+        deleteAccount: "Delete account",
+        deleteAsk: "Delete {name}? Rating, friends and records are erased for good. Games you played stay with your opponents, without your name.",
+        deleteGo: "Delete for good",
+        deleted: "The account is gone",
+        deletedPlayer: "deleted player",
         rkBonusTag: "bonuses",
         rkGames: "Your ranked games",
         rkNoGames: "No ranked game going on",
@@ -1786,7 +1792,7 @@
         yourTurn: "ваш ход", theirTurn: "ходит соперник",
         chTitle: "Вызов: {name}", chRange: "Диапазон", chWins: "Играем до скольких побед",
         chSend: "Отправить вызов", chCancel: "Отмена",
-        sentGame: "Вызов отправлен: {name}", backToFriends: "К друзьям",
+        sentGame: "Вызов отправлен: {name}",
         errNotYourTurn: "Сейчас ходит соперник",
         errRoundOver: "Раунд уже закончился",
         errOutOfRange: "Число вне диапазона",
@@ -1802,8 +1808,15 @@
         nobodyYet: "Пока больше никто не играл",
         errNotPlaying: "Игра не идёт",
         errNoRequest: "Заявки больше нет",
-        tabRanked: "\ud83c\udfc6 Рейтинг",
-        tabFriends: "\ud83d\udc65 С друзьями",
+        menuFriends: "\ud83d\udc65 Друзья",
+        friendsSub: "Добавить, вызвать, сыграть вместе",
+        rematch: "Реванш",
+        rematchSent: "Реванш предложен: {name}",
+        deleteAccount: "Удалить аккаунт",
+        deleteAsk: "Удалить аккаунт {name}? Рейтинг, друзья и рекорды сотрутся навсегда. Сыгранные игры останутся у соперников, но без вашего имени.",
+        deleteGo: "Удалить навсегда",
+        deleted: "Аккаунт удалён",
+        deletedPlayer: "удалённый игрок",
         rkBonusTag: "бонусы",
         rkGames: "Ваши рейтинговые игры",
         rkNoGames: "Рейтинговая игра не идёт",
@@ -1960,7 +1973,7 @@
         yourTurn: "\u00e0 vous", theirTurn: "\u00e0 l\u2019adversaire",
         chTitle: "D\u00e9fi \u00e0 {name}", chRange: "Plage", chWins: "Jouer jusqu\u2019\u00e0 combien de victoires",
         chSend: "Envoyer le d\u00e9fi", chCancel: "Annuler",
-        sentGame: "D\u00e9fi envoy\u00e9 \u00e0 {name}", backToFriends: "Aux amis",
+        sentGame: "D\u00e9fi envoy\u00e9 \u00e0 {name}",
         errNotYourTurn: "C\u2019est \u00e0 l\u2019adversaire de jouer",
         errRoundOver: "La manche est d\u00e9j\u00e0 termin\u00e9e",
         errOutOfRange: "Ce nombre est hors de la plage",
@@ -1976,8 +1989,15 @@
         nobodyYet: "Personne d\u2019autre n\u2019a encore jou\u00e9",
         errNotPlaying: "La partie n\u2019est pas en cours",
         errNoRequest: "La demande n'existe plus",
-        tabRanked: "\ud83c\udfc6 Class\u00e9",
-        tabFriends: "\ud83d\udc65 Amis",
+        menuFriends: "\ud83d\udc65 Amis",
+        friendsSub: "Ajouter, d\u00e9fier, jouer ensemble",
+        rematch: "Revanche",
+        rematchSent: "Revanche propos\u00e9e \u00e0 {name}",
+        deleteAccount: "Supprimer le compte",
+        deleteAsk: "Supprimer {name} ? Classement, amis et records sont effac\u00e9s d\u00e9finitivement. Les parties jou\u00e9es restent chez vos adversaires, sans votre nom.",
+        deleteGo: "Supprimer d\u00e9finitivement",
+        deleted: "Le compte a \u00e9t\u00e9 supprim\u00e9",
+        deletedPlayer: "joueur supprim\u00e9",
         rkBonusTag: "bonus",
         rkGames: "Vos parties class\u00e9es",
         rkNoGames: "Aucune partie class\u00e9e en cours",
@@ -2134,7 +2154,7 @@
         yourTurn: "du bist dran", theirTurn: "Gegner ist dran",
         chTitle: "Herausforderung an {name}", chRange: "Bereich", chWins: "Spiel bis wie viele Siege",
         chSend: "Herausforderung senden", chCancel: "Abbrechen",
-        sentGame: "Herausforderung an {name} gesendet", backToFriends: "Zu den Freunden",
+        sentGame: "Herausforderung an {name} gesendet",
         errNotYourTurn: "Der Gegner ist am Zug",
         errRoundOver: "Die Runde ist schon vorbei",
         errOutOfRange: "Diese Zahl liegt au\u00dferhalb des Bereichs",
@@ -2150,8 +2170,15 @@
         nobodyYet: "Sonst hat noch niemand gespielt",
         errNotPlaying: "Die Partie l\u00e4uft nicht",
         errNoRequest: "Die Anfrage gibt es nicht mehr",
-        tabRanked: "\ud83c\udfc6 Rangliste",
-        tabFriends: "\ud83d\udc65 Freunde",
+        menuFriends: "\ud83d\udc65 Freunde",
+        friendsSub: "Hinzuf\u00fcgen, herausfordern, zusammen spielen",
+        rematch: "Revanche",
+        rematchSent: "Revanche angeboten: {name}",
+        deleteAccount: "Konto l\u00f6schen",
+        deleteAsk: "{name} l\u00f6schen? Punkte, Freunde und Rekorde sind endg\u00fcltig weg. Gespielte Partien bleiben bei deinen Gegnern, ohne deinen Namen.",
+        deleteGo: "Endg\u00fcltig l\u00f6schen",
+        deleted: "Das Konto ist gel\u00f6scht",
+        deletedPlayer: "gel\u00f6schter Spieler",
         rkBonusTag: "Boni",
         rkGames: "Ihre Ranglistenpartien",
         rkNoGames: "Keine Ranglistenpartie im Gang",
@@ -2691,8 +2718,10 @@
     document.getElementById('tFriendsTitle').textContent = L.online.friends;
     document.getElementById('tOnlineBack').textContent = L.online.back;
     document.getElementById('tGamesTitle').textContent = L.online.games;
-    document.getElementById('tTabRanked').textContent = L.online.tabRanked;
-    document.getElementById('tTabFriends').textContent = L.online.tabFriends;
+    document.getElementById('tModeFriends').textContent = L.online.menuFriends;
+    document.getElementById('tModeFriendsSub').textContent = L.online.friendsSub;
+    document.getElementById('tFriendsBack').textContent = L.online.back;
+    document.getElementById('tDeleteAccount').textContent = L.online.deleteAccount;
     document.getElementById('tRkPlay').textContent = L.online.rkPlay;
     document.getElementById('tRkCancel').textContent = L.online.rkCancel;
     document.getElementById('tRkTop').textContent = L.online.rkTop;
@@ -2758,7 +2787,9 @@
     document.getElementById('screenAuth').classList.toggle('hidden', name !== 'auth');
     document.getElementById('screenRunHub').classList.toggle('hidden', name !== 'runHub');
     document.getElementById('screenOnline').classList.toggle('hidden', name !== 'online');
-    if (name !== 'online') stopFriendsPoll();
+    document.getElementById('screenFriends').classList.toggle('hidden', name !== 'friends');
+    if (name !== 'friends') stopFriendsPoll();
+    if (name !== 'online') { stopRankedPoll(); stopOnlinePoll(); }
     document.getElementById('card').classList.toggle('wide', name === 'game' && mode === 'duel');
     document.getElementById('card').classList.toggle('solo-game', name === 'game' && mode !== 'duel');
     document.querySelector('.header').classList.toggle('compact', name === 'game');
@@ -3670,8 +3701,12 @@
       actions.className = 'r-actions';
       if (D.matchOver) {
         // Онлайн-матч переиграть на месте нельзя: новый — это новый вызов
+        // Реванш зовёт того же соперника на тех же условиях. Пока приглашение
+        // не отправлено — кнопка; после — строка о том, что оно ушло
         actions.innerHTML = online
-          ? '<button class="btn" onclick="backToOnline()">' + L.online.backToFriends + '</button>'
+          ? ((online.rematchSent ? '' :
+              '<button class="btn" onclick="offerRematch()">' + L.online.rematch + '</button>') +
+             '<button class="btn-ghost" onclick="backToOnline()">' + L.toMenu + '</button>')
           : '<button class="btn" onclick="newMatch()">' + L.newMatch + '</button>' +
             '<button class="btn-ghost" onclick="quitToMenu()">' + L.toMenu + '</button>';
       } else {
@@ -3679,11 +3714,19 @@
       }
       // Причина стоит сразу под заголовком: иначе «выигрывает игру» рядом со
       // счётом 0:0 читается как ошибка, а не как сдача соперника
+      let sentLine = null;
+      if (online && online.rematchSent) {
+        sentLine = document.createElement('div');
+        sentLine.className = 'r-forfeit';
+        sentLine.textContent = L.online.rematchSent.replace('{name}', online.rematchSent);
+      }
+
       box.appendChild(icon); box.appendChild(title);
       if (forfeitLine) box.appendChild(forfeitLine);
       box.appendChild(score);
       box.appendChild(secretLine);
       if (eloLine) box.appendChild(eloLine);
+      if (sentLine) box.appendChild(sentLine);
       box.appendChild(actions);
       box.classList.remove('hidden');
       return;
@@ -3785,6 +3828,13 @@
           '<span class="h-label" style="color:' + h.meta.color + '">' + getFbText(h.meta) + '</span>';
       list.appendChild(item);
     });
+  }
+
+  // Удалённый аккаунт хранится под служебным именем с решёткой: показывать
+  // его как есть незачем, но и терять из истории тоже нельзя
+  function playerName(name) {
+    const n = String(name == null ? '' : name);
+    return n.charAt(0) === '#' ? t().online.deletedPlayer : n;
   }
 
   function escapeHtml(s) {
@@ -3997,6 +4047,43 @@
     showScreen('mode');
   }
 
+  // Удаление аккаунта. Спрашиваем отдельным окном и пишем, что именно исчезнет:
+  // рейтинг и друзей вернуть будет нечем
+  function openDeleteModal() {
+    const auth = runAuth();
+    if (!auth) return;
+    const L = t().online;
+    closeLogoutModal();
+    document.getElementById('tDeleteAsk').textContent =
+      L.deleteAsk.replace('{name}', auth.username);
+    document.getElementById('tDeleteCancel').textContent = t().run.cancel;
+    document.getElementById('tDeleteGo').textContent = L.deleteGo;
+    setNote('deleteNote', '');
+    document.getElementById('deleteModal').classList.remove('hidden');
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.add('hidden');
+  }
+
+  async function confirmDelete() {
+    try {
+      await friendRpc('delete_account');
+    } catch (e) {
+      return setNote('deleteNote', friendErrorText(e.message), true);
+    }
+    closeDeleteModal();
+    runLogout();
+    stopFriendsPoll();
+    stopRankedPoll();
+    stopOnlinePoll();
+    online = null;
+    mode = null;
+    applyTranslations();
+    showScreen('mode');
+    alert(t().online.deleted);
+  }
+
   let runAuthMode = 'login';
 
   // Куда вернуться после входа: аккаунт нужен и рейтингу, и онлайну
@@ -4004,6 +4091,7 @@
 
   function afterAuth() {
     if (authReturn === 'online') return openOnline();
+    if (authReturn === 'friends') return openFriends();
     return openRunHub();
   }
 
@@ -4015,6 +4103,11 @@
   function openOnlineEntry() {
     authReturn = 'online';
     if (runAuth()) openOnline(); else showScreen('authChoice');
+  }
+
+  function openFriendsEntry() {
+    authReturn = 'friends';
+    if (runAuth()) openFriends(); else showScreen('authChoice');
   }
 
   // Открывает форму заново: поля чистые, ошибок нет
@@ -4228,38 +4321,48 @@
   let friendsTimer = null;
   let friendsBusy = false;
 
+  // Рейтинг и друзья — разные экраны. На одном они мешали друг другу: за
+  // рейтингом приходят играть сейчас, к друзьям — договариваться
   function openOnline() {
     const auth = runAuth();
     if (!auth) { authReturn = 'online'; return showScreen('authChoice'); }
+    renderGreeting(auth.username);
+    setNote('rkGamesNote', '');
+    setNote('rkNote', '');
+    applyTranslations();
+    renderRankedModes();
+    renderRanked(null);
+    showScreen('online');
+    startOnlinePoll();
+    loadMatches();
+    loadRanked();
+    loadEloTop();
+  }
+
+  function openFriends() {
+    const auth = runAuth();
+    if (!auth) { authReturn = 'friends'; return showScreen('authChoice'); }
     renderGreeting(auth.username);
     document.getElementById('searchResults').innerHTML = '';
     document.getElementById('friendSearch').value = '';
     setNote('searchNote', '');
     setNote('friendsNote', '');
     setNote('gamesNote', '');
-    setNote('rkGamesNote', '');
-    setNote('rkNote', '');
     closeChallenge();
     applyTranslations();
-    setOnlineTab(onlineTab);
-    renderRankedModes();
-    renderRanked(null);
-    showScreen('online');
+    showScreen('friends');
     startFriendsPoll();
     loadFriends();
     loadMatches();
     loadSuggestions();
-    loadRanked();
-    loadEloTop();
   }
 
   function startFriendsPoll() {
     stopFriendsPoll();
     friendsTimer = setInterval(() => {
-      if (screen !== 'online') return stopFriendsPoll();
+      if (screen !== 'friends') return stopFriendsPoll();
       loadFriends(true);
       loadMatches(true);
-      if (!rankedInQueue) loadRanked(true);
     }, FRIENDS_POLL_MS);
   }
 
@@ -4350,7 +4453,10 @@
     rows.slice()
       .sort((a, b) => (FRIEND_ORDER[a.relation] - FRIEND_ORDER[b.relation]) ||
                       String(a.username).localeCompare(String(b.username)))
-      .forEach(r => box.appendChild(friendRow(r.username, r.relation)));
+      .forEach(r => {
+        if (r.relation === 'incoming') notifyAway('friend-' + r.username);
+        box.appendChild(friendRow(r.username, r.relation));
+      });
   }
 
   // quiet — это опрос по таймеру: молча, иначе на экране будет мигать ошибка
@@ -4379,7 +4485,7 @@
 
     const who = document.createElement('span');
     who.className = 'fr-name';
-    who.textContent = m.other;
+    who.textContent = playerName(m.other);
     row.appendChild(who);
 
     const button = (label, cls, fn) => {
@@ -4427,7 +4533,10 @@
       split.forEach(part => {
         const box = document.getElementById(part.box);
         box.innerHTML = '';
-        part.rows.forEach(m => box.appendChild(matchRow(m)));
+        part.rows.forEach(m => {
+          if (m.status === 'invited' && m.seat === 1) notifyAway('invite-' + m.id);
+          box.appendChild(matchRow(m));
+        });
         setNote(part.note, part.rows.length ? '' : part.empty);
       });
     } catch (e) {
@@ -4600,6 +4709,33 @@
   // нет — номер матча и своё место за доской. Ветвится только ввод: ход, жетон
   // и следующий раунд уходят на сервер, а не считаются здесь
   const MATCH_POLL_MS = 2000;
+  // ================= ОКЛИК ИЗ СОСЕДНЕЙ ВКЛАДКИ =================
+  // Настоящие push-уведомления этой игре почти не нужны: ход длится тридцать
+  // секунд, и сообщение, пришедшее на закрытое приложение, опоздает. А вот
+  // когда вкладка открыта, но человек в другой, — окликнуть стоит
+  const BASE_TITLE = document.title;
+  let alertCount = 0;
+  let alertSeen = {};
+
+  function notifyAway(key) {
+    if (!document.hidden) return;
+    if (alertSeen[key]) return;
+    alertSeen[key] = true;
+    alertCount++;
+    document.title = '(' + alertCount + ') ' + BASE_TITLE;
+    playTone(880, 0.1);
+    setTimeout(() => playTone(1175, 0.12), 130);
+  }
+
+  function clearAway() {
+    if (!alertCount) return;
+    alertCount = 0;
+    alertSeen = {};
+    document.title = BASE_TITLE;
+  }
+
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) clearAway(); });
+
   // ================= РЕЙТИНГОВЫЙ ОНЛАЙН =================
   // Четыре разновидности, у каждой свой отдельный рейтинг. Номер режима —
   // два бита: младший включает мороз и жару, старший — бонусы. Ровно то же
@@ -4608,6 +4744,7 @@
   const RANKED_POLL_MS = 3000;
   const RANKED_MODES = [0, 1, 2, 3];
   let rankedTimer = null;
+  let onlineTimer = null;
   let rankedBusy = false;
   let rankedInQueue = false;
   let rankedMatchId = null;
@@ -4618,12 +4755,6 @@
     } catch (e) { return 0; }
   })();
   let rankedRatings = null;
-  // Вкладка запоминается: возвращаться всегда на рейтинг, когда играешь
-  // только с друзьями, — лишнее нажатие каждый раз
-  let onlineTab = (function () {
-    try { return localStorage.getItem('hc_oltab') === 'friends' ? 'friends' : 'ranked'; }
-    catch (e) { return 'ranked'; }
-  })();
 
   function startRankedPoll() {
     stopRankedPoll();
@@ -4631,6 +4762,21 @@
       if (screen === 'online' && rankedInQueue) loadRanked(true);
       else stopRankedPoll();
     }, RANKED_POLL_MS);
+  }
+
+  // Пока экран рейтинга открыт, список игр и рейтинг обновляются сами:
+  // соперник мог принять реванш, пока вы смотрите на таблицу
+  function startOnlinePoll() {
+    stopOnlinePoll();
+    onlineTimer = setInterval(() => {
+      if (screen !== 'online') return stopOnlinePoll();
+      loadMatches(true);
+      if (!rankedInQueue) loadRanked(true);
+    }, FRIENDS_POLL_MS);
+  }
+
+  function stopOnlinePoll() {
+    if (onlineTimer) { clearInterval(onlineTimer); onlineTimer = null; }
   }
 
   function stopRankedPoll() {
@@ -4644,15 +4790,6 @@
     const L = t().online;
     const bounds = rankedModeFrost(mode) ? '−100…100' : '1–100';
     return bounds + (rankedModeBonuses(mode) ? ' · ' + L.rkBonusTag : '');
-  }
-
-  function setOnlineTab(name) {
-    onlineTab = name;
-    try { localStorage.setItem('hc_oltab', name); } catch (e) {}
-    document.getElementById('olRanked').classList.toggle('hidden', name !== 'ranked');
-    document.getElementById('olFriends').classList.toggle('hidden', name !== 'friends');
-    document.getElementById('tTabRanked').classList.toggle('active', name === 'ranked');
-    document.getElementById('tTabFriends').classList.toggle('active', name === 'friends');
   }
 
   // Переключение разновидности выводит из очереди: ждать в двух местах нельзя,
@@ -4741,6 +4878,7 @@
       if (rankedMatchId && wasQueued) {
         rankedInQueue = false;
         stopRankedPoll();
+        notifyAway('found-' + rankedMatchId);
         return openMatch(rankedMatchId);
       }
       if (rankedInQueue && !rankedTimer) startRankedPoll();
@@ -4875,7 +5013,7 @@
     frostMode = !!st.frost;
     FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
 
-    D.names = st.names.slice();
+    D.names = st.names.map(playerName);
     D.winsNeeded = st.winsNeeded;
     D.wins = st.wins.slice();
     D.round = st.round;
@@ -4914,6 +5052,10 @@
     secret = (st.secret === null || st.secret === undefined) ? 0 : st.secret;
     applyRangeToInputs();
     renderAll();
+    // Ключ меняется с каждым ходом, поэтому один ход окликает ровно один раз
+    if (st.status === 'active' && !st.roundOver && !st.matchOver && st.cur === st.seat) {
+      notifyAway('turn-' + st.id + '-' + st.round + '-' + (st.moves || []).length);
+    }
   }
 
   async function refreshMatch(quiet) {
@@ -5007,14 +5149,30 @@
   }
 
   // Уход с экрана матч не закрывает: к начатой игре можно вернуться
+  // Возвращаемся туда, откуда игра началась: рейтинг и друзья живут порознь
   function backToOnline() {
+    const wasRanked = !!(online && online.ranked);
     stopMatchPoll();
     stopClock();
     setMatchNote('');
     online = null;
     mode = null;
+    if (wasRanked) openOnline(); else openFriends();
+  }
+
+  // Приглашение уходит, но игра начнётся только когда соперник согласится:
+  // уводить с экрана раньше времени незачем
+  async function offerRematch() {
+    if (!online || online.rematchSent) return;
+    const other = D.names[1 - online.seat];
+    try {
+      await friendRpc('rematch', { p_match_id: online.id });
+    } catch (e) {
+      return setMatchNote(onlineMatchError(e.message));
+    }
+    online.rematchSent = other;
     setMatchNote('');
-    openOnline();
+    renderAll();
   }
 
   // ================= ГОТОВЫЕ ФРАЗЫ =================
