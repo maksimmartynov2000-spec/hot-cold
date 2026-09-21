@@ -1479,6 +1479,8 @@
         errNoMatch: "No such game",
         timedOut: "out of time", clockMine: "Your turn: {n}s", clockTheirs: "Their turn: {n}s",
         chBonuses: "Bonuses", chBonusCount: "Bonuses on the board",
+        whoPlays: "Recently playing \u2014 add anyone you like",
+        nobodyYet: "Nobody else has played yet",
         errNotPlaying: "The game is not running",
         errNoRequest: "That request is gone"
       },
@@ -1621,6 +1623,8 @@
         errNoMatch: "Такой игры нет",
         timedOut: "время вышло", clockMine: "Ваш ход: {n} с", clockTheirs: "Ход соперника: {n} с",
         chBonuses: "Бонусы", chBonusCount: "Бонусов на поле",
+        whoPlays: "Недавно играли — можно добавить любого",
+        nobodyYet: "Пока больше никто не играл",
         errNotPlaying: "Игра не идёт",
         errNoRequest: "Заявки больше нет"
       },
@@ -1763,6 +1767,8 @@
         errNoMatch: "Cette partie n\u2019existe pas",
         timedOut: "temps \u00e9coul\u00e9", clockMine: "\u00c0 vous : {n} s", clockTheirs: "Adversaire : {n} s",
         chBonuses: "Bonus", chBonusCount: "Bonus sur le plateau",
+        whoPlays: "Ont jou\u00e9 r\u00e9cemment \u2014 ajoutez qui vous voulez",
+        nobodyYet: "Personne d\u2019autre n\u2019a encore jou\u00e9",
         errNotPlaying: "La partie n\u2019est pas en cours",
         errNoRequest: "Cette demande n\u2019existe plus"
       },
@@ -1905,6 +1911,8 @@
         errNoMatch: "Diese Partie gibt es nicht",
         timedOut: "Zeit um", clockMine: "Du: {n} s", clockTheirs: "Gegner: {n} s",
         chBonuses: "Boni", chBonusCount: "Boni auf dem Feld",
+        whoPlays: "K\u00fcrzlich gespielt \u2014 f\u00fcg hinzu, wen du willst",
+        nobodyYet: "Sonst hat noch niemand gespielt",
         errNotPlaying: "Die Partie l\u00e4uft nicht",
         errNoRequest: "Diese Anfrage gibt es nicht mehr"
       },
@@ -3920,6 +3928,7 @@
     startFriendsPoll();
     loadFriends();
     loadMatches();
+    loadSuggestions();
   }
 
   function startFriendsPoll() {
@@ -4185,9 +4194,24 @@
     }
   }
 
+  async function loadSuggestions() {
+    const box = document.getElementById('searchResults');
+    if (!box) return;
+    try {
+      const rows = (await friendRpc('suggest_students')) || [];
+      box.innerHTML = '';
+      rows.forEach(r => box.appendChild(friendRow(r.username, null)));
+      setNote('searchNote', rows.length ? t().online.whoPlays : t().online.nobodyYet);
+    } catch (e) {
+      setNote('searchNote', friendErrorText(e.message), true);
+    }
+  }
+
   async function searchStudents() {
     const q = (document.getElementById('friendSearch').value || '').trim();
     const box = document.getElementById('searchResults');
+    // Пустой запрос — не ошибка, а повод показать, кто вообще есть
+    if (!q.length) return loadSuggestions();
     box.innerHTML = '';
     if (q.length < 2) return setNote('searchNote', t().online.errShort, true);
     setNote('searchNote', t().online.searching);
@@ -4206,6 +4230,7 @@
       await searchStudents();
       setNote('searchNote', t().online.sent.replace('{name}', name));
       loadFriends(true);
+      loadMatches(true);
     } catch (e) {
       setNote('searchNote', friendErrorText(e.message), true);
     }
@@ -4772,6 +4797,12 @@
   });
   document.getElementById('finalInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitFinal(); });
   document.getElementById('runPin').addEventListener('keydown', e => { if (e.key === 'Enter') runAuthSubmit(); });
+  document.getElementById('friendSearch').addEventListener('keydown', e => {
+    if (e.key === 'Enter') searchStudents();
+  });
+  document.getElementById('friendSearch').addEventListener('input', e => {
+    if (!e.target.value.trim()) loadSuggestions();
+  });
 
   // Офлайн: страница открывается и играется без сети после первого захода
   if ('serviceWorker' in navigator) {

@@ -1935,11 +1935,46 @@ async function testFriends(browser) {
     await page.locator('#friendsNote').textContent());
   await done(page);
 
+  // Список тех, кто недавно играл, — на месте пустого поиска
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__suggested = [{ username: 'Гриша', best_run_score: 300 },
+                          { username: 'Поля', best_run_score: 0 }];
+  });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(500);
+  check('со входом сразу открывается онлайн', await page.locator('#screenOnline').isVisible());
+  const suggested = await page.evaluate(() => ({
+    rows: [...document.querySelectorAll('#searchResults .friend-row')].map(r => r.dataset.name),
+    btns: [...document.querySelectorAll('#searchResults .fr-btn')].map(b => b.textContent),
+    note: document.getElementById('searchNote').textContent
+  }));
+  check('пустой поиск показывает, кто недавно играл',
+    suggested.rows.join() === 'Гриша,Поля', suggested.rows.join());
+  check('их можно добавить прямо оттуда',
+    suggested.btns.every(b => b === 'Добавить'), suggested.btns.join());
+  check('и объяснено, что это за список',
+    suggested.note.indexOf('Недавно играли') >= 0, suggested.note);
+
+  // Ввели имя — список сменился поиском, стёрли — вернулся
+  await page.evaluate(() => { window.__found = [{ username: 'Кира', relation: null }]; });
+  await page.fill('#friendSearch', 'ки');
+  await page.click('#tFindBtn');
+  await page.waitForTimeout(400);
+  check('поиск вытесняет список',
+    await page.evaluate(() =>
+      [...document.querySelectorAll('#searchResults .friend-row')].map(r => r.dataset.name).join()) === 'Кира');
+  await page.fill('#friendSearch', '');
+  await page.waitForTimeout(500);
+  check('пустое поле возвращает список',
+    await page.evaluate(() =>
+      [...document.querySelectorAll('#searchResults .friend-row')].map(r => r.dataset.name).join()) === 'Гриша,Поля');
+  await done(page);
+
   // Поиск
   page = await newGame(browser, { user: 'Лев' });
   await page.click('#tModeOnline');
   await page.waitForTimeout(400);
-  check('со входом сразу открывается онлайн', await page.locator('#screenOnline').isVisible());
 
   await page.fill('#friendSearch', 'к');
   await page.click('#tFindBtn');
