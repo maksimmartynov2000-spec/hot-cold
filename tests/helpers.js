@@ -154,6 +154,23 @@ function stubSupabase(opts) {
             const top = window.__eloTop || {};
             return { data: Array.isArray(top) ? top : (top[args.p_mode] || []), error: null };
           }
+          // Переписка с другом: заглушка держит ленту в window.__talk
+          if (name === 'friend_thread') {
+            const T = window.__talk[args.p_to] || (window.__talk[args.p_to] = []);
+            window.__talkRead = (window.__talkRead || {});
+            window.__talkRead[args.p_to] = T.length ? T[T.length - 1].id : 0;
+            return { data: { other: args.p_to, messages: T }, error: null };
+          }
+          if (name === 'send_friend_phrase') {
+            if (window.__talkError) return { data: null, error: { message: window.__talkError } };
+            const T = window.__talk[args.p_to] || (window.__talk[args.p_to] = []);
+            T.push({ id: T.length + 1, mine: true, code: args.p_code, ago: 0 });
+            return { data: T.length, error: null };
+          }
+          if (name === 'challenge_friend_ranked') {
+            window.__rankedChallenge = { to: args.p_to, mode: args.p_mode };
+            return { data: 77, error: null };
+          }
           if (name === 'rematch') {
             window.__rematched = (window.__rematched || 0) + 1;
             return { data: 99, error: null };
@@ -204,6 +221,7 @@ function stubSupabase(opts) {
 
     // Четыре режима: тест задаёт рейтинги через window.__rankedQ.ratings,
     // а очередь — одна на всех, как и на сервере
+    window.__talk = {};
     window.__rankedQ = { inQueue: false, mode: 0, matchId: null, queue: 1,
                          lastAgo: null, joined: 0,
                          ratings: { 0: { elo: 1000, games: 0 }, 1: { elo: 1000, games: 0 },

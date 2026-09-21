@@ -2977,6 +2977,123 @@ async function testAwayAlerts(browser) {
   await done(page);
 }
 
+// ------------------------------------------------------- переписка с другом
+async function testFriendChat(browser) {
+  console.log('\nПереписка с другом');
+
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__friends = [
+      { username: 'Кира', relation: 'friend', unread: 3 },
+      { username: 'Гриша', relation: 'incoming', unread: 0 }
+    ];
+    window.__talk = { 'Кира': [
+      { id: 1, mine: false, code: 'play', ago: 300 },
+      { id: 2, mine: true, code: 'later', ago: 120 },
+      { id: 3, mine: false, code: 'hour', ago: 10 }
+    ] };
+  });
+  await page.click('#tModeFriends');
+  await page.waitForTimeout(600);
+
+  const list = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#friendsList .friend-row')];
+    const friend = rows.find(r => r.dataset.name === 'Кира');
+    const incoming = rows.find(r => r.dataset.name === 'Гриша');
+    return {
+      badge: friend ? (friend.querySelector('.fr-unread') || {}).textContent : null,
+      clickable: friend ? friend.querySelector('.fr-name').style.cursor : null,
+      // На заявке переписки быть не может — друзьями ещё не стали
+      noBadge: incoming ? !incoming.querySelector('.fr-unread') : false,
+      noClick: incoming ? incoming.querySelector('.fr-name').style.cursor !== 'pointer' : false
+    };
+  });
+  check('непрочитанное видно прямо на имени', list.badge === '3', String(list.badge));
+  check('и по имени друга можно нажать', list.clickable === 'pointer', String(list.clickable));
+  check('у неотвеченной заявки переписки нет', list.noBadge && list.noClick);
+
+  // Открываем переписку
+  await page.click('#friendsList .friend-row[data-name="Кира"] .fr-name');
+  await page.waitForTimeout(600);
+  const chat = await page.evaluate(() => ({
+    open: !document.getElementById('screenChat').classList.contains('hidden'),
+    who: document.getElementById('chatWho').textContent,
+    msgs: [...document.querySelectorAll('.chat-msg')].map(e => ({
+      code: e.dataset.code, mine: e.classList.contains('mine'), text: e.textContent
+    })),
+    pad: [...document.querySelectorAll('#chatPad button')].map(b => b.dataset.code),
+    texts: [...document.querySelectorAll('#chatPad button')].map(b => b.textContent)
+  }));
+  check('переписка открылась и названа по имени',
+    chat.open && chat.who.indexOf('Кира') >= 0, chat.who);
+  check('видно всю ленту в правильном порядке',
+    chat.msgs.map(m => m.code).join() === 'play,later,hour', chat.msgs.map(m => m.code).join());
+  check('свои и чужие фразы различаются',
+    chat.msgs.map(m => m.mine).join() === 'false,true,false',
+    chat.msgs.map(m => m.mine).join());
+  check('фразы показаны словами, а не кодами',
+    chat.msgs[0].text.indexOf('Сыграем?') === 0, chat.msgs[0].text);
+  check('у каждой видно, когда она сказана',
+    chat.msgs[0].text.indexOf('5 мин назад') > 0, chat.msgs[0].text);
+  check('на палитре шестнадцать фраз', chat.pad.length === 16, String(chat.pad.length));
+  check('среди них есть про рейтинг и про «позже»',
+    chat.pad.indexOf('playranked') >= 0 && chat.pad.indexOf('later') >= 0, chat.pad.join(','));
+  check('свободного ввода на экране нет',
+    await page.evaluate(() => !document.querySelector('#screenChat input, #screenChat textarea')));
+
+  // Отправка фразы
+  await page.click('#chatPad button[data-code="yes"]');
+  await page.waitForTimeout(600);
+  const sent = await page.evaluate(() => ({
+    calls: window.__rpcCalls.filter(c => c.name === 'send_friend_phrase').map(c => c.args.p_code),
+    last: (document.querySelector('.chat-msg:last-child') || {}).dataset,
+    count: document.querySelectorAll('.chat-msg').length
+  }));
+  check('фраза ушла на сервер', sent.calls.join() === 'yes', sent.calls.join());
+  check('и сразу появилась в ленте своей',
+    sent.count === 4 && sent.last.code === 'yes', JSON.stringify(sent));
+
+  // Сервер отказал — человек должен прочитать почему
+  await page.evaluate(() => { window.__talkError = 'too_fast'; });
+  await page.click('#chatPad button[data-code="hi"]');
+  await page.waitForTimeout(600);
+  const note = await page.evaluate(() => ({
+    text: document.getElementById('chatNote').textContent,
+    bad: document.getElementById('chatNote').classList.contains('bad')
+  }));
+  check('отказ сервера объяснён словами',
+    note.bad && note.text.indexOf('Слишком часто') >= 0, note.text);
+  await page.evaluate(() => { window.__talkError = null; });
+
+  // Позвать на рейтинг прямо из переписки
+  const modes = await page.evaluate(() =>
+    [...document.querySelectorAll('#chatModes .rk-mode')].map(b => b.dataset.mode));
+  check('позвать можно в любую из четырёх разновидностей',
+    modes.join() === '0,1,2,3', modes.join());
+  await page.click('#chatModes .rk-mode[data-mode="2"]');
+  await page.waitForTimeout(600);
+  const inv = await page.evaluate(() => ({
+    sent: window.__rankedChallenge,
+    note: document.getElementById('chatNote').textContent
+  }));
+  check('вызов на рейтинг ушёл с нужным режимом',
+    inv.sent && inv.sent.to === 'Кира' && inv.sent.mode === 2, JSON.stringify(inv.sent));
+  check('и об этом сказано', inv.note.indexOf('Вызов отправлен') >= 0, inv.note);
+
+  // Дружеская игра настраивается — уводит в то же окно вызова
+  await page.click('#tChatFriendly');
+  await page.waitForTimeout(600);
+  const friendly = await page.evaluate(() => ({
+    friends: !document.getElementById('screenFriends').classList.contains('hidden'),
+    box: !document.getElementById('challengeBox').classList.contains('hidden'),
+    name: document.getElementById('challengeBox').dataset.name
+  }));
+  check('дружеская игра открывает окно вызова с настройками',
+    friendly.friends && friendly.box, JSON.stringify(friendly));
+  check('и вызывает того же человека', friendly.name === 'Кира', String(friendly.name));
+  await done(page);
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -3015,6 +3132,7 @@ async function testAwayAlerts(browser) {
     await testRoundCard(browser);
     await testAccountDelete(browser);
     await testAwayAlerts(browser);
+    await testFriendChat(browser);
   } finally {
     await browser.close();
   }
