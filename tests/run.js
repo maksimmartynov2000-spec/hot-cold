@@ -1149,15 +1149,20 @@ async function testBonusMode(browser) {
     panel: !document.getElementById('forcedTurn').classList.contains('hidden'),
     input: !document.getElementById('guessSection').classList.contains('hidden'),
     text: document.getElementById('forcedText').textContent,
+    btn: document.getElementById('forcedBtn').textContent,
+    hint: document.getElementById('forcedHint').textContent,
     token: document.getElementById('ptoken1').disabled
   }));
   check('сам собой ход не делается', waiting.moves === 1 && waiting.turn === 1,
     JSON.stringify(waiting));
   check('вместо поля ввода — панель с кнопкой', waiting.panel && !waiting.input,
     JSON.stringify(waiting));
-  check('в панели названо, что происходит',
-    waiting.text.indexOf('лаву') >= 0 && waiting.text.indexOf('за вас') >= 0, waiting.text);
-  check('жетон на отнятом ходе не взвести', waiting.token === true);
+  check('в панели сказано, что ход сделается сам',
+    waiting.text.indexOf('лаву') >= 0 && waiting.text.indexOf('сам') >= 0, waiting.text);
+  check('кнопка называется «В лаву»', waiting.btn === 'В лаву', waiting.btn);
+  check('жетон на отнятом ходе взвести можно', waiting.token === false);
+  check('и об этом сказано прямо в панели',
+    waiting.hint.indexOf('жетон') >= 0, waiting.hint);
 
   await page.click('#forcedBtn');
   await page.waitForTimeout(400);
@@ -1191,7 +1196,7 @@ async function testBonusMode(browser) {
   }));
   check('свой ход взявший не получает', skipping.turn === 0 && skipping.panel && !skipping.input,
     JSON.stringify(skipping));
-  check('кнопка так и называется', skipping.btn === 'Пропустить', skipping.btn);
+  check('кнопка так и называется', skipping.btn === 'Пропустить ход', skipping.btn);
   await page.click('#forcedBtn');
   await page.waitForTimeout(300);
   const skipped = await page.evaluate(() => ({
@@ -1200,6 +1205,60 @@ async function testBonusMode(browser) {
   check('пропуск отдаёт ход сопернику', skipped.turn === 1, JSON.stringify(skipped));
   check('и не добавляет хода в историю', skipped.moves === 2, JSON.stringify(skipped));
   check('пропуск одноразовый', skipped.flag === false);
+  await done(page);
+
+  // Жетон на пропуске: пропуск идёт первым ходом, второй игрок делает сам
+  page = await duelWithBonus(browser, 'skip', 40);
+  await page.fill('#guessInput', '40');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  await page.fill('#guessInput', '50');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const before = await page.evaluate(() => ({
+    tokens: D.tokens.slice(), turn: D.cur,
+    token: document.getElementById('ptoken0').disabled,
+    hint: document.getElementById('forcedHint').textContent
+  }));
+  check('на пропуске жетон доступен', before.token === false && before.turn === 0,
+    JSON.stringify(before));
+  check('и в панели объяснено, зачем он тут',
+    before.hint.indexOf('первым ходом') >= 0, before.hint);
+
+  // Если жетон недоступен, дальше идти некуда — провал уже назван выше
+  if (!before.token) await page.click('#ptoken0');
+  await page.waitForTimeout(250);
+  const armed = await page.evaluate(() => ({
+    armed: D.armed, tokens: D.tokens.slice(),
+    hint: document.getElementById('forcedHint').textContent,
+    panel: !document.getElementById('forcedTurn').classList.contains('hidden')
+  }));
+  check('жетон взводится прямо на пропуске', armed.armed === true, JSON.stringify(armed));
+  check('и списывается', armed.tokens[0] === before.tokens[0] - 1, JSON.stringify(armed));
+  check('взведённому подсказка больше не нужна', armed.hint === '', armed.hint);
+  check('кнопка пропуска осталась на месте', armed.panel);
+
+  await page.click('#forcedBtn');
+  await page.waitForTimeout(350);
+  const afterSkip = await page.evaluate(() => ({
+    turn: D.cur, armed: D.armed, flag: D.skip[0],
+    panel: !document.getElementById('forcedTurn').classList.contains('hidden'),
+    input: !document.getElementById('guessSection').classList.contains('hidden')
+  }));
+  check('с жетоном пропуск не отдаёт ход', afterSkip.turn === 0, JSON.stringify(afterSkip));
+  check('жетон при этом сгорает', afterSkip.armed === false, JSON.stringify(afterSkip));
+  check('пропуск снят, и можно ходить', !afterSkip.panel && afterSkip.input && !afterSkip.flag,
+    JSON.stringify(afterSkip));
+
+  await page.fill('#guessInput', '60');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(350);
+  const second = await page.evaluate(() => ({
+    turn: D.cur, last: history[history.length - 1].guess, by: history[history.length - 1].p
+  }));
+  check('второй ход делает сам игрок', second.last === 60 && second.by === 0,
+    JSON.stringify(second));
+  check('и только после него ход уходит', second.turn === 1, JSON.stringify(second));
   await done(page);
 
   // Подарок сопернику — жетон уходит не туда, куда хотелось
@@ -2335,6 +2394,37 @@ async function testOnlineClock(browser) {
     await p3.evaluate(() => window.__rpcCalls.filter(c => c.name === 'do_forced_turn').length) === 1);
   await done(p3);
 
+  // Онлайн: на отнятом ходе жетон тоже взводится, и ход остаётся за игроком
+  const p3b = await newGame(browser, { user: 'Лев', tab: 'friends' });
+  await p3b.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' }];
+    window.__matches = [{ id: 1, other: 'Кира', seat: 0, status: 'active',
+                          round: 1, wins: [0, 0], my_turn: true }];
+    Object.assign(window.__match, { forced: 'skip', cur: 0, seat: 0, tokens: [1, 1],
+                                    moves: [{ seat: 1, guess: 20, tier: 3 }] });
+  });
+  await p3b.click('#tModeOnline');
+  await p3b.waitForTimeout(400);
+  await p3b.click('#gamesList .friend-row .fr-btn');
+  await p3b.waitForTimeout(600);
+  const p3bArm = await p3b.evaluate(() => document.getElementById('ptoken0').disabled === false);
+  check('на отнятом ходе жетон доступен и в онлайне', p3bArm);
+  if (p3bArm) await p3b.click('#ptoken0');
+  await p3b.waitForTimeout(500);
+  check('взвод ушёл на сервер',
+    await p3b.evaluate(() => window.__rpcCalls.filter(c => c.name === 'use_match_token').length) === 1);
+  check('кнопка пропуска никуда не делась', await p3b.locator('#forcedTurn').isVisible());
+  await p3b.click('#forcedBtn');
+  await p3b.waitForTimeout(600);
+  const kept = await p3b.evaluate(() => ({
+    cur: D.cur, armed: D.armed, forced: online.forced,
+    input: !document.getElementById('guessSection').classList.contains('hidden')
+  }));
+  check('ход после пропуска с жетоном остался за игроком',
+    kept.cur === 0 && !kept.forced, JSON.stringify(kept));
+  check('и поле ввода вернулось', kept.input, JSON.stringify(kept));
+  await done(p3b);
+
   // Бонусы в окне вызова
   const p4 = await newGame(browser, { user: 'Лев', tab: 'friends' });
   await p4.evaluate(() => { window.__friends = [{ username: 'Кира', relation: 'friend' }]; });
@@ -2664,6 +2754,70 @@ async function testRanked(browser) {
   await done(page);
 }
 
+// ------------------------------------------------------------ карточка итогов
+async function testRoundCard(browser) {
+  console.log('\nКарточка итогов раунда');
+
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeDuel');
+  await page.waitForTimeout(200);
+  await page.selectOption('#rangeMax', '100');
+  await page.waitForTimeout(150);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    D.names = ['Александра', 'Кира'];
+    D.wins = [1, 2];
+    D.winsNeeded = 3;
+    D.roundOver = true;
+    D.roundWinner = 1;
+    D.matchOver = false;
+    secret = 42;
+    renderAll();
+  });
+
+  const card = await page.evaluate(() => {
+    const box = document.getElementById('resultBox');
+    const names = [...box.querySelectorAll('.rs-name')];
+    const nums = [...box.querySelectorAll('.rs-num')];
+    const r = e => e.getBoundingClientRect();
+    return {
+      names: names.map(e => e.textContent),
+      nums: nums.map(e => e.textContent),
+      chips: box.querySelectorAll('.r-chip').length,
+      // Имя стоит над своим счётом: выше по вертикали и по той же середине
+      above: names.length === 2 && nums.length === 2 &&
+             r(names[0]).bottom <= r(nums[0]).top + 1 &&
+             r(names[1]).bottom <= r(nums[1]).top + 1,
+      aligned: names.length === 2 && nums.length === 2 &&
+               Math.abs((r(names[0]).left + r(names[0]).right) / 2 -
+                        (r(nums[0]).left + r(nums[0]).right) / 2) < 2 &&
+               Math.abs((r(names[1]).left + r(names[1]).right) / 2 -
+                        (r(nums[1]).left + r(nums[1]).right) / 2) < 2,
+      // Счёт крупнее имени: на него и смотрят
+      bigger: nums.length === 2 &&
+              parseFloat(getComputedStyle(nums[0]).fontSize) >
+              parseFloat(getComputedStyle(names[0]).fontSize),
+      colors: names.map(e => getComputedStyle(e).color)
+        .concat(nums.map(e => getComputedStyle(e).color)),
+      width: box.scrollWidth <= box.clientWidth + 1
+    };
+  });
+  check('в карточке два имени и два числа',
+    card.names.join() === 'Александра,Кира' && card.nums.join() === '1,2',
+    JSON.stringify(card.names) + ' / ' + JSON.stringify(card.nums));
+  check('старых плашек «имя счёт» больше нет', card.chips === 0, String(card.chips));
+  check('имя стоит строкой выше своего счёта', card.above);
+  check('и ровно над ним', card.aligned);
+  check('счёт крупнее имени', card.bigger);
+  check('цвет имени и его счёта совпадает',
+    card.colors[0] === card.colors[2] && card.colors[1] === card.colors[3],
+    card.colors.join(' | '));
+  check('длинное имя не растягивает карточку', card.width);
+
+  await done(page);
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -2699,6 +2853,7 @@ async function testRanked(browser) {
     await testOnlineClock(browser);
     await testPhrases(browser);
     await testRanked(browser);
+    await testRoundCard(browser);
   } finally {
     await browser.close();
   }

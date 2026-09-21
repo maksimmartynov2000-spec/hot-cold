@@ -856,6 +856,12 @@
       color: rgba(255, 255, 255, 0.85);
       line-height: 1.4;
     }
+    /* Подсказка про жетон: только когда его правда есть чем взвести */
+    .forced-turn .forced-hint {
+      margin: 10px 0 0;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+    }
 
     .final-box {
       background: rgba(251, 191, 36, 0.1);
@@ -884,16 +890,26 @@
     .result-round { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255,255,255,0.2); color: #fff; }
     .result-box .r-icon { font-size: 32px; line-height: 1; margin-bottom: 6px; }
     .result-box .r-title { font-size: 18px; font-weight: 800; }
+    /* Имена сверху, счёт отдельной строкой под ними: в одну строку
+       «Лев 0 : 3 Кира» глаз не находит, где чей счёт */
     .result-box .r-score {
-      display: flex; align-items: center; justify-content: center;
-      gap: 10px; margin-top: 14px; flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: baseline;
+      row-gap: 2px;
+      margin-top: 14px;
     }
-    .result-box .r-chip {
-      padding: 6px 14px; border-radius: 999px; border: 1.5px solid;
-      font-weight: 700; font-size: 13px; background: rgba(255,255,255,0.05);
-      white-space: nowrap;
+    .result-box .rs-name {
+      font-size: 13px; font-weight: 600; text-align: center;
+      overflow-wrap: anywhere;
     }
-    .result-box .r-vs { font-size: 12px; color: rgba(255,255,255,0.4); font-weight: 700; }
+    .result-box .rs-num { font-size: 30px; font-weight: 800; text-align: center; line-height: 1.1; }
+    /* Двоеточие едет по потоку сетки во вторую строку: явный grid-row сбивал
+       раскладку и уводил «1» в среднюю колонку */
+    .result-box .r-vs {
+      font-size: 18px; font-weight: 700;
+      color: rgba(255,255,255,0.35); padding: 0 12px;
+    }
     .result-box .r-secret { margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.45); }
     .result-box .r-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: center; flex-wrap: wrap; }
 
@@ -1325,6 +1341,7 @@
         <div class="forced-turn hidden" id="forcedTurn">
           <p id="forcedText"></p>
           <button class="btn-yellow btn-block" id="forcedBtn" onclick="doForcedTurn()"></button>
+          <p class="forced-hint hidden" id="forcedHint"></p>
         </div>
 
         <div class="guess-section" id="guessSection">
@@ -1644,8 +1661,9 @@
       bonusLabel: "Bonuses", bonusNear: "something is near", lblBonusCount: "Bonuses on the board", bonusAuto: "as usual ({n})",
       bonusNames: { extra: "Two in reserve", fog: "Fog", blind: "Blind move", lava: "Lava toss", skip: "Skipped turn", gift: "Gift to the rival", memory: "Short memory", rush: "Rush" },
       bonusDesc: { extra: "{a} gets two tokens", fog: "{b} cannot see the other\u2019s moves", blind: "{b} cannot see their own moves", lava: "chance moves for {b}", skip: "{a} loses the next turn", gift: "{b} gets a token", memory: "{a} sees only the last two moves", rush: "{b} \u2014 3 seconds less per turn" },
-      forced: { skip: "\u23ed Skipped turn \u2014 you lose this move", lava: "\ud83c\udf0b Lava toss \u2014 chance moves for you" },
-      forcedBtn: { skip: "Skip", lava: "Throw" },
+      forced: { skip: "\u23ed Skipped turn \u2014 you lose this move", lava: "\ud83c\udf0b Lava toss \u2014 your move is made for you, at random" },
+      forcedHint: { skip: "You may arm a token first: then the skip counts as your first move and you play a second one", lava: "You may arm a token first: then the toss counts as your first move and you play a second one" },
+      forcedBtn: { skip: "Skip", lava: "Into the lava" },
       hintLabel: "Distance hint",
       vizThermo: "Thermometer", vizLine: "Number line",
       enterGuess: "Enter a number", placeholderTpl: "from {a} to {b}", submitGuess: "Check",
@@ -1817,8 +1835,9 @@
       bonusLabel: "Бонусы", bonusNear: "рядом что-то есть", lblBonusCount: "Бонусов на поле", bonusAuto: "как обычно ({n})",
       bonusNames: { extra: "Два про запас", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву", skip: "Пропуск хода", gift: "Подарок сопернику", memory: "Короткая память", rush: "Спешка" },
       bonusDesc: { extra: "{a} получает два жетона", fog: "{b} не видит чужие ходы", blind: "{b} не видит свои ходы", lava: "{b} — ход делает случай", skip: "{a} пропускает следующий ход", gift: "{b} получает жетон", memory: "{a} видит только два последних хода", rush: "{b} \u2014 минус 3 секунды на ход" },
-      forced: { skip: "\u23ed Пропуск хода \u2014 этот ход вы пропускаете", lava: "\ud83c\udf0b Бросок в лаву \u2014 за вас ходит случай" },
-      forcedBtn: { skip: "Пропустить", lava: "Бросить" },
+      forced: { skip: "\u23ed Пропуск хода \u2014 этот ход вы пропускаете", lava: "\ud83c\udf0b Бросок в лаву \u2014 ход за вас сделается сам, случайным числом" },
+      forcedHint: { skip: "Можно сначала взвести жетон: тогда пропуск пойдёт первым ходом, а второй вы сделаете сами", lava: "Можно сначала взвести жетон: тогда бросок пойдёт первым ходом, а второй вы сделаете сами" },
+      forcedBtn: { skip: "Пропустить ход", lava: "В лаву" },
       hintLabel: "Подсказка: расстояние",
       vizThermo: "Градусник", vizLine: "Числовая прямая",
       enterGuess: "Введите число", placeholderTpl: "от {a} до {b}", submitGuess: "Проверить",
@@ -1990,8 +2009,9 @@
       bonusLabel: "Bonus", bonusNear: "quelque chose est tout près", lblBonusCount: "Bonus sur le plateau", bonusAuto: "comme d\u2019habitude ({n})",
       bonusNames: { extra: "Deux en réserve", fog: "Brouillard", blind: "Coup aveugle", lava: "Jet de lave", skip: "Tour perdu", gift: "Cadeau à l\u2019adversaire", memory: "Mémoire courte", rush: "Hâte" },
       bonusDesc: { extra: "{a} reçoit deux jetons", fog: "{b} ne voit plus les coups adverses", blind: "{b} ne voit plus ses propres coups", lava: "le hasard joue pour {b}", skip: "{a} perd son prochain tour", gift: "{b} reçoit un jeton", memory: "{a} ne voit que les deux derniers coups", rush: "{b} \u2014 3 secondes de moins par tour" },
-      forced: { skip: "\u23ed Tour perdu \u2014 vous passez ce tour", lava: "\ud83c\udf0b Jet de lave \u2014 le hasard joue pour vous" },
-      forcedBtn: { skip: "Passer", lava: "Lancer" },
+      forced: { skip: "\u23ed Tour perdu \u2014 vous passez ce tour", lava: "\ud83c\udf0b Jet de lave \u2014 votre coup se joue tout seul, au hasard" },
+      forcedHint: { skip: "Vous pouvez d\u2019abord armer un jeton : le tour pass\u00e9 compte alors comme premier coup et vous en jouez un second", lava: "Vous pouvez d\u2019abord armer un jeton : le jet compte alors comme premier coup et vous en jouez un second" },
+      forcedBtn: { skip: "Passer le tour", lava: "Dans la lave" },
       hintLabel: "Indice de distance",
       vizThermo: "Thermomètre", vizLine: "Droite numérique",
       enterGuess: "Entrez un nombre", placeholderTpl: "de {a} à {b}", submitGuess: "Vérifier",
@@ -2163,8 +2183,9 @@
       bonusLabel: "Boni", bonusNear: "etwas ist in der Nähe", lblBonusCount: "Boni auf dem Feld", bonusAuto: "wie üblich ({n})",
       bonusNames: { extra: "Zwei in Reserve", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf", skip: "Zug verloren", gift: "Geschenk an den Gegner", memory: "Kurzes Gedächtnis", rush: "Hetze" },
       bonusDesc: { extra: "{a} bekommt zwei Marken", fog: "{b} sieht fremde Züge nicht", blind: "{b} sieht eigene Züge nicht", lava: "der Zufall zieht für {b}", skip: "{a} setzt den nächsten Zug aus", gift: "{b} bekommt eine Marke", memory: "{a} sieht nur die letzten zwei Züge", rush: "{b} \u2014 3 Sekunden weniger pro Zug" },
-      forced: { skip: "\u23ed Zug verloren \u2014 du setzt diesen Zug aus", lava: "\ud83c\udf0b Lavawurf \u2014 der Zufall zieht für dich" },
-      forcedBtn: { skip: "Aussetzen", lava: "Werfen" },
+      forced: { skip: "\u23ed Zug verloren \u2014 du setzt diesen Zug aus", lava: "\ud83c\udf0b Lavawurf \u2014 dein Zug geschieht von selbst, mit einer Zufallszahl" },
+      forcedHint: { skip: "Du kannst vorher einen Jeton spannen: dann z\u00e4hlt das Aussetzen als erster Zug und du ziehst ein zweites Mal", lava: "Du kannst vorher einen Jeton spannen: dann z\u00e4hlt der Wurf als erster Zug und du ziehst ein zweites Mal" },
+      forcedBtn: { skip: "Zug aussetzen", lava: "In die Lava" },
       hintLabel: "Abstandshinweis",
       vizThermo: "Thermometer", vizLine: "Zahlenstrahl",
       enterGuess: "Gib eine Zahl ein", placeholderTpl: "von {a} bis {b}", submitGuess: "Prüfen",
@@ -3137,17 +3158,24 @@
     const kind = forcedTurn();
     if (!kind) return;
     if (online) return onlineForcedTurn();
-    // Жетон на отнятом ходе не сгорает
-    if (D.armed) { D.armed = false; D.tokens[D.cur]++; }
     if (kind === 'skip') {
       D.skip[D.cur] = false;
+      // Взведённый жетон работает и здесь: пропуск идёт первым ходом, а второй
+      // игрок делает сам. Ради этого жетон и взводят
+      if (D.armed) { D.armed = false; renderAll(); return; }
       D.cur = 1 - D.cur;
       renderAll();
       return;
     }
     D.autoLava[D.cur] = false;
     const value = lavaThrow();
-    if (value === null) { D.cur = 1 - D.cur; renderAll(); return; }
+    if (value === null) {
+      if (D.armed) { D.armed = false; renderAll(); return; }
+      D.cur = 1 - D.cur;
+      renderAll();
+      return;
+    }
+    // Бросок идёт обычным ходом, поэтому жетон сработает внутри duelPlay
     duelPlay(value);
   }
 
@@ -3275,6 +3303,11 @@
     document.getElementById('forcedText').textContent =
       L.forced[kind].replace('{a}', D.names[D.cur]);
     document.getElementById('forcedBtn').textContent = L.forcedBtn[kind];
+    const canArm = !D.armed && D.tokens[D.cur] > 0 && history.length > 0 &&
+                   (!online || D.cur === online.seat);
+    const hint = document.getElementById('forcedHint');
+    hint.textContent = canArm ? L.forcedHint[kind] : '';
+    hint.classList.toggle('hidden', !canArm);
   }
 
   function renderFeedback() {
@@ -3596,14 +3629,16 @@
       title.style.color = D.matchOver ? P_COLORS[w] : '#fff';
       title.textContent = D.names[w] + (D.matchOver ? L.matchWin : L.roundWin);
 
+      // Сетка из трёх колонок: имя стоит ровно над своим счётом
       const score = document.createElement('div');
       score.className = 'r-score';
       score.innerHTML =
-        '<span class="r-chip" style="color:' + P_COLORS[0] + ';border-color:' + P_COLORS[0] + '">' +
-          escapeHtml(D.names[0]) + ' ' + D.wins[0] + '</span>' +
-        '<span class="r-vs">:</span>' +
-        '<span class="r-chip" style="color:' + P_COLORS[1] + ';border-color:' + P_COLORS[1] + '">' +
-          D.wins[1] + ' ' + escapeHtml(D.names[1]) + '</span>';
+        '<div class="rs-name" style="color:' + P_COLORS[0] + '">' + escapeHtml(D.names[0]) + '</div>' +
+        '<div></div>' +
+        '<div class="rs-name" style="color:' + P_COLORS[1] + '">' + escapeHtml(D.names[1]) + '</div>' +
+        '<div class="rs-num" style="color:' + P_COLORS[0] + '">' + D.wins[0] + '</div>' +
+        '<div class="r-vs">:</div>' +
+        '<div class="rs-num" style="color:' + P_COLORS[1] + '">' + D.wins[1] + '</div>';
 
       const secretLine = document.createElement('div');
       secretLine.className = 'r-secret';
@@ -3698,7 +3733,7 @@
 
       const btn = document.getElementById('ptoken' + p);
       const isArmedByMe = D.armed && D.cur === p;
-      const canArm = !D.armed && D.tokens[p] > 0 && history.length > 0 && !forcedTurn();
+      const canArm = !D.armed && D.tokens[p] > 0 && history.length > 0;
       const canUse = !D.roundOver && !D.matchOver && D.cur === p && (isArmedByMe || canArm);
       btn.disabled = !canUse;
       btn.classList.toggle('armed', isArmedByMe);

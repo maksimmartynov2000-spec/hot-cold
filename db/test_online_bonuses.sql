@@ -299,3 +299,80 @@ begin
   end if;
 end $$;
 \echo ok
+
+\echo === 17. жетон на пропуске: пропуск идёт первым ходом, второй делает игрок
+do $$
+declare mid bigint := current_setting('t.b')::bigint; st jsonb; m matches;
+        tok int; before int;
+begin
+  update matches set skip_turn = array[true, false], auto_lava = array[false, false],
+                     cur = 0, round_over = false, match_over = false, armed = false,
+                     tokens = array[1, 1],
+                     turn_deadline = now() + interval '30 seconds' where id = mid;
+  -- Жетон нельзя взвести первым ходом раунда: сделаем, чтобы ход уже был
+  select count(*) into before from match_moves where match_id = mid;
+  if before = 0 then
+    insert into match_moves(match_id, round, seat, guess, tier)
+    select mid, m2.round, 1, m2.range_min, 0 from matches m2 where id = mid;
+  end if;
+
+  if use_match_token('Лев','1234',mid,true) is distinct from true then
+    raise exception 'ОШИБКА: жетон не взвёлся на отнятом ходе';
+  end if;
+  select * into m from matches where id = mid;
+  if not m.armed then raise exception 'ОШИБКА: взвод не записан'; end if;
+  if m.tokens[1] is distinct from 0 then raise exception 'ОШИБКА: жетон не списан'; end if;
+
+  perform do_forced_turn('Лев','1234',mid);
+  select * into m from matches where id = mid;
+  if m.cur is distinct from 0 then raise exception 'ОШИБКА: пропуск с жетоном отдал ход'; end if;
+  if m.armed then raise exception 'ОШИБКА: жетон не сгорел'; end if;
+  if m.skip_turn[1] then raise exception 'ОШИБКА: пропуск не снялся'; end if;
+  if m.turn_deadline is null or m.turn_deadline <= now() then
+    raise exception 'ОШИБКА: на второй ход не дали времени';
+  end if;
+
+  st := match_state('Лев','1234',mid);
+  if st ->> 'forced' is not null then raise exception 'ОШИБКА: кнопка пропуска осталась'; end if;
+
+  -- И второй ход действительно можно сделать
+  select * into m from matches where id = mid;
+  perform match_guess('Лев','1234',mid,
+    case when m.secret = m.range_min then m.range_max else m.range_min end);
+  select * into m from matches where id = mid;
+  if m.cur is distinct from 1 then raise exception 'ОШИБКА: второй ход не передал очередь'; end if;
+end $$;
+\echo ok
+
+\echo === 18. без жетона пропуск по-прежнему отдаёт ход
+do $$
+declare mid bigint := current_setting('t.b')::bigint; m matches;
+begin
+  update matches set skip_turn = array[true, false], cur = 0, round_over = false,
+                     match_over = false, armed = false, tokens = array[1, 1],
+                     turn_deadline = now() + interval '30 seconds' where id = mid;
+  perform do_forced_turn('Лев','1234',mid);
+  select * into m from matches where id = mid;
+  if m.cur is distinct from 1 then raise exception 'ОШИБКА: пропуск без жетона оставил ход'; end if;
+  if m.tokens[1] is distinct from 1 then raise exception 'ОШИБКА: жетон тронули без надобности'; end if;
+end $$;
+\echo ok
+
+\echo === 19. жетон на броске в лаву тоже даёт второй ход
+do $$
+declare mid bigint := current_setting('t.b')::bigint; m matches; n1 int; n2 int;
+begin
+  update matches set auto_lava = array[true, false], skip_turn = array[false, false],
+                     cur = 0, round_over = false, match_over = false, armed = true,
+                     tokens = array[0, 1],
+                     turn_deadline = now() + interval '30 seconds' where id = mid;
+  select count(*) into n1 from match_moves where match_id = mid;
+  perform do_forced_turn('Лев','1234',mid);
+  select count(*) into n2 from match_moves where match_id = mid;
+  select * into m from matches where id = mid;
+  if n2 is distinct from n1 + 1 then raise exception 'ОШИБКА: бросок не записан ходом'; end if;
+  if m.round_over then return; end if;
+  if m.cur is distinct from 0 then raise exception 'ОШИБКА: бросок с жетоном отдал ход'; end if;
+  if m.armed then raise exception 'ОШИБКА: жетон не сгорел на броске'; end if;
+end $$;
+\echo ok

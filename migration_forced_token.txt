@@ -1,0 +1,53 @@
+-- Жетон дополнительного хода теперь работает и на отнятом ходе. Раньше пропуск
+-- просто передавал ход, и взведённый жетон оставался ни при чём; теперь пропуск
+-- (или бросок в лаву) засчитывается первым ходом, а второй игрок делает сам.
+-- Это то же правило, что и на обычном ходе, только начало у него чужое.
+
+create or replace function do_forced_turn(p_username text, p_pin text, p_match_id bigint)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; seat int; kind text; v int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  seat := match_seat(m, me);
+  if seat is null then raise exception 'not_your_match'; end if;
+  kind := forced_turn_kind(m);
+  if kind is null then raise exception 'nothing_forced'; end if;
+  if m.cur <> seat then raise exception 'not_your_turn'; end if;
+
+  if kind = 'skip' then
+    update matches set skip_turn[seat + 1] = false where id = p_match_id;
+    if m.armed then
+      -- Пропуск засчитан первым ходом: жетон тратится, ход остаётся за игроком
+      update matches set armed = false, last_timeout = false, updated_at = now()
+      where id = p_match_id;
+      select * into m from matches where id = p_match_id;
+      update matches set turn_deadline = now() + make_interval(secs => turn_seconds(m))
+      where id = p_match_id;
+      return 'skip';
+    end if;
+    perform pass_turn(p_match_id, false);
+    return 'skip';
+  end if;
+
+  update matches set auto_lava[seat + 1] = false where id = p_match_id;
+  select * into m from matches where id = p_match_id;
+  v := lava_value(m);
+  if v is null then
+    perform pass_turn(p_match_id, false);
+    return 'lava';
+  end if;
+  -- Бросок идёт обычным ходом, поэтому взведённый жетон там же и сработает
+  perform match_guess(p_username, p_pin, p_match_id, v);
+  return 'lava';
+end;
+$$;
