@@ -1,0 +1,479 @@
+alter table students add column if not exists elo int not null default 1000;
+alter table students add column if not exists elo_games int not null default 0;
+alter table matches add column if not exists ranked boolean not null default false;
+alter table matches add column if not exists timeouts int[] not null default array[0, 0];
+alter table matches add column if not exists forfeit_by int;
+alter table matches add column if not exists elo_applied boolean not null default false;
+alter table matches add column if not exists elo_delta int[] not null default array[0, 0];
+
+create table if not exists ranked_queue (
+  username text primary key references students(username) on delete cascade,
+  elo int not null,
+  joined_at timestamptz not null default now(),
+  match_id bigint references matches(id) on delete set null
+);
+alter table ranked_queue enable row level security;
+
+create or replace function queue_window(p_joined timestamptz)
+returns int
+language sql
+stable
+as $$
+  select 100 + floor(extract(epoch from (now() - p_joined)) / 15)::int * 50;
+$$;
+
+create or replace function apply_elo(p_match_id bigint, p_winner int)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; wn text; ln text; we int; le int; wg int; lg int;
+        expect double precision; kw int; kl int; delta int;
+begin
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null or not m.ranked or m.elo_applied or p_winner is null then return; end if;
+
+  wn := case when p_winner = 0 then m.p0 else m.p1 end;
+  ln := case when p_winner = 0 then m.p1 else m.p0 end;
+  select elo, elo_games into we, wg from students where username = wn;
+  select elo, elo_games into le, lg from students where username = ln;
+
+  expect := 1.0 / (1.0 + power(10.0, (le - we) / 400.0));
+  kw := case when wg < 10 then 40 else 24 end;
+  kl := case when lg < 10 then 40 else 24 end;
+
+  delta := round(kw * (1 - expect));
+  update students set elo = elo + delta, elo_games = elo_games + 1 where username = wn;
+  update matches set elo_delta[p_winner + 1] = delta where id = p_match_id;
+
+  -- Проигравший не падает ниже пола, и показать надо ровно то, что он потерял,
+  -- а не то, что отняла бы формула
+  delta := round(kl * (1 - expect));
+  update students set elo = greatest(100, elo - delta), elo_games = elo_games + 1
+  where username = ln
+  returning elo - le into delta;
+  update matches set elo_delta[2 - p_winner] = delta, elo_applied = true
+  where id = p_match_id;
+end;
+$$;
+
+create or replace function apply_turn_timeout(p_match_id bigint)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; gone int; rival int;
+begin
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then return false; end if;
+  if m.status <> 'active' or m.round_over or m.match_over then return false; end if;
+  if m.turn_deadline is null or m.turn_deadline > now() then return false; end if;
+
+  insert into match_moves(match_id, round, seat, guess, tier, kind)
+  values (p_match_id, m.round, m.cur, null, null, 'timeout');
+
+  gone := m.timeouts[m.cur + 1] + 1;
+  rival := 1 - m.cur;
+
+  update matches
+  set skip_turn[m.cur + 1] = false,
+      auto_lava[m.cur + 1] = false,
+      near_bonus = false,
+      last_bonus = null,
+      timeouts[m.cur + 1] = gone
+  where id = p_match_id;
+
+  -- Два пропуска подряд — это минута молчания. Человек ушёл, и держать
+  -- соперника у экрана дальше незачем
+  if gone >= 2 then
+    update matches
+    set round_over = true,
+        round_winner = rival,
+        match_over = true,
+        status = 'finished',
+        forfeit_by = m.cur,
+        turn_deadline = null,
+        updated_at = now()
+    where id = p_match_id;
+    perform apply_elo(p_match_id, rival);
+    return true;
+  end if;
+
+  perform pass_turn(p_match_id, true);
+  return true;
+end;
+$$;
+
+create or replace function match_guess(p_username text, p_pin text,
+                                       p_match_id bigint, p_guess int)
+returns int
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; seat int; dist int; band int; used_double boolean;
+        hit record; btype text; radius int; done boolean;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  seat := match_seat(m, me);
+  if seat is null then raise exception 'not_your_match'; end if;
+  if m.status <> 'active' then raise exception 'not_playing'; end if;
+  if m.round_over or m.match_over then raise exception 'round_over'; end if;
+  if m.cur <> seat then raise exception 'not_your_turn'; end if;
+  if m.skip_turn[seat + 1] or m.auto_lava[seat + 1] then raise exception 'forced_turn'; end if;
+  if p_guess is null or p_guess < m.range_min or p_guess > m.range_max then
+    raise exception 'out_of_range';
+  end if;
+
+  dist := abs(p_guess - m.secret);
+  band := feedback_tier(match_span(m), dist);
+  insert into match_moves(match_id, round, seat, guess, tier)
+  values (p_match_id, m.round, seat, p_guess, band);
+
+  radius := bonus_near_radius(match_span(m));
+  select * into hit from match_bonuses b
+  where b.match_id = p_match_id and b.round = m.round and not b.taken and b.value = p_guess;
+
+  btype := null;
+  if hit.type is not null then
+    btype := hit.type;
+    if match_bonus_blocked(m, btype, 1 - seat) then btype := 'extra'; end if;
+    update match_bonuses set taken = true
+    where match_id = p_match_id and round = m.round and value = p_guess;
+  end if;
+
+  -- Сходил — значит на месте: счётчик молчания обнуляется
+  update matches
+  set last_bonus = btype,
+      last_bonus_by = seat,
+      last_timeout = false,
+      timeouts[seat + 1] = 0,
+      near_bonus = (btype is null and exists (
+        select 1 from match_bonuses b
+        where b.match_id = p_match_id and b.round = m.round and not b.taken
+          and abs(b.value - p_guess) <= radius))
+  where id = p_match_id;
+
+  if btype is not null then perform apply_match_bonus(p_match_id, btype, seat); end if;
+
+  select * into m from matches where id = p_match_id;
+  used_double := m.armed;
+
+  if dist = 0 then
+    done := (m.wins[seat + 1] + 1) >= m.wins_needed;
+    update matches
+    set round_over = true, round_winner = seat,
+        wins[seat + 1] = m.wins[seat + 1] + 1,
+        match_over = done,
+        status = case when done then 'finished' else status end,
+        armed = false, turn_deadline = null, updated_at = now()
+    where id = p_match_id;
+    if done then perform apply_elo(p_match_id, seat); end if;
+  elsif used_double then
+    update matches set armed = false, updated_at = now() where id = p_match_id;
+    select * into m from matches where id = p_match_id;
+    update matches set turn_deadline = now() + make_interval(secs => turn_seconds(m))
+    where id = p_match_id;
+  else
+    perform pass_turn(p_match_id, false);
+  end if;
+
+  return band;
+end;
+$$;
+
+create or replace function join_ranked_queue(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; my_elo int; mid bigint; opp ranked_queue; new_id bigint; mine ranked_queue;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+
+  select id into mid from matches
+  where ranked and status = 'active' and (p0 = me or p1 = me)
+  order by id desc limit 1;
+  if mid is not null then
+    delete from ranked_queue where username = me;
+    return jsonb_build_object('matchId', mid);
+  end if;
+
+  select * into mine from ranked_queue where username = me;
+  if mine.match_id is not null then
+    delete from ranked_queue where username = me;
+    return jsonb_build_object('matchId', mine.match_id);
+  end if;
+
+  -- Брошенные строки: и те, кто ушёл не дождавшись, и те, кому матч уже
+  -- нашёлся, но забрать его никто не пришёл
+  delete from ranked_queue
+  where username <> me
+    and ((match_id is null and joined_at < now() - interval '5 minutes')
+      or (match_id is not null and joined_at < now() - interval '30 minutes'));
+
+  select elo into my_elo from students where username = me;
+  insert into ranked_queue(username, elo) values (me, my_elo)
+  on conflict (username) do nothing;
+  select * into mine from ranked_queue where username = me;
+
+  select * into opp from ranked_queue q
+  where q.username <> me and q.match_id is null
+    and abs(q.elo - my_elo) <= greatest(queue_window(q.joined_at), queue_window(mine.joined_at))
+  order by abs(q.elo - my_elo), q.joined_at
+  limit 1;
+
+  if opp.username is null then
+    return jsonb_build_object('matchId', null, 'waiting', true);
+  end if;
+
+  -- Кто ждал дольше, тот и ходит первым: маленькая компенсация за ожидание
+  insert into matches(p0, p1, wins_needed, range_min, range_max, frost,
+                      bonuses_on, ranked, status, starter)
+  values (opp.username, me, 3, 1, 100, false, false, true, 'active', 0)
+  returning id into new_id;
+  perform start_match_round(new_id);
+
+  update ranked_queue set match_id = new_id where username = opp.username;
+  delete from ranked_queue where username = me;
+  return jsonb_build_object('matchId', new_id);
+end;
+$$;
+
+create or replace function ranked_status(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; mine ranked_queue; mid bigint; waiting int; last_at timestamptz;
+        my_elo int; my_games int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+  select elo, elo_games into my_elo, my_games from students where username = me;
+
+  select id into mid from matches
+  where ranked and status = 'active' and (p0 = me or p1 = me)
+  order by id desc limit 1;
+
+  select * into mine from ranked_queue where username = me;
+  if mid is null and mine.match_id is not null then mid := mine.match_id; end if;
+  if mid is not null then delete from ranked_queue where username = me; end if;
+
+  select count(*) into waiting from ranked_queue
+  where match_id is null and joined_at > now() - interval '5 minutes';
+  -- Когда в рейтинге играли в последний раз хоть кто-нибудь: по этому числу
+  -- видно, есть ли смысл стоять в очереди. Отдаём секундами, а не временем:
+  -- часы на телефоне и на сервере не совпадают
+  select max(updated_at) into last_at from matches where ranked;
+
+  return jsonb_build_object(
+    'matchId', mid,
+    'inQueue', mine.username is not null and mine.match_id is null and mid is null,
+    'waited', case when mine.username is null then 0
+                   else floor(extract(epoch from (now() - mine.joined_at)))::int end,
+    'queue', waiting,
+    'elo', coalesce(my_elo, 1000),
+    'games', coalesce(my_games, 0),
+    'lastAgo', case when last_at is null then null
+                    else floor(extract(epoch from (now() - last_at)))::int end);
+end;
+$$;
+
+create or replace function leave_ranked_queue(p_username text, p_pin text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  delete from ranked_queue where username = me and match_id is null;
+  return true;
+end;
+$$;
+
+create or replace function elo_leaderboard()
+returns table(username text, elo int, games int)
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  select s.username, s.elo, s.elo_games
+  from students s
+  where s.elo_games >= 3
+  order by s.elo desc, s.elo_games desc
+  limit 10;
+$$;
+
+create or replace function leave_match(p_username text, p_pin text, p_match_id bigint)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; my_seat int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  my_seat := match_seat(m, me);
+  if my_seat is null then raise exception 'not_your_match'; end if;
+  if m.status not in ('invited', 'active') then return false; end if;
+
+  -- Из рейтинговой игры нельзя выйти без последствий: иначе проигрывающий
+  -- всегда будет закрывать вкладку, и рейтинг перестанет что-то значить
+  if m.ranked and m.status = 'active' then
+    update matches
+    set status = 'finished', match_over = true, round_over = true,
+        round_winner = 1 - my_seat, forfeit_by = my_seat,
+        turn_deadline = null, updated_at = now()
+    where id = p_match_id;
+    perform apply_elo(p_match_id, 1 - my_seat);
+    return true;
+  end if;
+
+  update matches set status = 'finished', match_over = true, updated_at = now()
+  where id = p_match_id;
+  return true;
+end;
+$$;
+
+create or replace function match_state(p_username text, p_pin text, p_match_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; my_seat int; moves jsonb; reveal boolean;
+        visible int; hide_mine boolean; hide_theirs boolean; chat jsonb; my_elo int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  my_seat := match_seat(m, me);
+  if my_seat is null then raise exception 'not_your_match'; end if;
+
+  reveal := m.round_over or m.match_over or m.status <> 'active';
+  hide_mine := (not reveal) and m.blind[my_seat + 1] and m.cur = my_seat;
+  hide_theirs := (not reveal) and m.fog[my_seat + 1] and m.cur = my_seat;
+  visible := case when (not reveal) and m.short_memory[my_seat + 1] and m.cur = my_seat then 2 else 4 end;
+
+  select coalesce(jsonb_agg(x order by x_id), '[]'::jsonb) into moves from (
+    select mv.id as x_id,
+           case
+             when mv.kind = 'timeout'
+               then jsonb_build_object('seat', mv.seat, 'timeout', true)
+             when (mv.seat = my_seat and hide_mine) or (mv.seat <> my_seat and hide_theirs)
+               then jsonb_build_object('seat', mv.seat, 'hidden', true)
+             else jsonb_build_object('seat', mv.seat, 'guess', mv.guess, 'tier', mv.tier)
+           end as x
+    from (select * from match_moves mv2
+          where mv2.match_id = p_match_id and mv2.round = m.round
+          order by mv2.id desc limit visible) mv
+  ) q;
+
+  -- Фразы отдаём вместе с возрастом: клиент сам решит, показывать ли ещё
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', c.id, 'seat', c.seat, 'code', c.code,
+           'ago', floor(extract(epoch from (now() - c.created_at)))::int) order by c.id), '[]'::jsonb)
+    into chat
+  from (select * from match_chat c2 where c2.match_id = p_match_id
+        order by c2.id desc limit 6) c;
+
+  select elo into my_elo from students where username = me;
+
+  return jsonb_build_object(
+    'id', m.id, 'seat', my_seat,
+    'names', jsonb_build_array(m.p0, m.p1),
+    'status', m.status, 'winsNeeded', m.wins_needed,
+    'rangeMin', m.range_min, 'rangeMax', m.range_max, 'frost', m.frost,
+    'round', m.round, 'wins', m.wins, 'cur', m.cur, 'tokens', m.tokens, 'armed', m.armed,
+    'roundOver', m.round_over, 'roundWinner', m.round_winner, 'matchOver', m.match_over,
+    'moves', moves,
+    'secret', case when reveal then to_jsonb(m.secret) else 'null'::jsonb end,
+    'bonusesOn', m.bonuses_on,
+    'fog', m.fog, 'blind', m.blind, 'autoLava', m.auto_lava,
+    'skip', m.skip_turn, 'shortMemory', m.short_memory, 'rush', m.rush,
+    'nearBonus', m.near_bonus, 'lastBonus', m.last_bonus, 'lastBonusBy', m.last_bonus_by,
+    'lastTimeout', m.last_timeout,
+    'forced', forced_turn_kind(m),
+    'turnSeconds', turn_seconds(m),
+    'secondsLeft', case when m.turn_deadline is null then null
+                        else greatest(0, ceil(extract(epoch from (m.turn_deadline - now()))))::int end,
+    'chat', chat,
+    'ranked', m.ranked,
+    'forfeitBy', m.forfeit_by,
+    'eloDelta', case when m.elo_applied then to_jsonb(m.elo_delta) else 'null'::jsonb end,
+    'elo', my_elo,
+    'updatedAt', m.updated_at
+  );
+end;
+$$;
+
+-- Список игр должен отличать рейтинговую от дружеского вызова: у них разные
+-- правила выхода, и путать их на экране нельзя
+drop function if exists list_matches(text, text);
+create or replace function list_matches(p_username text, p_pin text)
+returns table(id bigint, other text, seat int, status text, round int,
+              wins int[], my_turn boolean, ranked boolean, updated_at timestamptz)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+
+  return query
+  select m.id,
+         case when m.p0 = me then m.p1 else m.p0 end,
+         case when m.p0 = me then 0 else 1 end,
+         m.status,
+         m.round,
+         m.wins,
+         (m.status = 'active' and not m.round_over
+            and m.cur = case when m.p0 = me then 0 else 1 end),
+         m.ranked,
+         m.updated_at
+  from matches m
+  where (m.p0 = me or m.p1 = me)
+    and m.status in ('invited', 'active')
+  order by m.updated_at desc;
+end;
+$$;
+grant execute on function list_matches(text, text) to anon;
+
+revoke execute on function queue_window(timestamptz) from public, anon;
+revoke execute on function apply_elo(bigint, int) from public, anon;
+grant execute on function join_ranked_queue(text, text) to anon;
+grant execute on function ranked_status(text, text) to anon;
+grant execute on function leave_ranked_queue(text, text) to anon;
+grant execute on function elo_leaderboard() to anon;

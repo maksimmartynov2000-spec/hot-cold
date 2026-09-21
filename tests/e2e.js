@@ -241,10 +241,73 @@ async function registerPlayer(p, name, pin) {
   check('проигравший тоже увидел итог', loserSees.over === true && loserSees.secret === started.secret,
     JSON.stringify(loserSees));
 
+  // ===== Рейтинговый онлайн: очередь, автоматический подбор, сдача по молчанию
+  await A.page.click('.r-actions .btn');
+  await B.page.click('.r-actions .btn');
+  await A.page.waitForTimeout(900);
+  await B.page.waitForTimeout(900);
+  check('после матча оба вернулись в онлайн',
+    (await A.page.locator('#screenOnline').isVisible()) &&
+    (await B.page.locator('#screenOnline').isVisible()));
+
+  await A.page.click('#tRkPlay');
+  await A.page.waitForTimeout(900);
+  check('первый встал в очередь и ждёт', await A.page.locator('#rkWaitBox').isVisible());
+  check('очередь записана в базу',
+    (await db.query("select count(*) from ranked_queue where username = 'Тимур'")).rows[0].count === '1');
+  const waitText = await A.page.locator('#rkWaitText').textContent();
+  check('в ожидании написано, что соперника ещё нет',
+    waitText.indexOf('только вы') >= 0, waitText);
+
+  await B.page.click('#tRkPlay');
+  await B.page.waitForTimeout(1500);
+  const rk = (await db.query('select * from matches where ranked order by id desc limit 1')).rows[0];
+  check('рейтинговый матч создан на фиксированных условиях',
+    rk && rk.status === 'active' && rk.wins_needed === 3 && rk.range_min === 1 &&
+    rk.range_max === 100 && rk.bonuses_on === false && rk.frost === false,
+    JSON.stringify(rk && { s: rk.status, w: rk.wins_needed, r: rk.range_max, b: rk.bonuses_on }));
+  check('второму сразу открылась доска', await B.page.locator('#screenGame').isVisible());
+
+  // Ждавшего в матч затягивает его же опрос очереди — без нажатий
+  await A.page.waitForTimeout(4200);
+  check('ждавшего подбор сам перенёс на доску', await A.page.locator('#screenGame').isVisible());
+  const bothRanked = await A.page.evaluate(() => online && online.ranked);
+  check('клиент знает, что игра рейтинговая', bothRanked === true, String(bothRanked));
+  check('очередь после подбора пуста',
+    (await db.query('select count(*) from ranked_queue')).rows[0].count === '0');
+
+  // Молчание: у хода второго игрока просрочен срок и один пропуск уже был
+  const bSeat = await B.page.evaluate(() => online.seat);
+  await db.query('update matches set cur = $2, timeouts[$2 + 1] = 1, ' +
+                 "turn_deadline = now() - interval '1 second' where id = $1", [rk.id, bSeat]);
+  await A.page.waitForTimeout(2600);
+  const gone = (await db.query('select forfeit_by, match_over, elo_applied, elo_delta, status ' +
+                               'from matches where id = $1', [rk.id])).rows[0];
+  check('второй пропуск подряд закончил матч сдачей',
+    gone.match_over === true && gone.status === 'finished' && gone.forfeit_by === bSeat,
+    JSON.stringify(gone));
+  check('рейтинг посчитан один раз', gone.elo_applied === true);
+
+  const elos = (await db.query("select username, elo, elo_games from students " +
+                               "where username in ('Тимур','Лада') order by username")).rows;
+  const lada = elos.find(r => r.username === 'Лада');
+  const timur = elos.find(r => r.username === 'Тимур');
+  check('оставшийся вырос, ушедший упал',
+    timur.elo > 1000 && lada.elo < 1000 && timur.elo_games === 1 && lada.elo_games === 1,
+    JSON.stringify(elos));
+
+  // В карточке число разделено пробелами по-русски: сравниваем без них
+  const card = (await A.page.locator('#resultBox').textContent()).replace(/[\s\u00a0\u202f]/g, '');
+  check('оставшемуся объяснили, что соперник ушёл', card.indexOf('Ладавышелизигры') >= 0, card);
+  check('и показали новый рейтинг с прибавкой',
+    card.indexOf('(+') >= 0 && card.indexOf(String(timur.elo)) >= 0, card);
+  check('причина стоит раньше счёта', card.indexOf('вышелизигры') < card.indexOf('0:0'), card);
+
   const calls = A.log.concat(B.log);
   check('всё шло через настоящие функции базы',
     calls.includes('match_guess') && calls.includes('match_state') &&
-    calls.includes('send_phrase') && calls.includes('challenge_friend'),
+    calls.includes('send_phrase') && calls.includes('challenge_friend') &&
+    calls.includes('join_ranked_queue') && calls.includes('ranked_status'),
     [...new Set(calls)].join(', '));
 
   await browser.close();
