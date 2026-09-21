@@ -1,0 +1,323 @@
+-- Четыре рейтинговых режима вместо одного. Младший бит номера — мороз и жара,
+-- старший — бонусы: 0 = 1..100, 1 = -100..100, 2 = 1..100 с бонусами,
+-- 3 = -100..100 с бонусами. У каждого режима свой отдельный рейтинг.
+
+create table if not exists elo_ratings (
+  username text not null references students(username) on delete cascade,
+  mode int not null,
+  elo int not null default 1000,
+  games int not null default 0,
+  primary key (username, mode),
+  constraint elo_mode_range check (mode between 0 and 3)
+);
+alter table elo_ratings enable row level security;
+
+-- Рейтинг был один на всех, и набран он ровно в том режиме, который теперь
+-- называется нулевым. Переносим его туда и убираем старое место: два
+-- источника правды разошлись бы незаметно
+do $$ begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'students'
+               and column_name = 'elo') then
+    insert into elo_ratings(username, mode, elo, games)
+    select s.username, 0, s.elo, s.elo_games from students s where s.elo_games > 0
+    on conflict (username, mode) do nothing;
+    alter table students drop column elo;
+    alter table students drop column elo_games;
+  end if;
+end $$;
+
+alter table matches add column if not exists ranked_mode int;
+update matches set ranked_mode = 0 where ranked and ranked_mode is null;
+alter table ranked_queue add column if not exists mode int not null default 0;
+
+create or replace function ranked_rules(p_mode int)
+returns table(range_min int, range_max int, frost boolean, bonuses boolean)
+language sql
+immutable
+as $$
+  select case when (p_mode & 1) = 1 then -100 else 1 end,
+         100,
+         (p_mode & 1) = 1,
+         (p_mode & 2) = 2;
+$$;
+
+create or replace function apply_elo(p_match_id bigint, p_winner int)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; wn text; ln text; we int; le int; wg int; lg int; md int;
+        expect double precision; kw int; kl int; delta int;
+begin
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null or not m.ranked or m.elo_applied or p_winner is null then return; end if;
+  md := coalesce(m.ranked_mode, 0);
+
+  wn := case when p_winner = 0 then m.p0 else m.p1 end;
+  ln := case when p_winner = 0 then m.p1 else m.p0 end;
+
+  -- Строку рейтинга заводим при первой же игре, а не при регистрации: режимов
+  -- четыре, и большинство из них человек может не открыть никогда
+  insert into elo_ratings(username, mode) values (wn, md), (ln, md)
+  on conflict (username, mode) do nothing;
+
+  select elo, games into we, wg from elo_ratings where username = wn and mode = md;
+  select elo, games into le, lg from elo_ratings where username = ln and mode = md;
+
+  expect := 1.0 / (1.0 + power(10.0, (le - we) / 400.0));
+  kw := case when wg < 10 then 40 else 24 end;
+  kl := case when lg < 10 then 40 else 24 end;
+
+  delta := round(kw * (1 - expect));
+  update elo_ratings set elo = elo + delta, games = games + 1
+  where username = wn and mode = md;
+  update matches set elo_delta[p_winner + 1] = delta where id = p_match_id;
+
+  -- Проигравший не падает ниже пола, и показать надо ровно то, что он потерял,
+  -- а не то, что отняла бы формула
+  delta := round(kl * (1 - expect));
+  update elo_ratings set elo = greatest(100, elo - delta), games = games + 1
+  where username = ln and mode = md
+  returning elo - le into delta;
+  update matches set elo_delta[2 - p_winner] = delta, elo_applied = true
+  where id = p_match_id;
+end;
+$$;
+
+drop function if exists join_ranked_queue(text, text);
+create or replace function join_ranked_queue(p_username text, p_pin text, p_mode int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; my_elo int; mid bigint; opp ranked_queue; new_id bigint; mine ranked_queue;
+        r record;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_mode is null or p_mode < 0 or p_mode > 3 then raise exception 'bad_mode'; end if;
+
+  perform expire_stale_matches();
+
+  select id into mid from matches
+  where ranked and status = 'active' and (p0 = me or p1 = me)
+  order by id desc limit 1;
+  if mid is not null then
+    delete from ranked_queue where username = me;
+    return jsonb_build_object('matchId', mid);
+  end if;
+
+  select * into mine from ranked_queue where username = me;
+  if mine.match_id is not null then
+    delete from ranked_queue where username = me;
+    return jsonb_build_object('matchId', mine.match_id);
+  end if;
+  -- В очереди можно стоять только в одном режиме: иначе человека затянуло бы
+  -- в две партии сразу, и обе с таймером
+  if mine.username is not null and mine.mode is distinct from p_mode then
+    delete from ranked_queue where username = me;
+    mine := null;
+  end if;
+
+  -- Брошенные строки: и те, кто ушёл не дождавшись, и те, кому матч уже
+  -- нашёлся, но забрать его никто не пришёл
+  delete from ranked_queue
+  where username <> me
+    and ((match_id is null and joined_at < now() - interval '5 minutes')
+      or (match_id is not null and joined_at < now() - interval '30 minutes'));
+
+  select coalesce(e.elo, 1000) into my_elo from (select 1) x
+  left join elo_ratings e on e.username = me and e.mode = p_mode;
+  insert into ranked_queue(username, elo, mode) values (me, my_elo, p_mode)
+  on conflict (username) do nothing;
+  select * into mine from ranked_queue where username = me;
+
+  select * into opp from ranked_queue q
+  where q.username <> me and q.match_id is null and q.mode = p_mode
+    and abs(q.elo - my_elo) <= greatest(queue_window(q.joined_at), queue_window(mine.joined_at))
+  order by abs(q.elo - my_elo), q.joined_at
+  limit 1;
+
+  if opp.username is null then
+    return jsonb_build_object('matchId', null, 'waiting', true);
+  end if;
+
+  select * into r from ranked_rules(p_mode);
+
+  -- Кто ждал дольше, тот и ходит первым: маленькая компенсация за ожидание
+  insert into matches(p0, p1, wins_needed, range_min, range_max, frost,
+                      bonuses_on, ranked, ranked_mode, status, starter)
+  values (opp.username, me, 3, r.range_min, r.range_max, r.frost,
+          r.bonuses, true, p_mode, 'active', 0)
+  returning id into new_id;
+  perform start_match_round(new_id);
+
+  update ranked_queue set match_id = new_id where username = opp.username;
+  delete from ranked_queue where username = me;
+  return jsonb_build_object('matchId', new_id);
+end;
+$$;
+
+drop function if exists ranked_status(text, text);
+create or replace function ranked_status(p_username text, p_pin text, p_mode int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; mine ranked_queue; mid bigint; waiting int; last_at timestamptz;
+        my_elo int; my_games int; all_r jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_mode is null or p_mode < 0 or p_mode > 3 then raise exception 'bad_mode'; end if;
+
+  perform expire_stale_matches();
+
+  select id into mid from matches
+  where ranked and status = 'active' and (p0 = me or p1 = me)
+  order by id desc limit 1;
+
+  select * into mine from ranked_queue where username = me;
+  if mid is null and mine.match_id is not null then mid := mine.match_id; end if;
+  if mid is not null then delete from ranked_queue where username = me; end if;
+
+  select count(*) into waiting from ranked_queue
+  where match_id is null and mode = p_mode and joined_at > now() - interval '5 minutes';
+
+  -- Когда в этом режиме играли в последний раз хоть кто-нибудь: по этому числу
+  -- видно, есть ли смысл стоять в очереди. Отдаём секундами, а не временем:
+  -- часы на телефоне и на сервере не совпадают
+  select max(updated_at) into last_at from matches
+  where ranked and coalesce(ranked_mode, 0) = p_mode;
+
+  -- Все четыре рейтинга сразу: переключение режима не должно ждать сервер
+  select jsonb_object_agg(g.mode, jsonb_build_object(
+           'elo', coalesce(e.elo, 1000), 'games', coalesce(e.games, 0)))
+    into all_r
+  from generate_series(0, 3) g(mode)
+  left join elo_ratings e on e.username = me and e.mode = g.mode;
+
+  my_elo := coalesce((all_r -> p_mode::text ->> 'elo')::int, 1000);
+  my_games := coalesce((all_r -> p_mode::text ->> 'games')::int, 0);
+
+  return jsonb_build_object(
+    'mode', p_mode,
+    'matchId', mid,
+    'inQueue', mine.username is not null and mine.match_id is null and mid is null
+               and mine.mode = p_mode,
+    'queueMode', case when mine.username is not null and mine.match_id is null and mid is null
+                      then mine.mode else null end,
+    'waited', case when mine.username is null then 0
+                   else floor(extract(epoch from (now() - mine.joined_at)))::int end,
+    'queue', waiting,
+    'elo', my_elo,
+    'games', my_games,
+    'ratings', all_r,
+    'lastAgo', case when last_at is null then null
+                    else floor(extract(epoch from (now() - last_at)))::int end);
+end;
+$$;
+
+drop function if exists elo_leaderboard();
+create or replace function elo_leaderboard(p_mode int)
+returns table(username text, elo int, games int)
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  select e.username, e.elo, e.games
+  from elo_ratings e
+  where e.mode = p_mode and e.games >= 3
+  order by e.elo desc, e.games desc
+  limit 10;
+$$;
+
+-- Клиенту нужно знать, в каком режиме идёт матч: по нему подписывается итог
+create or replace function match_state(p_username text, p_pin text, p_match_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; my_seat int; moves jsonb; reveal boolean;
+        visible int; hide_mine boolean; hide_theirs boolean; chat jsonb; my_elo int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  my_seat := match_seat(m, me);
+  if my_seat is null then raise exception 'not_your_match'; end if;
+
+  reveal := m.round_over or m.match_over or m.status <> 'active';
+  hide_mine := (not reveal) and m.blind[my_seat + 1] and m.cur = my_seat;
+  hide_theirs := (not reveal) and m.fog[my_seat + 1] and m.cur = my_seat;
+  visible := case when (not reveal) and m.short_memory[my_seat + 1] and m.cur = my_seat then 2 else 4 end;
+
+  select coalesce(jsonb_agg(x order by x_id), '[]'::jsonb) into moves from (
+    select mv.id as x_id,
+           case
+             when mv.kind = 'timeout'
+               then jsonb_build_object('seat', mv.seat, 'timeout', true)
+             when (mv.seat = my_seat and hide_mine) or (mv.seat <> my_seat and hide_theirs)
+               then jsonb_build_object('seat', mv.seat, 'hidden', true)
+             else jsonb_build_object('seat', mv.seat, 'guess', mv.guess, 'tier', mv.tier)
+           end as x
+    from (select * from match_moves mv2
+          where mv2.match_id = p_match_id and mv2.round = m.round
+          order by mv2.id desc limit visible) mv
+  ) q;
+
+  -- Фразы отдаём вместе с возрастом: клиент сам решит, показывать ли ещё
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', c.id, 'seat', c.seat, 'code', c.code,
+           'ago', floor(extract(epoch from (now() - c.created_at)))::int) order by c.id), '[]'::jsonb)
+    into chat
+  from (select * from match_chat c2 where c2.match_id = p_match_id
+        order by c2.id desc limit 6) c;
+
+  select e.elo into my_elo from elo_ratings e
+  where e.username = me and e.mode = coalesce(m.ranked_mode, 0);
+
+  return jsonb_build_object(
+    'id', m.id, 'seat', my_seat,
+    'names', jsonb_build_array(m.p0, m.p1),
+    'status', m.status, 'winsNeeded', m.wins_needed,
+    'rangeMin', m.range_min, 'rangeMax', m.range_max, 'frost', m.frost,
+    'round', m.round, 'wins', m.wins, 'cur', m.cur, 'tokens', m.tokens, 'armed', m.armed,
+    'roundOver', m.round_over, 'roundWinner', m.round_winner, 'matchOver', m.match_over,
+    'moves', moves,
+    'secret', case when reveal then to_jsonb(m.secret) else 'null'::jsonb end,
+    'bonusesOn', m.bonuses_on,
+    'fog', m.fog, 'blind', m.blind, 'autoLava', m.auto_lava,
+    'skip', m.skip_turn, 'shortMemory', m.short_memory, 'rush', m.rush,
+    'nearBonus', m.near_bonus, 'lastBonus', m.last_bonus, 'lastBonusBy', m.last_bonus_by,
+    'lastTimeout', m.last_timeout,
+    'forced', forced_turn_kind(m),
+    'turnSeconds', turn_seconds(m),
+    'secondsLeft', case when m.turn_deadline is null then null
+                        else greatest(0, ceil(extract(epoch from (m.turn_deadline - now()))))::int end,
+    'chat', chat,
+    'ranked', m.ranked,
+    'rankedMode', m.ranked_mode,
+    'forfeitBy', m.forfeit_by,
+    'eloDelta', case when m.elo_applied then to_jsonb(m.elo_delta) else 'null'::jsonb end,
+    'elo', coalesce(my_elo, 1000),
+    'updatedAt', m.updated_at
+  );
+end;
+$$;
+
+revoke execute on function ranked_rules(int) from public, anon;
+revoke execute on function apply_elo(bigint, int) from public, anon;
+grant execute on function join_ranked_queue(text, text, int) to anon;
+grant execute on function ranked_status(text, text, int) to anon;
+grant execute on function elo_leaderboard(int) to anon;

@@ -29,6 +29,7 @@ su postgres -c "psql -q -d hotcold_test -v ON_ERROR_STOP=1 \
   -f $ROOT/migration_chat.txt \
   -f $ROOT/migration_suggest.txt \
   -f $ROOT/migration_ranked.txt \
+  -f $ROOT/migration_ranked_modes.txt \
   -c \"select register_student('Лев','1234',null), register_student('Кира','4321',null), register_student('Максим','1111',null);\"" >/dev/null
 
 FAILED=0

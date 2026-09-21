@@ -6,7 +6,7 @@
 do $$ begin
   delete from ranked_queue;
   delete from matches where ranked;
-  update students set elo = 1000, elo_games = 0;
+  delete from elo_ratings;
 end $$;
 \echo ok
 
@@ -14,7 +14,7 @@ end $$;
 do $$
 declare r jsonb;
 begin
-  r := join_ranked_queue('Лев','1234');
+  r := join_ranked_queue('Лев','1234',0);
   if r->>'matchId' is not null then raise exception 'ОШИБКА: матч из пустой очереди'; end if;
   if (r->>'waiting')::boolean is distinct from true then raise exception 'ОШИБКА: не ждёт'; end if;
   if (select count(*) from ranked_queue where username = 'Лев') is distinct from 1 then
@@ -27,7 +27,7 @@ end $$;
 do $$
 declare r jsonb;
 begin
-  r := ranked_status('Лев','1234');
+  r := ranked_status('Лев','1234',0);
   if (r->>'inQueue')::boolean is distinct from true then raise exception 'ОШИБКА: не в очереди'; end if;
   if (r->>'queue')::int is distinct from 1 then raise exception 'ОШИБКА: размер очереди'; end if;
   if (r->>'elo')::int is distinct from 1000 then raise exception 'ОШИБКА: рейтинг новичка'; end if;
@@ -41,7 +41,7 @@ end $$;
 do $$
 declare r jsonb; mid bigint; m matches;
 begin
-  r := join_ranked_queue('Кира','4321');
+  r := join_ranked_queue('Кира','4321',0);
   mid := (r->>'matchId')::bigint;
   if mid is null then raise exception 'ОШИБКА: подбор не сработал'; end if;
   perform set_config('t.m', mid::text, false);
@@ -63,9 +63,9 @@ end $$;
 do $$
 declare r jsonb; mid bigint := current_setting('t.m')::bigint;
 begin
-  r := ranked_status('Лев','1234');
+  r := ranked_status('Лев','1234',0);
   if (r->>'matchId')::bigint is distinct from mid then raise exception 'ОШИБКА: ждавший не видит матч'; end if;
-  r := ranked_status('Кира','4321');
+  r := ranked_status('Кира','4321',0);
   if (r->>'matchId')::bigint is distinct from mid then raise exception 'ОШИБКА: второй не видит матч'; end if;
   if (select count(*) from ranked_queue) is distinct from 0 then raise exception 'ОШИБКА: очередь не убрана'; end if;
 end $$;
@@ -75,7 +75,7 @@ end $$;
 do $$
 declare r jsonb; mid bigint := current_setting('t.m')::bigint;
 begin
-  r := join_ranked_queue('Лев','1234');
+  r := join_ranked_queue('Лев','1234',0);
   if (r->>'matchId')::bigint is distinct from mid then raise exception 'ОШИБКА: создался второй матч'; end if;
   if (select count(*) from ranked_queue) is distinct from 0 then raise exception 'ОШИБКА: попал в очередь при живом матче'; end if;
 end $$;
@@ -100,17 +100,18 @@ declare r jsonb;
 begin
   delete from ranked_queue;
   delete from matches where ranked;
-  update students set elo = 1000, elo_games = 0;
-  update students set elo = 1400 where username = 'Кира';
+  delete from elo_ratings;
+  insert into elo_ratings(username, mode, elo) values ('Кира',0,1400)
+    on conflict (username, mode) do update set elo = 1400;
 
-  perform join_ranked_queue('Лев','1234');
-  r := join_ranked_queue('Кира','4321');
+  perform join_ranked_queue('Лев','1234',0);
+  r := join_ranked_queue('Кира','4321',0);
   if r->>'matchId' is not null then raise exception 'ОШИБКА: подобрал слишком далёкого'; end if;
 
   -- Лев ждёт уже полторы минуты: окно 400, разрыв 400 — пора играть
   update ranked_queue set joined_at = now() - interval '90 seconds' where username = 'Лев';
   delete from ranked_queue where username = 'Кира';
-  r := join_ranked_queue('Кира','4321');
+  r := join_ranked_queue('Кира','4321',0);
   if r->>'matchId' is null then raise exception 'ОШИБКА: окно не расширилось'; end if;
   perform set_config('t.m', (r->>'matchId'), false);
 end $$;
@@ -128,11 +129,11 @@ begin
   select * into m from matches where id = mid;
   perform match_guess('Лев','1234', mid, m.secret);
 
-  select elo into lev from students where username = 'Лев';
-  select elo into kira from students where username = 'Кира';
+  select coalesce(max(elo), 1000) into lev from elo_ratings where username = 'Лев' and mode = 0;
+  select coalesce(max(elo), 1000) into kira from elo_ratings where username = 'Кира' and mode = 0;
   if lev is distinct from 1036 then raise exception 'ОШИБКА: рейтинг победителя %', lev; end if;
   if kira is distinct from 1364 then raise exception 'ОШИБКА: рейтинг проигравшего %', kira; end if;
-  if (select elo_games from students where username = 'Лев') is distinct from 1 then
+  if (select games from elo_ratings where username = 'Лев' and mode = 0) is distinct from 1 then
     raise exception 'ОШИБКА: игра не засчитана';
   end if;
 
@@ -142,7 +143,7 @@ begin
 
   -- Второй раз тот же матч рейтинг не двигает
   perform apply_elo(mid, match_seat(m, 'Лев'));
-  if (select elo from students where username = 'Лев') is distinct from lev then
+  if (select elo from elo_ratings where username = 'Лев' and mode = 0) is distinct from lev then
     raise exception 'ОШИБКА: рейтинг начислился дважды';
   end if;
 end $$;
@@ -154,19 +155,20 @@ declare mid bigint; m matches;
 begin
   delete from matches where ranked;
   delete from ranked_queue;
-  update students set elo = 1000, elo_games = 20;
-  perform join_ranked_queue('Лев','1234');
-  mid := (join_ranked_queue('Кира','4321')->>'matchId')::bigint;
+  delete from elo_ratings;
+  insert into elo_ratings(username, mode, elo, games) values ('Лев',0,1000,20), ('Кира',0,1000,20);
+  perform join_ranked_queue('Лев','1234',0);
+  mid := (join_ranked_queue('Кира','4321',0)->>'matchId')::bigint;
   select * into m from matches where id = mid;
   update matches set wins[match_seat(m,'Лев') + 1] = 2, cur = match_seat(m, 'Лев'),
       turn_deadline = now() + interval '1 minute' where id = mid;
   select * into m from matches where id = mid;
   perform match_guess('Лев','1234', mid, m.secret);
   -- равные рейтинги: ожидание 0.5, прибавка round(24 * 0.5) = 12
-  if (select elo from students where username = 'Лев') is distinct from 1012 then
+  if (select elo from elo_ratings where username = 'Лев' and mode = 0) is distinct from 1012 then
     raise exception 'ОШИБКА: K после десяти игр';
   end if;
-  if (select elo from students where username = 'Кира') is distinct from 988 then
+  if (select elo from elo_ratings where username = 'Кира' and mode = 0) is distinct from 988 then
     raise exception 'ОШИБКА: K проигравшего после десяти игр';
   end if;
 end $$;
@@ -177,7 +179,7 @@ do $$
 declare mid bigint; m matches;
 begin
   delete from matches;
-  update students set elo = 1000, elo_games = 0;
+  delete from elo_ratings;
   if friend_status('Лев','Кира') is distinct from 'friend' then
     perform send_friend_request('Лев','1234','Кира');
     perform respond_friend_request('Кира','4321','Лев',true);
@@ -189,7 +191,7 @@ begin
   perform match_guess(case when m.cur = 0 then m.p0 else m.p1 end,
                       case when (case when m.cur = 0 then m.p0 else m.p1 end) = 'Лев' then '1234' else '4321' end,
                       mid, m.secret);
-  if (select count(*) from students where elo <> 1000 or elo_games <> 0) is distinct from 0 then
+  if (select count(*) from elo_ratings where elo <> 1000 or games <> 0) is distinct from 0 then
     raise exception 'ОШИБКА: дружеская игра попала в рейтинг';
   end if;
 end $$;
@@ -200,9 +202,9 @@ do $$
 declare mid bigint; m matches; was int;
 begin
   delete from matches; delete from ranked_queue;
-  update students set elo = 1000, elo_games = 0;
-  perform join_ranked_queue('Лев','1234');
-  mid := (join_ranked_queue('Кира','4321')->>'matchId')::bigint;
+  delete from elo_ratings;
+  perform join_ranked_queue('Лев','1234',0);
+  mid := (join_ranked_queue('Кира','4321',0)->>'matchId')::bigint;
   perform set_config('t.m', mid::text, false);
   select * into m from matches where id = mid;
   was := m.cur;
@@ -212,7 +214,7 @@ begin
   if m.match_over then raise exception 'ОШИБКА: первый пропуск закончил матч'; end if;
   if m.cur is distinct from 1 - was then raise exception 'ОШИБКА: ход не перешёл'; end if;
   if m.timeouts[was + 1] is distinct from 1 then raise exception 'ОШИБКА: молчание не посчитано'; end if;
-  if (select count(*) from students where elo_games > 0) is distinct from 0 then
+  if (select count(*) from elo_ratings where games > 0) is distinct from 0 then
     raise exception 'ОШИБКА: рейтинг за один пропуск';
   end if;
 end $$;
@@ -264,7 +266,7 @@ begin
   if (st->>'ranked')::boolean is distinct from true then raise exception 'ОШИБКА: не видно, что матч рейтинговый'; end if;
   if (st->>'forfeitBy')::int is distinct from m.forfeit_by then raise exception 'ОШИБКА: не видно ухода'; end if;
   if st->'eloDelta' is null or st->'eloDelta' = 'null'::jsonb then raise exception 'ОШИБКА: не видно изменения рейтинга'; end if;
-  if (st->>'elo')::int is distinct from (select elo from students where username = leaver) then
+  if (st->>'elo')::int is distinct from (select elo from elo_ratings where username = leaver and mode = 0) then
     raise exception 'ОШИБКА: свой рейтинг не отдан';
   end if;
 end $$;
@@ -275,24 +277,24 @@ do $$
 declare mid bigint; m matches;
 begin
   delete from matches; delete from ranked_queue;
-  update students set elo = 1000, elo_games = 0;
-  perform join_ranked_queue('Лев','1234');
-  mid := (join_ranked_queue('Кира','4321')->>'matchId')::bigint;
+  delete from elo_ratings;
+  perform join_ranked_queue('Лев','1234',0);
+  mid := (join_ranked_queue('Кира','4321',0)->>'matchId')::bigint;
   perform leave_match('Лев','1234', mid);
   select * into m from matches where id = mid;
   if m.forfeit_by is distinct from match_seat(m, 'Лев') then raise exception 'ОШИБКА: ушедший не отмечен'; end if;
   if not m.elo_applied then raise exception 'ОШИБКА: за уход рейтинг не начислен'; end if;
-  if (select elo from students where username = 'Лев') >= 1000 then raise exception 'ОШИБКА: ушедший не потерял рейтинг'; end if;
-  if (select elo from students where username = 'Кира') <= 1000 then raise exception 'ОШИБКА: оставшийся не получил рейтинг'; end if;
+  if (select elo from elo_ratings where username = 'Лев' and mode = 0) >= 1000 then raise exception 'ОШИБКА: ушедший не потерял рейтинг'; end if;
+  if (select elo from elo_ratings where username = 'Кира' and mode = 0) <= 1000 then raise exception 'ОШИБКА: оставшийся не получил рейтинг'; end if;
 
   delete from matches;
-  update students set elo = 1000, elo_games = 0;
+  delete from elo_ratings;
   mid := challenge_friend('Лев','1234','Кира',100,false,3,false,null);
   perform respond_challenge('Кира','4321', mid, true);
   perform leave_match('Лев','1234', mid);
   select * into m from matches where id = mid;
   if m.forfeit_by is not null then raise exception 'ОШИБКА: дружеский выход записан как сдача'; end if;
-  if (select count(*) from students where elo_games > 0) is distinct from 0 then
+  if (select count(*) from elo_ratings where games > 0) is distinct from 0 then
     raise exception 'ОШИБКА: дружеский выход задел рейтинг';
   end if;
 end $$;
@@ -303,9 +305,9 @@ do $$
 declare mid bigint; n int;
 begin
   delete from matches; delete from ranked_queue;
-  update students set elo = 1000, elo_games = 0;
-  perform join_ranked_queue('Лев','1234');
-  mid := (join_ranked_queue('Кира','4321')->>'matchId')::bigint;
+  delete from elo_ratings;
+  perform join_ranked_queue('Лев','1234',0);
+  mid := (join_ranked_queue('Кира','4321',0)->>'matchId')::bigint;
   select count(*) into n from list_matches('Лев','1234') where id = mid and ranked;
   if n is distinct from 1 then raise exception 'ОШИБКА: рейтинговая игра не помечена'; end if;
 
@@ -321,11 +323,11 @@ do $$
 declare r jsonb;
 begin
   delete from matches; delete from ranked_queue;
-  perform join_ranked_queue('Максим','1111');
+  perform join_ranked_queue('Максим','1111',0);
   if (select count(*) from ranked_queue) is distinct from 1 then raise exception 'ОШИБКА: не встал в очередь'; end if;
   perform leave_ranked_queue('Максим','1111');
   if (select count(*) from ranked_queue) is distinct from 0 then raise exception 'ОШИБКА: не вышел из очереди'; end if;
-  r := ranked_status('Максим','1111');
+  r := ranked_status('Максим','1111',0);
   if (r->>'inQueue')::boolean is distinct from false then raise exception 'ОШИБКА: всё ещё в очереди'; end if;
 end $$;
 \echo ok
@@ -334,15 +336,14 @@ end $$;
 do $$
 declare n int; top text;
 begin
-  update students set elo = 1000, elo_games = 0;
-  update students set elo = 1200, elo_games = 5 where username = 'Кира';
-  update students set elo = 1100, elo_games = 3 where username = 'Лев';
-  update students set elo = 1500, elo_games = 2 where username = 'Максим';
-  select count(*) into n from elo_leaderboard();
+  delete from elo_ratings;
+  insert into elo_ratings(username, mode, elo, games) values
+    ('Кира',0,1200,5), ('Лев',0,1100,3), ('Максим',0,1500,2);
+  select count(*) into n from elo_leaderboard(0);
   if n is distinct from 2 then raise exception 'ОШИБКА: в таблице % строк', n; end if;
-  select username into top from elo_leaderboard() limit 1;
+  select username into top from elo_leaderboard(0) limit 1;
   if top is distinct from 'Кира' then raise exception 'ОШИБКА: порядок в таблице'; end if;
-  if exists (select 1 from elo_leaderboard() where username = 'Максим') then
+  if exists (select 1 from elo_leaderboard(0) where username = 'Максим') then
     raise exception 'ОШИБКА: попал с двумя играми';
   end if;
 end $$;
@@ -351,13 +352,13 @@ end $$;
 \echo === 18. чужим PIN в рейтинг не войти
 do $$ begin
   begin
-    perform join_ranked_queue('Лев','9999');
+    perform join_ranked_queue('Лев','9999',0);
     raise exception 'ОШИБКА: вошёл с чужим PIN';
   exception when others then
     if sqlerrm is distinct from 'auth_failed' then raise; end if;
   end;
   begin
-    perform ranked_status('Лев','9999');
+    perform ranked_status('Лев','9999',0);
     raise exception 'ОШИБКА: статус по чужому PIN';
   exception when others then
     if sqlerrm is distinct from 'auth_failed' then raise; end if;
@@ -397,15 +398,17 @@ declare mid bigint;
 begin
   delete from matches; delete from ranked_queue;
   -- Оба на самом дне: формула отняла бы 20, но отнимать уже нечего
-  update students set elo = 100, elo_games = 0;
-  insert into matches(p0, p1, wins_needed, range_min, range_max, ranked, status, secret)
-  values ('Лев', 'Кира', 1, 1, 100, true, 'active', 50) returning id into mid;
+  delete from elo_ratings;
+  insert into elo_ratings(username, mode, elo) values ('Лев',0,100), ('Кира',0,100);
+  insert into matches(p0, p1, wins_needed, range_min, range_max, ranked, ranked_mode,
+                      status, secret)
+  values ('Лев', 'Кира', 1, 1, 100, true, 0, 'active', 50) returning id into mid;
   perform apply_elo(mid, 0);
-  if (select elo from students where username = 'Кира') is distinct from 100 then
+  if (select elo from elo_ratings where username = 'Кира' and mode = 0) is distinct from 100 then
     raise exception 'ОШИБКА: рейтинг ушёл ниже пола: %',
-      (select elo from students where username = 'Кира');
+      (select elo from elo_ratings where username = 'Кира' and mode = 0);
   end if;
-  if (select elo from students where username = 'Лев') is distinct from 120 then
+  if (select elo from elo_ratings where username = 'Лев' and mode = 0) is distinct from 120 then
     raise exception 'ОШИБКА: победитель получил не 20';
   end if;
   if (select elo_delta[2] from matches where id = mid) is distinct from 0 then
@@ -420,13 +423,13 @@ do $$
 declare r jsonb; mid bigint;
 begin
   delete from matches; delete from ranked_queue;
-  update students set elo = 1000, elo_games = 0;
-  perform join_ranked_queue('Лев','1234');
-  mid := (join_ranked_queue('Кира','4321')->>'matchId')::bigint;
+  delete from elo_ratings;
+  perform join_ranked_queue('Лев','1234',0);
+  mid := (join_ranked_queue('Кира','4321',0)->>'matchId')::bigint;
   if mid is null then raise exception 'ОШИБКА: пара не собралась'; end if;
 
   -- Строка Льва уже отработала: Максим должен остаться ждать
-  r := join_ranked_queue('Максим','1111');
+  r := join_ranked_queue('Максим','1111',0);
   if r->>'matchId' is not null then raise exception 'ОШИБКА: подобрался к занятому'; end if;
   if (select count(*) from matches where ranked and status = 'active'
         and (p0 = 'Лев' or p1 = 'Лев')) is distinct from 1 then
@@ -438,6 +441,6 @@ end $$;
 \echo === уборка
 do $$ begin
   delete from matches; delete from ranked_queue;
-  update students set elo = 1000, elo_games = 0;
+  delete from elo_ratings;
 end $$;
 \echo ok

@@ -135,11 +135,12 @@ function stubSupabase(opts) {
           }
           // Рейтинговый онлайн: очередь и подбор живут в window.__rankedQ,
           // тест сам решает, когда соперник «нашёлся»
-          if (name === 'ranked_status') return { data: window.__ranked(), error: null };
+          if (name === 'ranked_status') return { data: window.__ranked(args.p_mode), error: null };
           if (name === 'join_ranked_queue') {
             const Q = window.__rankedQ;
             if (Q.matchId) return { data: { matchId: Q.matchId }, error: null };
             Q.inQueue = true;
+            Q.mode = args.p_mode;
             Q.joined = Date.now();
             return { data: { matchId: null, waiting: true }, error: null };
           }
@@ -147,7 +148,10 @@ function stubSupabase(opts) {
             window.__rankedQ.inQueue = false;
             return { data: true, error: null };
           }
-          if (name === 'elo_leaderboard') return { data: window.__eloTop || [], error: null };
+          if (name === 'elo_leaderboard') {
+            const top = window.__eloTop || {};
+            return { data: Array.isArray(top) ? top : (top[args.p_mode] || []), error: null };
+          }
           if (name === 'get_pin_hint') return { data: opts.hint === undefined ? 'номер дома' : opts.hint, error: null };
           return { data: true, error: null };
         }
@@ -188,13 +192,23 @@ function stubSupabase(opts) {
                movesLog: R.movesLog.slice(), frost: R.frost, best: R.best };
     };
 
-    window.__rankedQ = { inQueue: false, matchId: null, queue: 1, elo: 1000,
-                         games: 0, lastAgo: null, joined: 0 };
-    window.__ranked = function () {
+    // Четыре режима: тест задаёт рейтинги через window.__rankedQ.ratings,
+    // а очередь — одна на всех, как и на сервере
+    window.__rankedQ = { inQueue: false, mode: 0, matchId: null, queue: 1,
+                         lastAgo: null, joined: 0,
+                         ratings: { 0: { elo: 1000, games: 0 }, 1: { elo: 1000, games: 0 },
+                                    2: { elo: 1000, games: 0 }, 3: { elo: 1000, games: 0 } } };
+    window.__ranked = function (mode) {
       const Q = window.__rankedQ;
-      return { matchId: Q.matchId, inQueue: Q.inQueue && !Q.matchId,
-               waited: Q.inQueue ? Math.floor((Date.now() - Q.joined) / 1000) : 0,
-               queue: Q.queue, elo: Q.elo, games: Q.games, lastAgo: Q.lastAgo };
+      const m = mode === undefined ? 0 : mode;
+      const mine = Q.ratings[m] || { elo: 1000, games: 0 };
+      const queued = Q.inQueue && !Q.matchId;
+      return { mode: m, matchId: Q.matchId,
+               inQueue: queued && Q.mode === m,
+               queueMode: queued ? Q.mode : null,
+               waited: queued ? Math.floor((Date.now() - Q.joined) / 1000) : 0,
+               queue: Q.queue, elo: mine.elo, games: mine.games,
+               ratings: Q.ratings, lastAgo: Q.lastAgo };
     };
 
     // Сервер отдаёт число только когда раунд кончился — заглушка обязана так же,
@@ -222,6 +236,7 @@ function stubSupabase(opts) {
         lastBonus: M.lastBonus || null, lastBonusBy: M.lastBonusBy || 0,
         lastTimeout: !!M.lastTimeout, forced: M.forced || null, chat: M.chat || [],
         ranked: !!M.ranked,
+        rankedMode: M.rankedMode === undefined ? null : M.rankedMode,
         forfeitBy: M.forfeitBy === undefined ? null : M.forfeitBy,
         eloDelta: M.eloDelta || null,
         elo: M.elo === undefined ? 1000 : M.elo,
@@ -230,6 +245,7 @@ function stubSupabase(opts) {
         updatedAt: '2026-01-01T00:00:00Z' };
     };
 
+    if (opts.tab) localStorage.setItem('hc_oltab', opts.tab);
     if (opts.user) {
       localStorage.setItem('hc_run_user', opts.user);
       localStorage.setItem('hc_run_pin', '1234');
