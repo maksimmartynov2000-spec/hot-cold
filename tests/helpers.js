@@ -154,6 +154,14 @@ function stubSupabase(opts) {
             const top = window.__eloTop || {};
             return { data: Array.isArray(top) ? top : (top[args.p_mode] || []), error: null };
           }
+          if (name === 'rematch') {
+            window.__rematched = (window.__rematched || 0) + 1;
+            return { data: 99, error: null };
+          }
+          if (name === 'delete_account') {
+            window.__deleted = true;
+            return { data: '#1', error: null };
+          }
           if (name === 'get_pin_hint') return { data: opts.hint === undefined ? 'номер дома' : opts.hint, error: null };
           return { data: true, error: null };
         }
@@ -247,7 +255,6 @@ function stubSupabase(opts) {
         updatedAt: '2026-01-01T00:00:00Z' };
     };
 
-    if (opts.tab) localStorage.setItem('hc_oltab', opts.tab);
     if (opts.user) {
       localStorage.setItem('hc_run_user', opts.user);
       localStorage.setItem('hc_run_pin', '1234');

@@ -6,7 +6,7 @@
 do $$ begin
   delete from ranked_queue;
   delete from matches;
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
 end $$;
 \echo ok
 
@@ -68,7 +68,7 @@ end $$;
 do $$
 declare mid bigint; m matches; n int;
 begin
-  delete from matches; delete from ranked_queue; delete from elo_ratings;
+  delete from matches; delete from ranked_queue; delete from elo_ratings; delete from rivalry;
   perform join_ranked_queue('Лев','1234', 2);
   mid := (join_ranked_queue('Кира','4321', 2)->>'matchId')::bigint;
   select * into m from matches where id = mid;
@@ -89,7 +89,7 @@ end $$;
 do $$
 declare r jsonb;
 begin
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   insert into elo_ratings(username, mode, elo, games) values
     ('Лев',0,1100,4), ('Лев',1,900,6), ('Лев',3,1300,11);
   r := ranked_status('Лев','1234',1);
@@ -109,7 +109,7 @@ end $$;
 do $$
 declare n int; top text;
 begin
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   insert into elo_ratings(username, mode, elo, games) values
     ('Лев',0,1500,5), ('Кира',0,1200,4),
     ('Кира',1,1400,7), ('Максим',1,1300,3), ('Лев',1,1900,2);
@@ -130,7 +130,7 @@ end $$;
 do $$
 declare r jsonb; q ranked_queue;
 begin
-  delete from matches; delete from ranked_queue; delete from elo_ratings;
+  delete from matches; delete from ranked_queue; delete from elo_ratings; delete from rivalry;
   perform join_ranked_queue('Лев','1234', 0);
   perform join_ranked_queue('Лев','1234', 3);
   if (select count(*) from ranked_queue where username = 'Лев') is distinct from 1 then
@@ -235,6 +235,6 @@ rollback;
 
 \echo === уборка
 do $$ begin
-  delete from matches; delete from ranked_queue; delete from elo_ratings;
+  delete from matches; delete from ranked_queue; delete from elo_ratings; delete from rivalry;
 end $$;
 \echo ok

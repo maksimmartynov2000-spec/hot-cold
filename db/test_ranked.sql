@@ -6,7 +6,7 @@
 do $$ begin
   delete from ranked_queue;
   delete from matches where ranked;
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
 end $$;
 \echo ok
 
@@ -100,7 +100,7 @@ declare r jsonb;
 begin
   delete from ranked_queue;
   delete from matches where ranked;
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   insert into elo_ratings(username, mode, elo) values ('Кира',0,1400)
     on conflict (username, mode) do update set elo = 1400;
 
@@ -155,7 +155,7 @@ declare mid bigint; m matches;
 begin
   delete from matches where ranked;
   delete from ranked_queue;
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   insert into elo_ratings(username, mode, elo, games) values ('Лев',0,1000,20), ('Кира',0,1000,20);
   perform join_ranked_queue('Лев','1234',0);
   mid := (join_ranked_queue('Кира','4321',0)->>'matchId')::bigint;
@@ -179,7 +179,7 @@ do $$
 declare mid bigint; m matches;
 begin
   delete from matches;
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   if friend_status('Лев','Кира') is distinct from 'friend' then
     perform send_friend_request('Лев','1234','Кира');
     perform respond_friend_request('Кира','4321','Лев',true);
@@ -202,7 +202,7 @@ do $$
 declare mid bigint; m matches; was int;
 begin
   delete from matches; delete from ranked_queue;
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   perform join_ranked_queue('Лев','1234',0);
   mid := (join_ranked_queue('Кира','4321',0)->>'matchId')::bigint;
   perform set_config('t.m', mid::text, false);
@@ -277,7 +277,7 @@ do $$
 declare mid bigint; m matches;
 begin
   delete from matches; delete from ranked_queue;
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   perform join_ranked_queue('Лев','1234',0);
   mid := (join_ranked_queue('Кира','4321',0)->>'matchId')::bigint;
   perform leave_match('Лев','1234', mid);
@@ -288,7 +288,7 @@ begin
   if (select elo from elo_ratings where username = 'Кира' and mode = 0) <= 1000 then raise exception 'ОШИБКА: оставшийся не получил рейтинг'; end if;
 
   delete from matches;
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   mid := challenge_friend('Лев','1234','Кира',100,false,3,false,null);
   perform respond_challenge('Кира','4321', mid, true);
   perform leave_match('Лев','1234', mid);
@@ -305,7 +305,7 @@ do $$
 declare mid bigint; n int;
 begin
   delete from matches; delete from ranked_queue;
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   perform join_ranked_queue('Лев','1234',0);
   mid := (join_ranked_queue('Кира','4321',0)->>'matchId')::bigint;
   select count(*) into n from list_matches('Лев','1234') where id = mid and ranked;
@@ -336,7 +336,7 @@ end $$;
 do $$
 declare n int; top text;
 begin
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   insert into elo_ratings(username, mode, elo, games) values
     ('Кира',0,1200,5), ('Лев',0,1100,3), ('Максим',0,1500,2);
   select count(*) into n from elo_leaderboard(0);
@@ -398,7 +398,7 @@ declare mid bigint;
 begin
   delete from matches; delete from ranked_queue;
   -- Оба на самом дне: формула отняла бы 20, но отнимать уже нечего
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   insert into elo_ratings(username, mode, elo) values ('Лев',0,100), ('Кира',0,100);
   insert into matches(p0, p1, wins_needed, range_min, range_max, ranked, ranked_mode,
                       status, secret)
@@ -423,7 +423,7 @@ do $$
 declare r jsonb; mid bigint;
 begin
   delete from matches; delete from ranked_queue;
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
   perform join_ranked_queue('Лев','1234',0);
   mid := (join_ranked_queue('Кира','4321',0)->>'matchId')::bigint;
   if mid is null then raise exception 'ОШИБКА: пара не собралась'; end if;
@@ -441,6 +441,6 @@ end $$;
 \echo === уборка
 do $$ begin
   delete from matches; delete from ranked_queue;
-  delete from elo_ratings;
+  delete from elo_ratings; delete from rivalry;
 end $$;
 \echo ok

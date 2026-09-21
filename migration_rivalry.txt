@@ -1,0 +1,311 @@
+-- Три вещи: защита рейтинга от накрутки вторым аккаунтом, удаление аккаунта
+-- и реванш после матча.
+
+-- ============ 1. Серия побед над одним и тем же человеком ============
+-- Пара хранится в одну строку, имена по алфавиту: иначе «Лев против Киры» и
+-- «Кира против Льва» были бы разными сериями, и накрутка обходила бы счётчик
+create table if not exists rivalry (
+  a text not null references students(username) on delete cascade,
+  b text not null references students(username) on delete cascade,
+  winner text,
+  streak int not null default 0,
+  last_game timestamptz not null default now(),
+  primary key (a, b),
+  constraint rivalry_ordered check (a < b)
+);
+alter table rivalry enable row level security;
+
+-- Отдача за победу над одним и тем же соперником подряд падает: 100, 80, 60,
+-- 40, 20 и дальше 10 процентов. Победа другого обнуляет серию, а сутки без игр
+-- между этими двумя уменьшают её на единицу — иначе накрутку можно было бы
+-- продолжать каждый день заново
+create or replace function elo_multiplier(p_winner text, p_loser text)
+returns double precision
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare lo text; hi text; r rivalry; st int; idle int;
+begin
+  lo := least(p_winner, p_loser);
+  hi := greatest(p_winner, p_loser);
+  select * into r from rivalry where a = lo and b = hi for update;
+
+  if r.a is null then
+    insert into rivalry(a, b, winner, streak) values (lo, hi, p_winner, 1);
+    return 1.0;
+  end if;
+
+  idle := floor(extract(epoch from (now() - r.last_game)) / 86400)::int;
+  st := greatest(0, r.streak - greatest(0, idle));
+  if r.winner is distinct from p_winner then st := 0; end if;
+  st := st + 1;
+
+  update rivalry set winner = p_winner, streak = st, last_game = now()
+  where a = lo and b = hi;
+
+  return case st
+    when 1 then 1.0 when 2 then 0.8 when 3 then 0.6
+    when 4 then 0.4 when 5 then 0.2 else 0.1 end;
+end;
+$$;
+
+create or replace function apply_elo(p_match_id bigint, p_winner int)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; wn text; ln text; we int; le int; wg int; lg int; md int;
+        expect double precision; kw int; kl int; delta int; mult double precision;
+begin
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null or not m.ranked or m.elo_applied or p_winner is null then return; end if;
+  md := coalesce(m.ranked_mode, 0);
+
+  wn := case when p_winner = 0 then m.p0 else m.p1 end;
+  ln := case when p_winner = 0 then m.p1 else m.p0 end;
+
+  -- Строку рейтинга заводим при первой же игре, а не при регистрации: режимов
+  -- четыре, и большинство из них человек может не открыть никогда
+  insert into elo_ratings(username, mode) values (wn, md), (ln, md)
+  on conflict (username, mode) do nothing;
+
+  select elo, games into we, wg from elo_ratings where username = wn and mode = md;
+  select elo, games into le, lg from elo_ratings where username = ln and mode = md;
+
+  expect := 1.0 / (1.0 + power(10.0, (le - we) / 400.0));
+  kw := case when wg < 10 then 40 else 24 end;
+  kl := case when lg < 10 then 40 else 24 end;
+  -- Серия считается по паре целиком, а не по каждому режиму отдельно: иначе
+  -- накрутку можно было бы размазать по четырём режимам и получить вчетверо
+  mult := elo_multiplier(wn, ln);
+
+  delta := round(kw * (1 - expect) * mult);
+  update elo_ratings set elo = elo + delta, games = games + 1
+  where username = wn and mode = md;
+  update matches set elo_delta[p_winner + 1] = delta where id = p_match_id;
+
+  -- Проигравший не падает ниже пола, и показать надо ровно то, что он потерял,
+  -- а не то, что отняла бы формула
+  delta := round(kl * (1 - expect) * mult);
+  update elo_ratings set elo = greatest(100, elo - delta), games = games + 1
+  where username = ln and mode = md
+  returning elo - le into delta;
+  update matches set elo_delta[2 - p_winner] = delta, elo_applied = true
+  where id = p_match_id;
+end;
+$$;
+
+-- ============ 2. Удаление аккаунта ============
+-- Имя переименовывается, поэтому внешние ключи должны ехать следом: иначе
+-- сыгранные матчи потеряли бы игрока и пропали у соперника
+alter table friendships  drop constraint if exists friendships_requester_fkey;
+alter table friendships  add  constraint friendships_requester_fkey
+  foreign key (requester) references students(username) on update cascade on delete cascade;
+alter table friendships  drop constraint if exists friendships_addressee_fkey;
+alter table friendships  add  constraint friendships_addressee_fkey
+  foreign key (addressee) references students(username) on update cascade on delete cascade;
+alter table matches      drop constraint if exists matches_p0_fkey;
+alter table matches      add  constraint matches_p0_fkey
+  foreign key (p0) references students(username) on update cascade on delete cascade;
+alter table matches      drop constraint if exists matches_p1_fkey;
+alter table matches      add  constraint matches_p1_fkey
+  foreign key (p1) references students(username) on update cascade on delete cascade;
+alter table elo_ratings  drop constraint if exists elo_ratings_username_fkey;
+alter table elo_ratings  add  constraint elo_ratings_username_fkey
+  foreign key (username) references students(username) on update cascade on delete cascade;
+alter table ranked_queue drop constraint if exists ranked_queue_username_fkey;
+alter table ranked_queue add  constraint ranked_queue_username_fkey
+  foreign key (username) references students(username) on update cascade on delete cascade;
+alter table run_sessions drop constraint if exists run_sessions_username_fkey;
+alter table run_sessions add  constraint run_sessions_username_fkey
+  foreign key (username) references students(username) on update cascade on delete cascade;
+alter table rivalry      drop constraint if exists rivalry_a_fkey;
+alter table rivalry      add  constraint rivalry_a_fkey
+  foreign key (a) references students(username) on update cascade on delete cascade;
+alter table rivalry      drop constraint if exists rivalry_b_fkey;
+alter table rivalry      add  constraint rivalry_b_fkey
+  foreign key (b) references students(username) on update cascade on delete cascade;
+
+create sequence if not exists deleted_player_seq;
+
+-- Имя удалённого начинается с решётки, и занять такое имя при регистрации
+-- нельзя: иначе под него можно было бы подделаться
+create or replace function register_student(p_username text, p_pin text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+begin
+  if length(trim(p_username)) < 2 or length(trim(p_username)) > 20 then
+    raise exception 'invalid_username';
+  end if;
+  if trim(p_username) like '#%' then raise exception 'invalid_username'; end if;
+  if p_pin !~ '^[0-9]{4}$' then
+    raise exception 'invalid_pin';
+  end if;
+  if (select count(*) from students where created_at >= now() - interval '1 hour') >= 20 then
+    raise exception 'too_many_signups';
+  end if;
+
+  insert into students(username, pin_hash) values (trim(p_username), crypt(p_pin, gen_salt('bf')));
+  return true;
+exception when unique_violation then
+  return false;
+end;
+$$;
+
+create or replace function delete_account(p_username text, p_pin text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; gone text; m matches;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  -- Незаконченные игры нельзя бросить молча: для соперника это победа
+  for m in select * from matches
+           where status in ('invited', 'active') and (p0 = me or p1 = me) loop
+    if m.status = 'active' and m.ranked then
+      update matches
+      set status = 'finished', match_over = true, round_over = true,
+          round_winner = 1 - match_seat(m, me), forfeit_by = match_seat(m, me),
+          turn_deadline = null, updated_at = now()
+      where id = m.id;
+      perform apply_elo(m.id, 1 - match_seat(m, me));
+    else
+      update matches set status = 'finished', match_over = true, updated_at = now()
+      where id = m.id;
+    end if;
+  end loop;
+
+  delete from friendships where requester = me or addressee = me;
+  delete from elo_ratings where username = me;
+  delete from ranked_queue where username = me;
+  delete from run_sessions where username = me;
+  delete from rivalry where a = me or b = me;
+  -- Одиночные забеги — только его собственная история, она уходит целиком
+  delete from runs where username = me;
+
+  gone := '#' || nextval('deleted_player_seq');
+  update students
+  set username = gone,
+      pin_hash = crypt(gen_random_uuid()::text, gen_salt('bf')),
+      pin_hint = null,
+      best_run_score = 0,
+      best_run_rounds = 0,
+      failed_logins = 0,
+      locked_until = null
+  where username = me;
+
+  return gone;
+end;
+$$;
+
+-- ============ 3. Реванш ============
+-- Не вызов друга: рейтинговые соперники друг другу не друзья, а условия
+-- переигровки должны совпасть с теми, в которых только что играли
+create or replace function rematch(p_username text, p_pin text, p_match_id bigint)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; other text; live int; new_id bigint;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  if match_seat(m, me) is null then raise exception 'not_your_match'; end if;
+  if m.status in ('invited', 'active') then raise exception 'match_already_live'; end if;
+
+  other := case when m.p0 = me then m.p1 else m.p0 end;
+  if other like '#%' then raise exception 'no_such_student'; end if;
+
+  select count(*) into live from matches
+  where status in ('invited', 'active')
+    and ((p0 = me and p1 = other) or (p0 = other and p1 = me));
+  if live > 0 then raise exception 'match_already_live'; end if;
+
+  insert into matches(p0, p1, wins_needed, range_min, range_max, frost,
+                      bonuses_on, bonus_count, ranked, ranked_mode, status)
+  values (me, other, m.wins_needed, m.range_min, m.range_max, m.frost,
+          m.bonuses_on, m.bonus_count, m.ranked, m.ranked_mode, 'invited')
+  returning id into new_id;
+  return new_id;
+end;
+$$;
+
+
+-- ============ 4. Удалённых не видно в поиске ============
+-- Служебное имя с решёткой остаётся только в сыгранных матчах: ни найти,
+-- ни предложить в друзья удалённого нельзя
+create or replace function find_students(p_username text, p_pin text, p_query text)
+returns table(username text, best_run_score int, relation text)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; q text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  q := lower(trim(coalesce(p_query, '')));
+  if length(q) < 2 then raise exception 'query_too_short'; end if;
+
+  return query
+  select s.username, s.best_run_score, friend_status(me, s.username)
+  from students s
+  where s.username_lower like q || '%'
+    and s.username <> me
+    and s.username not like '#%'
+  order by s.username
+  limit 10;
+end;
+$$;
+
+create or replace function suggest_students(p_username text, p_pin text)
+returns table(username text, best_run_score int, last_seen timestamptz)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  return query
+  select s.username, s.best_run_score, act.seen
+  from students s
+  cross join lateral (
+    select greatest(
+      s.created_at,
+      coalesce((select max(r.created_at) from runs r where r.username = s.username), s.created_at),
+      coalesce((select max(m.updated_at) from matches m
+                where m.p0 = s.username or m.p1 = s.username), s.created_at)
+    ) as seen
+  ) act
+  where s.username <> me
+    and s.username not like '#%'
+    and friend_status(me, s.username) is null
+  order by act.seen desc, s.username
+  limit 10;
+end;
+$$;
+grant execute on function find_students(text, text, text) to anon;
+grant execute on function suggest_students(text, text) to anon;
+
+revoke execute on function elo_multiplier(text, text) from public, anon;
+grant execute on function delete_account(text, text) to anon;
+grant execute on function rematch(text, text, bigint) to anon;
