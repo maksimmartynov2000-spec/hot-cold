@@ -1,0 +1,45 @@
+-- Две правки баланса бонусов.
+
+-- 1. Бросок в лаву попадал ровно в одну клетку от ответа: на 1..100 расстояние
+-- было ровно 1. Жертва теряла ход, но ходил-то следующим тот, кто на лаву
+-- наступил, — и знал ответ с точностью до двух чисел. Это была не помеха
+-- сопернику, а монетка, решающая раунд в пользу бросившего.
+-- Теперь бросок ложится в пояс «лава или очень горячо»: вдвое шире, и угадать
+-- с первого раза уже нельзя.
+create or replace function lava_value(m matches)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare hottest int; options int[] := '{}'; d int; v int;
+begin
+  hottest := (tier_upper(match_span(m)))[7];
+  for d in 1..hottest loop
+    foreach v in array array[m.secret - d, m.secret + d] loop
+      if v >= m.range_min and v <= m.range_max and v <> m.secret then
+        options := options || v;
+      end if;
+    end loop;
+  end loop;
+  if array_length(options, 1) is null then return null; end if;
+  return options[1 + floor(random() * array_length(options, 1))::int];
+end;
+$$;
+
+-- 2. Бонусов было не больше двенадцати при любом размере поля. На тысяче это
+-- один бонус на восемьдесят клеток: за весь раунд хоть один срабатывал в одном
+-- случае из девяти, и режим «с бонусами» почти не отличался от обычного.
+-- Добавили третье слагаемое — три процента клеток. На маленьких диапазонах оно
+-- меньше прежнего и ничего не меняет, на больших снимает потолок.
+create or replace function auto_bonus_count(p_span int)
+returns int
+language sql
+immutable
+as $$
+  select greatest(
+    greatest(1, ceil(sqrt(p_span) / 4)::int),
+    least(greatest(1, ceil(sqrt(p_span) / 4)::int) * 2,
+          greatest(1, floor(p_span * 0.086)::int)),
+    floor(p_span * 0.03)::int);
+$$;

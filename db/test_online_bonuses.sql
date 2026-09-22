@@ -192,19 +192,20 @@ begin
 end $$;
 \echo ok
 
-\echo === 11. бросок в лаву попадает в самый горячий пояс
+\echo === 11. бросок в лаву попадает в горячие пояса, но не в ответ
 do $$
-declare mid bigint := current_setting('t.b')::bigint; m matches; last_move record; hottest int;
+declare mid bigint := current_setting('t.b')::bigint; m matches; last_move record; hot int;
 begin
   update matches set auto_lava = array[false, true], cur = 1, round_over = false,
                      turn_deadline = now() + interval '30 seconds' where id = mid;
   perform do_forced_turn('Кира','4321',mid);
   select * into m from matches where id = mid;
   select * into last_move from match_moves where match_id = mid order by id desc limit 1;
-  hottest := (tier_upper(match_span(m)))[8];
+  -- «Лава или очень горячо»: седьмая граница, а не восьмая
+  hot := (tier_upper(match_span(m)))[7];
   if last_move.seat is distinct from 1 then raise exception 'ОШИБКА: бросок сделан не за того'; end if;
-  if abs(last_move.guess - m.secret) > hottest or last_move.guess = m.secret then
-    raise exception 'ОШИБКА: бросок мимо лавы или прямо в ответ';
+  if abs(last_move.guess - m.secret) > hot or last_move.guess = m.secret then
+    raise exception 'ОШИБКА: бросок мимо горячих поясов или прямо в ответ';
   end if;
 end $$;
 \echo ok
@@ -374,5 +375,49 @@ begin
   if m.round_over then return; end if;
   if m.cur is distinct from 0 then raise exception 'ОШИБКА: бросок с жетоном отдал ход'; end if;
   if m.armed then raise exception 'ОШИБКА: жетон не сгорел на броске'; end if;
+end $$;
+\echo ok
+
+\echo === 20. число бонусов совпадает в браузере и в базе
+create temp table js_bonus(span int, count int);
+\copy js_bonus from '/home/user/hot-cold/db/bonus_count_js.csv' with (format csv, header true)
+do $$
+declare bad record; n int;
+begin
+  select count(*) into n from js_bonus;
+  if n < 2000 then raise exception 'ОШИБКА: таблица из клиента пуста (% строк)', n; end if;
+  select * into bad from js_bonus j
+  where j.count is distinct from auto_bonus_count(j.span) limit 1;
+  if bad.span is not null then
+    raise exception 'ОШИБКА: на диапазоне % клиент считает % бонусов, база — %',
+      bad.span, bad.count, auto_bonus_count(bad.span);
+  end if;
+  raise notice 'число бонусов совпало на всех % диапазонах', n;
+end $$;
+\echo ok
+
+\echo === 21. бросок в лаву не указывает на ответ одной клеткой
+do $$
+declare mid bigint; m matches; i int; d int; distinct_d int[] := '{}'; v int;
+begin
+  delete from matches;
+  insert into matches(p0, p1, range_min, range_max, secret, status, ranked)
+  values ('Лев','Кира', 1, 100, 50, 'active', false) returning id into mid;
+  select * into m from matches where id = mid;
+  for i in 1..400 loop
+    v := lava_value(m);
+    d := abs(v - m.secret);
+    if not (d = any(distinct_d)) then distinct_d := distinct_d || d; end if;
+    -- Бросок обязан попасть в «лаву или очень горячо», но не в сам ответ
+    if d = 0 then raise exception 'ОШИБКА: бросок попал в ответ'; end if;
+    if feedback_tier(match_span(m), d) < 6 then
+      raise exception 'ОШИБКА: бросок вне горячих поясов, расстояние %', d;
+    end if;
+  end loop;
+  -- Раньше расстояние было ровно одно, и следующий ход выигрывал наверняка
+  if array_length(distinct_d, 1) < 2 then
+    raise exception 'ОШИБКА: бросок всегда на одном расстоянии — это подсказка, а не помеха';
+  end if;
+  delete from matches;
 end $$;
 \echo ok
