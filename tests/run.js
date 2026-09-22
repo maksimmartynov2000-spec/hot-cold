@@ -3287,9 +3287,13 @@ async function testKeyPage(browser) {
   check('готовая строка расписания содержит пропуск в заголовке',
     pass.cron.indexOf('x-push-secret') > 0 && pass.cron.indexOf(pass.secret) > 0,
     pass.cron.slice(0, 40));
-  check('и зовёт именно функцию push',
-    pass.cron.indexOf('/functions/v1/push') > 0 && pass.cron.indexOf('select cron.schedule') === 0,
-    pass.cron.slice(0, 20));
+  check('и зовёт именно функцию push', pass.cron.indexOf('/functions/v1/push') > 0);
+  // Без расширений схемы cron нет вовсе, и расписание падает на первой же строке
+  check('расширения идут в той же строке, до расписания',
+    pass.cron.indexOf('create extension if not exists pg_cron') === 0
+    && pass.cron.indexOf('pg_net') > 0
+    && pass.cron.indexOf('pg_net') < pass.cron.indexOf('cron.schedule'),
+    pass.cron.slice(0, 24));
   check('пропуск не тронул уже созданные ключи',
     pass.pub === keys.pub && pass.priv === keys.priv);
   check('закрытый ключ в расписание не попал', pass.cron.indexOf(keys.priv) < 0);

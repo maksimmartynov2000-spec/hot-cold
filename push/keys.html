@@ -129,7 +129,11 @@
     crypto.getRandomValues(bytes);
     const secret = b64url(bytes);
     document.getElementById('secret').textContent = secret;
+    // Без расширений схемы cron просто нет, и строка падает с «schema does
+    // not exist»: показываем всё, что нужно выполнить, одним куском
     document.getElementById('cron').textContent =
+      "create extension if not exists pg_cron;\n" +
+      "create extension if not exists pg_net;\n\n" +
       "select cron.schedule('push-drain', '* * * * *', $$\n" +
       "  select net.http_post(\n" +
       "    url := 'https://fzakcsvyceqsnowvkxfu.supabase.co/functions/v1/push',\n" +
