@@ -134,8 +134,8 @@ async function registerPlayer(p, name, pin) {
   await B.page.click('#tOnlineBack');
   await A.page.waitForTimeout(300);
   await B.page.waitForTimeout(300);
-  await A.page.click('#tModeFriends');
-  await B.page.click('#tModeFriends');
+  await A.page.click('#friendsBtn');
+  await B.page.click('#friendsBtn');
   await A.page.waitForTimeout(500);
   await B.page.waitForTimeout(500);
   check('экран друзей отдельный от рейтинга',

@@ -100,6 +100,19 @@
       cursor: pointer;
     }
     .own-best { color: rgba(255, 255, 255, 0.45); font-weight: 600; }
+    /* Сколько непрочитанного ждёт в «Друзьях» — прямо на кнопке в шапке */
+    .hdr-badge {
+      display: inline-block;
+      background: #38bdf8;
+      color: #0f1430;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.4;
+      padding: 0 4px;
+      margin-left: 3px;
+      vertical-align: top;
+    }
     .icon-btn {
       background: rgba(255, 255, 255, 0.1);
       border: 1px solid rgba(255, 255, 255, 0.2);
@@ -176,9 +189,17 @@
 
     /* На телефоне в строке тесно: длинное имя выдавливало бы название на второй
        этаж, поэтому имя обрезаем раньше. Целиком оно видно по нажатию на чип */
+    /* На узком экране в верхней строке пять элементов вместо четырёх:
+       подписи и отступы ужимаются, чтобы строка осталась одноэтажной */
     @media (max-width: 460px) {
       .account-chip .chip-name { display: none; }
       .account-chip { padding: 4px 7px; }
+      .top-controls { gap: 4px; }
+      .icon-btn { padding: 4px 5px; }
+      .lang-switcher { padding: 4px 5px; }
+      .header h1 { font-size: 16px; }
+      /* Градусник рядом с названием — украшение: на узком экране им и жертвуем */
+      .header .emoji { display: none; }
     }
 
     .row { display: flex; gap: 8px; width: 100%; }
@@ -307,7 +328,6 @@
     .mode-btn.solo { border-left: 3px solid var(--p0); }
     .mode-btn.run { border-left: 3px solid #4ade80; }
     .mode-btn.online { border-left: 3px solid #38bdf8; }
-    .mode-btn.friends { border-left: 3px solid #c084fc; }
 
     /* ---------- Онлайн: друзья ---------- */
     .friend-list { margin-bottom: 4px; }
@@ -357,6 +377,71 @@
     .fr-note.bad { color: #f87171; }
     /* Кнопка, после которой ничего не вернуть, выглядит соответственно */
     .btn-ghost.danger { color: #f87171; border-color: rgba(248, 113, 113, 0.4); }
+
+    /* ---------- Переписка с другом ---------- */
+    .chat-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin: 12px 0 16px;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .chat-msg {
+      max-width: 80%;
+      padding: 8px 12px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+    /* Свои справа, чужие слева — привычка, которой не надо учить */
+    .chat-msg.mine {
+      align-self: flex-end;
+      background: rgba(56, 189, 248, 0.16);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+    .chat-msg.theirs {
+      align-self: flex-start;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+    .chat-msg .cm-ago {
+      display: block;
+      font-size: 11px;
+      opacity: 0.45;
+      margin-top: 2px;
+    }
+    .chat-pad {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .chat-pad button {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.85);
+      border-radius: 10px;
+      padding: 9px 6px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .chat-pad button:disabled { opacity: 0.4; }
+    .chat-modes-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.45);
+      margin: 14px 0 6px;
+    }
+    /* Сколько сообщений не прочитано — прямо на имени друга */
+    .fr-unread {
+      background: #38bdf8;
+      color: #0f1430;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 1px 6px;
+      margin-left: 6px;
+    }
 
     /* ---------- Рейтинговый онлайн ---------- */
     /* Разновидности рейтинга. Подпись на кнопке и есть описание правил:
@@ -1151,6 +1236,8 @@
     <button class="account-chip hidden" id="accountChip" onclick="openLogoutModal()">
       <span>👤</span><span class="chip-name" id="accountChipName"></span>
     </button>
+    <button class="icon-btn hidden" id="friendsBtn" onclick="openFriendsEntry()">👥<span
+      class="hdr-badge hidden" id="friendsBadge"></span></button>
     <button class="icon-btn" id="soundBtn" onclick="toggleSound()" aria-label="Звук"></button>
     <select class="lang-switcher" id="langSwitcher" onchange="changeLanguage()">
       <option value="en">🇺🇸 EN</option>
@@ -1175,10 +1262,6 @@
       <button class="mode-btn online" onclick="openOnlineEntry()">
         <div class="m-title" id="tModeOnline"></div>
         <div class="m-sub" id="tModeOnlineSub"></div>
-      </button>
-      <button class="mode-btn friends" onclick="openFriendsEntry()">
-        <div class="m-title" id="tModeFriends"></div>
-        <div class="m-sub" id="tModeFriendsSub"></div>
       </button>
     </div>
   </div>
@@ -1429,6 +1512,7 @@
 
   <!-- ЭКРАН: друзья. Отдельно от рейтинга — это разные занятия -->
   <div id="screenFriends" class="hidden">
+    <div class="lb-title" id="tFriendsScreen" style="font-size:15px;margin-bottom:10px"></div>
     <div class="run-greeting hidden" id="friendsGreeting"></div>
     <div id="olFriends">
     <div class="setup-field">
@@ -1490,6 +1574,26 @@
 
     <div class="run-hub-actions">
       <button class="btn-ghost btn-block" id="tFriendsBack" onclick="quitToMenu()">Menu</button>
+    </div>
+  </div>
+
+  <!-- ЭКРАН: переписка с одним другом. Текст готовыми фразами — по той же
+       причине, что и в матче: читают на разных языках -->
+  <div id="screenChat" class="hidden">
+    <div class="lb-title" id="chatWho"></div>
+    <div class="fr-note hidden" id="chatNote"></div>
+    <div id="chatList" class="chat-list"></div>
+    <div id="chatPad" class="chat-pad"></div>
+
+    <div class="fr-block">
+      <div class="lb-title" id="tChatInvite"></div>
+      <button class="btn btn-block" id="tChatFriendly" onclick="challengeFromChat()"></button>
+      <div class="chat-modes-label" id="tChatRanked"></div>
+      <div class="rk-modes" id="chatModes"></div>
+    </div>
+
+    <div class="run-hub-actions">
+      <button class="btn-ghost btn-block" id="tChatBack" onclick="openFriends()">Back</button>
     </div>
   </div>
 
@@ -1627,8 +1731,16 @@
         nobodyYet: "Nobody else has played yet",
         errNotPlaying: "The game is not running",
         errNoRequest: "The request is gone",
+        talkWith: "Talk to {name}",
+        chatEmpty: "Nothing written yet",
+        chatInvite: "Invite to play",
+        chatFriendly: "A friendly game",
+        chatRanked: "Or straight to ranked:",
+        chatSent: "Invitation sent",
+        errTooFast: "Too often — wait a minute",
+        chatBack: "To friends",
+        talk: { hi: "Hi!", howru: "How are you?", play: "Fancy a game?", playranked: "Fancy a ranked game?", later: "Later, maybe", hour: "In an hour", tomorrow: "Tomorrow?", cantnow: "Can\u2019t right now", ready: "I\u2019m ready", yes: "Yes", no: "No", thanks: "Thanks", gg: "Good game!", strong: "You\u2019re strong", revenge: "I\u2019ll get you back", bye: "Bye!" },
         menuFriends: "\ud83d\udc65 Friends",
-        friendsSub: "Add, challenge, play together",
         rematch: "Rematch",
         rematchSent: "Rematch offered to {name}",
         deleteAccount: "Delete account",
@@ -1808,8 +1920,16 @@
         nobodyYet: "Пока больше никто не играл",
         errNotPlaying: "Игра не идёт",
         errNoRequest: "Заявки больше нет",
+        talkWith: "Переписка: {name}",
+        chatEmpty: "Пока ничего не написано",
+        chatInvite: "Позвать играть",
+        chatFriendly: "Дружеская игра",
+        chatRanked: "Или сразу на рейтинг:",
+        chatSent: "Вызов отправлен",
+        errTooFast: "Слишком часто — подождите минуту",
+        chatBack: "К друзьям",
+        talk: { hi: "Привет!", howru: "Как дела?", play: "Сыграем?", playranked: "Сыграем на рейтинг?", later: "Давай позже", hour: "Через час", tomorrow: "Давай завтра", cantnow: "Сейчас не могу", ready: "Я готов", yes: "Да", no: "Нет", thanks: "Спасибо", gg: "Хорошая игра!", strong: "Ты силён", revenge: "Я отыграюсь", bye: "Пока!" },
         menuFriends: "\ud83d\udc65 Друзья",
-        friendsSub: "Добавить, вызвать, сыграть вместе",
         rematch: "Реванш",
         rematchSent: "Реванш предложен: {name}",
         deleteAccount: "Удалить аккаунт",
@@ -1989,8 +2109,16 @@
         nobodyYet: "Personne d\u2019autre n\u2019a encore jou\u00e9",
         errNotPlaying: "La partie n\u2019est pas en cours",
         errNoRequest: "La demande n'existe plus",
+        talkWith: "Discussion avec {name}",
+        chatEmpty: "Rien d\u2019\u00e9crit pour l\u2019instant",
+        chatInvite: "Inviter \u00e0 jouer",
+        chatFriendly: "Une partie amicale",
+        chatRanked: "Ou directement en class\u00e9 :",
+        chatSent: "Invitation envoy\u00e9e",
+        errTooFast: "Trop souvent \u2014 attendez une minute",
+        chatBack: "Aux amis",
+        talk: { hi: "Salut !", howru: "\u00c7a va ?", play: "On joue ?", playranked: "Une partie class\u00e9e ?", later: "Plus tard", hour: "Dans une heure", tomorrow: "Demain ?", cantnow: "Pas maintenant", ready: "Je suis pr\u00eat", yes: "Oui", no: "Non", thanks: "Merci", gg: "Belle partie !", strong: "Tu es fort", revenge: "Je prendrai ma revanche", bye: "Salut !" },
         menuFriends: "\ud83d\udc65 Amis",
-        friendsSub: "Ajouter, d\u00e9fier, jouer ensemble",
         rematch: "Revanche",
         rematchSent: "Revanche propos\u00e9e \u00e0 {name}",
         deleteAccount: "Supprimer le compte",
@@ -2170,8 +2298,16 @@
         nobodyYet: "Sonst hat noch niemand gespielt",
         errNotPlaying: "Die Partie l\u00e4uft nicht",
         errNoRequest: "Die Anfrage gibt es nicht mehr",
+        talkWith: "Gespr\u00e4ch mit {name}",
+        chatEmpty: "Noch nichts geschrieben",
+        chatInvite: "Zum Spielen einladen",
+        chatFriendly: "Ein Freundschaftsspiel",
+        chatRanked: "Oder gleich um Punkte:",
+        chatSent: "Einladung gesendet",
+        errTooFast: "Zu oft \u2014 warte eine Minute",
+        chatBack: "Zu den Freunden",
+        talk: { hi: "Hallo!", howru: "Wie geht\u2019s?", play: "Spielen wir?", playranked: "Eine Ranglistenpartie?", later: "Sp\u00e4ter", hour: "In einer Stunde", tomorrow: "Morgen?", cantnow: "Gerade nicht", ready: "Ich bin bereit", yes: "Ja", no: "Nein", thanks: "Danke", gg: "Gutes Spiel!", strong: "Du bist stark", revenge: "Ich hole mir das zur\u00fcck", bye: "Tsch\u00fcss!" },
         menuFriends: "\ud83d\udc65 Freunde",
-        friendsSub: "Hinzuf\u00fcgen, herausfordern, zusammen spielen",
         rematch: "Revanche",
         rematchSent: "Revanche angeboten: {name}",
         deleteAccount: "Konto l\u00f6schen",
@@ -2718,10 +2854,13 @@
     document.getElementById('tFriendsTitle').textContent = L.online.friends;
     document.getElementById('tOnlineBack').textContent = L.online.back;
     document.getElementById('tGamesTitle').textContent = L.online.games;
-    document.getElementById('tModeFriends').textContent = L.online.menuFriends;
-    document.getElementById('tModeFriendsSub').textContent = L.online.friendsSub;
     document.getElementById('tFriendsBack').textContent = L.online.back;
+    document.getElementById('tFriendsScreen').textContent = L.online.menuFriends;
     document.getElementById('tDeleteAccount').textContent = L.online.deleteAccount;
+    document.getElementById('tChatInvite').textContent = L.online.chatInvite;
+    document.getElementById('tChatFriendly').textContent = L.online.chatFriendly;
+    document.getElementById('tChatRanked').textContent = L.online.chatRanked;
+    document.getElementById('tChatBack').textContent = L.online.chatBack;
     document.getElementById('tRkPlay').textContent = L.online.rkPlay;
     document.getElementById('tRkCancel').textContent = L.online.rkCancel;
     document.getElementById('tRkTop').textContent = L.online.rkTop;
@@ -2788,6 +2927,8 @@
     document.getElementById('screenRunHub').classList.toggle('hidden', name !== 'runHub');
     document.getElementById('screenOnline').classList.toggle('hidden', name !== 'online');
     document.getElementById('screenFriends').classList.toggle('hidden', name !== 'friends');
+    document.getElementById('screenChat').classList.toggle('hidden', name !== 'chat');
+    if (name !== 'chat') stopChatPoll();
     if (name !== 'friends') stopFriendsPoll();
     if (name !== 'online') { stopRankedPoll(); stopOnlinePoll(); }
     document.getElementById('card').classList.toggle('wide', name === 'game' && mode === 'duel');
@@ -4019,9 +4160,27 @@
   function updateAccountChip() {
     const chip = document.getElementById('accountChip');
     const auth = runAuth();
-    const show = !!auth && (screen === 'runHub' || screen === 'online');
+    const show = !!auth && (screen === 'runHub' || screen === 'online' ||
+                            screen === 'friends' || screen === 'chat');
     chip.classList.toggle('hidden', !show);
     if (show) document.getElementById('accountChipName').textContent = auth.username;
+
+    // Друзья живут в шапке рядом с профилем: это не режим игры, а место,
+    // куда заходят между делом
+    // Кнопка видна и без аккаунта: иначе про друзей никто не узнает, пока
+    // случайно не зайдёт в онлайн. Нажатие приведёт ко входу
+    const fr = document.getElementById('friendsBtn');
+    fr.classList.toggle('hidden', screen === 'game' || screen === 'setup');
+  }
+
+  // Значок на кнопке считает и непрочитанные фразы, и неотвеченные заявки:
+  // и то и другое ждёт ответа
+  function setFriendsBadge(rows) {
+    const n = (rows || []).reduce((sum, r) =>
+      sum + (r.unread || 0) + (r.relation === 'incoming' ? 1 : 0), 0);
+    const badge = document.getElementById('friendsBadge');
+    badge.textContent = n > 9 ? '9+' : String(n);
+    badge.classList.toggle('hidden', n === 0);
   }
 
   function openLogoutModal() {
@@ -4334,6 +4493,7 @@
     renderRanked(null);
     showScreen('online');
     startOnlinePoll();
+    loadFriends(true);
     loadMatches();
     loadRanked();
     loadEloTop();
@@ -4410,7 +4570,7 @@
   // Входящие заявки первыми: это единственное, что требует действия
   const FRIEND_ORDER = { incoming: 0, friend: 1, outgoing: 2 };
 
-  function friendRow(name, relation) {
+  function friendRow(name, relation, unread) {
     const L = t().online;
     const row = document.createElement('div');
     row.className = 'friend-row';
@@ -4419,7 +4579,18 @@
 
     const who = document.createElement('span');
     who.className = 'fr-name';
-    who.textContent = name;
+    who.textContent = playerName(name);
+    // По имени друга открывается переписка с ним — отдельной кнопки не надо
+    if (relation === 'friend') {
+      who.style.cursor = 'pointer';
+      who.onclick = () => openChat(name);
+      if (unread > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'fr-unread';
+        badge.textContent = unread;
+        who.appendChild(badge);
+      }
+    }
     row.appendChild(who);
 
     const button = (label, cls, fn) => {
@@ -4455,7 +4626,8 @@
                       String(a.username).localeCompare(String(b.username)))
       .forEach(r => {
         if (r.relation === 'incoming') notifyAway('friend-' + r.username);
-        box.appendChild(friendRow(r.username, r.relation));
+        if (r.unread > 0) notifyAway('talkfrom-' + r.username + '-' + r.unread);
+        box.appendChild(friendRow(r.username, r.relation, r.unread));
       });
   }
 
@@ -4466,6 +4638,7 @@
     friendsBusy = true;
     try {
       const rows = (await friendRpc('list_friends')) || [];
+      setFriendsBadge(rows);
       renderFriends(rows);
       setNote('friendsNote', rows.length ? '' : t().online.noFriends);
     } catch (e) {
@@ -4709,6 +4882,163 @@
   // нет — номер матча и своё место за доской. Ветвится только ввод: ход, жетон
   // и следующий раунд уходят на сервер, а не считаются здесь
   const MATCH_POLL_MS = 2000;
+  // ================= ПЕРЕПИСКА С ДРУГОМ =================
+  // Свободного текста здесь нет по той же причине, что и в матче: играют дети
+  // из разных стран, и код фразы переводится у читающего, а не у пишущего
+  const TALK_CODES = ['hi', 'howru', 'play', 'playranked',
+                      'later', 'hour', 'tomorrow', 'cantnow',
+                      'ready', 'yes', 'no', 'thanks',
+                      'gg', 'strong', 'revenge', 'bye'];
+  const CHAT_POLL_MS = 5000;
+  let chatWith = null;
+  let chatTimer = null;
+  let chatBusy = false;
+  let chatLastId = 0;
+
+  function startChatPoll() {
+    stopChatPoll();
+    chatTimer = setInterval(() => {
+      if (screen === 'chat' && chatWith) loadChat(true);
+      else stopChatPoll();
+    }, CHAT_POLL_MS);
+  }
+
+  function stopChatPoll() {
+    if (chatTimer) { clearInterval(chatTimer); chatTimer = null; }
+  }
+
+  function openChat(name) {
+    chatWith = name;
+    chatLastId = 0;
+    const L = t().online;
+    document.getElementById('chatWho').textContent =
+      L.talkWith.replace('{name}', playerName(name));
+    document.getElementById('chatList').innerHTML = '';
+    setNote('chatNote', '');
+    renderChatPad();
+    renderChatModes();
+    applyTranslations();
+    showScreen('chat');
+    startChatPoll();
+    loadChat();
+  }
+
+  function renderChatPad() {
+    const pad = document.getElementById('chatPad');
+    const L = t().online.talk;
+    pad.innerHTML = '';
+    TALK_CODES.forEach(code => {
+      const b = document.createElement('button');
+      b.dataset.code = code;
+      b.textContent = L[code];
+      b.disabled = chatBusy;
+      b.onclick = () => sendTalk(code);
+      pad.appendChild(b);
+    });
+  }
+
+  // Позвать на рейтинг можно в любую разновидность: условия берёт сервер
+  function renderChatModes() {
+    const box = document.getElementById('chatModes');
+    box.innerHTML = '';
+    RANKED_MODES.forEach(mode => {
+      const b = document.createElement('button');
+      b.className = 'rk-mode';
+      b.dataset.mode = mode;
+      const name = document.createElement('div');
+      name.className = 'rm-name';
+      name.textContent = rankedModeLabel(mode);
+      b.appendChild(name);
+      b.onclick = () => challengeRankedFromChat(mode);
+      box.appendChild(b);
+    });
+  }
+
+  function renderChat(messages) {
+    const box = document.getElementById('chatList');
+    const L = t().online;
+    box.innerHTML = '';
+    if (!messages.length) {
+      const empty = document.createElement('div');
+      empty.className = 'fr-note';
+      empty.textContent = L.chatEmpty;
+      box.appendChild(empty);
+      return;
+    }
+    messages.forEach(m => {
+      const el = document.createElement('div');
+      el.className = 'chat-msg ' + (m.mine ? 'mine' : 'theirs');
+      el.dataset.code = m.code;
+      el.textContent = L.talk[m.code] || m.code;
+      const ago = document.createElement('span');
+      ago.className = 'cm-ago';
+      ago.textContent = agoShort(m.ago);
+      el.appendChild(ago);
+      box.appendChild(el);
+    });
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // Возраст сообщения теми же словами, что и давность игры в рейтинге
+  function agoShort(seconds) {
+    const L = t().online;
+    if (seconds === null || seconds === undefined || seconds < 90) return L.rkAgoNow;
+    if (seconds < 5400) return L.rkAgoMin.replace('{n}', Math.round(seconds / 60));
+    if (seconds < 172800) return L.rkAgoHour.replace('{n}', Math.round(seconds / 3600));
+    return L.rkAgoDay.replace('{n}', Math.round(seconds / 86400));
+  }
+
+  async function loadChat(quiet) {
+    if (!chatWith) return;
+    try {
+      const th = await friendRpc('friend_thread', { p_to: chatWith });
+      const messages = (th && th.messages) || [];
+      renderChat(messages);
+      const last = messages.length ? messages[messages.length - 1] : null;
+      // Окликаем только чужое и только то, чего ещё не видели
+      if (last && !last.mine && last.id > chatLastId && chatLastId) {
+        notifyAway('talk-' + chatWith + '-' + last.id);
+      }
+      if (last) chatLastId = last.id;
+      if (!quiet) setNote('chatNote', '');
+    } catch (e) {
+      if (!quiet) setNote('chatNote', onlineMatchError(e.message), true);
+    }
+  }
+
+  async function sendTalk(code) {
+    if (chatBusy || !chatWith) return;
+    chatBusy = true;
+    renderChatPad();
+    try {
+      await friendRpc('send_friend_phrase', { p_to: chatWith, p_code: code });
+      setNote('chatNote', '');
+      await loadChat(true);
+    } catch (e) {
+      setNote('chatNote', onlineMatchError(e.message), true);
+    } finally {
+      chatBusy = false;
+      renderChatPad();
+    }
+  }
+
+  // Дружеская игра настраивается, поэтому уводим в то же окно вызова
+  function challengeFromChat() {
+    const name = chatWith;
+    openFriends();
+    openChallenge(name);
+  }
+
+  async function challengeRankedFromChat(mode) {
+    if (!chatWith) return;
+    try {
+      await friendRpc('challenge_friend_ranked', { p_to: chatWith, p_mode: mode });
+      setNote('chatNote', t().online.chatSent);
+    } catch (e) {
+      setNote('chatNote', onlineMatchError(e.message), true);
+    }
+  }
+
   // ================= ОКЛИК ИЗ СОСЕДНЕЙ ВКЛАДКИ =================
   // Настоящие push-уведомления этой игре почти не нужны: ход длится тридцать
   // секунд, и сообщение, пришедшее на закрытое приложение, опоздает. А вот
@@ -4771,6 +5101,7 @@
     onlineTimer = setInterval(() => {
       if (screen !== 'online') return stopOnlinePoll();
       loadMatches(true);
+      loadFriends(true);
       if (!rankedInQueue) loadRanked(true);
     }, FRIENDS_POLL_MS);
   }
@@ -4994,6 +5325,8 @@
     if (m.indexOf('invite_closed') >= 0) return L.online.errInviteGone;
     if (m.indexOf('no_such_match') >= 0) return L.online.errNoMatch;
     if (m.indexOf('not_playing') >= 0) return L.online.errNotPlaying;
+    if (m.indexOf('too_fast') >= 0) return L.online.errTooFast;
+    if (m.indexOf('bad_phrase') >= 0) return L.online.errNoMatch;
     return friendErrorText(m);
   }
 

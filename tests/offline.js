@@ -68,8 +68,8 @@ function serve() {
   await page.waitForTimeout(600);
 
   check('без сети страница открывается', await page.locator('#screenMode').isVisible());
-  check('без сети видны все пять режимов',
-    (await page.locator('#screenMode .mode-btn').count()) === 5);
+  check('без сети видны все четыре режима',
+    (await page.locator('#screenMode .mode-btn').count()) === 4);
 
   // Онлайн — первый режим, которому сеть нужна по существу. И рейтинг, и друзья
   // должны сказать об этом словами, а не молча зависнуть на пустом списке
@@ -89,7 +89,7 @@ function serve() {
   await page.click('#tOnlineBack');
   await page.waitForTimeout(300);
 
-  await page.click('#tModeFriends');
+  await page.click('#friendsBtn');
   await page.waitForTimeout(600);
   const offlineNote = await page.evaluate(() => {
     const el = document.getElementById('friendsNote');
