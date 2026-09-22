@@ -12,6 +12,12 @@ const VAPID_PUBLIC = Deno.env.get('VAPID_PUBLIC')!;
 const VAPID_PRIVATE = Deno.env.get('VAPID_PRIVATE')!;
 const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:admin@example.com';
 
+// Свой пропуск вместо проверки токена. Проверку у функции приходится выключать:
+// планировщик в базе ходит сюда без токена, и с ней он получал бы 401, а
+// уведомления молча не уходили бы. Служебный ключ проекта для этого не берём —
+// он не должен появляться ни в расписании, ни где-либо ещё
+const PUSH_SECRET = Deno.env.get('PUSH_SECRET') ?? '';
+
 // Ключи проекта Supabase подставляет сам — руками их сюда вписывать не нужно
 const db = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -45,7 +51,16 @@ const TEXT: Record<string, Record<string, (who: string) => [string, string]>> = 
   }
 };
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
+  // Молчать при незаданном пропуске нельзя: тогда адрес остался бы открытым
+  // для всех, и заметить это было бы не по чему
+  if (!PUSH_SECRET) {
+    return new Response('PUSH_SECRET не задан в настройках функции', { status: 500 });
+  }
+  if (req.headers.get('x-push-secret') !== PUSH_SECRET) {
+    return new Response('forbidden', { status: 403 });
+  }
+
   const { data: rows, error } = await db
     .from('push_outbox')
     .select('id, username, kind, who')

@@ -3268,6 +3268,39 @@ async function testKeyPage(browser) {
     keys.sql.indexOf(keys.pub) > 0 && keys.sql.indexOf('vapid_public') > 0, keys.sql.slice(0, 50));
   check('закрытый ключ в эту строку не попал', keys.sql.indexOf(keys.priv) < 0);
 
+  // Пропуск для планировщика делается отдельной кнопкой: пара ключей уже
+  // может быть записана в базу, и повторное нажатие первой кнопки её сломало бы
+  check('до нажатия пропуска не показывают',
+    await page.evaluate(() => document.getElementById('outSecret').classList.contains('hidden')));
+  await page.click('#goSecret');
+  await page.waitForTimeout(200);
+  const pass = await page.evaluate(() => ({
+    secret: document.getElementById('secret').textContent,
+    cron: document.getElementById('cron').textContent,
+    pub: document.getElementById('pub').textContent,
+    priv: document.getElementById('priv').textContent
+  }));
+  check('пропуск — тридцать два случайных байта',
+    decode(pass.secret).length === 32, decode(pass.secret).length + ' байт');
+  check('пропуск в base64url: заголовок его не искажает',
+    !/[=+/]/.test(pass.secret) && !/[^A-Za-z0-9_-]/.test(pass.secret), pass.secret.slice(-4));
+  check('готовая строка расписания содержит пропуск в заголовке',
+    pass.cron.indexOf('x-push-secret') > 0 && pass.cron.indexOf(pass.secret) > 0,
+    pass.cron.slice(0, 40));
+  check('и зовёт именно функцию push',
+    pass.cron.indexOf('/functions/v1/push') > 0 && pass.cron.indexOf('select cron.schedule') === 0,
+    pass.cron.slice(0, 20));
+  check('пропуск не тронул уже созданные ключи',
+    pass.pub === keys.pub && pass.priv === keys.priv);
+  check('закрытый ключ в расписание не попал', pass.cron.indexOf(keys.priv) < 0);
+
+  await page.reload();
+  await page.waitForTimeout(200);
+  await page.click('#goSecret');
+  await page.waitForTimeout(200);
+  const passAgain = await page.evaluate(() => document.getElementById('secret').textContent);
+  check('каждый запуск даёт новый пропуск', passAgain !== pass.secret);
+
   // Каждый раз новая пара — иначе все проекты жили бы с одним ключом
   await page.reload();
   await page.waitForTimeout(200);
@@ -3282,6 +3315,7 @@ async function testKeyPage(browser) {
   await page.reload();
   await page.waitForTimeout(200);
   await page.click('#go');
+  await page.click('#goSecret');
   await page.waitForTimeout(700);
   check('страница не ходит в сеть', requests.length === 0, requests.join(', '));
 
