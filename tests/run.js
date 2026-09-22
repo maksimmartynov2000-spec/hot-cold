@@ -3232,6 +3232,62 @@ async function testPushNotifications(browser) {
   await done(page);
 }
 
+// ------------------------------------------ страница создания ключей VAPID
+async function testKeyPage(browser) {
+  console.log('\nСтраница ключей');
+
+  const context = await browser.newContext({ viewport: PHONE });
+  const page = await context.newPage();
+  page.on('pageerror', e => check('без ошибок JS на странице ключей', false, e.message));
+  await page.goto('file://' + require('path').resolve(__dirname, '..', 'push', 'keys.html'));
+  await page.waitForTimeout(300);
+
+  check('до нажатия ключей не показывают',
+    await page.evaluate(() => document.getElementById('out').classList.contains('hidden')));
+
+  await page.click('#go');
+  await page.waitForTimeout(700);
+  const keys = await page.evaluate(() => ({
+    pub: document.getElementById('pub').textContent,
+    priv: document.getElementById('priv').textContent,
+    sql: document.getElementById('sql').textContent,
+    shown: !document.getElementById('out').classList.contains('hidden')
+  }));
+  const decode = s => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+
+  check('ключи появились', keys.shown);
+  // Открытый ключ VAPID — несжатая точка на P-256: 65 байт, первый 0x04
+  const pub = decode(keys.pub);
+  check('открытый ключ нужной длины и вида',
+    pub.length === 65 && pub[0] === 4, pub.length + ' байт, первый ' + pub[0]);
+  check('закрытый ключ — тридцать два байта',
+    decode(keys.priv).length === 32, decode(keys.priv).length + ' байт');
+  check('оба в base64url, без символов, ломающих ссылки',
+    !/[=+/]/.test(keys.pub) && !/[=+/]/.test(keys.priv), keys.pub.slice(-4));
+  check('готовая строка для базы содержит открытый ключ',
+    keys.sql.indexOf(keys.pub) > 0 && keys.sql.indexOf('vapid_public') > 0, keys.sql.slice(0, 50));
+  check('закрытый ключ в эту строку не попал', keys.sql.indexOf(keys.priv) < 0);
+
+  // Каждый раз новая пара — иначе все проекты жили бы с одним ключом
+  await page.reload();
+  await page.waitForTimeout(200);
+  await page.click('#go');
+  await page.waitForTimeout(700);
+  const again = await page.evaluate(() => document.getElementById('pub').textContent);
+  check('каждый запуск даёт новую пару', again !== keys.pub);
+
+  // Страница ничего не отправляет наружу: ключи не должны утечь
+  const requests = [];
+  page.on('request', r => { if (!r.url().startsWith('file://')) requests.push(r.url()); });
+  await page.reload();
+  await page.waitForTimeout(200);
+  await page.click('#go');
+  await page.waitForTimeout(700);
+  check('страница не ходит в сеть', requests.length === 0, requests.join(', '));
+
+  await context.close();
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -3272,6 +3328,7 @@ async function testPushNotifications(browser) {
     await testAwayAlerts(browser);
     await testFriendChat(browser);
     await testPushNotifications(browser);
+    await testKeyPage(browser);
   } finally {
     await browser.close();
   }
