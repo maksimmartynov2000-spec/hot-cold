@@ -426,10 +426,13 @@ async function testPauseAndGiveUp(browser) {
   await page.reload();
   await page.waitForTimeout(400);
   await page.click('#tModeRun');
-  await page.waitForTimeout(400);
-  check('игра переживает перезагрузку страницы', await page.locator('#unfinishedBox').isVisible());
+  // Ждём саму карточку, а не фиксированные полсекунды: под нагрузкой ответ
+  // сервера приходил позже, и проверка падала на ровном месте
+  const survived = await page.locator('#unfinishedBox')
+    .waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+  check('игра переживает перезагрузку страницы', survived);
 
-  await page.click('#tUnfinishedResume');
+  if (survived) await page.click('#tUnfinishedResume');
   await page.waitForTimeout(300);
   const resumed = await page.evaluate(() => ({ score: RUN.totalScore, round: RUN.round }));
   check('продолжение восстанавливает счёт и раунд',
@@ -1173,8 +1176,20 @@ async function testBonusMode(browser) {
   });
   check('по кнопке за соперника ходит случай', lava.moves === 2 && lava.by === 1,
     JSON.stringify(lava));
-  check('ход попал в самый горячий пояс, но не в ответ',
-    lava.distance >= 1 && lava.distance <= 3, 'расстояние ' + lava.distance);
+  check('ход попал в горячие пояса, но не в ответ',
+    lava.distance >= 1 && lava.distance <= 2, 'расстояние ' + lava.distance);
+
+  // Раньше бросок всегда ложился ровно в одну клетку от ответа, и следующий
+  // ход выигрывал наверняка. Теперь расстояний несколько
+  const spread = await page.evaluate(() => {
+    const seen = {};
+    for (let i = 0; i < 400; i++) seen[Math.abs(lavaThrow() - secret)] = true;
+    return Object.keys(seen).map(Number).sort((a, b) => a - b);
+  });
+  check('бросок не указывает на ответ одной клеткой',
+    spread.length >= 2, 'расстояния: ' + spread.join(','));
+  check('и не попадает ни в ответ, ни мимо горячих поясов',
+    spread[0] >= 1 && spread[spread.length - 1] <= 2, 'расстояния: ' + spread.join(','));
   check('помеха снялась и ход вернулся', lava.flag === false && lava.turn === 0,
     JSON.stringify(lava));
   await done(page);
@@ -1378,13 +1393,21 @@ async function testBonusMode(browser) {
       RANGE_MIN = 1; RANGE_MAX = n;
       const k = bonusCount();
       if (k < 1) bad.push(n + ': ни одного бонуса');
-      if (k > 12) bad.push(n + ': бонусов больше дюжины');
-      // На тесном диапазоне зона «рядом» в семь чисел и так накрывает половину
-      // прямой — там бонусов должно остаться столько же, сколько было
       const base = Math.max(1, Math.ceil(Math.sqrt(n) / 4));
-      if (n <= 20 && k !== base) bad.push(n + ': на тесном диапазоне бонусов стало больше — ' + k);
-      // Дюжина — потолок: больше бонусов уже не про поиск, а про толчею
-      if (n >= 50 && k < Math.min(base * 2, 12)) bad.push(n + ': на широком диапазоне бонусов мало — ' + k);
+      const roomy = Math.max(1, Math.floor(n * 0.086));
+      // Потолок в дюжину снят ради больших диапазонов. Маленьких это не должно
+      // касаться вовсе: там считаем ровно как раньше
+      const before = Math.max(base, Math.min(base * 2, 12, roomy));
+      if (n <= 200 && k !== before) {
+        bad.push(n + ': на тесном диапазоне число изменилось — было ' + before + ', стало ' + k);
+      }
+      // На широком поле бонусы должны встречаться, а не теряться в пустоте,
+      // и при этом сигнал «рядом» не должен накрывать пол-прямой
+      if (n >= 500) {
+        if (k / n < 0.03) bad.push(n + ': на широком диапазоне бонусов мало — ' + k);
+        const covered = k * (2 * bonusNearRadius() + 1) / n;
+        if (covered > 0.5) bad.push(n + ': сигнал «рядом» накрывает ' + Math.round(covered * 100) + '%');
+      }
     });
     return bad;
   });
