@@ -2088,8 +2088,9 @@ async function testFriends(browser) {
     search.rows[0].btns.join() === 'Добавить', JSON.stringify(search.rows[0]));
   check('другу предлагают вызвать и убрать, а не добавить',
     search.rows[1].btns.join() === 'Вызвать,Убрать', JSON.stringify(search.rows[1]));
-  check('на висящую заявку кнопки нет',
-    search.rows[2].btns.length === 0, JSON.stringify(search.rows[2]));
+  // Заявку, которая ждёт ответа, повторно не отправишь — её можно только забрать
+  check('висящую заявку предлагают отменить, а не отправить снова',
+    search.rows[2].btns.join() === 'Отменить', JSON.stringify(search.rows[2]));
 
   // Добавление
   await page.evaluate(() => { window.__found[0].relation = 'outgoing'; });
@@ -2119,6 +2120,52 @@ async function testFriends(browser) {
     [...document.querySelectorAll('#friendsList .friend-row')].map(r => r.dataset.name + ':' + r.dataset.relation));
   check('входящие заявки стоят первыми',
     list.join(' ') === 'Кира:incoming Аня:friend Боря:friend Яна:outgoing', list.join(' '));
+
+  // Свою заявку можно забрать назад: отправил не тому — и она висела вечно
+  const outRow = '#friendsList .friend-row[data-relation="outgoing"]';
+  check('у своей заявки есть кнопка отмены',
+    await page.evaluate(sel => {
+      const b = document.querySelector(sel + ' .fr-btn');
+      return !!b && b.textContent === 'Отменить';
+    }, outRow));
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Аня', relation: 'friend' },
+                        { username: 'Кира', relation: 'incoming' },
+                        { username: 'Боря', relation: 'friend' }];
+  });
+  await page.click(outRow + ' .fr-btn');
+  await page.waitForTimeout(400);
+  const cancelled = await page.evaluate(() => ({
+    sent: (window.__rpcCalls.filter(c => c.name === 'cancel_friend_request').pop() || {}).args,
+    rows: [...document.querySelectorAll('#friendsList .friend-row')].map(r => r.dataset.name).join(' ')
+  }));
+  check('отмена уходит на сервер с именем адресата',
+    cancelled.sent && cancelled.sent.p_to === 'Яна', JSON.stringify(cancelled.sent));
+  check('и строка со списка пропадает',
+    cancelled.rows.indexOf('Яна') < 0, cancelled.rows);
+
+  // Мгновенный повтор сервер не пропустит — и это должно быть сказано словами
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Яна', relation: 'outgoing' }];
+    window.__rpcError = { name: 'cancel_friend_request', message: 'recently_cancelled' };
+  });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(400);
+  await page.click(outRow + ' .fr-btn');
+  await page.waitForTimeout(400);
+  const cancelNote = await page.evaluate(() => document.getElementById('friendsNote').textContent);
+  check('запрет на мгновенный повтор объяснён словами',
+    cancelNote.indexOf('через час') >= 0, cancelNote);
+  await page.evaluate(() => { window.__rpcError = null; });
+
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'incoming' },
+                        { username: 'Аня', relation: 'friend' },
+                        { username: 'Боря', relation: 'friend' },
+                        { username: 'Яна', relation: 'outgoing' }];
+  });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(400);
 
   // Принять
   await page.evaluate(() => {
@@ -3230,6 +3277,34 @@ async function testPushNotifications(browser) {
   check('несостоявшаяся подписка объяснена домашним экраном',
     home.indexOf('домашний экран') >= 0, home);
   await done(page);
+
+  // Айфон во вкладке Safari: кнопки нет и быть не может, но молчать нельзя
+  page = await newGame(browser, { user: 'Лев', push: {
+    key: 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI',
+    ios: true, noPushManager: true } });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.click('#accountChip');
+  await page.waitForTimeout(700);
+  const tab = await page.evaluate(() => ({
+    hidden: document.getElementById('tPushToggle').classList.contains('hidden'),
+    note: document.getElementById('pushNote').textContent
+  }));
+  check('во вкладке Safari кнопки уведомлений нет', tab.hidden);
+  check('но сказано, почему её нет', tab.note.indexOf('домашний экран') >= 0, tab.note);
+  await done(page);
+
+  // На обычном телефоне этой подсказки быть не должно: она там неуместна
+  page = await newGame(browser, { user: 'Лев', push: {
+    key: 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI' } });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.click('#accountChip');
+  await page.waitForTimeout(700);
+  const android = await page.evaluate(() => document.getElementById('pushNote').textContent);
+  check('там, где уведомления работают, про домашний экран не говорится',
+    android.indexOf('домашний экран') < 0, android);
+  await done(page);
 }
 
 // ------------------------------------------ страница создания ключей VAPID
@@ -3289,6 +3364,12 @@ async function testKeyPage(browser) {
     pass.cron.slice(0, 40));
   check('и зовёт именно функцию push', pass.cron.indexOf('/functions/v1/push') > 0);
   // Без расширений схемы cron нет вовсе, и расписание падает на первой же строке
+  check('очередь чистится вторым заданием, а не копится вечно',
+    pass.cron.indexOf("cron.schedule('push-clean'") > 0
+    && pass.cron.indexOf('delete from push_outbox') > 0
+    && pass.cron.indexOf("cron.schedule('push-drain'") < pass.cron.indexOf("cron.schedule('push-clean'"));
+  check('та же уборка убирает и заявки в друзья без ответа',
+    pass.cron.indexOf('expire_friend_requests') > pass.cron.indexOf("cron.schedule('push-clean'"));
   check('расширения идут в той же строке, до расписания',
     pass.cron.indexOf('create extension if not exists pg_cron') === 0
     && pass.cron.indexOf('pg_net') > 0
@@ -3328,6 +3409,7 @@ async function testKeyPage(browser) {
 
 (async () => {
   const browser = await chromium.launch(launchOptions());
+  let crashed = null;
   try {
     await testModes(browser);
     await testRating(browser);
@@ -3367,9 +3449,19 @@ async function testKeyPage(browser) {
     await testFriendChat(browser);
     await testPushNotifications(browser);
     await testKeyPage(browser);
+  } catch (e) {
+    // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
+    // в конце, а до конца дело не доходило. Молчание легко принять за «без
+    // замечаний», поэтому сначала показываем всё, что успели проверить
+    crashed = e;
   } finally {
     await browser.close();
   }
   console.log('');
-  process.exit(report() > 0 ? 1 : 0);
+  const failed = report();
+  if (crashed) {
+    console.log('\n  ПРОГОН ОБОРВАЛСЯ: ' + (crashed && crashed.message || crashed));
+    process.exit(1);
+  }
+  process.exit(failed > 0 ? 1 : 0);
 })();

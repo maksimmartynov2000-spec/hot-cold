@@ -139,7 +139,13 @@
       "    url := 'https://fzakcsvyceqsnowvkxfu.supabase.co/functions/v1/push',\n" +
       "    headers := '{\"Content-Type\": \"application/json\", " +
       "\"x-push-secret\": \"" + secret + "\"}'::jsonb\n" +
-      "  );\n$$);";
+      "  );\n$$);\n\n" +
+      // Отправленные строки иначе копятся вечно: раз в сутки убираем всё,
+      // что старше недели — недели хватает, чтобы разобраться, если что-то пошло не так
+      "select cron.schedule('push-clean', '17 4 * * *', $$\n" +
+      "  delete from push_outbox where sent_at < now() - interval '7 days';\n" +
+      // Заодно уходят заявки в друзья, на которые никто не ответил за пять дней
+      "  select expire_friend_requests();\n$$);";
     document.getElementById('outSecret').classList.remove('hidden');
     this.disabled = true;
   };

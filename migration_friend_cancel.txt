@@ -1,0 +1,138 @@
+-- Отмена своей заявки в друзья и срок жизни неотвеченных.
+--
+-- Заявку было не забрать назад: отправил не тому — и она висит у человека
+-- вечно. А «ждёт ответа» без срока превращается в мусор: через месяц ни
+-- отправитель, ни адресат уже не помнят, о чём речь.
+
+-- Отменённая заявка не удаляется, а помечается: иначе отмену и повторную
+-- отправку можно было бы крутить по кругу, каждый раз будя человека уведомлением
+alter table friendships drop constraint if exists friendship_status;
+alter table friendships add constraint friendship_status
+  check (status in ('pending', 'accepted', 'declined', 'cancelled'));
+
+-- Пять дней. Меньше — и человек, заглядывающий в игру по выходным, не успеет
+-- ответить; больше — заявка переживает повод, по которому её отправили
+create or replace function expire_friend_requests()
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare gone int;
+begin
+  delete from friendships
+  where status = 'pending' and created_at < now() - interval '5 days';
+  get diagnostics gone = row_count;
+
+  -- Отказы и отмены нужны только для своих запретов — сутки и час
+  -- соответственно. Неделя с запасом, дальше это просто мусор в таблице
+  delete from friendships
+  where status in ('declined', 'cancelled') and decided_at < now() - interval '7 days';
+
+  return gone;
+end;
+$$;
+
+create or replace function cancel_friend_request(p_username text, p_pin text, p_to text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; other text; touched int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select s.username into other from students s where s.username_lower = lower(trim(p_to));
+  if other is null then raise exception 'no_such_student'; end if;
+
+  -- Только свою и только неотвеченную: чужую заявку отменять нечего,
+  -- а на отвеченную есть «удалить из друзей»
+  update friendships set status = 'cancelled', decided_at = now()
+  where requester = me and addressee = other and status = 'pending';
+  get diagnostics touched = row_count;
+  if touched = 0 then raise exception 'no_such_request'; end if;
+
+  return true;
+end;
+$$;
+
+-- Та же функция, что и раньше, плюс две вещи: протухшие заявки убираются до
+-- подсчёта своего лимита, и отменённую нельзя слать заново сразу же
+create or replace function send_friend_request(p_username text, p_pin text, p_to text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; other text; cur text; pending_out int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select s.username into other from students s where s.username_lower = lower(trim(p_to));
+  if other is null then raise exception 'no_such_student'; end if;
+  if other = me then raise exception 'cannot_friend_self'; end if;
+
+  -- Иначе двадцать забытых заявок навсегда занимают все места
+  perform expire_friend_requests();
+
+  cur := friend_status(me, other);
+  if cur = 'friend' then return 'friend'; end if;
+  if cur = 'outgoing' then return 'outgoing'; end if;
+
+  if cur = 'incoming' then
+    update friendships set status = 'accepted', decided_at = now()
+    where requester = other and addressee = me;
+    return 'friend';
+  end if;
+
+  if exists (select 1 from friendships f
+             where f.requester = me and f.addressee = other
+               and f.status = 'declined' and f.decided_at > now() - interval '24 hours') then
+    raise exception 'recently_declined';
+  end if;
+
+  if exists (select 1 from friendships f
+             where f.requester = me and f.addressee = other
+               and f.status = 'cancelled' and f.decided_at > now() - interval '1 hour') then
+    raise exception 'recently_cancelled';
+  end if;
+
+  select count(*) into pending_out from friendships f
+  where f.requester = me and f.status = 'pending';
+  if pending_out >= 20 then raise exception 'too_many_requests'; end if;
+
+  insert into friendships(requester, addressee, status)
+  values (me, other, 'pending')
+  on conflict (requester, addressee) do update
+    set status = 'pending', created_at = now(), decided_at = null;
+  return 'outgoing';
+end;
+$$;
+
+-- Повторная заявка ложится в ту же строку через on conflict, то есть приходит
+-- обновлением, а не вставкой. Триггер на одной вставке её не замечал, и человек
+-- не узнавал о заявке, отправленной ему во второй раз
+create or replace function push_on_friendship()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.status = 'pending' and (tg_op = 'INSERT' or old.status is distinct from 'pending') then
+    insert into push_outbox(username, kind, who) values (new.addressee, 'friend_request', new.requester);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists push_friendship on friendships;
+create trigger push_friendship after insert or update of status on friendships
+  for each row execute function push_on_friendship();
+
+revoke execute on function expire_friend_requests() from public, anon;
+grant execute on function cancel_friend_request(text, text, text) to anon;
+grant execute on function send_friend_request(text, text, text) to anon;
