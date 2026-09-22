@@ -1,0 +1,204 @@
+-- Уведомления на закрытое приложение. Игра уже PWA — манифест, иконки и
+-- service worker на месте, — поэтому здесь только подписки и очередь отправки.
+--
+-- Отправляет не база: Web Push требует подписать запрос ключом VAPID, а этого
+-- в PostgreSQL нет. База лишь копит, кому и о чём написать, а разбирает очередь
+-- отдельная функция на сервере Supabase.
+
+alter table game_config add column if not exists vapid_public text;
+
+create table if not exists push_subscriptions (
+  endpoint text primary key,
+  username text not null references students(username)
+    on update cascade on delete cascade,
+  p256dh text not null,
+  auth text not null,
+  -- Язык хранится с подпиской: текст собирает отправитель, а service worker
+  -- не умеет читать настройки страницы — он просыпается без неё
+  lang text not null default 'ru',
+  created_at timestamptz not null default now()
+);
+create index if not exists push_subs_user_idx on push_subscriptions (username);
+alter table push_subscriptions enable row level security;
+
+-- Очередь: кому написать и о чём. Текст собирает отправитель по коду —
+-- у каждого свой язык, и хранить готовую фразу незачем
+create table if not exists push_outbox (
+  id bigint generated always as identity primary key,
+  username text not null references students(username)
+    on update cascade on delete cascade,
+  kind text not null,
+  who text,
+  created_at timestamptz not null default now(),
+  sent_at timestamptz,
+  constraint push_kind check (kind in ('friend_request', 'challenge', 'talk'))
+);
+create index if not exists push_outbox_idx on push_outbox (sent_at, id);
+alter table push_outbox enable row level security;
+
+-- Клиент спрашивает, настроены ли уведомления вообще. Пока ключа нет,
+-- переключатель в игре не показывается: обещать нечего
+create or replace function push_config()
+returns text
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  select vapid_public from game_config where id = 1;
+$$;
+
+create or replace function save_push_subscription(p_username text, p_pin text,
+                                                  p_endpoint text, p_p256dh text,
+                                                  p_auth text, p_lang text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if coalesce(p_endpoint, '') = '' then raise exception 'bad_subscription'; end if;
+
+  insert into push_subscriptions(endpoint, username, p256dh, auth, lang)
+  values (p_endpoint, me, p_p256dh, p_auth,
+          case when p_lang in ('en','ru','fr','de') then p_lang else 'ru' end)
+  on conflict (endpoint) do update
+    set username = excluded.username, p256dh = excluded.p256dh,
+        auth = excluded.auth, lang = excluded.lang;
+  return true;
+end;
+$$;
+
+create or replace function drop_push_subscription(p_username text, p_pin text,
+                                                  p_endpoint text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  delete from push_subscriptions where endpoint = p_endpoint and username = me;
+  return true;
+end;
+$$;
+
+-- Строки в очередь кладут триггеры, а не сами функции: так правило живёт в
+-- одном месте и не разойдётся с вызовом друга, заявкой или фразой
+create or replace function push_on_friendship()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.status = 'pending' then
+    insert into push_outbox(username, kind, who) values (new.addressee, 'friend_request', new.requester);
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function push_on_match()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.status = 'invited' then
+    insert into push_outbox(username, kind, who) values (new.p1, 'challenge', new.p0);
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function push_on_talk()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  insert into push_outbox(username, kind, who)
+  values (case when new.sender = new.a then new.b else new.a end, 'talk', new.sender);
+  return new;
+end;
+$$;
+
+drop trigger if exists push_friendship on friendships;
+create trigger push_friendship after insert on friendships
+  for each row execute function push_on_friendship();
+drop trigger if exists push_match on matches;
+create trigger push_match after insert on matches
+  for each row execute function push_on_match();
+drop trigger if exists push_talk on friend_chat;
+create trigger push_talk after insert on friend_chat
+  for each row execute function push_on_talk();
+
+-- Удалённый аккаунт уносит подписки и неотправленное
+create or replace function delete_account(p_username text, p_pin text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; gone text; m matches;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  for m in select * from matches
+           where status in ('invited', 'active') and (p0 = me or p1 = me) loop
+    if m.status = 'active' and m.ranked then
+      update matches
+      set status = 'finished', match_over = true, round_over = true,
+          round_winner = 1 - match_seat(m, me), forfeit_by = match_seat(m, me),
+          turn_deadline = null, updated_at = now()
+      where id = m.id;
+      perform apply_elo(m.id, 1 - match_seat(m, me));
+    else
+      update matches set status = 'finished', match_over = true, updated_at = now()
+      where id = m.id;
+    end if;
+  end loop;
+
+  delete from friendships where requester = me or addressee = me;
+  delete from elo_ratings where username = me;
+  delete from ranked_queue where username = me;
+  delete from run_sessions where username = me;
+  delete from rivalry where a = me or b = me;
+  delete from friend_chat where a = me or b = me;
+  delete from friend_chat_read where username = me or other = me;
+  delete from push_subscriptions where username = me;
+  -- И то, что ждало отправки ему, и то, что ждало отправки про него: имя в
+  -- колонке who внешним ключом не связано и пережило бы переименование
+  delete from push_outbox where username = me or who = me;
+  delete from runs where username = me;
+
+  gone := '#' || nextval('deleted_player_seq');
+  update students
+  set username = gone,
+      pin_hash = crypt(gen_random_uuid()::text, gen_salt('bf')),
+      pin_hint = null,
+      best_run_score = 0,
+      best_run_rounds = 0,
+      failed_logins = 0,
+      locked_until = null
+  where username = me;
+
+  return gone;
+end;
+$$;
+
+revoke execute on function push_on_friendship() from public, anon;
+revoke execute on function push_on_match() from public, anon;
+revoke execute on function push_on_talk() from public, anon;
+grant execute on function push_config() to anon;
+grant execute on function save_push_subscription(text, text, text, text, text, text) to anon;
+grant execute on function drop_push_subscription(text, text, text) to anon;
+grant execute on function delete_account(text, text) to anon;

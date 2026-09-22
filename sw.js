@@ -4,7 +4,7 @@
 
 // Версию поднимаем, когда меняется что-то из CORE: старый кеш отдаётся сразу,
 // и без смены имени телефон продолжил бы брать прежний manifest
-const CACHE = 'hot-cold-v2';
+const CACHE = 'hot-cold-v3';
 
 // Своё, что нужно для запуска
 const CORE = [
@@ -72,6 +72,37 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => hit);
       return hit || network;
+    })
+  );
+});
+
+// Уведомление на закрытое приложение. Текст приходит готовым: service worker
+// просыпается без страницы и не знает ни языка, ни имён — их подставляет
+// отправитель, зная язык подписки
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) {}
+  const title = data.title || 'Hot or Cold';
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || '',
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    // Один повод — одно уведомление: десять фраз подряд не завалят шторку
+    tag: data.tag || 'hot-cold',
+    data: { url: data.url || './' }
+  }));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || './';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      // Уже открытую вкладку не плодим, а поднимаем наверх
+      for (const client of list) {
+        if ('focus' in client) return client.focus();
+      }
+      return self.clients.openWindow ? self.clients.openWindow(url) : null;
     })
   );
 });
