@@ -3126,6 +3126,168 @@ async function testFriendChat(browser) {
   await done(page);
 }
 
+// ------------------------------------------------ уведомления на закрытое
+async function testPushNotifications(browser) {
+  console.log('\nУведомления');
+
+  // Ключа на сервере нет — переключателя быть не должно
+  let page = await newGame(browser, { user: 'Лев', push: {} });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.click('#accountChip');
+  await page.waitForTimeout(700);
+  check('без ключа на сервере уведомления не предлагаются',
+    await page.evaluate(() =>
+      document.getElementById('tPushToggle').classList.contains('hidden')));
+  await done(page);
+
+  // Ключ есть — появляется кнопка
+  page = await newGame(browser, { user: 'Лев', push: { key: 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI' } });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.click('#accountChip');
+  await page.waitForTimeout(700);
+  const off = await page.evaluate(() => ({
+    hidden: document.getElementById('tPushToggle').classList.contains('hidden'),
+    text: document.getElementById('tPushToggle').textContent
+  }));
+  check('с ключом кнопка появляется', !off.hidden);
+  check('и предлагает включить', off.text === '🔔 Включить уведомления', off.text);
+
+  // Включаем
+  await page.click('#tPushToggle');
+  await page.waitForTimeout(700);
+  const on = await page.evaluate(() => ({
+    saved: window.__push.saved,
+    text: document.getElementById('tPushToggle').textContent,
+    note: document.getElementById('pushNote').textContent
+  }));
+  check('подписка ушла на сервер с адресом и ключами',
+    on.saved && on.saved.p_endpoint === 'https://push.example/dev1' &&
+    on.saved.p_p256dh === 'PPP' && on.saved.p_auth === 'AAA', JSON.stringify(on.saved));
+  check('и с языком, на котором читает этот человек',
+    on.saved && on.saved.p_lang === 'ru', on.saved && on.saved.p_lang);
+  check('кнопка стала выключателем', on.text === '🔕 Выключить уведомления', on.text);
+  check('и сказано, что всё готово', on.note.indexOf('включены') >= 0, on.note);
+
+  // Выключаем
+  await page.click('#tPushToggle');
+  await page.waitForTimeout(700);
+  const back = await page.evaluate(() => ({
+    dropped: window.__push.dropped,
+    unsub: window.__push.unsubscribed,
+    text: document.getElementById('tPushToggle').textContent
+  }));
+  check('отписка ушла и в браузер, и на сервер',
+    back.unsub === true && back.dropped === 'https://push.example/dev1', JSON.stringify(back));
+  check('кнопка снова предлагает включить',
+    back.text === '🔔 Включить уведомления', back.text);
+  await done(page);
+
+  // Другой язык — подписка должна уехать с ним, а не с русским
+  const KEY = 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI';
+  page = await newGame(browser, { user: 'Лев', lang: 'fr', push: { key: KEY } });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.click('#accountChip');
+  await page.waitForTimeout(700);
+  await page.click('#tPushToggle');
+  await page.waitForTimeout(700);
+  const fr = await page.evaluate(() => window.__push.saved);
+  check('язык подписки берётся у читающего, а не подставляется всегда русский',
+    fr && fr.p_lang === 'fr', fr && fr.p_lang);
+  await done(page);
+
+  // Телефон отказал
+  page = await newGame(browser, { user: 'Лев', push: { key: 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI' } });
+  await page.evaluate(() => { window.__push.permission = 'denied'; });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.click('#accountChip');
+  await page.waitForTimeout(700);
+  await page.click('#tPushToggle');
+  await page.waitForTimeout(700);
+  const denied = await page.evaluate(() => ({
+    note: document.getElementById('pushNote').textContent,
+    bad: document.getElementById('pushNote').classList.contains('bad'),
+    saved: window.__push.saved
+  }));
+  check('отказ телефона объяснён словами',
+    denied.bad && denied.note.indexOf('разрешите') >= 0, denied.note);
+  check('и на сервер ничего не ушло', denied.saved === null, JSON.stringify(denied.saved));
+  await done(page);
+
+  // Подписка не завелась — на айфоне это про домашний экран
+  page = await newGame(browser, { user: 'Лев', push: { key: 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI' } });
+  await page.evaluate(() => { window.__push.subscribeFails = true; });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(400);
+  await page.click('#accountChip');
+  await page.waitForTimeout(700);
+  await page.click('#tPushToggle');
+  await page.waitForTimeout(700);
+  const home = await page.evaluate(() => document.getElementById('pushNote').textContent);
+  check('несостоявшаяся подписка объяснена домашним экраном',
+    home.indexOf('домашний экран') >= 0, home);
+  await done(page);
+}
+
+// ------------------------------------------ страница создания ключей VAPID
+async function testKeyPage(browser) {
+  console.log('\nСтраница ключей');
+
+  const context = await browser.newContext({ viewport: PHONE });
+  const page = await context.newPage();
+  page.on('pageerror', e => check('без ошибок JS на странице ключей', false, e.message));
+  await page.goto('file://' + require('path').resolve(__dirname, '..', 'push', 'keys.html'));
+  await page.waitForTimeout(300);
+
+  check('до нажатия ключей не показывают',
+    await page.evaluate(() => document.getElementById('out').classList.contains('hidden')));
+
+  await page.click('#go');
+  await page.waitForTimeout(700);
+  const keys = await page.evaluate(() => ({
+    pub: document.getElementById('pub').textContent,
+    priv: document.getElementById('priv').textContent,
+    sql: document.getElementById('sql').textContent,
+    shown: !document.getElementById('out').classList.contains('hidden')
+  }));
+  const decode = s => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+
+  check('ключи появились', keys.shown);
+  // Открытый ключ VAPID — несжатая точка на P-256: 65 байт, первый 0x04
+  const pub = decode(keys.pub);
+  check('открытый ключ нужной длины и вида',
+    pub.length === 65 && pub[0] === 4, pub.length + ' байт, первый ' + pub[0]);
+  check('закрытый ключ — тридцать два байта',
+    decode(keys.priv).length === 32, decode(keys.priv).length + ' байт');
+  check('оба в base64url, без символов, ломающих ссылки',
+    !/[=+/]/.test(keys.pub) && !/[=+/]/.test(keys.priv), keys.pub.slice(-4));
+  check('готовая строка для базы содержит открытый ключ',
+    keys.sql.indexOf(keys.pub) > 0 && keys.sql.indexOf('vapid_public') > 0, keys.sql.slice(0, 50));
+  check('закрытый ключ в эту строку не попал', keys.sql.indexOf(keys.priv) < 0);
+
+  // Каждый раз новая пара — иначе все проекты жили бы с одним ключом
+  await page.reload();
+  await page.waitForTimeout(200);
+  await page.click('#go');
+  await page.waitForTimeout(700);
+  const again = await page.evaluate(() => document.getElementById('pub').textContent);
+  check('каждый запуск даёт новую пару', again !== keys.pub);
+
+  // Страница ничего не отправляет наружу: ключи не должны утечь
+  const requests = [];
+  page.on('request', r => { if (!r.url().startsWith('file://')) requests.push(r.url()); });
+  await page.reload();
+  await page.waitForTimeout(200);
+  await page.click('#go');
+  await page.waitForTimeout(700);
+  check('страница не ходит в сеть', requests.length === 0, requests.join(', '));
+
+  await context.close();
+}
+
 (async () => {
   const browser = await chromium.launch(launchOptions());
   try {
@@ -3165,6 +3327,8 @@ async function testFriendChat(browser) {
     await testAccountDelete(browser);
     await testAwayAlerts(browser);
     await testFriendChat(browser);
+    await testPushNotifications(browser);
+    await testKeyPage(browser);
   } finally {
     await browser.close();
   }

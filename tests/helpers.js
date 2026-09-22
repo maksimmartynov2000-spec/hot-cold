@@ -171,6 +171,15 @@ function stubSupabase(opts) {
             window.__rankedChallenge = { to: args.p_to, mode: args.p_mode };
             return { data: 77, error: null };
           }
+          if (name === 'push_config') return { data: window.__push.key, error: null };
+          if (name === 'save_push_subscription') {
+            window.__push.saved = args;
+            return { data: true, error: null };
+          }
+          if (name === 'drop_push_subscription') {
+            window.__push.dropped = args.p_endpoint;
+            return { data: true, error: null };
+          }
           if (name === 'rematch') {
             window.__rematched = (window.__rematched || 0) + 1;
             return { data: 99, error: null };
@@ -221,6 +230,35 @@ function stubSupabase(opts) {
 
     // Четыре режима: тест задаёт рейтинги через window.__rankedQ.ratings,
     // а очередь — одна на всех, как и на сервере
+    // Уведомления: настоящую подписку в тесте не завести, поэтому браузерные
+    // части подменяются целиком, а проверяется наша логика вокруг них
+    window.__push = { key: null, permission: 'granted', subscribeFails: false,
+                      sub: null, saved: null, dropped: null, unsubscribed: false };
+    if (opts.push) {
+      window.__push.key = opts.push.key || null;
+      const fakeReg = {
+        pushManager: {
+          getSubscription: async () => window.__push.sub,
+          subscribe: async () => {
+            if (window.__push.subscribeFails) throw new Error('not allowed');
+            window.__push.sub = {
+              endpoint: 'https://push.example/dev1',
+              toJSON: () => ({ keys: { p256dh: 'PPP', auth: 'AAA' } }),
+              unsubscribe: async () => { window.__push.unsubscribed = true;
+                                         window.__push.sub = null; return true; }
+            };
+            return window.__push.sub;
+          }
+        }
+      };
+      Object.defineProperty(navigator, 'serviceWorker', {
+        configurable: true,
+        value: { ready: Promise.resolve(fakeReg), register: () => Promise.resolve(fakeReg) }
+      });
+      window.Notification = { requestPermission: async () => window.__push.permission };
+      window.PushManager = function () {};
+    }
+
     window.__talk = {};
     window.__rankedQ = { inQueue: false, mode: 0, matchId: null, queue: 1,
                          lastAgo: null, joined: 0,

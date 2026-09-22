@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Ключи для уведомлений</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 20px 16px 40px;
+    background: #10142c; color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p { font-size: 14px; color: rgba(255,255,255,0.65); margin: 0 0 16px; }
+  button {
+    width: 100%; padding: 14px; font-size: 16px; font-weight: 700;
+    font-family: inherit; color: #10142c; background: #4ade80;
+    border: none; border-radius: 12px; cursor: pointer;
+  }
+  button:disabled { opacity: .5; }
+  .box { margin-top: 22px; }
+  .box.hidden { display: none; }
+  label { display: block; font-size: 12px; font-weight: 700; margin: 16px 0 6px; }
+  .key {
+    width: 100%; box-sizing: border-box; padding: 10px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    color: #fff; background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
+    word-break: break-all; min-height: 64px;
+  }
+  .copy {
+    margin-top: 8px; width: auto; padding: 8px 14px; font-size: 13px;
+    background: rgba(255,255,255,0.1); color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .warn {
+    margin-top: 22px; padding: 12px 14px; font-size: 13px;
+    background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.4);
+    border-radius: 10px; color: #fde68a;
+  }
+  .sql {
+    margin-top: 10px; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12px; word-break: break-all;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Ключи для уведомлений</h1>
+  <p>Пара ключей VAPID создаётся прямо здесь, в вашем браузере. Никуда не
+     отправляется: страница ничего не умеет, кроме как посчитать их на месте.</p>
+
+  <button id="go">Создать пару ключей</button>
+
+  <div class="box hidden" id="out">
+    <label for="pub">Открытый ключ — его увидит игра</label>
+    <div class="key" id="pub"></div>
+    <button class="copy" data-for="pub">Скопировать</button>
+
+    <label for="priv">Закрытый ключ — только на сервер, никому больше</label>
+    <div class="key" id="priv"></div>
+    <button class="copy" data-for="priv">Скопировать</button>
+
+    <div class="warn">
+      Закрытый ключ никому не показывайте и не вставляйте в игру. Его место —
+      в настройках функции на сервере, в поле <b>VAPID_PRIVATE</b>.
+      <div class="sql" id="sql"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Открытый ключ VAPID — это точка на кривой P-256 в несжатом виде (65 байт),
+  // закрытый — тот самый скаляр d из JWK. Оба кодируются base64url без «=»
+  function b64url(bytes) {
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  document.getElementById('go').onclick = async function () {
+    this.disabled = true;
+    try {
+      const pair = await crypto.subtle.generateKey(
+        { name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+      const raw = new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey));
+      const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
+
+      const pub = b64url(raw);
+      const priv = jwk.d;
+      document.getElementById('pub').textContent = pub;
+      document.getElementById('priv').textContent = priv;
+      document.getElementById('sql').textContent =
+        "update game_config set vapid_public = '" + pub + "' where id = 1;";
+      document.getElementById('out').classList.remove('hidden');
+    } catch (e) {
+      this.disabled = false;
+      alert('Не получилось создать ключи: ' + e.message);
+    }
+  };
+
+  document.querySelectorAll('.copy').forEach(btn => {
+    btn.onclick = async () => {
+      const text = document.getElementById(btn.dataset.for).textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Скопировано';
+        setTimeout(() => { btn.textContent = 'Скопировать'; }, 1500);
+      } catch (e) {
+        // На старых телефонах буфера нет — выделяем, чтобы скопировать руками
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(document.getElementById(btn.dataset.for));
+        sel.removeAllRanges(); sel.addRange(range);
+      }
+    };
+  });
+</script>
+</body>
+</html>

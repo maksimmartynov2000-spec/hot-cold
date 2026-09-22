@@ -1655,6 +1655,9 @@
     <div class="rr-title" id="tAccountTitle" style="margin-bottom:10px"></div>
     <div class="modal-text" id="accountName" style="margin-bottom:10px"></div>
     <button class="btn-ghost btn-block" id="tShowPin" onclick="revealOwnPin()"></button>
+    <button class="btn-ghost btn-block hidden" id="tPushToggle" style="margin-top:8px"
+            onclick="togglePush()"></button>
+    <div class="fr-note hidden" id="pushNote"></div>
     <div class="modal-text" id="tLogoutAsk" style="margin-top:16px"></div>
     <div class="setup-row">
       <button class="btn-ghost btn-block" id="tLogoutCancel" onclick="closeLogoutModal()"></button>
@@ -1740,6 +1743,11 @@
         errTooFast: "Too often — wait a minute",
         chatBack: "To friends",
         talk: { hi: "Hi!", howru: "How are you?", play: "Fancy a game?", playranked: "Fancy a ranked game?", later: "Later, maybe", hour: "In an hour", tomorrow: "Tomorrow?", cantnow: "Can\u2019t right now", ready: "I\u2019m ready", yes: "Yes", no: "No", thanks: "Thanks", gg: "Good game!", strong: "You\u2019re strong", revenge: "I\u2019ll get you back", bye: "Bye!" },
+        pushOn: "\ud83d\udd14 Turn notifications on",
+        pushOff: "\ud83d\udd15 Turn notifications off",
+        pushReady: "Notifications are on: a friend request, a challenge or a message will reach you",
+        pushDenied: "The phone refused notifications — allow them in the browser settings",
+        pushHomeScreen: "On an iPhone this works only if the game is added to the Home Screen",
         menuFriends: "\ud83d\udc65 Friends",
         rematch: "Rematch",
         rematchSent: "Rematch offered to {name}",
@@ -1929,6 +1937,11 @@
         errTooFast: "Слишком часто — подождите минуту",
         chatBack: "К друзьям",
         talk: { hi: "Привет!", howru: "Как дела?", play: "Сыграем?", playranked: "Сыграем на рейтинг?", later: "Давай позже", hour: "Через час", tomorrow: "Давай завтра", cantnow: "Сейчас не могу", ready: "Я готов", yes: "Да", no: "Нет", thanks: "Спасибо", gg: "Хорошая игра!", strong: "Ты силён", revenge: "Я отыграюсь", bye: "Пока!" },
+        pushOn: "\ud83d\udd14 Включить уведомления",
+        pushOff: "\ud83d\udd15 Выключить уведомления",
+        pushReady: "Уведомления включены: заявка, вызов или сообщение дойдут до вас",
+        pushDenied: "Телефон отказал в уведомлениях — разрешите их в настройках браузера",
+        pushHomeScreen: "На айфоне это работает, только если игра добавлена на домашний экран",
         menuFriends: "\ud83d\udc65 Друзья",
         rematch: "Реванш",
         rematchSent: "Реванш предложен: {name}",
@@ -2118,6 +2131,11 @@
         errTooFast: "Trop souvent \u2014 attendez une minute",
         chatBack: "Aux amis",
         talk: { hi: "Salut !", howru: "\u00c7a va ?", play: "On joue ?", playranked: "Une partie class\u00e9e ?", later: "Plus tard", hour: "Dans une heure", tomorrow: "Demain ?", cantnow: "Pas maintenant", ready: "Je suis pr\u00eat", yes: "Oui", no: "Non", thanks: "Merci", gg: "Belle partie !", strong: "Tu es fort", revenge: "Je prendrai ma revanche", bye: "Salut !" },
+        pushOn: "\ud83d\udd14 Activer les notifications",
+        pushOff: "\ud83d\udd15 D\u00e9sactiver les notifications",
+        pushReady: "Notifications activ\u00e9es : une demande, un d\u00e9fi ou un message vous parviendra",
+        pushDenied: "Le t\u00e9l\u00e9phone a refus\u00e9 les notifications \u2014 autorisez-les dans les r\u00e9glages du navigateur",
+        pushHomeScreen: "Sur iPhone cela ne marche que si le jeu est ajout\u00e9 \u00e0 l\u2019\u00e9cran d\u2019accueil",
         menuFriends: "\ud83d\udc65 Amis",
         rematch: "Revanche",
         rematchSent: "Revanche propos\u00e9e \u00e0 {name}",
@@ -2307,6 +2325,11 @@
         errTooFast: "Zu oft \u2014 warte eine Minute",
         chatBack: "Zu den Freunden",
         talk: { hi: "Hallo!", howru: "Wie geht\u2019s?", play: "Spielen wir?", playranked: "Eine Ranglistenpartie?", later: "Sp\u00e4ter", hour: "In einer Stunde", tomorrow: "Morgen?", cantnow: "Gerade nicht", ready: "Ich bin bereit", yes: "Ja", no: "Nein", thanks: "Danke", gg: "Gutes Spiel!", strong: "Du bist stark", revenge: "Ich hole mir das zur\u00fcck", bye: "Tsch\u00fcss!" },
+        pushOn: "\ud83d\udd14 Mitteilungen einschalten",
+        pushOff: "\ud83d\udd15 Mitteilungen ausschalten",
+        pushReady: "Mitteilungen sind an: Anfrage, Herausforderung oder Nachricht erreichen dich",
+        pushDenied: "Das Telefon hat Mitteilungen abgelehnt \u2014 erlaube sie in den Browsereinstellungen",
+        pushHomeScreen: "Auf dem iPhone geht das nur, wenn das Spiel zum Home-Bildschirm hinzugef\u00fcgt wurde",
         menuFriends: "\ud83d\udc65 Freunde",
         rematch: "Revanche",
         rematchSent: "Revanche angeboten: {name}",
@@ -4195,6 +4218,9 @@
     document.getElementById('tLogoutAsk').textContent = L.run.logoutAsk.replace('{name}', auth.username);
     document.getElementById('tLogoutCancel').textContent = L.run.cancel;
     document.getElementById('tLogoutConfirm').textContent = L.run.logout;
+    setNote('pushNote', '');
+    renderPushToggle();
+    loadPushState();
     document.getElementById('logoutModal').classList.remove('hidden');
   }
 
@@ -5039,6 +5065,119 @@
     } catch (e) {
       setNote('chatNote', onlineMatchError(e.message), true);
     }
+  }
+
+  // ================= УВЕДОМЛЕНИЯ НА ЗАКРЫТОЕ ПРИЛОЖЕНИЕ =================
+  // Пока на сервере не настроен ключ, переключателя нет вовсе: обещать нечего.
+  // На айфоне подписка возможна только если игру добавили на домашний экран —
+  // это ограничение Apple, обойти его нельзя, поэтому говорим об этом словами
+  let pushKey = null;
+  let pushOn = false;
+  let pushBusy = false;
+
+  function pushSupported() {
+    return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  }
+
+  // Ключ приходит строкой base64url, а подписке нужен массив байтов
+  function pushKeyBytes(key) {
+    const pad = '='.repeat((4 - key.length % 4) % 4);
+    const raw = atob((key + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    const out = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+
+  // serviceWorker.ready не отклоняется, а просто не наступает, если работник
+  // не встал (например, страницу открыли файлом). Без срока ожидания окно
+  // аккаунта молча зависало бы на полпути
+  function pushReady() {
+    return Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise(resolve => setTimeout(() => resolve(null), 3000))
+    ]);
+  }
+
+  async function pushSubscription() {
+    if (!pushSupported()) return null;
+    try {
+      const reg = await pushReady();
+      return reg ? await reg.pushManager.getSubscription() : null;
+    } catch (e) { return null; }
+  }
+
+  async function loadPushState() {
+    if (!sb || !pushSupported() || !runAuth()) { pushKey = null; return renderPushToggle(); }
+    try {
+      const { data, error } = await sb.rpc('push_config');
+      pushKey = error ? null : (data || null);
+    } catch (e) { pushKey = null; }
+    pushOn = !!(await pushSubscription());
+    renderPushToggle();
+  }
+
+  function renderPushToggle() {
+    const btn = document.getElementById('tPushToggle');
+    if (!btn) return;
+    const L = t().online;
+    const show = !!pushKey && pushSupported() && !!runAuth();
+    btn.classList.toggle('hidden', !show);
+    if (!show) return;
+    btn.textContent = pushOn ? L.pushOff : L.pushOn;
+    btn.disabled = pushBusy;
+  }
+
+  async function togglePush() {
+    if (pushBusy || !pushKey) return;
+    pushBusy = true;
+    setNote('pushNote', '');
+    renderPushToggle();
+    try {
+      if (pushOn) await disablePush(); else await enablePush();
+    } catch (e) {
+      setNote('pushNote', friendErrorText(e && e.message), true);
+    } finally {
+      pushBusy = false;
+      pushOn = !!(await pushSubscription());
+      renderPushToggle();
+    }
+  }
+
+  async function enablePush() {
+    const L = t().online;
+    const allowed = await Notification.requestPermission();
+    if (allowed !== 'granted') return setNote('pushNote', L.pushDenied, true);
+
+    const reg = await pushReady();
+    if (!reg) return setNote('pushNote', L.pushHomeScreen, true);
+    // Ключ разбираем до подписки: кривой ключ — это ошибка настройки сервера,
+    // и валить её на домашний экран айфона было бы неправдой
+    const keyBytes = pushKeyBytes(pushKey);
+    let sub;
+    try {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: keyBytes
+      });
+    } catch (e) {
+      // На айфоне без добавления на домашний экран подписка просто не заводится
+      return setNote('pushNote', L.pushHomeScreen, true);
+    }
+    const raw = sub.toJSON().keys || {};
+    await friendRpc('save_push_subscription', {
+      p_endpoint: sub.endpoint, p_p256dh: raw.p256dh, p_auth: raw.auth,
+      p_lang: currentLang
+    });
+    setNote('pushNote', L.pushReady);
+  }
+
+  async function disablePush() {
+    const sub = await pushSubscription();
+    if (!sub) return;
+    const endpoint = sub.endpoint;
+    try { await sub.unsubscribe(); } catch (e) {}
+    try { await friendRpc('drop_push_subscription', { p_endpoint: endpoint }); } catch (e) {}
+    setNote('pushNote', '');
   }
 
   // ================= ОКЛИК ИЗ СОСЕДНЕЙ ВКЛАДКИ =================
