@@ -43,8 +43,10 @@
   }
   .sql {
     margin-top: 10px; font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 12px; word-break: break-all;
+    font-size: 12px; word-break: break-all; white-space: pre-wrap;
   }
+  h1.second { margin-top: 44px; padding-top: 28px;
+              border-top: 1px solid rgba(255,255,255,0.12); }
 </style>
 </head>
 <body>
@@ -68,6 +70,25 @@
       Закрытый ключ никому не показывайте и не вставляйте в игру. Его место —
       в настройках функции на сервере, в поле <b>VAPID_PRIVATE</b>.
       <div class="sql" id="sql"></div>
+    </div>
+  </div>
+
+  <h1 class="second">Пропуск для планировщика</h1>
+  <p>Нужен на шаге 5. Случайная строка: её знают только функция на сервере и
+     расписание в базе, больше никто. К ключам выше отношения не имеет —
+     кнопку ниже можно нажимать отдельно.</p>
+
+  <button id="goSecret">Создать пропуск</button>
+
+  <div class="box hidden" id="outSecret">
+    <label for="secret">Пропуск — в настройки функции, поле PUSH_SECRET</label>
+    <div class="key" id="secret"></div>
+    <button class="copy" data-for="secret">Скопировать</button>
+
+    <div class="warn">
+      Этот же пропуск подставлен в готовую строку расписания — её целиком
+      в SQL Editor:
+      <div class="sql" id="cron"></div>
     </div>
   </div>
 </div>
@@ -100,6 +121,23 @@
       this.disabled = false;
       alert('Не получилось создать ключи: ' + e.message);
     }
+  };
+
+  document.getElementById('goSecret').onclick = function () {
+    // 32 случайных байта: угадать перебором нечего, а в заголовок влезает
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    const secret = b64url(bytes);
+    document.getElementById('secret').textContent = secret;
+    document.getElementById('cron').textContent =
+      "select cron.schedule('push-drain', '* * * * *', $$\n" +
+      "  select net.http_post(\n" +
+      "    url := 'https://fzakcsvyceqsnowvkxfu.supabase.co/functions/v1/push',\n" +
+      "    headers := '{\"Content-Type\": \"application/json\", " +
+      "\"x-push-secret\": \"" + secret + "\"}'::jsonb\n" +
+      "  );\n$$);";
+    document.getElementById('outSecret').classList.remove('hidden');
+    this.disabled = true;
   };
 
   document.querySelectorAll('.copy').forEach(btn => {
