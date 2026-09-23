@@ -1011,12 +1011,13 @@ async function duelWithBonus(browser, type, at) {
 async function testBonusMode(browser) {
   console.log('\nБонусы в игре с другом');
 
-  // Радиус сигнала «рядом» — от диапазона: три клетки накрывали почти весь
-  // десяток и не значили ничего на тысяче
+  // Радиус сигнала «рядом» считается от длины прямой и числа бонусов, чтобы
+  // сигнал не горел на половине прямой. Ступенька 1–3–5 числа бонусов не знала
+  // и на −10…10 зажигала «рядом» на 57 % ходов
   let page = await duelWithBonus(browser, 'extra', 40);
   const radii = await page.evaluate(() => {
     const out = {};
-    [[1, 10], [1, 100], [1, 1000], [-500, 500]].forEach(([lo, hi]) => {
+    [[1, 10], [-10, 10], [1, 100], [1, 1000], [-500, 500]].forEach(([lo, hi]) => {
       RANGE_MIN = lo; RANGE_MAX = hi;
       out[lo + '..' + hi] = bonusNearRadius();
     });
@@ -1024,19 +1025,20 @@ async function testBonusMode(browser) {
     return out;
   });
   check('на десятке сигнал за одну клетку', radii['1..10'] === 1, JSON.stringify(radii));
-  check('на сотне — за три', radii['1..100'] === 3, JSON.stringify(radii));
-  check('на тысяче — за пять', radii['1..1000'] === 5 && radii['-500..500'] === 5,
+  check('на −10…10 тоже за одну, а не за три', radii['-10..10'] === 1, JSON.stringify(radii));
+  check('на сотне — за две', radii['1..100'] === 2, JSON.stringify(radii));
+  check('на тысяче — по-прежнему за пять', radii['1..1000'] === 5 && radii['-500..500'] === 5,
     JSON.stringify(radii));
 
-  await page.fill('#guessInput', '44');
-  await page.click('#tSubmitGuess');
-  await page.waitForTimeout(250);
-  check('за четыре клетки бонус не чувствуется', !(await page.locator('#bonusLine').isVisible()));
   await page.fill('#guessInput', '43');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  check('за три клетки бонус не чувствуется', !(await page.locator('#bonusLine').isVisible()));
+  await page.fill('#guessInput', '42');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
   const nearLine = await page.locator('#bonusLine').textContent();
-  check('за три клетки виден сигнал', nearLine.indexOf('рядом') >= 0, nearLine);
+  check('за две клетки виден сигнал', nearLine.indexOf('рядом') >= 0, nearLine);
   // Рядом может лежать и ловушка, поэтому значок больше не подарок
   check('значок сигнала нейтральный', nearLine.indexOf('❓') >= 0 && nearLine.indexOf('🎁') < 0,
     nearLine);
@@ -1401,14 +1403,19 @@ async function testBonusMode(browser) {
       if (n <= 200 && k !== before) {
         bad.push(n + ': на тесном диапазоне число изменилось — было ' + before + ', стало ' + k);
       }
-      // На широком поле бонусы должны встречаться, а не теряться в пустоте,
-      // и при этом сигнал «рядом» не должен накрывать пол-прямой
-      if (n >= 500) {
-        if (k / n < 0.03) bad.push(n + ': на широком диапазоне бонусов мало — ' + k);
-        const covered = k * (2 * bonusNearRadius() + 1) / n;
-        if (covered > 0.5) bad.push(n + ': сигнал «рядом» накрывает ' + Math.round(covered * 100) + '%');
-      }
+      // На широком поле бонусы должны встречаться, а не теряться в пустоте
+      if (n >= 500 && k / n < 0.03) bad.push(n + ': на широком диапазоне бонусов мало — ' + k);
     });
+    // Сигнал «рядом» не должен гореть больше чем на трети прямой — ни на одном
+    // диапазоне игры, включая «мороз»: иначе он ничего не говорит
+    [[1, 10], [1, 20], [1, 100], [1, 200], [1, 1000], [1, 2000],
+     [-10, 10], [-20, 20], [-100, 100], [-200, 200], [-1000, 1000], [-2000, 2000]].forEach(([lo, hi]) => {
+      RANGE_MIN = lo; RANGE_MAX = hi;
+      const n = rangeCount(), k = autoBonusCountFor(n);
+      const covered = 2 * bonusNearRadius() * k / n;
+      if (covered > 0.34) bad.push(lo + '…' + hi + ': сигнал «рядом» накрывает ' + Math.round(covered * 100) + '%');
+    });
+    RANGE_MIN = 1; RANGE_MAX = 100;
     return bad;
   });
   check('бонусов столько, чтобы сигнал ещё что-то значил', density.length === 0, density.join('; '));
