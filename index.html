@@ -1706,6 +1706,7 @@
         searching: "Searching\u2026", nobody: "Nobody found",
         noFriends: "No friends yet \u2014 find someone by name",
         add: "Add", accept: "Accept", decline: "Decline", remove: "Remove", waiting: "waiting",
+        cancelReq: "Cancel", errCancelled: "You have just cancelled this request \u2014 try again in an hour",
         sent: "Request sent to {name}",
         errAuth: "Could not confirm your account",
         errShort: "At least two letters, please",
@@ -1900,6 +1901,7 @@
         searching: "Ищем\u2026", nobody: "Никого не нашлось",
         noFriends: "Друзей пока нет — найдите кого-нибудь по имени",
         add: "Добавить", accept: "Принять", decline: "Отклонить", remove: "Убрать", waiting: "ждёт ответа",
+        cancelReq: "Отменить", errCancelled: "Вы только что отменили эту заявку — попробуйте через час",
         sent: "Заявка отправлена: {name}",
         errAuth: "Не получилось подтвердить аккаунт",
         errShort: "Нужно хотя бы две буквы",
@@ -2094,6 +2096,7 @@
         searching: "Recherche\u2026", nobody: "Aucun joueur trouv\u00e9",
         noFriends: "Pas encore d\u2019amis \u2014 cherchez quelqu\u2019un par son nom",
         add: "Ajouter", accept: "Accepter", decline: "Refuser", remove: "Retirer", waiting: "en attente",
+        cancelReq: "Annuler", errCancelled: "Vous venez d\u2019annuler cette demande \u2014 r\u00e9essayez dans une heure",
         sent: "Demande envoy\u00e9e \u00e0 {name}",
         errAuth: "Impossible de v\u00e9rifier votre compte",
         errShort: "Au moins deux lettres",
@@ -2288,6 +2291,7 @@
         searching: "Suche\u2026", nobody: "Niemand gefunden",
         noFriends: "Noch keine Freunde \u2014 such jemanden \u00fcber den Namen",
         add: "Hinzuf\u00fcgen", accept: "Annehmen", decline: "Ablehnen", remove: "Entfernen", waiting: "wartet",
+        cancelReq: "Abbrechen", errCancelled: "Du hast diese Anfrage gerade abgebrochen \u2014 versuch es in einer Stunde",
         sent: "Anfrage an {name} gesendet",
         errAuth: "Konto konnte nicht best\u00e4tigt werden",
         errShort: "Mindestens zwei Buchstaben",
@@ -4580,6 +4584,7 @@
     if (m.indexOf('no_such_student') >= 0) return L.online.errNoStudent;
     if (m.indexOf('cannot_friend_self') >= 0) return L.online.errSelf;
     if (m.indexOf('recently_declined') >= 0) return L.online.errDeclined;
+    if (m.indexOf('recently_cancelled') >= 0) return L.online.errCancelled;
     if (m.indexOf('too_many_requests') >= 0) return L.online.errTooMany;
     if (m.indexOf('no_such_request') >= 0) return L.online.errNoRequest;
     return L.run.errServer + m;
@@ -4640,6 +4645,8 @@
       wait.className = 'fr-wait';
       wait.textContent = L.waiting;
       row.appendChild(wait);
+      // Заявку было не забрать назад: отправил не тому — и она висела вечно
+      button(L.cancelReq, '', () => cancelFriendRequest(name));
     } else if (relation !== 'declined') {
       button(L.add, '', () => addFriend(name));
     }
@@ -4895,6 +4902,15 @@
     }
   }
 
+  async function cancelFriendRequest(name) {
+    try {
+      await friendRpc('cancel_friend_request', { p_to: name });
+      await loadFriends();
+    } catch (e) {
+      setNote('friendsNote', friendErrorText(e.message), true);
+    }
+  }
+
   async function removeFriend(name) {
     try {
       await friendRpc('remove_friend', { p_other: name });
@@ -5107,7 +5123,11 @@
   }
 
   async function loadPushState() {
-    if (!sb || !pushSupported() || !runAuth()) { pushKey = null; return renderPushToggle(); }
+    // Ключ спрашиваем и там, где подписаться нельзя: на айфоне во вкладке
+    // нужно объяснить, почему кнопки нет, а объяснять нечего, если
+    // уведомления у проекта вообще не настроены
+    const ask = pushSupported() || pushNeedsHomeScreen();
+    if (!sb || !ask || !runAuth()) { pushKey = null; return renderPushToggle(); }
     try {
       const { data, error } = await sb.rpc('push_config');
       pushKey = error ? null : (data || null);
@@ -5116,13 +5136,26 @@
     renderPushToggle();
   }
 
+  // Айфон отдаёт уведомления только приложению с домашнего экрана: во вкладке
+  // Safari самих этих возможностей в системе нет. Молчать об этом нельзя —
+  // кнопки просто не будет, и человек решит, что уведомлений у игры нет вовсе
+  function pushNeedsHomeScreen() {
+    if (pushSupported()) return false;
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || ''));
+    return ios && navigator.standalone !== true;
+  }
+
   function renderPushToggle() {
     const btn = document.getElementById('tPushToggle');
     if (!btn) return;
     const L = t().online;
     const show = !!pushKey && pushSupported() && !!runAuth();
     btn.classList.toggle('hidden', !show);
-    if (!show) return;
+    if (!show) {
+      if (pushKey && runAuth() && pushNeedsHomeScreen()) setNote('pushNote', L.pushHomeScreen);
+      return;
+    }
     btn.textContent = pushOn ? L.pushOff : L.pushOn;
     btn.disabled = pushBusy;
   }

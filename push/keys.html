@@ -129,13 +129,23 @@
     crypto.getRandomValues(bytes);
     const secret = b64url(bytes);
     document.getElementById('secret').textContent = secret;
+    // Без расширений схемы cron просто нет, и строка падает с «schema does
+    // not exist»: показываем всё, что нужно выполнить, одним куском
     document.getElementById('cron').textContent =
+      "create extension if not exists pg_cron;\n" +
+      "create extension if not exists pg_net;\n\n" +
       "select cron.schedule('push-drain', '* * * * *', $$\n" +
       "  select net.http_post(\n" +
       "    url := 'https://fzakcsvyceqsnowvkxfu.supabase.co/functions/v1/push',\n" +
       "    headers := '{\"Content-Type\": \"application/json\", " +
       "\"x-push-secret\": \"" + secret + "\"}'::jsonb\n" +
-      "  );\n$$);";
+      "  );\n$$);\n\n" +
+      // Отправленные строки иначе копятся вечно: раз в сутки убираем всё,
+      // что старше недели — недели хватает, чтобы разобраться, если что-то пошло не так
+      "select cron.schedule('push-clean', '17 4 * * *', $$\n" +
+      "  delete from push_outbox where sent_at < now() - interval '7 days';\n" +
+      // Заодно уходят заявки в друзья, на которые никто не ответил за пять дней
+      "  select expire_friend_requests();\n$$);";
     document.getElementById('outSecret').classList.remove('hidden');
     this.disabled = true;
   };

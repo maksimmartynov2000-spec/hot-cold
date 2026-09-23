@@ -35,6 +35,7 @@ function stubSupabase(opts) {
           if (name === 'send_friend_request') return { data: 'outgoing', error: null };
           if (name === 'respond_friend_request') return { data: args.p_accept ? 'friend' : 'declined', error: null };
           if (name === 'remove_friend') return { data: true, error: null };
+          if (name === 'cancel_friend_request') return { data: true, error: null };
 
           // Матчи: заглушка ведёт себя как сервер — держит состояние, проверяет
           // очередь и НЕ отдаёт загаданное число, пока раунд не кончился
@@ -256,7 +257,16 @@ function stubSupabase(opts) {
         value: { ready: Promise.resolve(fakeReg), register: () => Promise.resolve(fakeReg) }
       });
       window.Notification = { requestPermission: async () => window.__push.permission };
-      window.PushManager = function () {};
+      // Айфон во вкладке Safari не отдаёт PushManager вовсе: чтобы проверить,
+      // что игра объясняет это словами, подделываем именно такой браузер
+      if (opts.push.ios) {
+        Object.defineProperty(navigator, 'userAgent', { configurable: true,
+          value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
+      }
+      // У самого Chromium PushManager есть, поэтому «айфон во вкладке»
+      // изображается не пропуском подмены, а удалением настоящего
+      if (opts.push.noPushManager) delete window.PushManager;
+      else window.PushManager = function () {};
     }
 
     window.__talk = {};
