@@ -84,21 +84,38 @@
       gap: 6px;
       margin-bottom: 18px;
     }
-    .account-chip {
-      display: flex;
+    /* Профиль — кружок с первой буквой имени. Цвет берётся из имени, поэтому у
+       каждого свой и не меняется от входа к входу. Без аккаунта — шестерёнка:
+       внутри тогда только язык и вход */
+    .avatar-btn, .avatar {
+      display: inline-flex;
       align-items: center;
-      gap: 4px;
-      max-width: 130px;
+      justify-content: center;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      font-weight: 800;
+      color: #0f1430;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+    .avatar-btn {
+      width: 32px;
+      height: 32px;
+      font-size: 15px;
+      font-family: inherit;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      cursor: pointer;
+      padding: 0;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+    .avatar-btn.guest {
       background: rgba(255, 255, 255, 0.1);
       border: 1px solid rgba(255, 255, 255, 0.2);
-      color: rgba(255, 255, 255, 0.8);
-      border-radius: 8px;
-      padding: 4px 8px;
-      font-size: 12px;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
+      color: #fff;
+      font-size: 16px;
+      box-shadow: none;
     }
+    .avatar { width: 30px; height: 30px; font-size: 14px; }
     .own-best { color: rgba(255, 255, 255, 0.45); font-weight: 600; }
     /* Сколько непрочитанного ждёт в «Друзьях» — прямо на кнопке в шапке */
     .hdr-badge {
@@ -113,20 +130,21 @@
       margin-left: 3px;
       vertical-align: top;
     }
+    /* Кнопки шапки одного роста с кружком профиля — строка читается ровной */
     .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 32px;
+      min-width: 32px;
       background: rgba(255, 255, 255, 0.1);
       border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      padding: 4px 7px;
-      font-size: 13px;
-      line-height: 1.2;
+      border-radius: 10px;
+      padding: 0 7px;
+      font-size: 16px;
+      line-height: 1;
       cursor: pointer;
       font-family: inherit;
-    }
-    .account-chip .chip-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
 
     .modal-backdrop {
@@ -156,6 +174,33 @@
       font-size: 15px;
       line-height: 1.5;
       margin-bottom: 20px;
+    }
+    .pf-avatar {
+      width: 64px; height: 64px; margin: 0 auto 10px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px; font-weight: 800; color: #0f1430; text-transform: uppercase;
+      border: 3px solid rgba(255, 255, 255, 0.85);
+    }
+    .pf-avatar.guest { background: rgba(255, 255, 255, 0.1); color: #fff; border-width: 1px; }
+    .pf-name { font-size: 20px; font-weight: 800; }
+    .pf-sub { font-size: 12px; color: rgba(255, 255, 255, 0.5); margin: 2px 0 16px; }
+    .pf-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      margin-top: 14px; padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.06); border-radius: 12px;
+      font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.85);
+    }
+    .pf-row .lang-switcher { font-size: 14px; padding: 6px 8px; }
+    .pf-confirm { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+    .pf-confirm .modal-text { font-size: 14px; margin-bottom: 12px; }
+    /* Удалить аккаунт — редкое и безвозвратное действие. Оно есть, но не
+       кнопкой вровень с «Готово», а тихой ссылкой внизу, куда случайно не попасть */
+    .link-danger {
+      display: block; margin: 18px auto 0; padding: 6px 10px;
+      background: none; border: none; cursor: pointer; font-family: inherit;
+      font-size: 13px; font-weight: 600; color: #f87171; opacity: 0.8;
+      text-decoration: underline; text-underline-offset: 3px;
     }
 
     .lang-switcher {
@@ -192,14 +237,8 @@
     /* На узком экране в верхней строке пять элементов вместо четырёх:
        подписи и отступы ужимаются, чтобы строка осталась одноэтажной */
     @media (max-width: 460px) {
-      .account-chip .chip-name { display: none; }
-      .account-chip { padding: 4px 7px; }
-      .top-controls { gap: 4px; }
-      .icon-btn { padding: 4px 5px; }
-      .lang-switcher { padding: 4px 5px; }
-      .header h1 { font-size: 16px; }
-      /* Градусник рядом с названием — украшение: на узком экране им и жертвуем */
-      .header .emoji { display: none; }
+      .top-controls { gap: 6px; }
+      .header h1 { font-size: 17px; }
     }
 
     .row { display: flex; gap: 8px; width: 100%; }
@@ -309,10 +348,12 @@
     /* ---------- Стартовый экран ---------- */
     .mode-list { display: flex; flex-direction: column; gap: 12px; }
     .mode-btn {
-      display: block;
+      display: flex;
+      align-items: center;
+      gap: 14px;
       width: 100%;
       text-align: left;
-      padding: 18px 20px;
+      padding: 16px 18px;
       border-radius: 16px;
       border: 1px solid rgba(255, 255, 255, 0.15);
       background: rgba(255, 255, 255, 0.06);
@@ -322,8 +363,16 @@
       transition: background 0.2s, border-color 0.2s;
     }
     .mode-btn:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255,255,255,0.3); }
-    .mode-btn .m-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
-    .mode-btn .m-sub { font-size: 13px; color: rgba(255, 255, 255, 0.5); }
+    .mode-btn .m-icon {
+      flex: 0 0 auto;
+      width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .mode-btn .m-text { display: flex; flex-direction: column; min-width: 0; }
+    .mode-btn .m-title { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
+    .mode-btn .m-sub { font-size: 13px; color: rgba(255, 255, 255, 0.55); line-height: 1.35; }
     .mode-btn.duel { border-left: 3px solid var(--p1); }
     .mode-btn.solo { border-left: 3px solid var(--p0); }
     .mode-btn.run { border-left: 3px solid #4ade80; }
@@ -369,6 +418,11 @@
     .fr-btn.yes { background: rgba(74, 222, 128, 0.18); border-color: rgba(74, 222, 128, 0.5); color: #4ade80; }
     .fr-btn.no { background: rgba(248, 113, 113, 0.14); border-color: rgba(248, 113, 113, 0.4); color: #f87171; }
     .fr-block { margin-top: 22px; }
+    /* Заголовок экрана, а не раздела: белый и крупнее серых подписей внутри */
+    .screen-title { font-size: 19px; font-weight: 800; margin-bottom: 12px; }
+    .fr-block.first { margin-top: 4px; }
+    .fr-btn.more { padding: 5px 9px; font-size: 15px; line-height: 1; letter-spacing: 1px; }
+    .friend-row .avatar { margin-right: 2px; }
     .fr-note {
       font-size: 13px;
       color: rgba(255, 255, 255, 0.45);
@@ -523,9 +577,12 @@
     .setup-row { display: flex; gap: 8px; margin-top: 4px; }
 
     /* ---------- Игровое поле ---------- */
+    /* minmax(0, 1fr), а не просто 1fr: колонка иначе не уже самого длинного
+       слова внутри, и «Дополнительный» на кнопке выталкивало поле дуэли за
+       правый край карточки на телефоне */
     .board {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       grid-template-areas: "p0 p1" "center center";
       gap: 12px;
       align-items: start;
@@ -810,6 +867,28 @@
        стоит поле ввода, и лишнее место там ни к чему */
     .board.over .numline { margin-bottom: 16px; }
 
+    /* Дуэль на телефоне. Поле ввода — главное действие — уезжало ниже края
+       экрана: сверху его подпирали высокие карточки игроков, градусник в
+       полэкрана и отступы. Подсказку «холодно/горячо» не трогаем: её смотрят
+       двое с одного телефона, ей нужно быть крупной */
+    @media (max-width: 859px) {
+      .card.wide .board { gap: 10px; }
+      .card.wide .pcard { padding: 10px; }
+      /* Увеличенная карточка у края вылезала за рамку — хватает цвета рамки */
+      .card.wide .pcard.active { transform: none; }
+      .card.wide .pcard .p-name { font-size: 14px; margin-bottom: 4px; }
+      .card.wide .pcard .p-pips { margin-bottom: 8px; }
+      /* Самое длинное слово на кнопке — «Дополнительный», «supplémentaire» —
+         на узком телефоне упиралось в рамку. Шрифт считается от ширины
+         карточки игрока: где она уже, там и буквы мельче, но не крупнее 12px.
+         Первая строка — для браузеров, не знающих единиц контейнера */
+      .card.wide .pcard { container-type: inline-size; }
+      .card.wide .token-btn { padding: 6px 4px; font-size: 11px; font-size: min(12px, 7cqi); }
+      .card.wide .info-bar { margin-bottom: 10px; padding: 8px 12px; }
+      .card.wide .turn-banner { margin-bottom: 10px; padding: 8px 12px; }
+      .card.wide .thermo-wrap { margin: 0 0 4px; }
+    }
+
     /* Прямая заняла место, которого на невысоком экране нет. Забираем его у
        градусника: «где именно» теперь показывает прямая, а ему остаётся
        «насколько горячо». Условие по высоте, а не по ширине — широкий, но
@@ -819,6 +898,14 @@
       .card.solo-game .thermo-tube { height: 62px; }
       .card.solo-game .thermo-bulb { width: 36px; height: 36px; }
       .card.solo-game .thermo-bulb::after { top: 8px; left: 10px; width: 9px; height: 6px; }
+    }
+    /* То же для дуэли, но только на телефоне: на широком экране градусник
+       стоит в средней колонке, и высоты ему там хватает */
+    @media (max-height: 900px) and (max-width: 859px) {
+      .card.wide .thermo-wrap { margin-top: 0; }
+      .card.wide .thermo-tube { height: 62px; }
+      .card.wide .thermo-bulb { width: 36px; height: 36px; }
+      .card.wide .thermo-bulb::after { top: 8px; left: 10px; width: 9px; height: 6px; }
     }
 
     /* Широкому, но низкому экрану телефонные правила не достаются, а место
@@ -1233,35 +1320,50 @@
       <div class="emoji">🌡️</div>
       <h1 id="tTitle">Hot or Cold</h1>
     </div>
-    <button class="account-chip hidden" id="accountChip" onclick="openLogoutModal()">
-      <span>👤</span><span class="chip-name" id="accountChipName"></span>
-    </button>
+    <!-- Друзья, звук и профиль. Раньше профиль был силуэтом 👤 рядом с 👥 —
+         два одинаковых синих человечка, различимых только по памяти. Теперь
+         профиль — кружок с первой буквой имени, а язык, который меняют раз в
+         жизни, уехал внутрь профиля. Звук остался: его выключают на ходу -->
     <button class="icon-btn hidden" id="friendsBtn" onclick="openFriendsEntry()">👥<span
       class="hdr-badge hidden" id="friendsBadge"></span></button>
     <button class="icon-btn" id="soundBtn" onclick="toggleSound()" aria-label="Звук"></button>
-    <select class="lang-switcher" id="langSwitcher" onchange="changeLanguage()">
-      <option value="en">🇺🇸 EN</option>
-      <option value="ru">🇷🇺 RU</option>
-      <option value="fr">🇫🇷 FR</option>
-      <option value="de">🇩🇪 DE</option>
-    </select>
+    <button class="avatar-btn hidden" id="accountChip" onclick="openLogoutModal()"><span
+      id="accountChipName"></span></button>
   </div>
 
   <!-- ЭКРАН 1: выбор режима -->
   <div id="screenMode">
     <div class="mode-list">
+      <!-- У каждого режима значок и строка «что это». Без неё «Игра с другом»
+           и «Друзья» в шапке читались как одно и то же, а «Игра на рейтинг»
+           и «Игра онлайн» — как два входа в рейтинг -->
       <button class="mode-btn solo" onclick="openSetup('solo')">
-        <div class="m-title" id="tModeSolo">Single player</div>
+        <span class="m-icon">🎯</span>
+        <span class="m-text">
+          <span class="m-title" id="tModeSolo">Single player</span>
+          <span class="m-sub" id="tModeSoloSub"></span>
+        </span>
       </button>
       <button class="mode-btn duel" onclick="openSetup('duel')">
-        <div class="m-title" id="tModeDuel">Play with a friend</div>
+        <span class="m-icon">🤝</span>
+        <span class="m-text">
+          <span class="m-title" id="tModeDuel">Play with a friend</span>
+          <span class="m-sub" id="tModeDuelSub"></span>
+        </span>
       </button>
       <button class="mode-btn run" onclick="openRunEntry()">
-        <div class="m-title" id="tModeRun"></div>
+        <span class="m-icon">🏆</span>
+        <span class="m-text">
+          <span class="m-title" id="tModeRun"></span>
+          <span class="m-sub" id="tModeRunSub"></span>
+        </span>
       </button>
       <button class="mode-btn online" onclick="openOnlineEntry()">
-        <div class="m-title" id="tModeOnline"></div>
-        <div class="m-sub" id="tModeOnlineSub"></div>
+        <span class="m-icon">🌐</span>
+        <span class="m-text">
+          <span class="m-title" id="tModeOnline"></span>
+          <span class="m-sub" id="tModeOnlineSub"></span>
+        </span>
       </button>
     </div>
   </div>
@@ -1512,18 +1614,16 @@
 
   <!-- ЭКРАН: друзья. Отдельно от рейтинга — это разные занятия -->
   <div id="screenFriends" class="hidden">
-    <div class="lb-title" id="tFriendsScreen" style="font-size:15px;margin-bottom:10px"></div>
-    <div class="run-greeting hidden" id="friendsGreeting"></div>
+    <div class="screen-title" id="tFriendsScreen"></div>
     <div id="olFriends">
-    <div class="setup-field">
-      <label id="tLblFindFriend">Find a player</label>
-      <div class="row">
-        <input type="text" id="friendSearch" maxlength="20" autocomplete="off" />
-        <button class="btn" id="tFindBtn" onclick="searchStudents()">Find</button>
-      </div>
+    <!-- Порядок — по срочности: сначала те, кто ждёт ответа, и друзья, потом
+         идущие игры, поиск новых — последним. Раньше сверху стоял поиск, а
+         входящая заявка оказывалась в самом низу экрана -->
+    <div class="fr-block first">
+      <div class="lb-title hidden" id="tFriendsTitle">Friends</div>
+      <div class="fr-note hidden" id="friendsNote"></div>
+      <div id="friendsList" class="friend-list"></div>
     </div>
-    <div class="fr-note hidden" id="searchNote"></div>
-    <div id="searchResults" class="friend-list"></div>
 
     <div class="fr-block">
       <div class="lb-title" id="tGamesTitle">Games</div>
@@ -1566,9 +1666,13 @@
     </div>
 
     <div class="fr-block">
-      <div class="lb-title" id="tFriendsTitle">Friends</div>
-      <div class="fr-note hidden" id="friendsNote"></div>
-      <div id="friendsList" class="friend-list"></div>
+      <div class="lb-title" id="tLblFindFriend">Find a player</div>
+      <div class="row">
+        <input type="text" id="friendSearch" maxlength="20" autocomplete="off" />
+        <button class="btn" id="tFindBtn" onclick="searchStudents()">Find</button>
+      </div>
+      <div class="fr-note hidden" id="searchNote"></div>
+      <div id="searchResults" class="friend-list"></div>
     </div>
     </div>
 
@@ -1650,21 +1754,51 @@
 </div>
 
 <!-- Аккаунт: имя, свой PIN и выход -->
-<div class="modal-backdrop hidden" id="logoutModal">
-  <div class="modal-card">
-    <div class="rr-title" id="tAccountTitle" style="margin-bottom:10px"></div>
-    <div class="modal-text" id="accountName" style="margin-bottom:10px"></div>
-    <button class="btn-ghost btn-block" id="tShowPin" onclick="revealOwnPin()"></button>
-    <button class="btn-ghost btn-block hidden" id="tPushToggle" style="margin-top:8px"
-            onclick="togglePush()"></button>
-    <div class="fr-note hidden" id="pushNote"></div>
-    <div class="modal-text" id="tLogoutAsk" style="margin-top:16px"></div>
-    <div class="setup-row">
-      <button class="btn-ghost btn-block" id="tLogoutCancel" onclick="closeLogoutModal()"></button>
-      <button class="btn btn-block" id="tLogoutConfirm" onclick="confirmLogout()"></button>
+<!-- Профиль. Раньше это было окно выхода: вопрос «Выйти из аккаунта?» висел,
+     хотя человек ничего не нажимал, — открыл посмотреть PIN, а его спрашивают,
+     не уйти ли. Теперь вопрос появляется только после «Выйти».
+     Без аккаунта то же окно — настройки: язык и вход -->
+<div class="modal-backdrop hidden" id="logoutModal" onclick="if (event.target === this) closeLogoutModal()">
+  <div class="modal-card profile-card">
+    <div class="pf-avatar" id="pfAvatar"></div>
+    <div class="pf-name" id="accountName"></div>
+    <div class="pf-sub" id="tAccountTitle"></div>
+
+    <div id="pfAccount">
+      <button class="btn-ghost btn-block" id="tShowPin" onclick="revealOwnPin()"></button>
+      <button class="btn-ghost btn-block hidden" id="tPushToggle" style="margin-top:8px"
+              onclick="togglePush()"></button>
+      <div class="fr-note hidden" id="pushNote"></div>
     </div>
-    <button class="btn-ghost btn-block danger" id="tDeleteAccount" style="margin-top:18px"
-            onclick="openDeleteModal()"></button>
+
+    <label class="pf-row">
+      <span id="tLangLabel"></span>
+      <select class="lang-switcher" id="langSwitcher" onchange="changeLanguage()">
+        <option value="en">🇺🇸 English</option>
+        <option value="ru">🇷🇺 Русский</option>
+        <option value="fr">🇫🇷 Français</option>
+        <option value="de">🇩🇪 Deutsch</option>
+      </select>
+    </label>
+
+    <button class="btn-ghost btn-block hidden" id="tSignIn" style="margin-top:14px"
+            onclick="signInFromProfile()"></button>
+
+    <div id="pfLogout">
+      <button class="btn-ghost btn-block" id="tLogoutStart" style="margin-top:14px"
+              onclick="askLogout(true)"></button>
+      <div class="pf-confirm hidden" id="logoutConfirmBox">
+        <div class="modal-text" id="tLogoutAsk"></div>
+        <div class="setup-row">
+          <button class="btn-ghost btn-block" id="tLogoutCancel" onclick="askLogout(false)"></button>
+          <button class="btn btn-block" id="tLogoutConfirm" onclick="confirmLogout()"></button>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-block" id="tProfileDone" style="margin-top:14px"
+            onclick="closeLogoutModal()"></button>
+    <button class="link-danger danger" id="tDeleteAccount" onclick="openDeleteModal()"></button>
   </div>
 </div>
 
@@ -1700,7 +1834,7 @@
         unmute: "\ud83d\udd0a Show phrases"
       },
       online: {
-        mode: "Online", modeSub: "Friends and challenges",
+        mode: "Online", modeSub: "Opponents over the internet, your own rating",
         find: "Find a player", findBtn: "Find", searchPh: "name",
         friends: "\ud83d\udc65 Friends", back: "Menu",
         searching: "Searching\u2026", nobody: "Nobody found",
@@ -1762,7 +1896,7 @@
         rkNoGames: "No ranked game going on",
         rkOtherMode: "You are waiting in {mode} \u2014 pressing Play moves you here",
         rkPlay: "Play ranked",
-        rkElo: "{n} \u00b7 {g} games",
+        rkElo: "rating {n} \u00b7 {g} games", rkEloShort: "rating {n}",
         rkSearching: "Looking for an opponent",
         rkWaited: "{n} s in the queue",
         rkQueueOne: "you are the only one waiting",
@@ -1801,6 +1935,8 @@
 
       modeSolo: "Practice",
       modeDuel: "Play with a friend",
+      modeSoloSub: "Guess the number on your own",
+      modeDuelSub: "Two players on one phone",
       lblP1: "Player 1", lblP2: "Player 2", defP1: "Player 1", defP2: "Player 2",
       lblWins: "Play until how many wins", lblHandicap: "Head start",
       lblRange: "Range", lblAttempts: "Attempts",
@@ -1813,6 +1949,7 @@
       recordLabel: "Best for this range: ", newRecord: "🏆 New record!",
       run: {
         mode: "Rating game",
+        modeSub: "Rounds get harder, points go to the leaderboard",
         choiceLogin: "Log in",
         choiceLoginSub: "I already have a name and PIN",
         choiceRegister: "Sign up",
@@ -1874,6 +2011,8 @@
         hintIs: "Your reminder: ",
         noHint: "No reminder was saved for this name",
         account: "Your account",
+        settings: "Settings", language: "Language", done: "Done",
+        signIn: "Sign in or create an account",
         showPin: "Show PIN",
         yourPin: "Your PIN: ",
       }
@@ -1895,7 +2034,7 @@
         unmute: "\ud83d\udd0a Показывать фразы"
       },
       online: {
-        mode: "Игра онлайн", modeSub: "Друзья и вызовы",
+        mode: "Игра онлайн", modeSub: "Соперники по сети, свой рейтинг",
         find: "Найти игрока", findBtn: "Найти", searchPh: "имя",
         friends: "\ud83d\udc65 Друзья", back: "В меню",
         searching: "Ищем\u2026", nobody: "Никого не нашлось",
@@ -1957,7 +2096,7 @@
         rkNoGames: "Рейтинговая игра не идёт",
         rkOtherMode: "Вы ждёте в режиме {mode} — «Играть» перенесёт сюда",
         rkPlay: "Играть на рейтинг",
-        rkElo: "{n} \u00b7 игр: {g}",
+        rkElo: "рейтинг {n} \u00b7 игр: {g}", rkEloShort: "рейтинг {n}",
         rkSearching: "Ищем соперника",
         rkWaited: "в очереди {n} с",
         rkQueueOne: "пока ждёте только вы",
@@ -1996,6 +2135,8 @@
 
       modeSolo: "Тренировка",
       modeDuel: "Игра с другом",
+      modeSoloSub: "Угадайте число сами",
+      modeDuelSub: "Вдвоём на одном телефоне",
       lblP1: "Игрок 1", lblP2: "Игрок 2", defP1: "Игрок 1", defP2: "Игрок 2",
       lblWins: "Играем до скольких побед", lblHandicap: "Фора",
       lblRange: "Диапазон", lblAttempts: "Попыток",
@@ -2008,6 +2149,7 @@
       recordLabel: "Рекорд для этого диапазона: ", newRecord: "🏆 Новый рекорд!",
       run: {
         mode: "Игра на рейтинг",
+        modeSub: "Раунды всё сложнее, очки — в\u00a0общий топ",
         choiceLogin: "Войти",
         choiceLoginSub: "У меня уже есть имя и PIN",
         choiceRegister: "Зарегистрироваться",
@@ -2069,6 +2211,8 @@
         hintIs: "Ваша подсказка: ",
         noHint: "Для этого имени подсказки нет",
         account: "Ваш аккаунт",
+        settings: "Настройки", language: "Язык", done: "Готово",
+        signIn: "Войти или создать аккаунт",
         showPin: "Показать PIN",
         yourPin: "Ваш PIN: ",
       }
@@ -2090,7 +2234,7 @@
         unmute: "\ud83d\udd0a Afficher les phrases"
       },
       online: {
-        mode: "Jouer en ligne", modeSub: "Amis et d\u00e9fis",
+        mode: "Jouer en ligne", modeSub: "Des adversaires en ligne, votre classement",
         find: "Trouver un joueur", findBtn: "Chercher", searchPh: "nom",
         friends: "\ud83d\udc65 Amis", back: "Menu",
         searching: "Recherche\u2026", nobody: "Aucun joueur trouv\u00e9",
@@ -2152,7 +2296,7 @@
         rkNoGames: "Aucune partie class\u00e9e en cours",
         rkOtherMode: "Vous attendez en {mode} \u2014 \u00ab Jouer \u00bb vous d\u00e9place ici",
         rkPlay: "Jouer en class\u00e9",
-        rkElo: "{n} \u00b7 {g} parties",
+        rkElo: "classement {n} \u00b7 {g} parties", rkEloShort: "classement {n}",
         rkSearching: "Recherche d'un adversaire",
         rkWaited: "{n} s dans la file",
         rkQueueOne: "vous \u00eates seul \u00e0 attendre",
@@ -2191,6 +2335,8 @@
 
       modeSolo: "Entraînement",
       modeDuel: "Jouer à deux",
+      modeSoloSub: "Devinez le nombre seul",
+      modeDuelSub: "À deux sur un seul téléphone",
       lblP1: "Joueur 1", lblP2: "Joueur 2", defP1: "Joueur 1", defP2: "Joueur 2",
       lblWins: "Jusqu'à combien de victoires", lblHandicap: "Avantage",
       lblRange: "Plage", lblAttempts: "Essais",
@@ -2203,6 +2349,7 @@
       recordLabel: "Meilleur score pour cette plage : ", newRecord: "🏆 Nouveau record !",
       run: {
         mode: "Partie classée",
+        modeSub: "Des manches de plus en plus dures, les points au classement",
         choiceLogin: "Se connecter",
         choiceLoginSub: "J'ai déjà un nom et un code PIN",
         choiceRegister: "S'inscrire",
@@ -2264,6 +2411,8 @@
         hintIs: "Votre aide : ",
         noHint: "Aucune aide enregistrée pour ce nom",
         account: "Votre compte",
+        settings: "R\u00e9glages", language: "Langue", done: "OK",
+        signIn: "Se connecter ou cr\u00e9er un compte",
         showPin: "Afficher le PIN",
         yourPin: "Votre PIN : ",
       }
@@ -2285,7 +2434,7 @@
         unmute: "\ud83d\udd0a Spr\u00fcche zeigen"
       },
       online: {
-        mode: "Online spielen", modeSub: "Freunde und Herausforderungen",
+        mode: "Online spielen", modeSub: "Gegner im Netz, eigene Wertung",
         find: "Spieler finden", findBtn: "Suchen", searchPh: "Name",
         friends: "\ud83d\udc65 Freunde", back: "Men\u00fc",
         searching: "Suche\u2026", nobody: "Niemand gefunden",
@@ -2347,7 +2496,7 @@
         rkNoGames: "Keine Ranglistenpartie im Gang",
         rkOtherMode: "Sie warten in {mode} \u2014 \u201eSpielen\u201c verschiebt Sie hierher",
         rkPlay: "Um Punkte spielen",
-        rkElo: "{n} \u00b7 {g} Partien",
+        rkElo: "Wertung {n} \u00b7 {g} Partien", rkEloShort: "Wertung {n}",
         rkSearching: "Gegner wird gesucht",
         rkWaited: "{n} s in der Warteschlange",
         rkQueueOne: "nur Sie warten gerade",
@@ -2386,6 +2535,8 @@
 
       modeSolo: "Training",
       modeDuel: "Zu zweit spielen",
+      modeSoloSub: "Errate die Zahl allein",
+      modeDuelSub: "Zu zweit auf einem Handy",
       lblP1: "Spieler 1", lblP2: "Spieler 2", defP1: "Spieler 1", defP2: "Spieler 2",
       lblWins: "Bis wie viele Siege", lblHandicap: "Vorsprung",
       lblRange: "Bereich", lblAttempts: "Versuche",
@@ -2398,6 +2549,7 @@
       recordLabel: "Bestwert für diesen Bereich: ", newRecord: "🏆 Neuer Rekord!",
       run: {
         mode: "Ranglisten-Spiel",
+        modeSub: "Runden werden schwerer, Punkte kommen in die Rangliste",
         choiceLogin: "Anmelden",
         choiceLoginSub: "Ich habe schon Name und PIN",
         choiceRegister: "Registrieren",
@@ -2459,6 +2611,8 @@
         hintIs: "Deine Hilfe: ",
         noHint: "Für diesen Namen ist keine Hilfe gespeichert",
         account: "Dein Konto",
+        settings: "Einstellungen", language: "Sprache", done: "Fertig",
+        signIn: "Anmelden oder Konto erstellen",
         showPin: "PIN anzeigen",
         yourPin: "Deine PIN: ",
       }
@@ -2811,6 +2965,9 @@
     currentLang = document.getElementById('langSwitcher').value;
     localStorage.setItem('hc_lang', currentLang);
     applyTranslations();
+    // Язык меняют в окне профиля — оно должно сразу заговорить по-новому
+    if (!document.getElementById('logoutModal').classList.contains('hidden')) fillProfile();
+    updateAccountChip();
   }
 
   function buildHandicapOptions() {
@@ -2853,6 +3010,8 @@
 
     document.getElementById('tModeSolo').textContent = L.modeSolo;
     document.getElementById('tModeDuel').textContent = L.modeDuel;
+    document.getElementById('tModeSoloSub').textContent = L.modeSoloSub;
+    document.getElementById('tModeDuelSub').textContent = L.modeDuelSub;
 
     document.getElementById('tLblP1').textContent = L.lblP1;
     document.getElementById('tLblP2').textContent = L.lblP2;
@@ -2880,9 +3039,11 @@
 
     // экраны режима на рейтинг
     document.getElementById('tModeRun').textContent = L.run.mode;
+    document.getElementById('tModeRunSub').textContent = L.run.modeSub;
     document.getElementById('tModeOnline').textContent = L.online.mode;
     document.getElementById('tModeOnlineSub').textContent = L.online.modeSub;
-    document.getElementById('tLblFindFriend').textContent = L.online.find;
+    // Значок — как у «🎮 Игры»: разделы экрана подписаны одинаково
+    document.getElementById('tLblFindFriend').textContent = '🔍 ' + L.online.find;
     document.getElementById('tFindBtn').textContent = L.online.findBtn;
     document.getElementById('tFriendsTitle').textContent = L.online.friends;
     document.getElementById('tOnlineBack').textContent = L.online.back;
@@ -4190,13 +4351,45 @@
 
   // Чип с именем ученика живёт рядом с переключателем языка и показывается
   // только в хабе режима на рейтинг — во время самой игры он лишний и легко нажать случайно
+  // Кружок с буквой: первая буква имени и цвет, который из имени же и
+  // считается — у каждого свой и не меняется от входа к входу. Array.from, а
+  // не [0]: имя может начинаться с эмодзи, и половинка суррогатной пары
+  // нарисовалась бы квадратиком
+  const AVATAR_COLORS = ['#fbbf24', '#34d399', '#60a5fa', '#f472b6',
+                         '#a78bfa', '#fb923c', '#2dd4bf', '#a3e635'];
+  function avatarColor(name) {
+    let h = 0;
+    for (const ch of String(name || '')) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+    return AVATAR_COLORS[h % AVATAR_COLORS.length];
+  }
+  function avatarLetter(name) {
+    const first = Array.from(String(name || '').trim())[0];
+    return first ? first.toUpperCase() : '?';
+  }
+  function paintAvatar(el, name) {
+    el.textContent = avatarLetter(name);
+    el.style.background = avatarColor(name);
+  }
+
   function updateAccountChip() {
     const chip = document.getElementById('accountChip');
     const auth = runAuth();
-    const show = !!auth && (screen === 'runHub' || screen === 'online' ||
-                            screen === 'friends' || screen === 'chat');
+    // Профиль виден везде, кроме самой партии: без аккаунта он же — настройки,
+    // а язык должен быть под рукой и у того, кто ещё не вошёл
+    const show = screen !== 'game';
     chip.classList.toggle('hidden', !show);
-    if (show) document.getElementById('accountChipName').textContent = auth.username;
+    chip.classList.toggle('guest', !auth);
+    const face = document.getElementById('accountChipName');
+    if (auth) {
+      paintAvatar(face, auth.username);
+      chip.style.background = avatarColor(auth.username);
+      chip.title = auth.username;
+    } else {
+      face.textContent = '⚙';
+      chip.style.background = '';
+      chip.title = t().run.settings;
+    }
+    chip.setAttribute('aria-label', chip.title);
 
     // Друзья живут в шапке рядом с профилем: это не режим игры, а место,
     // куда заходят между делом
@@ -4216,24 +4409,67 @@
     badge.classList.toggle('hidden', n === 0);
   }
 
-  function openLogoutModal() {
+  // Тексты окна отдельно от открытия: язык меняют прямо в этом окне, и оно
+  // должно тут же заговорить на новом, не закрываясь
+  function fillProfile() {
     const auth = runAuth();
-    if (!auth) return;
     const L = t();
-    document.getElementById('tAccountTitle').textContent = L.run.account;
-    document.getElementById('accountName').textContent = auth.username;
-    document.getElementById('tShowPin').textContent = L.run.showPin;
-    document.getElementById('tLogoutAsk').textContent = L.run.logoutAsk.replace('{name}', auth.username);
+    const face = document.getElementById('pfAvatar');
+    face.classList.toggle('guest', !auth);
+    if (auth) {
+      paintAvatar(face, auth.username);
+    } else {
+      face.textContent = '⚙';
+      face.style.background = '';
+    }
+    document.getElementById('accountName').textContent = auth ? auth.username : L.run.settings;
+    document.getElementById('tAccountTitle').textContent = auth ? L.run.account : '';
+    document.getElementById('pfAccount').classList.toggle('hidden', !auth);
+    document.getElementById('pfLogout').classList.toggle('hidden', !auth);
+    document.getElementById('tDeleteAccount').classList.toggle('hidden', !auth);
+    document.getElementById('tSignIn').classList.toggle('hidden', !!auth);
+    document.getElementById('tSignIn').textContent = L.run.signIn;
+    document.getElementById('tLangLabel').textContent = L.run.language;
+    document.getElementById('tProfileDone').textContent = L.run.done;
+    document.getElementById('tLogoutStart').textContent = L.run.logout;
     document.getElementById('tLogoutCancel').textContent = L.run.cancel;
     document.getElementById('tLogoutConfirm').textContent = L.run.logout;
-    setNote('pushNote', '');
-    renderPushToggle();
-    loadPushState();
+    if (auth) {
+      document.getElementById('tShowPin').textContent = L.run.showPin;
+      document.getElementById('tLogoutAsk').textContent = L.run.logoutAsk.replace('{name}', auth.username);
+      document.getElementById('tDeleteAccount').textContent = L.online.deleteAccount;
+      renderPushToggle();
+    }
+  }
+
+  function openLogoutModal() {
+    const auth = runAuth();
+    askLogout(false);
+    fillProfile();
+    if (auth) {
+      setNote('pushNote', '');
+      loadPushState();
+    }
     document.getElementById('logoutModal').classList.remove('hidden');
   }
 
   function closeLogoutModal() {
     document.getElementById('logoutModal').classList.add('hidden');
+  }
+
+  // Вопрос «выйти?» появляется только после нажатия «Выйти», а «Отмена»
+  // прячет его обратно, не закрывая профиль
+  function askLogout(show) {
+    document.getElementById('logoutConfirmBox').classList.toggle('hidden', !show);
+    document.getElementById('tLogoutStart').classList.toggle('hidden', !!show);
+    // Две синие кнопки подряд — «Выйти» и «Готово» — спорили бы, какая главная
+    document.getElementById('tProfileDone').classList.toggle('hidden', !!show);
+  }
+
+  function signInFromProfile() {
+    closeLogoutModal();
+    authReturn = 'mode';
+    showScreen('authChoice');
   }
 
   function confirmLogout() {
@@ -4285,6 +4521,7 @@
   let authReturn = 'runHub';
 
   function afterAuth() {
+    if (authReturn === 'mode') return showScreen('mode');
     if (authReturn === 'online') return openOnline();
     if (authReturn === 'friends') return openFriends();
     return openRunHub();
@@ -4535,9 +4772,12 @@
     loadEloTop();
   }
 
+  let friendMenuOpen = null;
+
   function openFriends() {
     const auth = runAuth();
     if (!auth) { authReturn = 'friends'; return showScreen('authChoice'); }
+    friendMenuOpen = null;
     renderGreeting(auth.username);
     document.getElementById('searchResults').innerHTML = '';
     document.getElementById('friendSearch').value = '';
@@ -4614,6 +4854,18 @@
     row.dataset.name = name;
     row.dataset.relation = relation || 'none';
 
+    // Кружок с буквой, как в шапке: друзей узнают по цвету раньше, чем прочтут имя.
+    // У удалённого игрока имени нет — вместо буквы знак вопроса и серый круг
+    const face = document.createElement('span');
+    face.className = 'avatar';
+    if (String(name).charAt(0) === '#') {
+      face.textContent = '?';
+      face.style.background = 'rgba(255, 255, 255, 0.25)';
+    } else {
+      paintAvatar(face, name);
+    }
+    row.appendChild(face);
+
     const who = document.createElement('span');
     who.className = 'fr-name';
     who.textContent = playerName(name);
@@ -4643,7 +4895,19 @@
       button(L.decline, 'no', () => respondFriend(name, false));
     } else if (relation === 'friend') {
       button(L.challenge, 'yes', () => openChallenge(name));
-      button(L.remove, '', () => removeFriend(name));
+      // «Убрать» стояло вровень с «Вызвать» — промахнулся пальцем, и друга нет.
+      // Теперь оно за «⋯»: сначала открыть, потом нажать. Какая строка открыта,
+      // помним отдельно: список перерисовывается опросом каждые несколько
+      // секунд, и открытое «Убрать» иначе захлопывалось бы под пальцем
+      if (friendMenuOpen === name) {
+        button(L.remove, 'no', () => removeFriend(name));
+      } else {
+        button('⋯', 'more', function () {
+          friendMenuOpen = name;
+          this.remove();
+          button(L.remove, 'no', () => removeFriend(name));
+        });
+      }
     } else if (relation === 'outgoing') {
       const wait = document.createElement('span');
       wait.className = 'fr-wait';
@@ -5329,7 +5593,8 @@
       const elo = document.createElement('div');
       elo.className = 'rm-elo';
       const r = rankedRatings && rankedRatings[mode];
-      elo.textContent = r ? formatNum(r.elo) : '';
+      // Голое «1 000» под «1–100» читалось как вторая граница диапазона
+      elo.textContent = r ? t().online.rkEloShort.replace('{n}', formatNum(r.elo)) : '';
       b.appendChild(name); b.appendChild(elo);
       b.onclick = () => setRankedMode(mode);
       box.appendChild(b);
