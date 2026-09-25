@@ -15,6 +15,15 @@ async function newGame(browser, opts) {
   return page;
 }
 
+// Язык живёт в окне профиля: открыть, выбрать, закрыть
+async function setLang(page, lang) {
+  await page.click('#accountChip');
+  await page.waitForTimeout(100);
+  await page.selectOption('#langSwitcher', lang);
+  await page.click('#tProfileDone');
+  await page.waitForTimeout(100);
+}
+
 async function done(page) {
   await page.context().close();
 }
@@ -217,15 +226,30 @@ async function testLogout(browser) {
   await page.click('#accountChip');
   await page.waitForTimeout(200);
 
-  check('окно подтверждения открылось', await page.locator('#logoutModal').isVisible());
+  check('окно профиля открылось', await page.locator('#logoutModal').isVisible());
+  // Раньше вопрос «Выйти?» висел сразу, хотя человек ничего не нажимал
+  check('вопрос о выходе не задаётся, пока не нажали «Выйти»',
+    !(await page.locator('#tLogoutAsk').isVisible()) && await page.locator('#tLogoutStart').isVisible());
+
+  await page.click('#tLogoutStart');
+  await page.waitForTimeout(150);
+  check('после «Выйти» появляется вопрос', await page.locator('#tLogoutAsk').isVisible());
   check('текст в окне читается (не чёрный на тёмном)',
     (await page.locator('#tLogoutAsk').evaluate(e => getComputedStyle(e).color)) === 'rgb(255, 255, 255)');
+
+  // Под вопросом две синие кнопки подряд — «Выйти» и «Готово» — спорили бы,
+  // какая главная. Пока спрашиваем, «Готово» убрано
+  check('пока спрашиваем о выходе, «Готово» не спорит с «Выйти»',
+    !(await page.locator('#tProfileDone').isVisible()));
 
   await page.click('#tLogoutCancel');
   await page.waitForTimeout(150);
   check('отмена не разлогинивает', !!(await page.evaluate(() => localStorage.getItem('hc_run_user'))));
+  check('после отмены «Готово» на месте', await page.locator('#tProfileDone').isVisible());
+  check('и прячет вопрос, не закрывая профиль',
+    !(await page.locator('#tLogoutAsk').isVisible()) && await page.locator('#logoutModal').isVisible());
 
-  await page.click('#accountChip');
+  await page.click('#tLogoutStart');
   await page.waitForTimeout(150);
   await page.click('#tLogoutConfirm');
   await page.waitForTimeout(250);
@@ -239,7 +263,7 @@ async function testTranslations(browser) {
   const page = await newGame(browser, { user: 'Максим' });
 
   for (const lang of ['en', 'ru', 'fr', 'de']) {
-    await page.selectOption('#langSwitcher', lang);
+    await setLang(page, lang);
     await page.waitForTimeout(150);
     const empty = await page.evaluate(() => {
       const ids = ['tModeSolo', 'tModeDuel', 'tModeRun', 'tRunStart', 'tRunTop', 'tRunTopDay', 'tRunTopWeek', 'tRunTopAll'];
@@ -422,9 +446,21 @@ async function testPauseAndGiveUp(browser) {
   const info = await page.locator('#unfinishedInfo').textContent();
   check('в карточке видно раунд и очки', /Раунд\s*2/.test(info), info.trim());
 
-  // полная перезагрузка страницы — игра должна пережить закрытие приложения
-  await page.reload();
-  await page.waitForTimeout(400);
+  // полная перезагрузка страницы — игра должна пережить закрытие приложения.
+  // Заглушка держит «сервер» в хранилище страницы, а Chromium по file:// под
+  // нагрузкой изредка стирает его при перезагрузке (пойманный случай: забег
+  // был в хранилище до перезагрузки и пропал после, уцелели только ключи,
+  // которые заглушка пишет заново). Настоящий сервер так данных не теряет,
+  // поэтому стёртый «сервер» возвращаем и перезагружаем снова — игра о
+  // подмене не знает, и проверяется по-прежнему она, а не заглушка
+  const serverRun = await page.evaluate(() => localStorage.getItem('__stub_run'));
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.reload();
+    await page.waitForTimeout(400);
+    const kept = await page.evaluate(() => !!localStorage.getItem('__stub_run'));
+    if (kept) break;
+    await page.evaluate(v => localStorage.setItem('__stub_run', v), serverRun);
+  }
   await page.click('#tModeRun');
   // Ждём саму карточку, а не фиксированные полсекунды: под нагрузкой ответ
   // сервера приходил позже, и проверка падала на ровном месте
@@ -1589,7 +1625,7 @@ async function testPinHelp(browser) {
   await page4.waitForTimeout(150);
   check('свой PIN показывается по нажатию',
     (await page4.locator('#tShowPin').textContent()).includes('1234'));
-  check('выход из аккаунта остался на месте', await page4.locator('#tLogoutConfirm').isVisible());
+  check('выход из аккаунта остался на месте', await page4.locator('#tLogoutStart').isVisible());
   await done(page4);
 }
 
@@ -1887,13 +1923,13 @@ async function testHubGreeting(browser) {
   check('в нём названо имя', text.includes('Александра'), text);
   check('имя выделено', (await greet('#runGreeting strong')) === 'Александра');
 
-  await page.selectOption('#langSwitcher', 'en');
+  await setLang(page, 'en');
   await page.waitForTimeout(250);
   const en = (await greet('#runGreeting')) || '';
   check('при смене языка приветствие переводится', en.includes('Playing as') && en.includes('Александра'), en);
 
   // Имя не должно ломать строку и не должно выдавливать кнопку
-  await page.selectOption('#langSwitcher', 'ru');
+  await setLang(page, 'ru');
   await page.waitForTimeout(200);
   const fit = await page.evaluate(() => {
     const el = document.getElementById('runGreeting');
@@ -2093,8 +2129,21 @@ async function testFriends(browser) {
   check('найденных показали троих', search.rows.length === 3, JSON.stringify(search.rows));
   check('незнакомого можно добавить',
     search.rows[0].btns.join() === 'Добавить', JSON.stringify(search.rows[0]));
-  check('другу предлагают вызвать и убрать, а не добавить',
-    search.rows[1].btns.join() === 'Вызвать,Убрать', JSON.stringify(search.rows[1]));
+  // «Убрать» стояло вровень с «Вызвать» — мимо пальцем, и друга нет. Теперь
+  // оно за «⋯», чтобы до него было два осознанных нажатия
+  check('другу предлагают вызвать, а «убрать» спрятано за «⋯»',
+    search.rows[1].btns.join() === 'Вызвать,⋯', JSON.stringify(search.rows[1]));
+  await page.click('#searchResults .friend-row:nth-child(2) .fr-btn.more');
+  await page.waitForTimeout(150);
+  const more = await page.evaluate(() =>
+    [...document.querySelectorAll('#searchResults .friend-row:nth-child(2) .fr-btn')].map(b => b.textContent));
+  check('«⋯» открывает «Убрать»', more.join() === 'Вызвать,Убрать', more.join());
+  await page.click('#searchResults .friend-row:nth-child(2) .fr-btn.no');
+  await page.waitForTimeout(300);
+  const removed = await page.evaluate(() =>
+    (window.__rpcCalls.filter(c => c.name === 'remove_friend').pop() || {}).args);
+  check('и «Убрать» уходит на сервер с именем друга',
+    removed && removed.p_other === 'Ким', JSON.stringify(removed));
   // Заявку, которая ждёт ответа, повторно не отправишь — её можно только забрать
   check('висящую заявку предлагают отменить, а не отправить снова',
     search.rows[2].btns.join() === 'Отменить', JSON.stringify(search.rows[2]));
@@ -2665,8 +2714,9 @@ async function testRanked(browser) {
   check('четыре разновидности с условиями прямо в названии',
     modes.names.join(' | ') === '1–100 | −100…100 | 1–100 · бонусы | −100…100 · бонусы',
     modes.names.join(' | '));
-  check('у каждой свой рейтинг прямо на кнопке',
-    modes.elos.join() === '1180,940,1000,1520', modes.elos.join());
+  // Голое «1 000» под «1–100» читалось как вторая граница диапазона
+  check('у каждой свой рейтинг прямо на кнопке, и он подписан',
+    modes.elos.join() === 'рейтинг1180,рейтинг940,рейтинг1000,рейтинг1520', modes.elos.join());
   check('длинного описания правил больше нет', !modes.rules);
   check('выбрана первая разновидность', modes.active.join() === 'true,false,false,false', modes.active.join());
   check('в заголовке названа выбранная разновидность и её рейтинг',
@@ -3314,6 +3364,226 @@ async function testPushNotifications(browser) {
   await done(page);
 }
 
+// ------------------------------------------ новый вид: шапка, профиль, меню, друзья, дуэль
+async function testNewLook(browser) {
+  console.log('\nНовый вид: шапка, профиль, меню, друзья');
+
+  // Шапка у вошедшего: профиль — кружок с буквой, его не спутать с «Друзьями»
+  let page = await newGame(browser, { user: 'Максим' });
+  const hdr = await page.evaluate(() => {
+    const chip = document.getElementById('accountChip');
+    return {
+      chipVisible: !chip.classList.contains('hidden'),
+      letter: chip.textContent.trim(),
+      bg: getComputedStyle(chip).backgroundColor,
+      friends: document.getElementById('friendsBtn').textContent.trim(),
+      langInHeader: !!document.querySelector('.top-controls #langSwitcher')
+    };
+  });
+  check('профиль виден уже в главном меню', hdr.chipVisible);
+  check('профиль — первая буква имени, а не силуэт 👤', hdr.letter === 'М', hdr.letter);
+  check('у кружка свой цвет', hdr.bg !== 'rgba(0, 0, 0, 0)' && hdr.bg !== 'rgba(255, 255, 255, 0.1)', hdr.bg);
+  check('кнопка друзей выглядит иначе, чем профиль', hdr.friends.indexOf('М') < 0 && hdr.friends !== hdr.letter);
+  check('язык больше не занимает место в шапке', !hdr.langInHeader);
+
+  // Цвет считается из имени: у одного имени всегда один цвет, у разных — обычно разный
+  const colors = await page.evaluate(() => ({
+    same: avatarColor('Максим') === avatarColor('Максим'),
+    spread: new Set(['Аня', 'Боря', 'Кира', 'Лев', 'Яна', 'Ким', 'Максим', 'Оля']
+      .map(avatarColor)).size,
+    emoji: avatarLetter('🦊Лиса'),
+    lower: avatarLetter('анна')
+  }));
+  check('цвет аватара не меняется от раза к разу', colors.same);
+  check('у разных людей разные цвета', colors.spread >= 4, String(colors.spread));
+  check('имя с эмодзи не рвёт кружок пополам', colors.emoji === '🦊', colors.emoji);
+  check('буква в кружке заглавная', colors.lower === 'А', colors.lower);
+
+  // Язык меняют прямо в профиле — окно тут же переходит на новый
+  await page.click('#accountChip');
+  await page.waitForTimeout(150);
+  await page.selectOption('#langSwitcher', 'en');
+  await page.waitForTimeout(150);
+  const flipped = await page.evaluate(() => ({
+    done: document.getElementById('tProfileDone').textContent,
+    lang: document.getElementById('tLangLabel').textContent,
+    menu: document.getElementById('tModeSolo').textContent
+  }));
+  check('профиль переводится сразу, не закрываясь',
+    flipped.done === 'Done' && flipped.lang === 'Language', JSON.stringify(flipped));
+  check('и меню за ним тоже', flipped.menu === 'Practice', flipped.menu);
+  await page.selectOption('#langSwitcher', 'ru');
+  await page.click('#tProfileDone');
+  await page.waitForTimeout(100);
+  check('«Готово» закрывает профиль', !(await page.locator('#logoutModal').isVisible()));
+
+  // Тап мимо окна тоже закрывает — как в любом приложении
+  await page.click('#accountChip');
+  await page.waitForTimeout(100);
+  await page.mouse.click(5, 5);
+  await page.waitForTimeout(100);
+  check('тап мимо окна закрывает профиль', !(await page.locator('#logoutModal').isVisible()));
+
+  // Главное меню: у каждого режима значок и пояснение
+  const menu = await page.evaluate(() =>
+    [...document.querySelectorAll('#screenMode .mode-btn')].map(b => ({
+      icon: (b.querySelector('.m-icon') || {}).textContent || '',
+      sub: ((b.querySelector('.m-sub') || {}).textContent || '').trim()
+    })));
+  check('у каждого режима есть значок', menu.every(m => m.icon.trim().length > 0),
+    menu.map(m => m.icon).join(' '));
+  check('и строка «что это»', menu.every(m => m.sub.length > 0), menu.map(m => m.sub).join(' | '));
+  check('«Игра онлайн» — про соперников по сети, а не про друзей',
+    menu[3].sub.indexOf('Друз') < 0 && menu[3].sub.indexOf('сети') >= 0, menu[3].sub);
+  check('«Игра с другом» объясняет, что это на одном телефоне',
+    menu[1].sub.indexOf('одном телефоне') >= 0, menu[1].sub);
+
+  // Одиночный режим на очки назывался «Игра на рейтинг» — почти как кнопка
+  // «Играть на рейтинг» внутри «Игры онлайн», хотя это совсем другой режим
+  const runName = await page.evaluate(() => document.getElementById('tModeRun').textContent);
+  check('одиночный режим на очки называется «Испытание»', runName === 'Испытание', runName);
+  check('и больше не путается с рейтингом онлайн', runName.indexOf('рейтинг') < 0, runName);
+
+  // Два блока по тому, нужен ли интернет: подпись стоит перед своими режимами
+  const groups = await page.evaluate(() => {
+    const kids = [...document.querySelector('#screenMode .mode-list').children];
+    return kids.map(k => k.classList.contains('mode-group') ? 'G:' + k.textContent
+                                                            : k.className.replace('mode-btn ', ''));
+  });
+  check('меню разбито на «без интернета» и «нужен интернет»',
+    groups.join(',') === 'G:Без интернета,solo,duel,G:Нужен интернет,run,online', groups.join(','));
+  for (const lang of ['en', 'fr', 'de']) {
+    await setLang(page, lang);
+    const subs = await page.evaluate(() =>
+      [...document.querySelectorAll('#screenMode .mode-btn .m-sub')].map(e => e.textContent.trim()));
+    check('пояснения режимов переведены: ' + lang, subs.length === 4 && subs.every(x => x.length > 0),
+      subs.join(' | '));
+    const heads = await page.evaluate(() =>
+      [...document.querySelectorAll('#screenMode .mode-group')].map(e => e.textContent.trim()));
+    check('подписи блоков переведены: ' + lang, heads.length === 2 && heads.every(x => x.length > 0)
+      && heads[0] !== 'Без интернета', heads.join(' | '));
+  }
+  await setLang(page, 'ru');
+  await done(page);
+
+  // Гость: вместо буквы шестерёнка, внутри язык и вход
+  page = await newGame(browser, {});
+  const guest = await page.evaluate(() => {
+    const chip = document.getElementById('accountChip');
+    return { visible: !chip.classList.contains('hidden'), face: chip.textContent.trim(),
+             guest: chip.classList.contains('guest') };
+  });
+  check('без аккаунта в шапке шестерёнка', guest.visible && guest.face === '⚙' && guest.guest,
+    JSON.stringify(guest));
+  await page.click('#accountChip');
+  await page.waitForTimeout(150);
+  const sheet = await page.evaluate(() => ({
+    lang: !!document.querySelector('#logoutModal #langSwitcher'),
+    signIn: !document.getElementById('tSignIn').classList.contains('hidden'),
+    pin: !document.getElementById('pfAccount').classList.contains('hidden'),
+    logout: !document.getElementById('pfLogout').classList.contains('hidden'),
+    del: !document.getElementById('tDeleteAccount').classList.contains('hidden')
+  }));
+  check('гость может сменить язык', sheet.lang);
+  check('и войти оттуда же', sheet.signIn);
+  check('PIN, выхода и удаления у гостя нет', !sheet.pin && !sheet.logout && !sheet.del, JSON.stringify(sheet));
+  await page.selectOption('#langSwitcher', 'de');
+  await page.waitForTimeout(150);
+  check('гость меняет язык без входа',
+    (await page.evaluate(() => document.getElementById('tModeSolo').textContent)) === 'Training');
+  await page.selectOption('#langSwitcher', 'ru');
+  await page.click('#tSignIn');
+  await page.waitForTimeout(200);
+  check('«Войти» ведёт к выбору входа', await page.locator('#screenAuthChoice').isVisible());
+  await done(page);
+
+  // Друзья: сначала те, кто ждёт ответа, и сами друзья, поиск — внизу
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'incoming' }, { username: 'Аня', relation: 'friend' },
+                        { username: '#7', relation: 'friend' }];
+  });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(400);
+  const order = await page.evaluate(() => {
+    const y = id => document.getElementById(id).getBoundingClientRect().top;
+    return { friends: y('friendsList'), games: y('gamesList'), search: y('friendSearch'),
+             titles: document.querySelectorAll('#screenFriends .lb-title:not(.hidden)').length,
+             avatars: Object.fromEntries([...document.querySelectorAll('#friendsList .friend-row')]
+               .map(r => [r.dataset.name, (r.querySelector('.avatar') || {}).textContent])) };
+  });
+  check('друзья и заявки выше игр', order.friends < order.games, JSON.stringify(order));
+  check('поиск — последним', order.games < order.search, JSON.stringify(order));
+  check('у каждого в списке кружок с буквой',
+    order.avatars['Кира'] === 'К' && order.avatars['Аня'] === 'А', JSON.stringify(order.avatars));
+  check('у удалённого игрока — знак вопроса, а не буква служебного имени',
+    order.avatars['#7'] === '?', JSON.stringify(order.avatars));
+
+  // Открытое «Убрать» не должно захлопываться, пока список обновляется опросом
+  await page.click('#friendsList .friend-row[data-name="Аня"] .fr-btn.more');
+  await page.waitForTimeout(100);
+  await page.evaluate(() => loadFriends(true));
+  await page.waitForTimeout(300);
+  const stillOpen = await page.evaluate(() =>
+    [...document.querySelectorAll('#friendsList .friend-row[data-name="Аня"] .fr-btn')].map(b => b.textContent));
+  check('открытое «Убрать» переживает обновление списка', stillOpen.join() === 'Вызвать,Убрать', stillOpen.join());
+  await done(page);
+
+  // Дуэль на телефоне: ничего не вылезает за карточку, поле ввода — на экране.
+  // Ширина 360 — самые узкие из ходовых телефонов: на 390 старая сетка уже
+  // помещалась благодаря мелкому шрифту кнопки, и поломка проходила бы молча
+  const ctx = await browser.newContext({ viewport: { width: 360, height: 700 } });
+  page = await ctx.newPage();
+  await applyStub(page, {});
+  await page.addInitScript(() => {
+    window.tokenSpills = b => {
+      const cs = getComputedStyle(b);
+      const room = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const r = document.createRange();
+      r.selectNodeContents(b);
+      return r.getBoundingClientRect().width > room + 0.5;
+    };
+  });
+  await page.goto(GAME_URL);
+  await page.waitForTimeout(300);
+  await page.click('.mode-btn.duel');
+  await page.waitForTimeout(200);
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  await page.fill('#guessInput', '50');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(300);
+  const duel = await page.evaluate(() => {
+    const card = document.getElementById('card');
+    const edge = card.getBoundingClientRect().right - parseFloat(getComputedStyle(card).paddingRight);
+    const out = [...document.querySelectorAll('#screenGame .pcard, #screenGame .info-bar, #screenGame .turn-banner')]
+      .filter(e => e.getBoundingClientRect().right > edge + 1).map(e => e.id || e.className);
+    // Длинное слово на кнопке («Дополнительный», «supplémentaire») не должно
+    // вылезать за её рамку
+    // Меряем сам текст: scrollWidth заползание в поля кнопки не видит, а на
+    // глаз слово тогда упирается в рамку
+    const spill = [...document.querySelectorAll('.token-btn')].filter(tokenSpills)
+      .map(b => b.id + ': ' + b.textContent);
+    return { out, spill, input: document.getElementById('guessInput').getBoundingClientRect().bottom };
+  });
+  check('в дуэли на телефоне ничего не вылезает за правый край', duel.out.length === 0, duel.out.join(', '));
+  check('надпись на кнопке жетона помещается в кнопку', duel.spill.length === 0, duel.spill.join('; '));
+  const tokenText = await page.evaluate(() => document.getElementById('ptoken0').textContent.trim());
+  check('на кнопке жетона короткое «⚡ +1 ход»', tokenText.indexOf('⚡ +1 ход') === 0, tokenText);
+  // Шрифт больше не ужимается под ширину: короткой надписи хватает обычного
+  const tokenFont = await page.evaluate(() => parseFloat(getComputedStyle(document.getElementById('ptoken0')).fontSize));
+  check('и написана обычным шрифтом, а не мелким', tokenFont >= 12, tokenFont + 'px');
+  // И на французском, где слово ещё длиннее
+  await page.evaluate(() => { document.getElementById('langSwitcher').value = 'fr'; changeLanguage(); });
+  await page.waitForTimeout(200);
+  const spillFr = await page.evaluate(() => [...document.querySelectorAll('.token-btn')]
+    .filter(tokenSpills).map(b => b.id + ': ' + b.textContent));
+  check('и на французском тоже', spillFr.length === 0, spillFr.join('; '));
+  await page.evaluate(() => { document.getElementById('langSwitcher').value = 'ru'; changeLanguage(); });
+  check('поле ввода видно без прокрутки на экране высотой 700', duel.input <= 700, Math.round(duel.input) + 'px');
+  await ctx.close();
+}
+
 // ------------------------------------------ страница создания ключей VAPID
 async function testKeyPage(browser) {
   console.log('\nСтраница ключей');
@@ -3456,6 +3726,7 @@ async function testKeyPage(browser) {
     await testFriendChat(browser);
     await testPushNotifications(browser);
     await testKeyPage(browser);
+    await testNewLook(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
