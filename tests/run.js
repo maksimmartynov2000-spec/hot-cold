@@ -1806,8 +1806,8 @@ async function testScaleMemory(browser) {
     return { text: tip.textContent, shown: !tip.classList.contains('hidden'),
              under: arrow >= b.left && arrow <= b.right };
   });
-  check('первое нажатие на 🌡️ объясняет, что выключилось и как вернуть',
-    tip1.shown && tip1.text === '🌡️ Градусник: выключено. Нажмите ещё раз, чтобы вернуть', JSON.stringify(tip1));
+  check('первое нажатие на 🌡️ коротко говорит, что скрылось',
+    tip1.shown && tip1.text === '🌡️ Градусник скрыт', JSON.stringify(tip1));
   check('стрелка подсказки — под нажатой кнопкой', tip1.under, JSON.stringify(tip1));
   await tp.clock.runFor(3600);
   check('подсказка гаснет сама', !(await tp.locator('#barTip').isVisible()));
@@ -1816,13 +1816,60 @@ async function testScaleMemory(browser) {
   check('второй раз та же кнопка не объясняет', !(await tp.locator('#barTip').isVisible()));
   await tp.click('#toggleLineBtn');
   check('у другой кнопки своя первая подсказка',
-    (await tp.locator('#barTip').textContent()) === '📏 Числовая прямая: выключено. Нажмите ещё раз, чтобы вернуть');
-  await tp.evaluate(() => quitToMenu());
+    (await tp.locator('#barTip').textContent()) === '📏 Прямая скрыта');
+  await done(tp);
+
+  // Скрытое раньше — первое нажатие возвращает, и подсказка говорит «показана»
+  const back = await gameWithStorage(browser, {}, { hc_show_line: '0' });
+  await back.click('#tModeSolo');
+  await back.click('#tStartMatch');
+  await back.waitForTimeout(300);
+  await back.click('#toggleLineBtn');
+  check('если прямая была скрыта, подсказка — «показана»',
+    (await back.locator('#barTip').textContent()) === '📏 Прямая показана');
+  await done(back);
+
+  // Все шесть фраз есть на всех языках и каждая — в одну строку на узком экране
+  const ctx360 = await browser.newContext({ viewport: { width: 360, height: 740 } });
+  const nar = await ctx360.newPage();
+  await applyStub(nar, {});
+  await nar.goto(GAME_URL);
+  await nar.waitForTimeout(300);
+  await nar.click('#tModeSolo');
+  await nar.click('#tStartMatch');
+  await nar.waitForTimeout(300);
+  const fits = await nar.evaluate(() => {
+    const bad = [];
+    for (const lang of ['ru', 'en', 'fr', 'de']) {
+      for (const [key, btn] of [['thermo', 'toggleThermoBtn'], ['line', 'toggleLineBtn'], ['hint', 'toggleHintBtn']]) {
+        for (const on of [false, true]) {
+          const phrase = i18n[lang].tips && i18n[lang].tips[key] && i18n[lang].tips[key][on ? 1 : 0];
+          if (!phrase) { bad.push(lang + ' ' + key + ' нет фразы'); continue; }
+          currentLang = lang;
+          localStorage.removeItem('hc_tip_' + key);
+          firstTimeTip(key, btn, '🌡️', on);
+          const tip = document.getElementById('barTip').getBoundingClientRect();
+          const card = document.querySelector('.card').getBoundingClientRect();
+          if (tip.height > 40 || tip.left < card.left || tip.right > card.right) bad.push(lang + ' ' + phrase);
+        }
+      }
+    }
+    return bad;
+  });
+  check('все подсказки есть на четырёх языках и влезают в одну строку', fits.length === 0, fits.join('; '));
+  await ctx360.close();
+
+  const tp2 = await newGame(browser, {});
+  await tp2.click('#tModeSolo');
+  await tp2.click('#tStartMatch');
+  await tp2.waitForTimeout(300);
+  await tp2.click('#toggleThermoBtn');
+  await tp2.evaluate(() => quitToMenu());
   // Экран игры в меню скрыт целиком — смотрим на саму подсказку: вернись
   // в игру за эти секунды, она бы ещё висела
   check('в меню подсказка не висит',
-    await tp.evaluate(() => document.getElementById('barTip').classList.contains('hidden')));
-  await done(tp);
+    await tp2.evaluate(() => document.getElementById('barTip').classList.contains('hidden')));
+  await done(tp2);
 }
 
 // Галочки нарисованы свои: системный чекбокс — белый квадрат на тёмном экране
