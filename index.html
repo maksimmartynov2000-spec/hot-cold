@@ -526,26 +526,31 @@
       background: rgba(255, 255, 255, 0.07);
       border: 1px solid rgba(255, 255, 255, 0.14);
     }
+    /* Время — мелко в той же строке: отдельной строкой оно удваивало пузырь */
     .chat-msg .cm-ago {
-      display: block;
       font-size: 11px;
       opacity: 0.45;
-      margin-top: 2px;
+      margin-left: 8px;
+      white-space: nowrap;
     }
+    .chat-head { display: flex; align-items: center; gap: 10px; }
+    /* Фразы — «таблетки» по ширине текста, а не плитки в две колонки:
+       16 плиток занимали весь экран, и позвать играть было не видно */
     .chat-pad {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
+      flex-wrap: wrap;
       gap: 6px;
     }
     .chat-pad button {
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.14);
       color: rgba(255, 255, 255, 0.85);
-      border-radius: 10px;
-      padding: 9px 6px;
+      border-radius: 999px;
+      padding: 7px 12px;
       font-size: 13px;
       font-family: inherit;
       cursor: pointer;
+      white-space: nowrap;
     }
     .chat-pad button:disabled { opacity: 0.4; }
     .chat-modes-label {
@@ -1121,7 +1126,7 @@
 
     .result-box {
       border-radius: 14px;
-      padding: 18px 14px;
+      padding: 14px 14px 16px;
       margin-bottom: 16px;
       text-align: center;
       line-height: 1.4;
@@ -1129,8 +1134,9 @@
     .result-win { background: rgba(22, 163, 74, 0.16); border: 1px solid #16a34a; color: #86efac; }
     .result-lose { background: rgba(239, 68, 68, 0.16); border: 1px solid #ef4444; color: #fca5a5; }
     .result-round { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255,255,255,0.2); color: #fff; }
-    .result-box .r-icon { font-size: 32px; line-height: 1; margin-bottom: 6px; }
-    .result-box .r-title { font-size: 18px; font-weight: 800; }
+    /* Значок в строку с заголовком, а не отдельным этажом над ним */
+    .result-box .r-icon { font-size: 18px; line-height: 1; margin-right: 5px; vertical-align: -1px; }
+    .result-box .r-title { font-size: 17px; font-weight: 800; }
     /* Имена сверху, счёт отдельной строкой под ними: в одну строку
        «Лев 0 : 3 Кира» глаз не находит, где чей счёт */
     .result-box .r-score {
@@ -1138,7 +1144,7 @@
       grid-template-columns: 1fr auto 1fr;
       align-items: baseline;
       row-gap: 2px;
-      margin-top: 14px;
+      margin-top: 10px;
     }
     .result-box .rs-name {
       font-size: 13px; font-weight: 600; text-align: center;
@@ -1147,12 +1153,14 @@
     .result-box .rs-num { font-size: 30px; font-weight: 800; text-align: center; line-height: 1.1; }
     /* Двоеточие едет по потоку сетки во вторую строку: явный grid-row сбивал
        раскладку и уводил «1» в среднюю колонку */
+    /* Двоеточие того же кегля, что и цифры: по базовой линии мелкое «:»
+       садилось ниже середины счёта */
     .result-box .r-vs {
-      font-size: 18px; font-weight: 700;
-      color: rgba(255,255,255,0.35); padding: 0 12px;
+      font-size: 30px; font-weight: 700; line-height: 1.1;
+      color: rgba(255,255,255,0.3); padding: 0 12px;
     }
     .result-box .r-secret { margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.45); }
-    .result-box .r-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: center; flex-wrap: wrap; }
+    .result-box .r-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: center; flex-wrap: wrap; }
 
     .guess-section { margin-bottom: 16px; }
     .guess-section p { margin-bottom: 8px; font-size: 14px; color: rgba(255, 255, 255, 0.65); font-weight: 500; }
@@ -1795,7 +1803,7 @@
   <!-- ЭКРАН: переписка с одним другом. Текст готовыми фразами — по той же
        причине, что и в матче: читают на разных языках -->
   <div id="screenChat" class="hidden">
-    <div class="lb-title" id="chatWho"></div>
+    <div class="screen-title chat-head"><span class="avatar" id="chatFace"></span><span id="chatWho"></span></div>
     <div class="fr-note hidden" id="chatNote"></div>
     <div id="chatList" class="chat-list"></div>
     <div id="chatPad" class="chat-pad"></div>
@@ -2016,7 +2024,6 @@
         nobodyYet: "Nobody else has played yet",
         errNotPlaying: "The game is not running",
         errNoRequest: "The request is gone",
-        talkWith: "Talk to {name}",
         chatEmpty: "Nothing written yet",
         chatInvite: "Invite to play",
         chatFriendly: "A friendly game",
@@ -2226,7 +2233,6 @@
         nobodyYet: "Пока больше никто не играл",
         errNotPlaying: "Игра не идёт",
         errNoRequest: "Заявки больше нет",
-        talkWith: "Переписка: {name}",
         chatEmpty: "Пока ничего не написано",
         chatInvite: "Позвать играть",
         chatFriendly: "Дружеская игра",
@@ -2436,7 +2442,6 @@
         nobodyYet: "Personne d\u2019autre n\u2019a encore jou\u00e9",
         errNotPlaying: "La partie n\u2019est pas en cours",
         errNoRequest: "La demande n'existe plus",
-        talkWith: "Discussion avec {name}",
         chatEmpty: "Rien d\u2019\u00e9crit pour l\u2019instant",
         chatInvite: "Inviter \u00e0 jouer",
         chatFriendly: "Une partie amicale",
@@ -2646,7 +2651,6 @@
         nobodyYet: "Sonst hat noch niemand gespielt",
         errNotPlaying: "Die Partie l\u00e4uft nicht",
         errNoRequest: "Die Anfrage gibt es nicht mehr",
-        talkWith: "Gespr\u00e4ch mit {name}",
         chatEmpty: "Noch nichts geschrieben",
         chatInvite: "Zum Spielen einladen",
         chatFriendly: "Ein Freundschaftsspiel",
@@ -3932,8 +3936,12 @@
 
   function renderThermo() {
     const wrap = document.getElementById('thermoWrap');
-    wrap.classList.toggle('hidden', !showThermo);
-    if (!showThermo) return;
+    // На итогах градусник только повторяет карточку («в точку!»), а ответ и
+    // так отмечен на прямой — убираем его, чтобы итог и история попыток
+    // поместились на экран
+    const hide = !showThermo || (mode !== 'run' && roundOver());
+    wrap.classList.toggle('hidden', hide);
+    if (hide) return;
 
     const fill = document.getElementById('thermoFill');
     const bulb = document.getElementById('thermoBulb');
@@ -4221,14 +4229,14 @@
       const w = D.roundWinner;
       box.className = 'result-box ' + (D.matchOver ? 'result-win' : 'result-round');
 
-      const icon = document.createElement('div');
-      icon.className = 'r-icon';
-      icon.textContent = D.matchOver ? '🏆' : '🎯';
-
       const title = document.createElement('div');
       title.className = 'r-title';
       title.style.color = D.matchOver ? P_COLORS[w] : '#fff';
-      title.textContent = D.names[w] + (D.matchOver ? L.matchWin : L.roundWin);
+      const icon = document.createElement('span');
+      icon.className = 'r-icon';
+      icon.textContent = D.matchOver ? '🏆' : '🎯';
+      title.appendChild(icon);
+      title.appendChild(document.createTextNode(D.names[w] + (D.matchOver ? L.matchWin : L.roundWin)));
 
       // Сетка из трёх колонок: имя стоит ровно над своим счётом
       const score = document.createElement('div');
@@ -4291,7 +4299,7 @@
         sentLine.textContent = L.online.rematchSent.replace('{name}', online.rematchSent);
       }
 
-      box.appendChild(icon); box.appendChild(title);
+      box.appendChild(title);
       if (forfeitLine) box.appendChild(forfeitLine);
       box.appendChild(score);
       box.appendChild(secretLine);
@@ -5840,8 +5848,10 @@
     chatWith = name;
     chatLastId = 0;
     const L = t().online;
-    document.getElementById('chatWho').textContent =
-      L.talkWith.replace('{name}', playerName(name));
+    // Заголовок — сам друг: кружок и имя, как в списке друзей
+    document.getElementById('chatWho').textContent = playerName(name);
+    paintAvatar(document.getElementById('chatFace'), name);
+    fetchAvatars([name]);
     document.getElementById('chatList').innerHTML = '';
     setNote('chatNote', '');
     renderChatPad();

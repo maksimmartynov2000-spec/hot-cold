@@ -2113,8 +2113,10 @@ async function testResultPlacement(browser) {
   await page.waitForTimeout(300);
 
   const g = await geom(page);
-  check('карточка идёт сразу за строкой статуса', g.card.top < g.thermo.top && g.card.top < g.line.top,
-    JSON.stringify(g));
+  check('карточка идёт сразу за строкой статуса', g.card.top < g.line.top, JSON.stringify(g));
+  // Градусник на итогах повторял карточку, а ответ и так на прямой
+  check('на итогах градусника нет — ответ отмечен на прямой',
+    !(await page.locator('#thermoWrap').isVisible()) && await page.locator('#numLine').isVisible());
   check('и не заезжает на саму строку статуса', g.card.top >= g.bar.bottom, g.bar.bottom + ' / ' + g.card.top);
   check('карточка видна целиком, без прокрутки', g.card.bottom <= g.view,
     g.card.bottom + ' при экране ' + g.view);
@@ -2125,6 +2127,7 @@ async function testResultPlacement(browser) {
   await page.click('#resultBox .btn');
   await page.waitForTimeout(300);
   check('во время игры карточки не видно', !(await page.locator('#resultBox').isVisible()));
+  check('в новой партии градусник снова на месте', await page.locator('#thermoWrap').isVisible());
   const playing = await page.evaluate(() =>
     document.getElementById('board').classList.contains('over'));
   check('признак конца партии снят', !playing);
@@ -2146,8 +2149,8 @@ async function testResultPlacement(browser) {
   }
   await duel.waitForTimeout(300);
   const d = await geom(duel);
-  check('в дуэли итог раунда тоже сверху', d.card.top < d.thermo.top && d.card.top < d.line.top,
-    JSON.stringify(d));
+  check('в дуэли итог раунда тоже сверху', d.card.top < d.line.top, JSON.stringify(d));
+  check('и градусника на итогах раунда нет', !(await duel.locator('#thermoWrap').isVisible()));
   await done(duel);
 
   // На невысоком телефоне карточка целиком в первом экране
@@ -3091,6 +3094,19 @@ async function testRoundCard(browser) {
     renderAll();
   });
 
+  const compact = await page.evaluate(() => {
+    const box = document.getElementById('resultBox');
+    const title = box.querySelector('.r-title');
+    const nums = [...box.querySelectorAll('.rs-num')].map(e => e.getBoundingClientRect());
+    const vs = box.querySelector('.r-vs').getBoundingClientRect();
+    const mid = r => (r.top + r.bottom) / 2;
+    return { iconInTitle: !!title.querySelector('.r-icon'), titleH: Math.round(title.getBoundingClientRect().height),
+             vsOff: Math.round(Math.abs(mid(vs) - mid(nums[0]))), h: Math.round(box.getBoundingClientRect().height) };
+  });
+  check('значок стоит в строке заголовка, а не отдельным этажом', compact.iconInTitle, JSON.stringify(compact));
+  check('двоеточие — посередине счёта, а не ниже', compact.vsOff <= 3, JSON.stringify(compact));
+  check('карточка раунда компактная', compact.h <= 240, JSON.stringify(compact));
+
   const card = await page.evaluate(() => {
     const box = document.getElementById('resultBox');
     const names = [...box.querySelectorAll('.rs-name')];
@@ -3326,7 +3342,22 @@ async function testFriendChat(browser) {
     texts: [...document.querySelectorAll('#chatPad button')].map(b => b.textContent)
   }));
   check('переписка открылась и названа по имени',
-    chat.open && chat.who.indexOf('Кира') >= 0, chat.who);
+    chat.open && chat.who === 'Кира', chat.who);
+  const chatLook = await page.evaluate(() => {
+    const pad = [...document.querySelectorAll('#chatPad button')];
+    const rows = new Set(pad.map(b => Math.round(b.getBoundingClientRect().top))).size;
+    const msg = document.querySelector('.chat-msg');
+    const ago = msg.querySelector('.cm-ago').getBoundingClientRect();
+    const txt = msg.getBoundingClientRect();
+    const invite = document.getElementById('tChatFriendly').getBoundingClientRect();
+    return { face: document.getElementById('chatFace').textContent, rows,
+             oneLine: ago.bottom <= txt.bottom && Math.round(txt.height) <= 44,
+             invite: Math.round(invite.bottom), view: innerHeight };
+  });
+  check('в заголовке переписки — кружок друга', chatLook.face === 'К', JSON.stringify(chatLook));
+  check('фразы — «таблетки», рядов меньше, чем было (8)', chatLook.rows <= 6, JSON.stringify(chatLook));
+  check('время сообщения в той же строке, что и текст', chatLook.oneLine, JSON.stringify(chatLook));
+  check('«Дружеская игра» видна без прокрутки', chatLook.invite <= chatLook.view, JSON.stringify(chatLook));
   check('видно всю ленту в правильном порядке',
     chat.msgs.map(m => m.code).join() === 'play,later,hour', chat.msgs.map(m => m.code).join());
   check('свои и чужие фразы различаются',
