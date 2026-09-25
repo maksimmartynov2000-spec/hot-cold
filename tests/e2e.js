@@ -117,7 +117,7 @@ async function registerPlayer(p, name, pin) {
   const db = new Client({ host: '/var/run/postgresql', user: 'root', database: 'hotcold_test' });
   await db.connect();
   // Сценарии миграций оставляют после себя игроков — для чистоты берём своих
-  await db.query("delete from students where username in ('Тимур','Лада')");
+  await db.query("delete from students where username in ('Тимур','Лада','Артур')");
 
   const browser = await chromium.launch(launchOptions());
   const A = await openPlayer(browser, db, 'ru');
@@ -335,7 +335,83 @@ async function registerPlayer(p, name, pin) {
     card.indexOf('(+') >= 0 && card.indexOf(String(timur.elo)) >= 0, card);
   check('причина стоит раньше счёта', card.indexOf('вышелизигры') < card.indexOf('0:0'), card);
 
+  // ---------- Профиль: иконка, смена имени и PIN — через настоящий SQL ----------
+  // «Тимур» стоит по алфавиту после «Лады», «Артур» — перед ней: в парах, что
+  // хранятся по алфавиту (переписка, лесенка против накрутки), строки должны
+  // перевернуться, иначе база откажет в переименовании целиком
+  await db.query("select send_friend_phrase('Тимур', '1111', 'Лада', 'play')");
+  for (const P of [A, B]) await P.page.evaluate(() => quitToMenu());
+  await A.page.click('#accountChip');
+  await A.page.waitForTimeout(700);
+  await A.page.click('#avGrid .av-tile[data-icon="🦊"]');
+  await A.page.waitForTimeout(500);
+  check('иконка записана в базу',
+    (await db.query("select avatar from students where username = 'Тимур'")).rows[0].avatar === '🦊');
+
+  await B.page.click('#friendsBtn');
+  await B.page.waitForTimeout(900);
+  const face = await B.page.evaluate(() => {
+    const row = document.querySelector('#friendsList .friend-row[data-name="Тимур"]');
+    return row ? row.querySelector('.avatar').textContent : null;
+  });
+  check('второй игрок видит иконку друга', face === '🦊', String(face));
+
+  await A.page.click('#tRenameStart');
+  await A.page.fill('#renameInput', 'Артур');
+  await A.page.click('#tRenameSave');
+  await A.page.waitForTimeout(700);
+  check('имя сменилось в базе',
+    (await db.query("select count(*) from students where username = 'Артур'")).rows[0].count === '1');
+  // Старое имя не должно остаться нигде — обходим все текстовые столбцы базы
+  const cols = (await db.query(
+    "select table_name, column_name, data_type from information_schema.columns " +
+    "where table_schema = 'public' and data_type in ('text', 'ARRAY', 'jsonb') and table_name in " +
+    "(select table_name from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE')")).rows;
+  const leftovers = [];
+  for (const c of cols) {
+    const q = c.data_type === 'text'
+      ? `select count(*) from "${c.table_name}" where "${c.column_name}" = 'Тимур'`
+      : `select count(*) from "${c.table_name}" where "${c.column_name}"::text like '%Тимур%'`;
+    const n = +(await db.query(q)).rows[0].count;
+    if (n) leftovers.push(c.table_name + '.' + c.column_name + '×' + n);
+  }
+  check('старое имя не осталось ни в одной таблице', leftovers.length === 0, leftovers.join(', '));
+  check('устройство теперь входит под новым именем',
+    (await A.page.evaluate(() => localStorage.getItem('hc_run_user'))) === 'Артур');
+
+  await B.page.evaluate(() => loadFriends());
+  await B.page.waitForTimeout(700);
+  const renamedRow = await B.page.evaluate(() => {
+    const row = document.querySelector('#friendsList .friend-row[data-name="Артур"]');
+    return row ? { rel: row.dataset.relation, face: row.querySelector('.avatar').textContent } : null;
+  });
+  check('у друга новое имя, дружба и иконка на месте',
+    renamedRow && renamedRow.rel === 'friend' && renamedRow.face === '🦊', JSON.stringify(renamedRow));
+  await B.page.click('#friendsList .friend-row[data-name="Артур"] .fr-name');
+  await B.page.waitForTimeout(800);
+  const thread = await B.page.evaluate(() =>
+    [...document.querySelectorAll('#chatList .chat-msg')].map(m => m.className));
+  check('переписка пережила переименование', thread.length === 1 && thread[0].indexOf('theirs') >= 0,
+    thread.join(', '));
+
+  await A.page.click('#tPinStart');
+  await A.page.fill('#pinOld', '1111');
+  await A.page.fill('#pinNew', '3333');
+  await A.page.click('#tPinSave');
+  await A.page.waitForTimeout(700);
+  check('новый PIN подходит в базе',
+    (await db.query("select check_student_pin('Артур', '3333') as u")).rows[0].u === 'Артур');
+  await A.page.click('#tProfileDone');
+  await A.page.click('#friendsBtn');
+  await A.page.waitForTimeout(800);
+  check('после смены PIN устройство работает дальше',
+    (await A.page.evaluate(() => localStorage.getItem('hc_run_user'))) === 'Артур' &&
+    (await A.page.locator('#screenFriends').isVisible()));
+
   const calls = A.log.concat(B.log);
+  check('профиль шёл через настоящие функции базы',
+    ['my_profile', 'set_avatar', 'avatars_for', 'rename_student', 'change_pin'].every(f => calls.includes(f)),
+    [...new Set(calls)].join(', '));
   check('всё шло через настоящие функции базы',
     calls.includes('match_guess') && calls.includes('match_state') &&
     calls.includes('send_phrase') && calls.includes('challenge_friend') &&

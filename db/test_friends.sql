@@ -103,7 +103,12 @@ select 'регистр: ' || send_friend_request('Максим','1111','лЕв')
 do $$
 declare i int;
 begin
+  -- Лимит «20 регистраций в час» действует и здесь: ботов регистрируем
+  -- пачками, отодвигая уже созданных в прошлое, — проверяется предел заявок,
+  -- а не предел регистраций
   for i in 1..25 loop
+    update students set created_at = now() - interval '2 hours'
+    where created_at >= now() - interval '1 hour';
     perform register_student('Бот' || i, '0000', null);
   end loop;
   for i in 1..20 loop
