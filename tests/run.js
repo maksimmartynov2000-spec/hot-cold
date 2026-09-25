@@ -3588,9 +3588,31 @@ async function testProfile(browser) {
   const head = await page.evaluate(() => document.getElementById('accountChip').textContent.trim());
   check('своя иконка в шапке вместо буквы', head === '🦊', head);
 
-  // Выбор иконки: буква и 24 животных, выбранная отмечена
+  // Сетка иконок свёрнута: кто не меняет иконку, тому она не занимает окно
   await page.click('#accountChip');
   await page.waitForTimeout(300);
+  const folded = await page.evaluate(() => ({
+    grid: !document.getElementById('avGrid').classList.contains('hidden'),
+    btn: !document.getElementById('pfAvatarBox').classList.contains('hidden') &&
+         document.getElementById('tAvatarStart').textContent,
+    pen: document.getElementById('pfAvatar').classList.contains('editable')
+  }));
+  check('сетка иконок при открытии профиля свёрнута', !folded.grid, JSON.stringify(folded));
+  check('на её месте кнопка «Сменить иконку», на кружке карандаш',
+    folded.btn === 'Сменить иконку' && folded.pen, JSON.stringify(folded));
+
+  // Нажатие на большой кружок раскрывает сетку, повторное — сворачивает
+  await page.click('#pfAvatar');
+  await page.waitForTimeout(150);
+  const byFace = await page.locator('#avGrid').isVisible();
+  await page.click('#pfAvatar');
+  await page.waitForTimeout(150);
+  const byFaceAgain = await page.locator('#avGrid').isVisible();
+  check('кружок открывает и закрывает выбор', byFace && !byFaceAgain, byFace + ' ' + byFaceAgain);
+
+  // Выбор иконки: буква и 24 животных, выбранная отмечена
+  await page.click('#tAvatarStart');
+  await page.waitForTimeout(150);
   const grid = await page.evaluate(() => {
     const tiles = [...document.querySelectorAll('#avGrid .av-tile')];
     return { n: tiles.length, first: tiles[0].textContent, firstLetter: tiles[0].classList.contains('letter'),
@@ -3609,7 +3631,10 @@ async function testProfile(browser) {
   }));
   check('выбор уходит на сервер', picked.sent && picked.sent.p_avatar === '🐼', JSON.stringify(picked.sent));
   check('и сразу виден в шапке и в профиле', picked.head === '🐼' && picked.big === '🐼', JSON.stringify(picked));
+  check('после выбора сетка сворачивается', !(await page.locator('#avGrid').isVisible()));
 
+  await page.click('#tAvatarStart');
+  await page.waitForTimeout(150);
   await page.click('#avGrid .av-tile.letter');
   await page.waitForTimeout(300);
   const back = await page.evaluate(() => ({
@@ -3619,6 +3644,8 @@ async function testProfile(browser) {
   check('к букве можно вернуться', back.sent && back.sent.p_avatar === null && back.head === 'М', JSON.stringify(back));
 
   // Клетки выбора — не меньше 44px: мельче детскому пальцу попадать неудобно
+  await page.click('#tAvatarStart');
+  await page.waitForTimeout(150);
   const tile = await page.evaluate(() => {
     const r = document.querySelector('#avGrid .av-tile').getBoundingClientRect();
     const tops = new Set([...document.querySelectorAll('#avGrid .av-tile')].map(t => Math.round(t.getBoundingClientRect().top)));
@@ -3626,6 +3653,12 @@ async function testProfile(browser) {
   });
   check('клетки иконок крупные и сетка ровная 5×5', tile.w >= 44 && tile.h >= 44 && tile.rows === 5,
     JSON.stringify(tile));
+
+  // Закрыл профиль с раскрытой сеткой — в следующий раз она снова свёрнута
+  await page.click('#tProfileDone');
+  await page.click('#accountChip');
+  await page.waitForTimeout(300);
+  check('при новом открытии профиля сетка снова свёрнута', !(await page.locator('#avGrid').isVisible()));
 
   // Смена имени
   await page.click('#tRenameStart');

@@ -201,6 +201,14 @@
     .avatar.has-icon { font-size: 17px; }
     .avatar-btn .has-icon { font-size: 18px; }
     .pf-avatar.has-icon { font-size: 36px; }
+    /* Карандашик на кружке: подсказка, что его можно нажать и сменить иконку */
+    .pf-avatar.editable { position: relative; cursor: pointer; }
+    .pf-avatar.editable::after {
+      content: '✎'; position: absolute; right: -4px; bottom: -4px;
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 400; color: #0f1430; background: #fff;
+    }
     .pf-label {
       font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
       color: rgba(255, 255, 255, 0.5); text-align: left; margin: 2px 2px 8px;
@@ -208,7 +216,8 @@
     /* Буква и 24 иконки — ровно 5×5. Клетка 44px — меньше детскому пальцу
        попадать неудобно, в ряды по 8 они выходили по 32px */
     .av-grid { display: grid; grid-template-columns: repeat(5, 44px); justify-content: center;
-               gap: 8px 12px; margin-bottom: 14px; }
+               gap: 8px 12px; margin: 12px 0 6px; }
+    #pfAvatarBox { margin-bottom: 8px; }
     .av-tile {
       aspect-ratio: 1; border-radius: 50%; border: none; padding: 0; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
@@ -1793,16 +1802,17 @@
      Без аккаунта то же окно — настройки: язык и вход -->
 <div class="modal-backdrop hidden" id="logoutModal" onclick="if (event.target === this) closeLogoutModal()">
   <div class="modal-card profile-card">
-    <div class="pf-avatar" id="pfAvatar"></div>
+    <div class="pf-avatar" id="pfAvatar" onclick="if (this.classList.contains('editable')) toggleAvatarPicker()"></div>
     <div class="pf-name" id="accountName"></div>
     <div class="pf-sub" id="tAccountTitle"></div>
 
     <div id="pfAccount">
       <!-- Своя иконка вместо буквы. Прячется, пока сервер не умеет профиль
-           (миграция не применена): обещать нечего -->
+           (миграция не применена): обещать нечего. Сетка свёрнута: кто не
+           меняет иконку, тому 25 кружков только мешают дойти до остального -->
       <div class="hidden" id="pfAvatarBox">
-        <div class="pf-label" id="tAvatarTitle"></div>
-        <div class="av-grid" id="avGrid"></div>
+        <button class="btn-ghost btn-block" id="tAvatarStart" onclick="toggleAvatarPicker()"></button>
+        <div class="av-grid hidden" id="avGrid"></div>
         <div class="fr-note hidden" id="avNote"></div>
       </div>
 
@@ -2077,7 +2087,7 @@
         noHint: "No reminder was saved for this name",
         account: "Your account",
         settings: "Settings", language: "Language", done: "Done",
-        avatarTitle: "Icon", save: "Save",
+        avatarChange: "Change icon", save: "Save",
         renameStart: "Change name", renameNew: "New name",
         renameDone: "Name changed",
         renameWait: "You can change your name once a day \u2014 wait {n} h more",
@@ -2286,7 +2296,7 @@
         noHint: "Для этого имени подсказки нет",
         account: "Ваш аккаунт",
         settings: "Настройки", language: "Язык", done: "Готово",
-        avatarTitle: "Иконка", save: "Сохранить",
+        avatarChange: "Сменить иконку", save: "Сохранить",
         renameStart: "Сменить имя", renameNew: "Новое имя",
         renameDone: "Имя изменено",
         renameWait: "Имя можно менять раз в сутки — подождите ещё {n} ч",
@@ -2495,7 +2505,7 @@
         noHint: "Aucune aide enregistrée pour ce nom",
         account: "Votre compte",
         settings: "R\u00e9glages", language: "Langue", done: "OK",
-        avatarTitle: "Ic\u00f4ne", save: "Enregistrer",
+        avatarChange: "Changer d\u2019ic\u00f4ne", save: "Enregistrer",
         renameStart: "Changer de nom", renameNew: "Nouveau nom",
         renameDone: "Nom modifi\u00e9",
         renameWait: "Le nom se change une fois par jour \u2014 encore {n} h",
@@ -2704,7 +2714,7 @@
         noHint: "Für diesen Namen ist keine Hilfe gespeichert",
         account: "Dein Konto",
         settings: "Einstellungen", language: "Sprache", done: "Fertig",
-        avatarTitle: "Symbol", save: "Speichern",
+        avatarChange: "Symbol \u00e4ndern", save: "Speichern",
         renameStart: "Namen \u00e4ndern", renameNew: "Neuer Name",
         renameDone: "Name ge\u00e4ndert",
         renameWait: "Der Name l\u00e4sst sich einmal am Tag \u00e4ndern \u2014 noch {n} Std.",
@@ -4629,7 +4639,7 @@
     document.getElementById('tLogoutStart').textContent = L.run.logout;
     document.getElementById('tLogoutCancel').textContent = L.run.cancel;
     document.getElementById('tLogoutConfirm').textContent = L.run.logout;
-    document.getElementById('tAvatarTitle').textContent = L.run.avatarTitle;
+    document.getElementById('tAvatarStart').textContent = L.run.avatarChange;
     document.getElementById('tRenameStart').textContent = L.run.renameStart;
     document.getElementById('tRenameSave').textContent = L.run.save;
     document.getElementById('tRenameCancel').textContent = L.run.cancel;
@@ -4642,6 +4652,7 @@
     document.getElementById('pinHintNew').placeholder = L.run.pinHintNew;
     // Иконки, имя и PIN — только когда сервер умеет профиль
     document.getElementById('pfAvatarBox').classList.toggle('hidden', !(auth && profileInfo));
+    face.classList.toggle('editable', !!(auth && profileInfo));
     document.getElementById('pfEdit').classList.toggle('hidden', !(auth && profileInfo));
     if (auth && profileInfo) renderAvatarGrid();
     if (auth) {
@@ -4655,6 +4666,7 @@
   function openLogoutModal() {
     const auth = runAuth();
     askLogout(false);
+    showAvatarPicker(false);
     openRename(false);
     openPinChange(false);
     ['avNote', 'renameNote', 'pinNote'].forEach(id => setNote(id, ''));
@@ -4669,6 +4681,14 @@
       });
     }
     document.getElementById('logoutModal').classList.remove('hidden');
+  }
+
+  function showAvatarPicker(show) {
+    document.getElementById('avGrid').classList.toggle('hidden', !show);
+  }
+
+  function toggleAvatarPicker() {
+    showAvatarPicker(document.getElementById('avGrid').classList.contains('hidden'));
   }
 
   function renderAvatarGrid() {
@@ -4691,6 +4711,8 @@
   // Выбор видно сразу; если сервер не принял — возвращаем прежнюю
   async function chooseAvatar(icon) {
     const before = myAvatar();
+    // Выбрал — сетка сворачивается: новая иконка видна в большом кружке
+    showAvatarPicker(false);
     if (icon === before) return;
     setMyAvatar(icon);
     fillProfile();
