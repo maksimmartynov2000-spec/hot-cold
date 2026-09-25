@@ -3424,19 +3424,17 @@ async function testNewLook(browser) {
   await page.waitForTimeout(100);
   check('тап мимо окна закрывает профиль', !(await page.locator('#logoutModal').isVisible()));
 
-  // Главное меню: у каждого режима значок и пояснение
+  // Главное меню: у каждого режима значок. Строки-пояснения под названиями
+  // убраны по просьбе — названий и блоков «без интернета / нужен интернет» хватает
   const menu = await page.evaluate(() =>
     [...document.querySelectorAll('#screenMode .mode-btn')].map(b => ({
       icon: (b.querySelector('.m-icon') || {}).textContent || '',
-      sub: ((b.querySelector('.m-sub') || {}).textContent || '').trim()
+      subs: b.querySelectorAll('.m-sub').length
     })));
   check('у каждого режима есть значок', menu.every(m => m.icon.trim().length > 0),
     menu.map(m => m.icon).join(' '));
-  check('и строка «что это»', menu.every(m => m.sub.length > 0), menu.map(m => m.sub).join(' | '));
-  check('«Игра онлайн» — про соперников по сети, а не про друзей',
-    menu[3].sub.indexOf('Друз') < 0 && menu[3].sub.indexOf('сети') >= 0, menu[3].sub);
-  check('«Игра с другом» объясняет, что это на одном телефоне',
-    menu[1].sub.indexOf('одном телефоне') >= 0, menu[1].sub);
+  check('описаний под названиями режимов нет', menu.every(m => m.subs === 0),
+    menu.map(m => m.subs).join(','));
 
   // Одиночный режим на очки назывался «Игра на рейтинг» — почти как кнопка
   // «Играть на рейтинг» внутри «Игры онлайн», хотя это совсем другой режим
@@ -3454,10 +3452,6 @@ async function testNewLook(browser) {
     groups.join(',') === 'G:Без интернета,solo,duel,G:Нужен интернет,run,online', groups.join(','));
   for (const lang of ['en', 'fr', 'de']) {
     await setLang(page, lang);
-    const subs = await page.evaluate(() =>
-      [...document.querySelectorAll('#screenMode .mode-btn .m-sub')].map(e => e.textContent.trim()));
-    check('пояснения режимов переведены: ' + lang, subs.length === 4 && subs.every(x => x.length > 0),
-      subs.join(' | '));
     const heads = await page.evaluate(() =>
       [...document.querySelectorAll('#screenMode .mode-group')].map(e => e.textContent.trim()));
     check('подписи блоков переведены: ' + lang, heads.length === 2 && heads.every(x => x.length > 0)

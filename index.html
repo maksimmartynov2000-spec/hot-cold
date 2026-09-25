@@ -1346,14 +1346,12 @@
         <span class="m-icon">🎯</span>
         <span class="m-text">
           <span class="m-title" id="tModeSolo">Single player</span>
-          <span class="m-sub" id="tModeSoloSub"></span>
         </span>
       </button>
       <button class="mode-btn duel" onclick="openSetup('duel')">
         <span class="m-icon">🤝</span>
         <span class="m-text">
           <span class="m-title" id="tModeDuel">Play with a friend</span>
-          <span class="m-sub" id="tModeDuelSub"></span>
         </span>
       </button>
       <div class="mode-group" id="tGroupOnline"></div>
@@ -1361,14 +1359,12 @@
         <span class="m-icon">🏆</span>
         <span class="m-text">
           <span class="m-title" id="tModeRun"></span>
-          <span class="m-sub" id="tModeRunSub"></span>
         </span>
       </button>
       <button class="mode-btn online" onclick="openOnlineEntry()">
         <span class="m-icon">🌐</span>
         <span class="m-text">
           <span class="m-title" id="tModeOnline"></span>
-          <span class="m-sub" id="tModeOnlineSub"></span>
         </span>
       </button>
     </div>
@@ -1840,7 +1836,7 @@
         unmute: "\ud83d\udd0a Show phrases"
       },
       online: {
-        mode: "Online", modeSub: "Opponents over the internet, your own rating",
+        mode: "Online",
         find: "Find a player", findBtn: "Find", searchPh: "name",
         friends: "\ud83d\udc65 Friends", back: "Menu",
         searching: "Searching\u2026", nobody: "Nobody found",
@@ -1941,9 +1937,7 @@
 
       modeSolo: "Practice",
       modeDuel: "Play with a friend",
-      modeSoloSub: "Guess the number on your own",
       groupOffline: "No internet needed", groupOnline: "Needs internet",
-      modeDuelSub: "Two players on one phone",
       lblP1: "Player 1", lblP2: "Player 2", defP1: "Player 1", defP2: "Player 2",
       lblWins: "Play until how many wins", lblHandicap: "Head start",
       lblRange: "Range", lblAttempts: "Attempts",
@@ -1956,7 +1950,6 @@
       recordLabel: "Best for this range: ", newRecord: "🏆 New record!",
       run: {
         mode: "Trial",
-        modeSub: "Rounds get harder, points go to the leaderboard",
         choiceLogin: "Log in",
         choiceLoginSub: "I already have a name and PIN",
         choiceRegister: "Sign up",
@@ -2041,7 +2034,7 @@
         unmute: "\ud83d\udd0a Показывать фразы"
       },
       online: {
-        mode: "Игра онлайн", modeSub: "Соперники по сети, свой рейтинг",
+        mode: "Игра онлайн",
         find: "Найти игрока", findBtn: "Найти", searchPh: "имя",
         friends: "\ud83d\udc65 Друзья", back: "В меню",
         searching: "Ищем\u2026", nobody: "Никого не нашлось",
@@ -2142,9 +2135,7 @@
 
       modeSolo: "Тренировка",
       modeDuel: "Игра с другом",
-      modeSoloSub: "Угадайте число сами",
       groupOffline: "Без интернета", groupOnline: "Нужен интернет",
-      modeDuelSub: "Вдвоём на одном телефоне",
       lblP1: "Игрок 1", lblP2: "Игрок 2", defP1: "Игрок 1", defP2: "Игрок 2",
       lblWins: "Играем до скольких побед", lblHandicap: "Фора",
       lblRange: "Диапазон", lblAttempts: "Попыток",
@@ -2157,7 +2148,6 @@
       recordLabel: "Рекорд для этого диапазона: ", newRecord: "🏆 Новый рекорд!",
       run: {
         mode: "Испытание",
-        modeSub: "Раунды всё сложнее, очки — в\u00a0общий топ",
         choiceLogin: "Войти",
         choiceLoginSub: "У меня уже есть имя и PIN",
         choiceRegister: "Зарегистрироваться",
@@ -2242,7 +2232,7 @@
         unmute: "\ud83d\udd0a Afficher les phrases"
       },
       online: {
-        mode: "Jouer en ligne", modeSub: "Des adversaires en ligne, votre classement",
+        mode: "Jouer en ligne",
         find: "Trouver un joueur", findBtn: "Chercher", searchPh: "nom",
         friends: "\ud83d\udc65 Amis", back: "Menu",
         searching: "Recherche\u2026", nobody: "Aucun joueur trouv\u00e9",
@@ -2343,9 +2333,7 @@
 
       modeSolo: "Entraînement",
       modeDuel: "Jouer à deux",
-      modeSoloSub: "Devinez le nombre seul",
       groupOffline: "Sans internet", groupOnline: "Avec internet",
-      modeDuelSub: "À deux sur un seul téléphone",
       lblP1: "Joueur 1", lblP2: "Joueur 2", defP1: "Joueur 1", defP2: "Joueur 2",
       lblWins: "Jusqu'à combien de victoires", lblHandicap: "Avantage",
       lblRange: "Plage", lblAttempts: "Essais",
@@ -2358,7 +2346,6 @@
       recordLabel: "Meilleur score pour cette plage : ", newRecord: "🏆 Nouveau record !",
       run: {
         mode: "\u00c9preuve",
-        modeSub: "Des manches de plus en plus dures, les points au classement",
         choiceLogin: "Se connecter",
         choiceLoginSub: "J'ai déjà un nom et un code PIN",
         choiceRegister: "S'inscrire",
@@ -2443,7 +2430,7 @@
         unmute: "\ud83d\udd0a Spr\u00fcche zeigen"
       },
       online: {
-        mode: "Online spielen", modeSub: "Gegner im Netz, eigene Wertung",
+        mode: "Online spielen",
         find: "Spieler finden", findBtn: "Suchen", searchPh: "Name",
         friends: "\ud83d\udc65 Freunde", back: "Men\u00fc",
         searching: "Suche\u2026", nobody: "Niemand gefunden",
@@ -2544,9 +2531,7 @@
 
       modeSolo: "Training",
       modeDuel: "Zu zweit spielen",
-      modeSoloSub: "Errate die Zahl allein",
       groupOffline: "Ohne Internet", groupOnline: "Mit Internet",
-      modeDuelSub: "Zu zweit auf einem Handy",
       lblP1: "Spieler 1", lblP2: "Spieler 2", defP1: "Spieler 1", defP2: "Spieler 2",
       lblWins: "Bis wie viele Siege", lblHandicap: "Vorsprung",
       lblRange: "Bereich", lblAttempts: "Versuche",
@@ -2559,7 +2544,6 @@
       recordLabel: "Bestwert für diesen Bereich: ", newRecord: "🏆 Neuer Rekord!",
       run: {
         mode: "Kraftprobe",
-        modeSub: "Runden werden schwerer, Punkte kommen in die Rangliste",
         choiceLogin: "Anmelden",
         choiceLoginSub: "Ich habe schon Name und PIN",
         choiceRegister: "Registrieren",
@@ -3020,8 +3004,6 @@
 
     document.getElementById('tModeSolo').textContent = L.modeSolo;
     document.getElementById('tModeDuel').textContent = L.modeDuel;
-    document.getElementById('tModeSoloSub').textContent = L.modeSoloSub;
-    document.getElementById('tModeDuelSub').textContent = L.modeDuelSub;
 
     document.getElementById('tLblP1').textContent = L.lblP1;
     document.getElementById('tLblP2').textContent = L.lblP2;
@@ -3051,9 +3033,7 @@
     document.getElementById('tModeRun').textContent = L.run.mode;
     document.getElementById('tGroupOffline').textContent = L.groupOffline;
     document.getElementById('tGroupOnline').textContent = L.groupOnline;
-    document.getElementById('tModeRunSub').textContent = L.run.modeSub;
     document.getElementById('tModeOnline').textContent = L.online.mode;
-    document.getElementById('tModeOnlineSub').textContent = L.online.modeSub;
     // Значок — как у «🎮 Игры»: разделы экрана подписаны одинаково
     document.getElementById('tLblFindFriend').textContent = '🔍 ' + L.online.find;
     document.getElementById('tFindBtn').textContent = L.online.findBtn;
