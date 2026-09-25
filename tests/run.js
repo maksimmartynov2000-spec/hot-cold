@@ -1720,8 +1720,9 @@ async function testEndOfRound(browser) {
   // Новая игра возвращает шкалу и обычный счётчик
   await page.click('#resultBox .btn');
   await page.waitForTimeout(300);
-  check('в новой партии шкала снова раскрыта',
-    await page.evaluate(() => document.getElementById('scaleBox').open));
+  // Шкалу игрок уже видел — на телефоне со второй партии она свёрнута
+  check('со второй партии на телефоне шкала свёрнута',
+    !(await page.evaluate(() => document.getElementById('scaleBox').open)));
   check('в новой партии счётчик снова про попытки',
     (await page.locator('#attemptsLabel').textContent()).includes('Попыток'));
 
@@ -1762,6 +1763,66 @@ async function testScaleMemory(browser) {
   check('и его выбор запоминается',
     await page.evaluate(() => localStorage.getItem('hc_scale_open')) === '1');
   await done(page);
+
+  // Сам раскрыл — раскрыта и в десятой партии: выбор игрока важнее правила
+  const kept = await gameWithStorage(browser, {}, { hc_scale_open: '1', hc_games_done: '9' });
+  await kept.click('#tModeSolo');
+  await kept.click('#tStartMatch');
+  await kept.waitForTimeout(300);
+  check('раскрытая игроком шкала не сворачивается со временем',
+    await kept.evaluate(() => document.getElementById('scaleBox').open));
+  await done(kept);
+
+  // Не трогал, но уже играл: на телефоне свёрнута сразу, на широком — раскрыта
+  const phone = await gameWithStorage(browser, {}, { hc_games_done: '1' });
+  await phone.click('#tModeSolo');
+  await phone.click('#tStartMatch');
+  await phone.waitForTimeout(300);
+  check('на телефоне после первой партии шкала свёрнута сразу',
+    !(await phone.evaluate(() => document.getElementById('scaleBox').open)));
+  await done(phone);
+  const wide = await gameWithStorage(browser, {}, { hc_games_done: '5' });
+  await wide.setViewportSize({ width: 1280, height: 900 });
+  await wide.reload();
+  await wide.waitForTimeout(300);
+  await wide.click('#tModeSolo');
+  await wide.click('#tStartMatch');
+  await wide.waitForTimeout(300);
+  check('на широком экране шкала раскрыта — места хватает',
+    await wide.evaluate(() => document.getElementById('scaleBox').open));
+  await done(wide);
+
+  // Кнопки-значки объясняют себя при первом нажатии
+  const tp = await newGame(browser, { clock: true });
+  await tp.click('#tModeSolo');
+  await tp.click('#tStartMatch');
+  await tp.clock.runFor(300);
+  check('до нажатия подсказки нет', !(await tp.locator('#barTip').isVisible()));
+  await tp.click('#toggleThermoBtn');
+  const tip1 = await tp.evaluate(() => {
+    const tip = document.getElementById('barTip');
+    const b = document.getElementById('toggleThermoBtn').getBoundingClientRect();
+    const arrow = tip.getBoundingClientRect().right - parseFloat(getComputedStyle(tip).getPropertyValue('--arrow-right')) - 6;
+    return { text: tip.textContent, shown: !tip.classList.contains('hidden'),
+             under: arrow >= b.left && arrow <= b.right };
+  });
+  check('первое нажатие на 🌡️ объясняет, что выключилось и как вернуть',
+    tip1.shown && tip1.text === '🌡️ Градусник: выключено. Нажмите ещё раз, чтобы вернуть', JSON.stringify(tip1));
+  check('стрелка подсказки — под нажатой кнопкой', tip1.under, JSON.stringify(tip1));
+  await tp.clock.runFor(3600);
+  check('подсказка гаснет сама', !(await tp.locator('#barTip').isVisible()));
+  await tp.click('#toggleThermoBtn');
+  await tp.clock.runFor(100);
+  check('второй раз та же кнопка не объясняет', !(await tp.locator('#barTip').isVisible()));
+  await tp.click('#toggleLineBtn');
+  check('у другой кнопки своя первая подсказка',
+    (await tp.locator('#barTip').textContent()) === '📏 Числовая прямая: выключено. Нажмите ещё раз, чтобы вернуть');
+  await tp.evaluate(() => quitToMenu());
+  // Экран игры в меню скрыт целиком — смотрим на саму подсказку: вернись
+  // в игру за эти секунды, она бы ещё висела
+  check('в меню подсказка не висит',
+    await tp.evaluate(() => document.getElementById('barTip').classList.contains('hidden')));
+  await done(tp);
 }
 
 // Галочки нарисованы свои: системный чекбокс — белый квадрат на тёмном экране

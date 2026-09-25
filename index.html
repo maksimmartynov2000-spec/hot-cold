@@ -757,6 +757,19 @@
     }
     .info-bar .confirmed { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
     .info-bar .confirmed:empty { display: none; }
+    .info-bar { position: relative; }
+    /* Пузырь поверх поля, а не в потоке: не толкает градусник вниз */
+    .bar-tip {
+      position: absolute; top: calc(100% + 6px); right: 8px; z-index: 5;
+      max-width: min(300px, calc(100% - 16px));
+      padding: 8px 12px; border-radius: 10px;
+      background: #f8fafc; color: #0f1430; font-size: 13px; font-weight: 600; line-height: 1.35;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    }
+    .bar-tip::before {
+      content: ''; position: absolute; top: -6px; right: var(--arrow-right, 18px);
+      border: 6px solid transparent; border-top: none; border-bottom-color: #f8fafc;
+    }
     .info-bar .attempts { font-size: 13px; font-weight: 600; color: #a5f3fc; }
     .info-bar .attempts.low { color: #f87171; }
 
@@ -1543,6 +1556,9 @@
             <button class="mini-toggle hidden" id="sayBtn" onclick="toggleSayPad()">💬</button>
             <button class="btn-reset" onclick="leaveGame()" id="tMenu">Menu</button>
           </span>
+          <!-- Что сделала кнопка-значок. Показывается при первом нажатии на
+               каждую: без подписи 🌡️ 📏 💡 непонятны, а место под слова нет -->
+          <div class="bar-tip hidden" id="barTip" role="status"></div>
         </div>
 
         <div class="turn-banner hidden" id="turnBanner"></div>
@@ -2056,6 +2072,7 @@
       forcedHint: { skip: "You may arm a token first: then the skip counts as your first move and you play a second one", lava: "You may arm a token first: then the toss counts as your first move and you play a second one" },
       forcedBtn: { skip: "Skip", lava: "Into the lava" },
       hintLabel: "Distance hint",
+      tipOff: "{name}: off. Tap again to bring it back", tipOn: "{name}: on",
       vizThermo: "Thermometer", vizLine: "Number line",
       enterGuess: "Enter a number", placeholderTpl: "from {a} to {b}", submitGuess: "Check",
       finalWarning: "Attempts used — last chance!", finalSubmit: "Submit", finalInput: "Final answer...",
@@ -2264,6 +2281,7 @@
       forcedHint: { skip: "Можно сначала взвести жетон: тогда пропуск пойдёт первым ходом, а второй вы сделаете сами", lava: "Можно сначала взвести жетон: тогда бросок пойдёт первым ходом, а второй вы сделаете сами" },
       forcedBtn: { skip: "Пропустить ход", lava: "В лаву" },
       hintLabel: "Подсказка: расстояние",
+      tipOff: "{name}: выключено. Нажмите ещё раз, чтобы вернуть", tipOn: "{name}: включено",
       vizThermo: "Градусник", vizLine: "Числовая прямая",
       enterGuess: "Введите число", placeholderTpl: "от {a} до {b}", submitGuess: "Проверить",
       finalWarning: "Попытки закончились — последний шанс!", finalSubmit: "Ответить", finalInput: "Финальный ответ...",
@@ -2472,6 +2490,7 @@
       forcedHint: { skip: "Vous pouvez d\u2019abord armer un jeton : le tour pass\u00e9 compte alors comme premier coup et vous en jouez un second", lava: "Vous pouvez d\u2019abord armer un jeton : le jet compte alors comme premier coup et vous en jouez un second" },
       forcedBtn: { skip: "Passer le tour", lava: "Dans la lave" },
       hintLabel: "Indice de distance",
+      tipOff: "{name} : désactivé. Touchez encore pour le rétablir", tipOn: "{name} : activé",
       vizThermo: "Thermomètre", vizLine: "Droite numérique",
       enterGuess: "Entrez un nombre", placeholderTpl: "de {a} à {b}", submitGuess: "Vérifier",
       finalWarning: "Tentatives épuisées — dernière chance !", finalSubmit: "Valider", finalInput: "Réponse finale...",
@@ -2680,6 +2699,7 @@
       forcedHint: { skip: "Du kannst vorher einen Jeton spannen: dann z\u00e4hlt das Aussetzen als erster Zug und du ziehst ein zweites Mal", lava: "Du kannst vorher einen Jeton spannen: dann z\u00e4hlt der Wurf als erster Zug und du ziehst ein zweites Mal" },
       forcedBtn: { skip: "Zug aussetzen", lava: "In die Lava" },
       hintLabel: "Abstandshinweis",
+      tipOff: "{name}: aus. Nochmal tippen, um es zurückzuholen", tipOn: "{name}: an",
       vizThermo: "Thermometer", vizLine: "Zahlenstrahl",
       enterGuess: "Gib eine Zahl ein", placeholderTpl: "von {a} bis {b}", submitGuess: "Prüfen",
       finalWarning: "Versuche aufgebraucht — letzte Chance!", finalSubmit: "Bestätigen", finalInput: "Letzte Antwort...",
@@ -2938,18 +2958,48 @@
     showThermo = !showThermo;
     try { localStorage.setItem('hc_show_thermo', showThermo ? '1' : '0'); } catch (e) {}
     renderAll();
+    firstTimeTip('thermo', 'toggleThermoBtn', '🌡️', t().vizThermo, showThermo);
   }
 
   function toggleLine() {
     showLine = !showLine;
     try { localStorage.setItem('hc_show_line', showLine ? '1' : '0'); } catch (e) {}
     renderAll();
+    firstTimeTip('line', 'toggleLineBtn', '📏', t().vizLine, showLine);
   }
 
   function toggleHint() {
     distanceHint = !distanceHint;
     try { localStorage.setItem('hc_hint', distanceHint ? '1' : '0'); } catch (e) {}
     renderAll();
+    firstTimeTip('hint', 'toggleHintBtn', '💡', t().hintLabel, distanceHint);
+  }
+
+  // Значок без подписи понятен, только когда уже знаешь, что он делает. Поэтому
+  // первое нажатие на каждый объясняет себя: что выключилось и как вернуть.
+  // Дальше не мешаем — запомнено, что человек уже видел
+  const TIP_MS = 3500;
+  let tipTimer = null;
+  function firstTimeTip(key, btnId, icon, name, on) {
+    try {
+      if (localStorage.getItem('hc_tip_' + key) === '1') return;
+      localStorage.setItem('hc_tip_' + key, '1');
+    } catch (e) {}
+    const L = t();
+    const tip = document.getElementById('barTip');
+    tip.textContent = icon + ' ' + (on ? L.tipOn : L.tipOff).replace('{name}', name);
+    tip.classList.remove('hidden');
+    // Стрелка — под той кнопкой, что нажали
+    const b = document.getElementById(btnId).getBoundingClientRect();
+    const t0 = tip.getBoundingClientRect();
+    tip.style.setProperty('--arrow-right', Math.max(8, Math.round(t0.right - (b.left + b.width / 2) - 6)) + 'px');
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(hideBarTip, TIP_MS);
+  }
+  function hideBarTip() {
+    clearTimeout(tipTimer);
+    tipTimer = null;
+    document.getElementById('barTip').classList.add('hidden');
   }
 
   function rangeCount() { return RANGE_MAX - RANGE_MIN + 1; }
@@ -3310,6 +3360,7 @@
   }
 
   function quitToMenu() {
+    hideBarTip();
     mode = null;
     D.matchOver = false;
     applyTranslations();
@@ -4360,8 +4411,27 @@
 
   // Шкала расстояний нужна, пока идёт партия. На итогах она занимает пол-экрана
   // и отодвигает вниз то, ради чего партия и была — сворачиваем её, а в новом
-  // раунде возвращаем в том виде, в каком её оставил игрок
-  let scaleWanted = localStorage.getItem('hc_scale_open') !== '0';
+  // раунде возвращаем в том виде, в каком её оставил игрок.
+  //
+  // Если игрок её не трогал: на телефоне она раскрыта только в первой партии —
+  // пока шкалу не видел, она нужна; дальше полэкрана под неё жалко, а раскрыть
+  // её можно одним нажатием. На широком экране место есть — раскрыта всегда
+  const SCALE_NARROW = '(max-width: 859px)';
+  function scaleWanted() {
+    let choice = null, played = 0;
+    try {
+      choice = localStorage.getItem('hc_scale_open');
+      played = parseInt(localStorage.getItem('hc_games_done')) || 0;
+    } catch (e) {}
+    if (choice !== null) return choice !== '0';
+    return !(played > 0 && window.matchMedia(SCALE_NARROW).matches);
+  }
+  function countGameDone() {
+    try {
+      const n = parseInt(localStorage.getItem('hc_games_done')) || 0;
+      localStorage.setItem('hc_games_done', String(n + 1));
+    } catch (e) {}
+  }
   let scaleAutoValue = null;
   let scaleCollapsed = false;
 
@@ -4381,17 +4451,17 @@
       const auto = scaleAutoValue;
       scaleAutoValue = null;
       if (auto !== null && box.open === auto) return;
-      scaleWanted = box.open;
-      try { localStorage.setItem('hc_scale_open', scaleWanted ? '1' : '0'); } catch (e) {}
+      try { localStorage.setItem('hc_scale_open', box.open ? '1' : '0'); } catch (e) {}
     });
-    setScaleOpen(scaleWanted);
+    setScaleOpen(scaleWanted());
   }
 
   function syncScaleBox() {
     const over = roundOver();
     if (over === scaleCollapsed) return;
     scaleCollapsed = over;
-    setScaleOpen(over ? false : scaleWanted);
+    if (over) countGameDone();
+    setScaleOpen(over ? false : scaleWanted());
   }
 
   function buildLegend() {
