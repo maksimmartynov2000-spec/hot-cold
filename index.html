@@ -748,18 +748,20 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       margin-bottom: 16px;
-      padding: 10px 14px;
+      padding: 10px 12px;
       background: rgba(255, 255, 255, 0.06);
       border-radius: 12px;
       flex-wrap: wrap;
     }
     .info-bar .confirmed { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+    .info-bar .confirmed:empty { display: none; }
     .info-bar .attempts { font-size: 13px; font-weight: 600; color: #a5f3fc; }
     .info-bar .attempts.low { color: #f87171; }
 
-    .bar-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+    .bar-actions { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+    .btn-reset.icon { font-size: 15px; padding: 3px 10px; line-height: 1.3; }
 
     /* Градусник и прямую можно убрать: на маленьком экране лишние 150 пикселей
        иногда дороже красоты. Включённое состояние подсвечено, выключенное бледное */
@@ -767,7 +769,7 @@
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: 8px;
-      padding: 2px 6px;
+      padding: 2px 5px;
       font-size: 13px;
       line-height: 1.3;
       cursor: pointer;
@@ -1306,8 +1308,7 @@
     #screenRunHub #tRunStart + .frost-row { margin-top: 14px; }
     #screenRunHub .lb-wrap { margin-top: 28px; }
     #screenRunHub .lb-list { margin-top: 10px; }
-    #screenRunHub .lb-row { padding: 9px 4px; font-size: 14px; }
-    #screenRunHub .lb-row:last-child { border-bottom: none; }
+
     .run-hub-actions {
       display: flex;
       gap: 8px;
@@ -1533,7 +1534,7 @@
       <div class="center">
 
         <div class="info-bar" id="infoBar">
-          <span class="confirmed" id="tConfirmed">Number generated ✓</span>
+          <span class="confirmed" id="tConfirmed"></span>
           <span class="attempts" id="attemptsLabel"></span>
           <span class="bar-actions">
             <button class="mini-toggle" id="toggleThermoBtn" onclick="toggleThermo()">🌡️</button>
@@ -1949,7 +1950,7 @@
   const i18n = {
     en: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
+      attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
       frostLabel: "Frost and Heat",
       say: {
         hi: "\ud83d\udc4b Hello!",
@@ -2157,7 +2158,7 @@
     },
     ru: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
+      attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
       frostLabel: "Мороз и Жара",
       say: {
         hi: "\ud83d\udc4b Привет!",
@@ -2365,7 +2366,7 @@
     },
     fr: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
+      attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
       frostLabel: "Gel et Chaleur",
       say: {
         hi: "\ud83d\udc4b Salut !",
@@ -2573,7 +2574,7 @@
     },
     de: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
+      attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze",
       say: {
         hi: "\ud83d\udc4b Hallo!",
@@ -3160,8 +3161,13 @@
     document.getElementById('docTitle').textContent = L.docTitle;
     document.title = L.docTitle;
     document.getElementById('tTitle').textContent = L.title;
-    document.getElementById('tConfirmed').textContent = L.confirmed;
-    document.getElementById('tMenu').textContent = L.menu;
+    // В строке статуса «Меню» — значком: словом оно не помещалось в одну
+    // строку с попытками и тремя переключателями, и строка ломалась надвое
+    const menuBtn = document.getElementById('tMenu');
+    menuBtn.textContent = '☰';
+    menuBtn.title = L.menu;
+    menuBtn.setAttribute('aria-label', L.menu);
+    menuBtn.classList.toggle('icon', mode !== 'run');
     document.getElementById('tFinalWarning').textContent = L.finalWarning;
     document.getElementById('tFinalSubmit').textContent = L.finalSubmit;
     document.getElementById('tEnterGuess').textContent = L.enterGuess;
@@ -3252,7 +3258,11 @@
     document.getElementById('tRunTopWeek').textContent = L.run.topWeek;
     document.getElementById('tRunTopAll').textContent = L.run.topAll;
     document.getElementById('tRunToMenu').textContent = L.run.toMenu;
-    if (mode === 'run') document.getElementById('tMenu').textContent = L.run.pause;
+    if (mode === 'run') {
+      document.getElementById('tMenu').textContent = L.run.pause;
+      document.getElementById('tMenu').title = L.run.pause;
+      document.getElementById('tMenu').setAttribute('aria-label', L.run.pause);
+    }
     document.getElementById('tPauseTitle').textContent = L.run.pauseTitle;
     document.getElementById('tPauseResume').textContent = L.run.resume;
     document.getElementById('tPauseExit').textContent = L.run.exitKeep;
@@ -4100,8 +4110,10 @@
     const banner = document.getElementById('turnBanner');
     const confirmed = document.getElementById('tConfirmed');
 
+    // «Число загадано ✓» ничего не сообщало: число загадано всегда. Место
+    // остаётся пустым, если сказать нечего, — и строка не переносится
     if (duel) {
-      confirmed.textContent = L.confirmed;
+      confirmed.textContent = '';
       attempts.textContent = L.roundLabel + D.round;
       attempts.className = 'attempts';
       if (D.roundOver) { banner.classList.add('hidden'); }
@@ -4136,7 +4148,7 @@
                                       formatNum(best) + '</span>' : '');
       } else {
         const rec = getRecord(RANGE_MAX);
-        confirmed.innerHTML = (rec === null) ? L.confirmed : (L.recordLabel + '<strong>' + rec + '</strong>');
+        confirmed.innerHTML = (rec === null) ? '' : (L.recordLabel + '<strong>' + rec + '</strong>');
       }
     }
   }
@@ -5186,6 +5198,28 @@
     renderRunLeaderboard();
   }
 
+  // Строка любого топа — рейтинга и «Испытания» одинаково. Первые три —
+  // медалями: место читается с одного взгляда
+  const MEDALS = ['🥇', '🥈', '🥉'];
+  function topRow(i, name, points, isMe) {
+    const row = document.createElement('div');
+    row.className = 'lb-row rk-top-row' + (isMe ? ' me' : '');
+    const place = document.createElement('span');
+    place.className = 'rk-place' + (i < 3 ? ' medal' : '');
+    place.textContent = MEDALS[i] || String(i + 1);
+    const face = document.createElement('span');
+    face.className = 'avatar';
+    paintAvatar(face, name);
+    const who = document.createElement('span');
+    who.className = 'rk-who';
+    who.textContent = name;
+    const pts = document.createElement('span');
+    pts.className = 'rk-pts';
+    pts.textContent = formatNum(points);
+    row.append(place, face, who, pts);
+    return row;
+  }
+
   async function renderRunLeaderboard() {
     const el = document.getElementById('runLeaderboardList');
     if (!sb || !el) return;
@@ -5206,13 +5240,14 @@
         el.innerHTML = '<div class="lb-empty">' + L.run.noScores + '</div>';
         return;
       }
-      el.innerHTML = data.map((r, i) => {
-        const isMe = auth && String(r.username).toLowerCase() === auth.username.toLowerCase();
+      // Заменяем целиком, а не дописываем: два запроса подряд (быстро
+      // переключили вкладку) иначе сложили бы строки дважды
+      el.replaceChildren(...data.map((r, i) => {
+        const isMe = !!auth && String(r.username).toLowerCase() === auth.username.toLowerCase();
         if (isMe && leaderboardScope === 'all') rememberRunBest(r.best_run_score);
-        const style = isMe ? ' style="color:#fbbf24;font-weight:700"' : '';
-        return '<div class="lb-row"' + style + '><span>' + (i + 1) + '. ' + escapeHtml(r.username) +
-               '</span><span>' + formatNum(r.best_run_score) + '</span></div>';
-      }).join('');
+        return topRow(i, r.username, r.best_run_score, isMe);
+      }));
+      fetchAvatars(data.map(r => r.username));
     } catch (e) {}
   }
 
@@ -6220,27 +6255,7 @@
         box.innerHTML = '<div class="fr-note">' + escapeHtml(t().online.rkTopEmpty) + '</div>';
         return;
       }
-      // Первые три — медалями: место читается с одного взгляда
-      const MEDALS = ['🥇', '🥈', '🥉'];
-      box.innerHTML = '';
-      rows.forEach((r, i) => {
-        const row = document.createElement('div');
-        row.className = 'lb-row rk-top-row' + (r.username === me ? ' me' : '');
-        const place = document.createElement('span');
-        place.className = 'rk-place' + (i < 3 ? ' medal' : '');
-        place.textContent = MEDALS[i] || String(i + 1);
-        const face = document.createElement('span');
-        face.className = 'avatar';
-        paintAvatar(face, r.username);
-        const who = document.createElement('span');
-        who.className = 'rk-who';
-        who.textContent = r.username;
-        const pts = document.createElement('span');
-        pts.className = 'rk-pts';
-        pts.textContent = formatNum(r.elo);
-        row.append(place, face, who, pts);
-        box.appendChild(row);
-      });
+      box.replaceChildren(...rows.map((r, i) => topRow(i, r.username, r.elo, r.username === me)));
       fetchAvatars(rows.map(r => r.username));
     } catch (e) {}
   }

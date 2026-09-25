@@ -3728,6 +3728,55 @@ async function testCalmScreens(browser) {
   check('подпись под названием', choice.every(c => c.below), JSON.stringify(choice));
   check('и не больше двух строк', choice.every(c => c.lines <= 2), JSON.stringify(choice));
   await done(page);
+
+  // Строка статуса в игре — одна строка даже на узком телефоне, без пустого
+  // «Число загадано ✓»; «Меню» — значком с подписью для подсказки
+  for (const m of ['Solo', 'Duel']) {
+    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 } });
+    const p = await ctx.newPage();
+    p.on('pageerror', e => check('без ошибок JS', false, e.message));
+    await applyStub(p, {});
+    await p.goto(GAME_URL);
+    await p.waitForTimeout(300);
+    await p.click('#tMode' + m);
+    await p.waitForTimeout(200);
+    await p.click('#tStartMatch');
+    await p.waitForTimeout(300);
+    const bar = await p.evaluate(() => {
+      const b = document.getElementById('infoBar');
+      const tops = [...b.querySelectorAll('#attemptsLabel, .bar-actions')]
+        .map(e => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2));
+      const menu = document.getElementById('tMenu');
+      return { text: b.innerText, oneLine: Math.abs(tops[0] - tops[1]) <= 2,
+               menu: menu.textContent, label: menu.getAttribute('aria-label'), title: menu.title };
+    });
+    check(m + ': в строке статуса нет «Число загадано»', !/загадано/.test(bar.text), bar.text);
+    check(m + ': строка статуса в одну строку на 360px', bar.oneLine, JSON.stringify(bar));
+    check(m + ': «Меню» — значок с подписью', bar.menu === '☰' && bar.label === 'Меню' && bar.title === 'Меню',
+      JSON.stringify(bar));
+    await ctx.close();
+  }
+
+  // В «Испытании» на этом месте — «Пауза» словом, а топ оформлен как рейтинговый
+  page = await newGame(browser, { user: 'Лев' });
+  await page.click('#tModeRun');
+  await page.waitForTimeout(500);
+  const runTop = await page.evaluate(async () => {
+    // Два запроса подряд — как при быстром переключении вкладок
+    await Promise.all([renderRunLeaderboard(), renderRunLeaderboard()]);
+    return [...document.querySelectorAll('#runLeaderboardList .rk-top-row')].map(r => ({
+      place: r.querySelector('.rk-place').textContent, face: !!r.querySelector('.avatar'),
+      name: r.querySelector('.rk-who').textContent, me: r.classList.contains('me') }));
+  });
+  check('топ «Испытания» с медалями и кружками',
+    runTop.length > 0 && runTop[0].place === '🥇' && runTop.every(r => r.face), JSON.stringify(runTop));
+  check('два запроса подряд не задваивают строки',
+    new Set(runTop.map(r => r.name)).size === runTop.length, JSON.stringify(runTop));
+  await page.click('#tRunStart');
+  await page.waitForTimeout(400);
+  check('в «Испытании» кнопка называется «Пауза»',
+    (await page.locator('#tMenu').textContent()) === 'Пауза');
+  await done(page);
 }
 
 // ------------------------------------------ профиль: иконка, имя, PIN
