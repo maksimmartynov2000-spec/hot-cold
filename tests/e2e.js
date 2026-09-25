@@ -343,6 +343,7 @@ async function registerPlayer(p, name, pin) {
   for (const P of [A, B]) await P.page.evaluate(() => quitToMenu());
   await A.page.click('#accountChip');
   await A.page.waitForTimeout(700);
+  await A.page.click('#tAvatarStart');
   await A.page.click('#avGrid .av-tile[data-icon="🦊"]');
   await A.page.waitForTimeout(500);
   check('иконка записана в базу',
