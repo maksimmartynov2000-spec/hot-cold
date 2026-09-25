@@ -49,8 +49,9 @@
       overscroll-behavior: none;
       display: flex;
       justify-content: center;
-      align-items: center;
-      align-items: safe center;
+      /* Окно прижато к верху: по центру шапка прыгала от экрана к экрану —
+         в меню посреди экрана, в игре у верхнего края */
+      align-items: flex-start;
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       padding: calc(12px + env(safe-area-inset-top))
                calc(12px + env(safe-area-inset-right))
@@ -201,6 +202,8 @@
     .avatar.has-icon { font-size: 17px; }
     .avatar-btn .has-icon { font-size: 18px; }
     .pf-avatar.has-icon { font-size: 36px; }
+    .pin-hide { margin-left: 10px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.45); }
+    #tShowPin.pin-shown { letter-spacing: 0.02em; color: #fff; }
     /* Карандашик на кружке: подсказка, что его можно нажать и сменить иконку */
     .pf-avatar.editable { position: relative; cursor: pointer; }
     .pf-avatar.editable::after {
@@ -418,6 +421,10 @@
     .mode-btn .m-text { display: flex; flex-direction: column; min-width: 0; }
     .mode-btn .m-title { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
     .mode-btn .m-sub { font-size: 13px; color: rgba(255, 255, 255, 0.55); line-height: 1.35; }
+    /* Вход и регистрация: подпись под названием, а не сбоку — рядом с длинным
+       «Зарегистрироваться» ей оставалась узкая полоска в четыре строки */
+    .setup-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+    .mode-btn.stack { flex-direction: column; align-items: flex-start; gap: 0; }
     .mode-btn.duel { border-left: 3px solid var(--p1); }
     .mode-btn.solo { border-left: 3px solid var(--p0); }
     .mode-btn.run { border-left: 3px solid #4ade80; }
@@ -466,6 +473,21 @@
     /* Заголовок экрана, а не раздела: белый и крупнее серых подписей внутри */
     .screen-title { font-size: 19px; font-weight: 800; margin-bottom: 12px; }
     .fr-block.first { margin-top: 4px; }
+    /* Сворачиваемый раздел: заголовок — вся строка, в неё легко попасть пальцем */
+    .fold-head {
+      list-style: none; cursor: pointer; user-select: none;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; border-radius: 12px;
+      background: rgba(255, 255, 255, 0.06);
+      font-size: 14px; font-weight: 700; color: rgba(255, 255, 255, 0.85);
+    }
+    .fold-head::-webkit-details-marker { display: none; }
+    .fold-head::after {
+      content: '›'; font-size: 22px; line-height: 1; color: rgba(255, 255, 255, 0.5);
+      transition: transform 0.2s;
+    }
+    .fold[open] > .fold-head::after { transform: rotate(90deg); }
+    .fold-body { padding-top: 10px; }
     .fr-btn.more { padding: 5px 9px; font-size: 15px; line-height: 1; letter-spacing: 1px; }
     .friend-row .avatar { margin-right: 2px; }
     .fr-note {
@@ -561,22 +583,34 @@
       cursor: pointer;
       text-align: center;
     }
-    .rk-mode .rm-name { font-size: 12px; font-weight: 700; }
-    .rk-mode .rm-elo { font-size: 11px; opacity: 0.6; margin-top: 2px; }
+    /* В одну строку: «−100…100 · бонусы» переносилась, и кнопки выходили
+       разной высоты */
+    .rk-mode .rm-name { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+    #rkModes .rk-mode { padding: 11px 4px; }
     .rk-mode.active {
       background: rgba(251, 191, 36, 0.14);
       border-color: rgba(251, 191, 36, 0.5);
       color: #fbbf24;
     }
-    .rk-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 10px;
+    /* Рейтинг выбранной разновидности — крупно, один раз. Раньше он стоял и на
+       кнопке, и строкой ниже: два одинаковых числа рядом */
+    .rk-hero { text-align: center; padding: 10px 0 16px; }
+    .rk-elo { font-size: 44px; font-weight: 800; line-height: 1.05; color: #fbbf24;
+              font-variant-numeric: tabular-nums; }
+    .rk-elo-sub { font-size: 13px; color: rgba(255, 255, 255, 0.5); margin-top: 4px; }
+    .rk-top { margin-top: 26px; }
+    .lb-row.rk-top-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 8px; border-radius: 10px; font-size: 14px; border-bottom: none;
     }
-    .rk-head { margin-bottom: 12px; }
-    .rk-head .lb-title { margin-bottom: 0; font-size: 13px; color: rgba(255, 255, 255, 0.75); }
-    .rk-elo { font-size: 15px; font-weight: 700; color: #fbbf24; white-space: nowrap; }
+    .rk-top-row + .rk-top-row { margin-top: 2px; }
+    .rk-top-row.me { background: rgba(251, 191, 36, 0.12); color: #fbbf24; font-weight: 700; }
+    .rk-top-row .rk-place { width: 24px; text-align: center; flex: 0 0 auto;
+                            color: rgba(255, 255, 255, 0.45); font-weight: 700; }
+    /* Медаль — эмодзи: полупрозрачный цвет делал её серой */
+    .rk-top-row .rk-place.medal { color: #fff; font-size: 18px; }
+    .rk-top-row .rk-who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rk-top-row .rk-pts { font-variant-numeric: tabular-nums; font-weight: 700; }
     .rk-wait { margin-top: 10px; }
     /* Пока ищем соперника, единственное, что меняется, — это строка ожидания.
        Она должна быть заметна, но не мигать: точки дорисовываются в тексте */
@@ -714,18 +748,33 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       margin-bottom: 16px;
-      padding: 10px 14px;
+      padding: 10px 12px;
       background: rgba(255, 255, 255, 0.06);
       border-radius: 12px;
       flex-wrap: wrap;
     }
     .info-bar .confirmed { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+    .info-bar .confirmed:empty { display: none; }
+    .info-bar { position: relative; }
+    /* Пузырь поверх поля, а не в потоке: не толкает градусник вниз */
+    .bar-tip {
+      position: absolute; top: calc(100% + 6px); right: 8px; z-index: 5;
+      white-space: nowrap;
+      padding: 7px 12px; border-radius: 10px;
+      background: #f8fafc; color: #0f1430; font-size: 13px; font-weight: 600; line-height: 1.35;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    }
+    .bar-tip::before {
+      content: ''; position: absolute; top: -6px; right: var(--arrow-right, 18px);
+      border: 6px solid transparent; border-top: none; border-bottom-color: #f8fafc;
+    }
     .info-bar .attempts { font-size: 13px; font-weight: 600; color: #a5f3fc; }
     .info-bar .attempts.low { color: #f87171; }
 
-    .bar-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+    .bar-actions { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+    .btn-reset.icon { font-size: 15px; padding: 3px 10px; line-height: 1.3; }
 
     /* Градусник и прямую можно убрать: на маленьком экране лишние 150 пикселей
        иногда дороже красоты. Включённое состояние подсвечено, выключенное бледное */
@@ -733,7 +782,7 @@
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: 8px;
-      padding: 2px 6px;
+      padding: 2px 5px;
       font-size: 13px;
       line-height: 1.3;
       cursor: pointer;
@@ -1266,10 +1315,13 @@
       white-space: nowrap;
     }
     .run-greeting strong { color: rgba(255, 255, 255, 0.85); }
+    /* Под названием экрана «Играет …» — подзаголовок, а не отдельная строка
+       посередине */
+    .screen-title + .run-greeting { text-align: left; margin: -8px 0 16px; }
+    #screenRunHub #tRunStart + .frost-row { margin-top: 14px; }
     #screenRunHub .lb-wrap { margin-top: 28px; }
     #screenRunHub .lb-list { margin-top: 10px; }
-    #screenRunHub .lb-row { padding: 9px 4px; font-size: 14px; }
-    #screenRunHub .lb-row:last-child { border-bottom: none; }
+
     .run-hub-actions {
       display: flex;
       gap: 8px;
@@ -1412,6 +1464,7 @@
 
   <!-- ЭКРАН 2: настройка -->
   <div id="screenSetup" class="hidden">
+    <div class="screen-title" id="tSetupScreen"></div>
     <div class="setup-field tight">
       <label id="tLblRange">Range</label>
       <select class="field" id="rangeMax" onchange="onRangeChange()"></select>
@@ -1438,13 +1491,16 @@
         <select class="field" id="bonusCount" onchange="setBonusCount(this.value)"></select>
       </div>
 
-      <div class="setup-field">
-        <label id="tLblP1">Player 1</label>
-        <input type="text" id="nameP1" maxlength="14" />
-      </div>
-      <div class="setup-field">
-        <label id="tLblP2">Player 2</label>
-        <input type="text" id="nameP2" maxlength="14" />
+      <!-- Имена рядом, а не столбиком: форма дуэли не влезала в экран -->
+      <div class="setup-pair">
+        <div class="setup-field">
+          <label id="tLblP1">Player 1</label>
+          <input type="text" id="nameP1" maxlength="14" oninput="buildHandicapOptions()" />
+        </div>
+        <div class="setup-field">
+          <label id="tLblP2">Player 2</label>
+          <input type="text" id="nameP2" maxlength="14" oninput="buildHandicapOptions()" />
+        </div>
       </div>
       <div class="setup-field">
         <label id="tLblWins">Play until how many wins</label>
@@ -1491,7 +1547,7 @@
       <div class="center">
 
         <div class="info-bar" id="infoBar">
-          <span class="confirmed" id="tConfirmed">Number generated ✓</span>
+          <span class="confirmed" id="tConfirmed"></span>
           <span class="attempts" id="attemptsLabel"></span>
           <span class="bar-actions">
             <button class="mini-toggle" id="toggleThermoBtn" onclick="toggleThermo()">🌡️</button>
@@ -1500,6 +1556,9 @@
             <button class="mini-toggle hidden" id="sayBtn" onclick="toggleSayPad()">💬</button>
             <button class="btn-reset" onclick="leaveGame()" id="tMenu">Menu</button>
           </span>
+          <!-- Что сделала кнопка-значок. Показывается при первом нажатии на
+               каждую: без подписи 🌡️ 📏 💡 непонятны, а место под слова нет -->
+          <div class="bar-tip hidden" id="barTip" role="status"></div>
         </div>
 
         <div class="turn-banner hidden" id="turnBanner"></div>
@@ -1586,11 +1645,11 @@
   <!-- ЭКРАН: выбор вход/регистрация -->
   <div id="screenAuthChoice" class="hidden">
     <div class="mode-list">
-      <button class="mode-btn solo" onclick="showRunAuth('login')">
+      <button class="mode-btn solo stack" onclick="showRunAuth('login')">
         <div class="m-title" id="tRunChoiceLogin"></div>
         <div class="m-sub" id="tRunChoiceLoginSub"></div>
       </button>
-      <button class="mode-btn run" onclick="showRunAuth('register')">
+      <button class="mode-btn run stack" onclick="showRunAuth('register')">
         <div class="m-title" id="tRunChoiceRegister"></div>
         <div class="m-sub" id="tRunChoiceRegisterSub"></div>
       </button>
@@ -1622,14 +1681,18 @@
   </div>
 
   <!-- ЭКРАН: онлайн. Сейчас это друзья; вызовы на игру встанут сюда же -->
+  <!-- Рейтинг. Сверху вниз — ровно в том порядке, в каком решают: во что
+       играть, сколько у меня очков, играть. Всё прочее — ниже и только когда
+       есть что показать -->
   <div id="screenOnline" class="hidden">
+    <div class="screen-title" id="tOnlineScreen"></div>
     <div class="run-greeting hidden" id="onlineGreeting"></div>
 
     <div id="olRanked">
       <div class="rk-modes" id="rkModes"></div>
-      <div class="rk-head">
-        <div class="lb-title" id="rkModeName"></div>
+      <div class="rk-hero">
         <div class="rk-elo" id="rkElo"></div>
+        <div class="rk-elo-sub" id="rkEloSub"></div>
       </div>
       <div class="fr-note hidden" id="rkNote"></div>
       <button class="btn btn-block" id="tRkPlay" onclick="startRanked()"></button>
@@ -1638,12 +1701,13 @@
         <div class="rk-wait-sub" id="rkWaitSub"></div>
         <button class="btn-ghost btn-block" id="tRkCancel" onclick="cancelRanked()"></button>
       </div>
-      <div class="fr-block">
+      <!-- Идущие рейтинговые игры. Пусто — блока нет: «игра не идёт» и так
+           видно по тому, что вы не в игре -->
+      <div class="fr-block hidden" id="rkGamesBox">
         <div class="lb-title" id="tRkGames"></div>
-        <div class="fr-note hidden" id="rkGamesNote"></div>
         <div id="rkGamesList" class="friend-list"></div>
       </div>
-      <div class="lb-wrap">
+      <div class="rk-top">
         <div class="lb-title" id="tRkTop"></div>
         <div id="rkTopList" class="lb-list"></div>
       </div>
@@ -1707,15 +1771,20 @@
       </div>
     </div>
 
-    <div class="fr-block">
-      <div class="lb-title" id="tLblFindFriend">Find a player</div>
-      <div class="row">
-        <input type="text" id="friendSearch" maxlength="20" autocomplete="off" />
-        <button class="btn" id="tFindBtn" onclick="searchStudents()">Find</button>
+    <!-- Поиск свёрнут: он нужен изредка, а список «недавно играли» занимал
+         пол-экрана каждый раз. Новичку без друзей раскрыт — больше ему тут
+         делать нечего -->
+    <details class="fr-block fold" id="findBox">
+      <summary class="fold-head" id="tLblFindFriend">Find a player</summary>
+      <div class="fold-body">
+        <div class="row">
+          <input type="text" id="friendSearch" maxlength="20" autocomplete="off" />
+          <button class="btn" id="tFindBtn" onclick="searchStudents()">Find</button>
+        </div>
+        <div class="fr-note hidden" id="searchNote"></div>
+        <div id="searchResults" class="friend-list"></div>
       </div>
-      <div class="fr-note hidden" id="searchNote"></div>
-      <div id="searchResults" class="friend-list"></div>
-    </div>
+    </details>
     </div>
 
     <div class="run-hub-actions">
@@ -1745,6 +1814,7 @@
 
   <!-- ЭКРАН: хаб режима на рейтинг (старт/результат/топ) -->
   <div id="screenRunHub" class="hidden">
+    <div class="screen-title" id="tRunScreen"></div>
     <div class="run-greeting hidden" id="runGreeting"></div>
     <div id="runHubMessage"></div>
     <div class="fr-note hidden" id="runNote"></div>
@@ -1896,7 +1966,7 @@
   const i18n = {
     en: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Number generated ✓", attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
+      attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
       frostLabel: "Frost and Heat",
       say: {
         hi: "\ud83d\udc4b Hello!",
@@ -1970,10 +2040,9 @@
         deletedPlayer: "deleted player",
         rkBonusTag: "bonuses",
         rkGames: "Your ranked games",
-        rkNoGames: "No ranked game going on",
         rkOtherMode: "You are waiting in {mode} \u2014 pressing Play moves you here",
         rkPlay: "Play ranked",
-        rkElo: "rating {n} \u00b7 {g} games", rkEloShort: "rating {n}",
+        rkEloSub: "your rating \u00b7 {g} games",
         rkSearching: "Looking for an opponent",
         rkWaited: "{n} s in the queue",
         rkQueueOne: "you are the only one waiting",
@@ -2003,6 +2072,8 @@
       forcedHint: { skip: "You may arm a token first: then the skip counts as your first move and you play a second one", lava: "You may arm a token first: then the toss counts as your first move and you play a second one" },
       forcedBtn: { skip: "Skip", lava: "Into the lava" },
       hintLabel: "Distance hint",
+      tips: { thermo: ["Thermometer hidden", "Thermometer shown"], line: ["Number line hidden", "Number line shown"],
+              hint: ["Distance hidden", "Distance shown"] },
       vizThermo: "Thermometer", vizLine: "Number line",
       enterGuess: "Enter a number", placeholderTpl: "from {a} to {b}", submitGuess: "Check",
       finalWarning: "Attempts used — last chance!", finalSubmit: "Submit", finalInput: "Final answer...",
@@ -2016,7 +2087,7 @@
       lblP1: "Player 1", lblP2: "Player 2", defP1: "Player 1", defP2: "Player 2",
       lblWins: "Play until how many wins", lblHandicap: "Head start",
       lblRange: "Range", lblAttempts: "Attempts",
-      hcNone: "None", hcTokens: "2 tokens", hcFirst: "always goes first",
+      hcNone: "None", hcTokens: "2 tokens",
       back: "Back", startMatch: "Start game", startGame: "Start game",
       winsLabel: "Wins", tokenBtn: "⚡ +1 move", tokenArmed: "⚡ +1 move active", tokenSpent: "⚡ Token spent",
       turnOf: "Turn: ", roundLabel: "Round ",
@@ -2100,12 +2171,12 @@
         ownerChanged: "This name now belongs to another player \u2014 log in again with your new name",
         signIn: "Sign in or create an account",
         showPin: "Show PIN",
-        yourPin: "Your PIN: ",
+        yourPin: "Your PIN: ", pinHide: "hide",
       }
     },
     ru: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Число загадано ✓", attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
+      attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
       frostLabel: "Мороз и Жара",
       say: {
         hi: "\ud83d\udc4b Привет!",
@@ -2179,10 +2250,9 @@
         deletedPlayer: "удалённый игрок",
         rkBonusTag: "бонусы",
         rkGames: "Ваши рейтинговые игры",
-        rkNoGames: "Рейтинговая игра не идёт",
         rkOtherMode: "Вы ждёте в режиме {mode} — «Играть» перенесёт сюда",
         rkPlay: "Играть на рейтинг",
-        rkElo: "рейтинг {n} \u00b7 игр: {g}", rkEloShort: "рейтинг {n}",
+        rkEloSub: "ваш рейтинг \u00b7 игр: {g}",
         rkSearching: "Ищем соперника",
         rkWaited: "в очереди {n} с",
         rkQueueOne: "пока ждёте только вы",
@@ -2212,6 +2282,8 @@
       forcedHint: { skip: "Можно сначала взвести жетон: тогда пропуск пойдёт первым ходом, а второй вы сделаете сами", lava: "Можно сначала взвести жетон: тогда бросок пойдёт первым ходом, а второй вы сделаете сами" },
       forcedBtn: { skip: "Пропустить ход", lava: "В лаву" },
       hintLabel: "Подсказка: расстояние",
+      tips: { thermo: ["Градусник скрыт", "Градусник показан"], line: ["Прямая скрыта", "Прямая показана"],
+              hint: ["Расстояние скрыто", "Расстояние показано"] },
       vizThermo: "Градусник", vizLine: "Числовая прямая",
       enterGuess: "Введите число", placeholderTpl: "от {a} до {b}", submitGuess: "Проверить",
       finalWarning: "Попытки закончились — последний шанс!", finalSubmit: "Ответить", finalInput: "Финальный ответ...",
@@ -2225,7 +2297,7 @@
       lblP1: "Игрок 1", lblP2: "Игрок 2", defP1: "Игрок 1", defP2: "Игрок 2",
       lblWins: "Играем до скольких побед", lblHandicap: "Фора",
       lblRange: "Диапазон", lblAttempts: "Попыток",
-      hcNone: "Нет", hcTokens: "2 жетона", hcFirst: "всегда ходит первым",
+      hcNone: "Нет", hcTokens: "2 жетона",
       back: "Назад", startMatch: "Начать игру", startGame: "Начать игру",
       winsLabel: "Побед", tokenBtn: "⚡ +1 ход", tokenArmed: "⚡ +1 ход активен", tokenSpent: "⚡ Жетон потрачен",
       turnOf: "Ходит: ", roundLabel: "Раунд ",
@@ -2309,12 +2381,12 @@
         ownerChanged: "Это имя теперь у другого игрока — войдите заново под своим новым именем",
         signIn: "Войти или создать аккаунт",
         showPin: "Показать PIN",
-        yourPin: "Ваш PIN: ",
+        yourPin: "Ваш PIN: ", pinHide: "скрыть",
       }
     },
     fr: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Nombre généré ✓", attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
+      attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
       frostLabel: "Gel et Chaleur",
       say: {
         hi: "\ud83d\udc4b Salut !",
@@ -2388,10 +2460,9 @@
         deletedPlayer: "joueur supprim\u00e9",
         rkBonusTag: "bonus",
         rkGames: "Vos parties class\u00e9es",
-        rkNoGames: "Aucune partie class\u00e9e en cours",
         rkOtherMode: "Vous attendez en {mode} \u2014 \u00ab Jouer \u00bb vous d\u00e9place ici",
         rkPlay: "Jouer en class\u00e9",
-        rkElo: "classement {n} \u00b7 {g} parties", rkEloShort: "classement {n}",
+        rkEloSub: "votre classement \u00b7 {g} parties",
         rkSearching: "Recherche d'un adversaire",
         rkWaited: "{n} s dans la file",
         rkQueueOne: "vous \u00eates seul \u00e0 attendre",
@@ -2421,6 +2492,8 @@
       forcedHint: { skip: "Vous pouvez d\u2019abord armer un jeton : le tour pass\u00e9 compte alors comme premier coup et vous en jouez un second", lava: "Vous pouvez d\u2019abord armer un jeton : le jet compte alors comme premier coup et vous en jouez un second" },
       forcedBtn: { skip: "Passer le tour", lava: "Dans la lave" },
       hintLabel: "Indice de distance",
+      tips: { thermo: ["Thermomètre masqué", "Thermomètre affiché"], line: ["Droite masquée", "Droite affichée"],
+              hint: ["Distance masquée", "Distance affichée"] },
       vizThermo: "Thermomètre", vizLine: "Droite numérique",
       enterGuess: "Entrez un nombre", placeholderTpl: "de {a} à {b}", submitGuess: "Vérifier",
       finalWarning: "Tentatives épuisées — dernière chance !", finalSubmit: "Valider", finalInput: "Réponse finale...",
@@ -2434,7 +2507,7 @@
       lblP1: "Joueur 1", lblP2: "Joueur 2", defP1: "Joueur 1", defP2: "Joueur 2",
       lblWins: "Jusqu'à combien de victoires", lblHandicap: "Avantage",
       lblRange: "Plage", lblAttempts: "Essais",
-      hcNone: "Aucun", hcTokens: "2 jetons", hcFirst: "commence toujours",
+      hcNone: "Aucun", hcTokens: "2 jetons",
       back: "Retour", startMatch: "Commencer la partie", startGame: "Commencer la partie",
       winsLabel: "Victoires", tokenBtn: "⚡ +1 tour", tokenArmed: "⚡ +1 tour activé", tokenSpent: "⚡ Jeton utilisé",
       turnOf: "Au tour de : ", roundLabel: "Manche ",
@@ -2518,12 +2591,12 @@
         ownerChanged: "Ce nom appartient maintenant \u00e0 un autre joueur \u2014 reconnectez-vous avec votre nouveau nom",
         signIn: "Se connecter ou cr\u00e9er un compte",
         showPin: "Afficher le PIN",
-        yourPin: "Votre PIN : ",
+        yourPin: "Votre PIN : ", pinHide: "masquer",
       }
     },
     de: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
-      confirmed: "Zahl generiert ✓", attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
+      attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze",
       say: {
         hi: "\ud83d\udc4b Hallo!",
@@ -2597,10 +2670,9 @@
         deletedPlayer: "gel\u00f6schter Spieler",
         rkBonusTag: "Boni",
         rkGames: "Ihre Ranglistenpartien",
-        rkNoGames: "Keine Ranglistenpartie im Gang",
         rkOtherMode: "Sie warten in {mode} \u2014 \u201eSpielen\u201c verschiebt Sie hierher",
         rkPlay: "Um Punkte spielen",
-        rkElo: "Wertung {n} \u00b7 {g} Partien", rkEloShort: "Wertung {n}",
+        rkEloSub: "deine Wertung \u00b7 {g} Partien",
         rkSearching: "Gegner wird gesucht",
         rkWaited: "{n} s in der Warteschlange",
         rkQueueOne: "nur Sie warten gerade",
@@ -2630,6 +2702,8 @@
       forcedHint: { skip: "Du kannst vorher einen Jeton spannen: dann z\u00e4hlt das Aussetzen als erster Zug und du ziehst ein zweites Mal", lava: "Du kannst vorher einen Jeton spannen: dann z\u00e4hlt der Wurf als erster Zug und du ziehst ein zweites Mal" },
       forcedBtn: { skip: "Zug aussetzen", lava: "In die Lava" },
       hintLabel: "Abstandshinweis",
+      tips: { thermo: ["Thermometer aus", "Thermometer an"], line: ["Zahlenstrahl aus", "Zahlenstrahl an"],
+              hint: ["Abstand aus", "Abstand an"] },
       vizThermo: "Thermometer", vizLine: "Zahlenstrahl",
       enterGuess: "Gib eine Zahl ein", placeholderTpl: "von {a} bis {b}", submitGuess: "Prüfen",
       finalWarning: "Versuche aufgebraucht — letzte Chance!", finalSubmit: "Bestätigen", finalInput: "Letzte Antwort...",
@@ -2643,7 +2717,7 @@
       lblP1: "Spieler 1", lblP2: "Spieler 2", defP1: "Spieler 1", defP2: "Spieler 2",
       lblWins: "Bis wie viele Siege", lblHandicap: "Vorsprung",
       lblRange: "Bereich", lblAttempts: "Versuche",
-      hcNone: "Ohne", hcTokens: "2 Jetons", hcFirst: "beginnt immer",
+      hcNone: "Ohne", hcTokens: "2 Jetons",
       back: "Zurück", startMatch: "Spiel starten", startGame: "Spiel starten",
       winsLabel: "Siege", tokenBtn: "⚡ +1 Zug", tokenArmed: "⚡ +1 Zug aktiv", tokenSpent: "⚡ Jeton verbraucht",
       turnOf: "Am Zug: ", roundLabel: "Runde ",
@@ -2727,7 +2801,7 @@
         ownerChanged: "Dieser Name geh\u00f6rt jetzt einem anderen Spieler \u2014 melde dich mit deinem neuen Namen an",
         signIn: "Anmelden oder Konto erstellen",
         showPin: "PIN anzeigen",
-        yourPin: "Deine PIN: ",
+        yourPin: "Deine PIN: ", pinHide: "ausblenden",
       }
     }
   };
@@ -2888,18 +2962,47 @@
     showThermo = !showThermo;
     try { localStorage.setItem('hc_show_thermo', showThermo ? '1' : '0'); } catch (e) {}
     renderAll();
+    firstTimeTip('thermo', 'toggleThermoBtn', '🌡️', showThermo);
   }
 
   function toggleLine() {
     showLine = !showLine;
     try { localStorage.setItem('hc_show_line', showLine ? '1' : '0'); } catch (e) {}
     renderAll();
+    firstTimeTip('line', 'toggleLineBtn', '📏', showLine);
   }
 
   function toggleHint() {
     distanceHint = !distanceHint;
     try { localStorage.setItem('hc_hint', distanceHint ? '1' : '0'); } catch (e) {}
     renderAll();
+    firstTimeTip('hint', 'toggleHintBtn', '💡', distanceHint);
+  }
+
+  // Значок без подписи понятен, только когда уже знаешь, что он делает. Поэтому
+  // первое нажатие на каждый объясняет себя парой слов: что скрылось или
+  // появилось. Дальше не мешаем — запомнено, что человек уже видел
+  const TIP_MS = 3500;
+  let tipTimer = null;
+  function firstTimeTip(key, btnId, icon, on) {
+    try {
+      if (localStorage.getItem('hc_tip_' + key) === '1') return;
+      localStorage.setItem('hc_tip_' + key, '1');
+    } catch (e) {}
+    const tip = document.getElementById('barTip');
+    tip.textContent = icon + ' ' + t().tips[key][on ? 1 : 0];
+    tip.classList.remove('hidden');
+    // Стрелка — под той кнопкой, что нажали
+    const b = document.getElementById(btnId).getBoundingClientRect();
+    const t0 = tip.getBoundingClientRect();
+    tip.style.setProperty('--arrow-right', Math.max(8, Math.round(t0.right - (b.left + b.width / 2) - 6)) + 'px');
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(hideBarTip, TIP_MS);
+  }
+  function hideBarTip() {
+    clearTimeout(tipTimer);
+    tipTimer = null;
+    document.getElementById('barTip').classList.add('hidden');
   }
 
   function rangeCount() { return RANGE_MAX - RANGE_MIN + 1; }
@@ -2974,7 +3077,7 @@
   const D = {
     names: ["", ""],
     winsNeeded: 3,
-    handicap: 0,      // 0 нет, 1/2 — 2 жетона игроку 1/2, 3/4 — игрок 1/2 всегда первый
+    handicap: 0,      // 0 нет, 1/2 — 2 жетона игроку 1/2
     wins: [0, 0],
     tokens: [0, 0],
     cur: 0,
@@ -3083,16 +3186,18 @@
     updateAccountChip();
   }
 
+  // Фора — только лишний жетон. «Всегда ходит первым» убрано: первый ход
+  // и так переходит от раунда к раунду. В подписи — имена, если их ввели
   function buildHandicapOptions() {
     const sel = document.getElementById('handicap');
     const prev = sel.value || "0";
     const L = t();
+    const who = i => (document.getElementById(i ? 'nameP2' : 'nameP1').value || '').trim() ||
+                     (i ? L.defP2 : L.defP1);
     const opts = [
       L.hcNone,
-      L.defP1 + " — " + L.hcTokens,
-      L.defP2 + " — " + L.hcTokens,
-      L.defP1 + " — " + L.hcFirst,
-      L.defP2 + " — " + L.hcFirst
+      who(0) + " — " + L.hcTokens,
+      who(1) + " — " + L.hcTokens
     ];
     sel.innerHTML = '';
     opts.forEach((txt, i) => {
@@ -3109,8 +3214,13 @@
     document.getElementById('docTitle').textContent = L.docTitle;
     document.title = L.docTitle;
     document.getElementById('tTitle').textContent = L.title;
-    document.getElementById('tConfirmed').textContent = L.confirmed;
-    document.getElementById('tMenu').textContent = L.menu;
+    // В строке статуса «Меню» — значком: словом оно не помещалось в одну
+    // строку с попытками и тремя переключателями, и строка ломалась надвое
+    const menuBtn = document.getElementById('tMenu');
+    menuBtn.textContent = '☰';
+    menuBtn.title = L.menu;
+    menuBtn.setAttribute('aria-label', L.menu);
+    menuBtn.classList.toggle('icon', mode !== 'run');
     document.getElementById('tFinalWarning').textContent = L.finalWarning;
     document.getElementById('tFinalSubmit').textContent = L.finalSubmit;
     document.getElementById('tEnterGuess').textContent = L.enterGuess;
@@ -3123,6 +3233,9 @@
 
     document.getElementById('tModeSolo').textContent = L.modeSolo;
     document.getElementById('tModeDuel').textContent = L.modeDuel;
+    // У каждого экрана своё название — с тем же значком, что в меню
+    document.getElementById('tSetupScreen').textContent =
+      mode === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo;
 
     document.getElementById('tLblP1').textContent = L.lblP1;
     document.getElementById('tLblP2').textContent = L.lblP2;
@@ -3150,6 +3263,7 @@
 
     // экраны режима на рейтинг
     document.getElementById('tModeRun').textContent = L.run.mode;
+    document.getElementById('tRunScreen').textContent = '🏆 ' + L.run.mode;
     document.getElementById('tGroupOffline').textContent = L.groupOffline;
     document.getElementById('tGroupOnline').textContent = L.groupOnline;
     document.getElementById('tModeOnline').textContent = L.online.mode;
@@ -3169,6 +3283,7 @@
     document.getElementById('tRkPlay').textContent = L.online.rkPlay;
     document.getElementById('tRkCancel').textContent = L.online.rkCancel;
     document.getElementById('tRkTop').textContent = L.online.rkTop;
+    document.getElementById('tOnlineScreen').textContent = '🌐 ' + L.online.mode;
     document.getElementById('tRkGames').textContent = L.online.rkGames;
     document.getElementById('tChRange').textContent = L.online.chRange;
     document.getElementById('tChFrost').textContent = L.frostLabel;
@@ -3196,7 +3311,11 @@
     document.getElementById('tRunTopWeek').textContent = L.run.topWeek;
     document.getElementById('tRunTopAll').textContent = L.run.topAll;
     document.getElementById('tRunToMenu').textContent = L.run.toMenu;
-    if (mode === 'run') document.getElementById('tMenu').textContent = L.run.pause;
+    if (mode === 'run') {
+      document.getElementById('tMenu').textContent = L.run.pause;
+      document.getElementById('tMenu').title = L.run.pause;
+      document.getElementById('tMenu').setAttribute('aria-label', L.run.pause);
+    }
     document.getElementById('tPauseTitle').textContent = L.run.pauseTitle;
     document.getElementById('tPauseResume').textContent = L.run.resume;
     document.getElementById('tPauseExit').textContent = L.run.exitKeep;
@@ -3244,6 +3363,7 @@
   }
 
   function quitToMenu() {
+    hideBarTip();
     mode = null;
     D.matchOver = false;
     applyTranslations();
@@ -3267,6 +3387,8 @@
     document.getElementById('duelOnlyFields').classList.toggle('hidden', m !== 'duel');
     document.getElementById('attemptsField').classList.toggle('hidden', m !== 'solo');
     document.getElementById('tStartMatch').textContent = (m === 'duel') ? L.startMatch : L.startGame;
+    document.getElementById('tSetupScreen').textContent =
+      m === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo;
     buildRangeOptions();
     if (m === 'duel') buildHandicapOptions();
     renderBonusSetup();
@@ -3472,7 +3594,7 @@
     D.wins = [0, 0];
     D.round = 1;
     D.matchOver = false;
-    D.starter = (D.handicap === 3) ? 0 : (D.handicap === 4 ? 1 : 0);
+    D.starter = 0;
     startRound();
     applyTranslations();
     showScreen('game');
@@ -3503,7 +3625,7 @@
   function nextRound() {
     if (online) return onlineNextRound();
     D.round++;
-    if (D.handicap !== 3 && D.handicap !== 4) D.starter = 1 - D.starter;
+    D.starter = 1 - D.starter;
     startRound();
   }
 
@@ -3511,7 +3633,7 @@
     D.wins = [0, 0];
     D.round = 1;
     D.matchOver = false;
-    D.starter = (D.handicap === 3) ? 0 : (D.handicap === 4 ? 1 : 0);
+    D.starter = 0;
     startRound();
   }
 
@@ -4042,8 +4164,10 @@
     const banner = document.getElementById('turnBanner');
     const confirmed = document.getElementById('tConfirmed');
 
+    // «Число загадано ✓» ничего не сообщало: число загадано всегда. Место
+    // остаётся пустым, если сказать нечего, — и строка не переносится
     if (duel) {
-      confirmed.textContent = L.confirmed;
+      confirmed.textContent = '';
       attempts.textContent = L.roundLabel + D.round;
       attempts.className = 'attempts';
       if (D.roundOver) { banner.classList.add('hidden'); }
@@ -4078,7 +4202,7 @@
                                       formatNum(best) + '</span>' : '');
       } else {
         const rec = getRecord(RANGE_MAX);
-        confirmed.innerHTML = (rec === null) ? L.confirmed : (L.recordLabel + '<strong>' + rec + '</strong>');
+        confirmed.innerHTML = (rec === null) ? '' : (L.recordLabel + '<strong>' + rec + '</strong>');
       }
     }
   }
@@ -4290,8 +4414,27 @@
 
   // Шкала расстояний нужна, пока идёт партия. На итогах она занимает пол-экрана
   // и отодвигает вниз то, ради чего партия и была — сворачиваем её, а в новом
-  // раунде возвращаем в том виде, в каком её оставил игрок
-  let scaleWanted = localStorage.getItem('hc_scale_open') !== '0';
+  // раунде возвращаем в том виде, в каком её оставил игрок.
+  //
+  // Если игрок её не трогал: на телефоне она раскрыта только в первой партии —
+  // пока шкалу не видел, она нужна; дальше полэкрана под неё жалко, а раскрыть
+  // её можно одним нажатием. На широком экране место есть — раскрыта всегда
+  const SCALE_NARROW = '(max-width: 859px)';
+  function scaleWanted() {
+    let choice = null, played = 0;
+    try {
+      choice = localStorage.getItem('hc_scale_open');
+      played = parseInt(localStorage.getItem('hc_games_done')) || 0;
+    } catch (e) {}
+    if (choice !== null) return choice !== '0';
+    return !(played > 0 && window.matchMedia(SCALE_NARROW).matches);
+  }
+  function countGameDone() {
+    try {
+      const n = parseInt(localStorage.getItem('hc_games_done')) || 0;
+      localStorage.setItem('hc_games_done', String(n + 1));
+    } catch (e) {}
+  }
   let scaleAutoValue = null;
   let scaleCollapsed = false;
 
@@ -4311,17 +4454,17 @@
       const auto = scaleAutoValue;
       scaleAutoValue = null;
       if (auto !== null && box.open === auto) return;
-      scaleWanted = box.open;
-      try { localStorage.setItem('hc_scale_open', scaleWanted ? '1' : '0'); } catch (e) {}
+      try { localStorage.setItem('hc_scale_open', box.open ? '1' : '0'); } catch (e) {}
     });
-    setScaleOpen(scaleWanted);
+    setScaleOpen(scaleWanted());
   }
 
   function syncScaleBox() {
     const over = roundOver();
     if (over === scaleCollapsed) return;
     scaleCollapsed = over;
-    setScaleOpen(over ? false : scaleWanted);
+    if (over) countGameDone();
+    setScaleOpen(over ? false : scaleWanted());
   }
 
   function buildLegend() {
@@ -4656,7 +4799,7 @@
     document.getElementById('pfEdit').classList.toggle('hidden', !(auth && profileInfo));
     if (auth && profileInfo) renderAvatarGrid();
     if (auth) {
-      document.getElementById('tShowPin').textContent = L.run.showPin;
+      paintPinButton();
       document.getElementById('tLogoutAsk').textContent = L.run.logoutAsk.replace('{name}', auth.username);
       document.getElementById('tDeleteAccount').textContent = L.online.deleteAccount;
       renderPushToggle();
@@ -4666,6 +4809,7 @@
   function openLogoutModal() {
     const auth = runAuth();
     askLogout(false);
+    hideOwnPin();
     showAvatarPicker(false);
     openRename(false);
     openPinChange(false);
@@ -4830,6 +4974,7 @@
   }
 
   function closeLogoutModal() {
+    hideOwnPin();
     document.getElementById('logoutModal').classList.add('hidden');
   }
 
@@ -5036,10 +5181,36 @@
 
   // Свой собственный PIN на своём же устройстве: он и так лежит в браузере,
   // так что показать его владельцу — это не раскрытие, а напоминание
+  // PIN на экране — ровно пока нужен: нажал ещё раз — спрятался, забыл
+  // спрятать — спрячется сам через 10 секунд (вдруг рядом кто-то смотрит)
+  const PIN_SHOW_MS = 10000;
+  let pinTimer = null;
+
   function revealOwnPin() {
     const auth = runAuth();
     if (!auth) return;
-    document.getElementById('tShowPin').textContent = t().run.yourPin + auth.pin;
+    if (pinTimer) return hideOwnPin();
+    pinTimer = setTimeout(hideOwnPin, PIN_SHOW_MS);
+    paintPinButton();
+  }
+
+  function hideOwnPin() {
+    if (pinTimer) clearTimeout(pinTimer);
+    pinTimer = null;
+    paintPinButton();
+  }
+
+  function paintPinButton() {
+    const btn = document.getElementById('tShowPin');
+    const auth = runAuth();
+    const L = t().run;
+    btn.classList.toggle('pin-shown', !!(pinTimer && auth));
+    if (!pinTimer || !auth) { btn.textContent = L.showPin; return; }
+    btn.textContent = L.yourPin + auth.pin;
+    const hint = document.createElement('span');
+    hint.className = 'pin-hide';
+    hint.textContent = L.pinHide;
+    btn.appendChild(hint);
   }
 
   async function openRunHub(message) {
@@ -5100,6 +5271,28 @@
     renderRunLeaderboard();
   }
 
+  // Строка любого топа — рейтинга и «Испытания» одинаково. Первые три —
+  // медалями: место читается с одного взгляда
+  const MEDALS = ['🥇', '🥈', '🥉'];
+  function topRow(i, name, points, isMe) {
+    const row = document.createElement('div');
+    row.className = 'lb-row rk-top-row' + (isMe ? ' me' : '');
+    const place = document.createElement('span');
+    place.className = 'rk-place' + (i < 3 ? ' medal' : '');
+    place.textContent = MEDALS[i] || String(i + 1);
+    const face = document.createElement('span');
+    face.className = 'avatar';
+    paintAvatar(face, name);
+    const who = document.createElement('span');
+    who.className = 'rk-who';
+    who.textContent = name;
+    const pts = document.createElement('span');
+    pts.className = 'rk-pts';
+    pts.textContent = formatNum(points);
+    row.append(place, face, who, pts);
+    return row;
+  }
+
   async function renderRunLeaderboard() {
     const el = document.getElementById('runLeaderboardList');
     if (!sb || !el) return;
@@ -5120,13 +5313,14 @@
         el.innerHTML = '<div class="lb-empty">' + L.run.noScores + '</div>';
         return;
       }
-      el.innerHTML = data.map((r, i) => {
-        const isMe = auth && String(r.username).toLowerCase() === auth.username.toLowerCase();
+      // Заменяем целиком, а не дописываем: два запроса подряд (быстро
+      // переключили вкладку) иначе сложили бы строки дважды
+      el.replaceChildren(...data.map((r, i) => {
+        const isMe = !!auth && String(r.username).toLowerCase() === auth.username.toLowerCase();
         if (isMe && leaderboardScope === 'all') rememberRunBest(r.best_run_score);
-        const style = isMe ? ' style="color:#fbbf24;font-weight:700"' : '';
-        return '<div class="lb-row"' + style + '><span>' + (i + 1) + '. ' + escapeHtml(r.username) +
-               '</span><span>' + formatNum(r.best_run_score) + '</span></div>';
-      }).join('');
+        return topRow(i, r.username, r.best_run_score, isMe);
+      }));
+      fetchAvatars(data.map(r => r.username));
     } catch (e) {}
   }
 
@@ -5144,7 +5338,6 @@
     const auth = runAuth();
     if (!auth) { authReturn = 'online'; return showScreen('authChoice'); }
     renderGreeting(auth.username);
-    setNote('rkGamesNote', '');
     setNote('rkNote', '');
     applyTranslations();
     renderRankedModes();
@@ -5158,11 +5351,16 @@
   }
 
   let friendMenuOpen = null;
+  // Раскрыт ли поиск, решаем один раз за заход на экран — по первому списку
+  // друзей. Дальше решает игрок: опрос каждые 10 секунд его выбор не трогает
+  let findDecided = false;
 
   function openFriends() {
     const auth = runAuth();
     if (!auth) { authReturn = 'friends'; return showScreen('authChoice'); }
     friendMenuOpen = null;
+    document.getElementById('findBox').open = false;
+    findDecided = false;
     // Иконки могли смениться с прошлого раза — спрашиваем заново
     Object.keys(avatarCache).forEach(k => { delete avatarCache[k]; });
     renderGreeting(auth.username);
@@ -5355,6 +5553,10 @@
       const rows = (await friendRpc('list_friends')) || [];
       setFriendsBadge(rows);
       renderFriends(rows);
+      if (!findDecided) {
+        findDecided = true;
+        if (!rows.some(r => r.relation === 'friend')) document.getElementById('findBox').open = true;
+      }
       setNote('friendsNote', rows.length ? '' : t().online.noFriends);
     } catch (e) {
       if (!quiet) setNote('friendsNote', friendErrorText(e.message), true);
@@ -5416,7 +5618,7 @@
       const L = t().online;
       const split = [
         { rows: rows.filter(m => !m.ranked), box: 'gamesList', note: 'gamesNote', empty: L.noGames },
-        { rows: rows.filter(m => m.ranked), box: 'rkGamesList', note: 'rkGamesNote', empty: L.rkNoGames }
+        { rows: rows.filter(m => m.ranked), box: 'rkGamesList', note: null, empty: '' }
       ];
       split.forEach(part => {
         const box = document.getElementById(part.box);
@@ -5425,12 +5627,13 @@
           if (m.status === 'invited' && m.seat === 1) notifyAway('invite-' + m.id);
           box.appendChild(matchRow(m));
         });
-        setNote(part.note, part.rows.length ? '' : part.empty);
+        if (part.note) setNote(part.note, part.rows.length ? '' : part.empty);
       });
+      document.getElementById('rkGamesBox').classList.toggle('hidden', !rows.some(m => m.ranked));
     } catch (e) {
       if (!quiet) {
         setNote('gamesNote', onlineMatchError(e.message), true);
-        setNote('rkGamesNote', onlineMatchError(e.message), true);
+        if (screen === 'online') setNote('rkNote', onlineMatchError(e.message), true);
       }
     }
   }
@@ -6004,12 +6207,7 @@
       const name = document.createElement('div');
       name.className = 'rm-name';
       name.textContent = rankedModeLabel(mode);
-      const elo = document.createElement('div');
-      elo.className = 'rm-elo';
-      const r = rankedRatings && rankedRatings[mode];
-      // Голое «1 000» под «1–100» читалось как вторая граница диапазона
-      elo.textContent = r ? t().online.rkEloShort.replace('{n}', formatNum(r.elo)) : '';
-      b.appendChild(name); b.appendChild(elo);
+      b.appendChild(name);
       b.onclick = () => setRankedMode(mode);
       box.appendChild(b);
     });
@@ -6029,10 +6227,9 @@
   function renderRanked(st) {
     const L = t().online;
     const mine = rankedRatings && rankedRatings[rankedMode];
-    document.getElementById('rkModeName').textContent = rankedModeLabel(rankedMode);
-    document.getElementById('rkElo').textContent = mine
-      ? L.rkElo.replace('{n}', formatNum(mine.elo)).replace('{g}', mine.games)
-      : '';
+    document.getElementById('rkElo').textContent = mine ? formatNum(mine.elo) : '—';
+    document.getElementById('rkEloSub').textContent = mine
+      ? L.rkEloSub.replace('{g}', mine.games) : L.rkEloSub.replace('{g}', '0');
 
     const play = document.getElementById('tRkPlay');
     play.textContent = rankedMatchId ? L.rkResume : L.rkPlay;
@@ -6131,11 +6328,8 @@
         box.innerHTML = '<div class="fr-note">' + escapeHtml(t().online.rkTopEmpty) + '</div>';
         return;
       }
-      box.innerHTML = rows.map((r, i) => {
-        const style = r.username === me ? ' style="color:#fbbf24;font-weight:700"' : '';
-        return '<div class="lb-row"' + style + '><span>' + (i + 1) + '. ' +
-               escapeHtml(r.username) + '</span><span>' + formatNum(r.elo) + '</span></div>';
-      }).join('');
+      box.replaceChildren(...rows.map((r, i) => topRow(i, r.username, r.elo, r.username === me)));
+      fetchAvatars(rows.map(r => r.username));
     } catch (e) {}
   }
 

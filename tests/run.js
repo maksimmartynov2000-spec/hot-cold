@@ -8,6 +8,7 @@ const PHONE = { width: 430, height: 850 };
 async function newGame(browser, opts) {
   const context = await browser.newContext({ viewport: PHONE });
   const page = await context.newPage();
+  if (opts && opts.clock) await page.clock.install();
   page.on('pageerror', e => check('без ошибок JS', false, e.message));
   await applyStub(page, opts);
   await page.goto(GAME_URL);
@@ -1626,7 +1627,34 @@ async function testPinHelp(browser) {
   check('свой PIN показывается по нажатию',
     (await page4.locator('#tShowPin').textContent()).includes('1234'));
   check('выход из аккаунта остался на месте', await page4.locator('#tLogoutStart').isVisible());
+  // Повторное нажатие на PIN прячет его
+  await page4.click('#tShowPin');
+  await page4.waitForTimeout(150);
+  check('второе нажатие прячет PIN',
+    !(await page4.locator('#tShowPin').textContent()).includes('1234'),
+    await page4.locator('#tShowPin').textContent());
+  // Закрыл профиль с открытым PIN — в следующий раз он снова спрятан
+  await page4.click('#tShowPin');
+  await page4.click('#tProfileDone');
+  await page4.click('#accountChip');
+  await page4.waitForTimeout(200);
+  check('при новом открытии профиля PIN снова спрятан',
+    !(await page4.locator('#tShowPin').textContent()).includes('1234'));
   await done(page4);
+
+  // Забыл спрятать — прячется сам через 10 секунд. Часы подменены, чтобы
+  // не ждать по-настоящему
+  const page5 = await newGame(browser, { user: 'Максим', clock: true });
+  await page5.click('#accountChip');
+  await page5.waitForTimeout(200);
+  await page5.click('#tShowPin');
+  await page5.clock.runFor(9000);
+  const at9 = await page5.locator('#tShowPin').textContent();
+  await page5.clock.runFor(1500);
+  const at10 = await page5.locator('#tShowPin').textContent();
+  check('через 9 секунд PIN ещё виден', at9.includes('1234'), at9);
+  check('через 10 секунд прячется сам', !at10.includes('1234'), at10);
+  await done(page5);
 }
 
 // Конец раунда: ответ на прямой, счётчик ходов, свёрнутая шкала
@@ -1692,8 +1720,9 @@ async function testEndOfRound(browser) {
   // Новая игра возвращает шкалу и обычный счётчик
   await page.click('#resultBox .btn');
   await page.waitForTimeout(300);
-  check('в новой партии шкала снова раскрыта',
-    await page.evaluate(() => document.getElementById('scaleBox').open));
+  // Шкалу игрок уже видел — на телефоне со второй партии она свёрнута
+  check('со второй партии на телефоне шкала свёрнута',
+    !(await page.evaluate(() => document.getElementById('scaleBox').open)));
   check('в новой партии счётчик снова про попытки',
     (await page.locator('#attemptsLabel').textContent()).includes('Попыток'));
 
@@ -1734,6 +1763,113 @@ async function testScaleMemory(browser) {
   check('и его выбор запоминается',
     await page.evaluate(() => localStorage.getItem('hc_scale_open')) === '1');
   await done(page);
+
+  // Сам раскрыл — раскрыта и в десятой партии: выбор игрока важнее правила
+  const kept = await gameWithStorage(browser, {}, { hc_scale_open: '1', hc_games_done: '9' });
+  await kept.click('#tModeSolo');
+  await kept.click('#tStartMatch');
+  await kept.waitForTimeout(300);
+  check('раскрытая игроком шкала не сворачивается со временем',
+    await kept.evaluate(() => document.getElementById('scaleBox').open));
+  await done(kept);
+
+  // Не трогал, но уже играл: на телефоне свёрнута сразу, на широком — раскрыта
+  const phone = await gameWithStorage(browser, {}, { hc_games_done: '1' });
+  await phone.click('#tModeSolo');
+  await phone.click('#tStartMatch');
+  await phone.waitForTimeout(300);
+  check('на телефоне после первой партии шкала свёрнута сразу',
+    !(await phone.evaluate(() => document.getElementById('scaleBox').open)));
+  await done(phone);
+  const wide = await gameWithStorage(browser, {}, { hc_games_done: '5' });
+  await wide.setViewportSize({ width: 1280, height: 900 });
+  await wide.reload();
+  await wide.waitForTimeout(300);
+  await wide.click('#tModeSolo');
+  await wide.click('#tStartMatch');
+  await wide.waitForTimeout(300);
+  check('на широком экране шкала раскрыта — места хватает',
+    await wide.evaluate(() => document.getElementById('scaleBox').open));
+  await done(wide);
+
+  // Кнопки-значки объясняют себя при первом нажатии
+  const tp = await newGame(browser, { clock: true });
+  await tp.click('#tModeSolo');
+  await tp.click('#tStartMatch');
+  await tp.clock.runFor(300);
+  check('до нажатия подсказки нет', !(await tp.locator('#barTip').isVisible()));
+  await tp.click('#toggleThermoBtn');
+  const tip1 = await tp.evaluate(() => {
+    const tip = document.getElementById('barTip');
+    const b = document.getElementById('toggleThermoBtn').getBoundingClientRect();
+    const arrow = tip.getBoundingClientRect().right - parseFloat(getComputedStyle(tip).getPropertyValue('--arrow-right')) - 6;
+    return { text: tip.textContent, shown: !tip.classList.contains('hidden'),
+             under: arrow >= b.left && arrow <= b.right };
+  });
+  check('первое нажатие на 🌡️ коротко говорит, что скрылось',
+    tip1.shown && tip1.text === '🌡️ Градусник скрыт', JSON.stringify(tip1));
+  check('стрелка подсказки — под нажатой кнопкой', tip1.under, JSON.stringify(tip1));
+  await tp.clock.runFor(3600);
+  check('подсказка гаснет сама', !(await tp.locator('#barTip').isVisible()));
+  await tp.click('#toggleThermoBtn');
+  await tp.clock.runFor(100);
+  check('второй раз та же кнопка не объясняет', !(await tp.locator('#barTip').isVisible()));
+  await tp.click('#toggleLineBtn');
+  check('у другой кнопки своя первая подсказка',
+    (await tp.locator('#barTip').textContent()) === '📏 Прямая скрыта');
+  await done(tp);
+
+  // Скрытое раньше — первое нажатие возвращает, и подсказка говорит «показана»
+  const back = await gameWithStorage(browser, {}, { hc_show_line: '0' });
+  await back.click('#tModeSolo');
+  await back.click('#tStartMatch');
+  await back.waitForTimeout(300);
+  await back.click('#toggleLineBtn');
+  check('если прямая была скрыта, подсказка — «показана»',
+    (await back.locator('#barTip').textContent()) === '📏 Прямая показана');
+  await done(back);
+
+  // Все шесть фраз есть на всех языках и каждая — в одну строку на узком экране
+  const ctx360 = await browser.newContext({ viewport: { width: 360, height: 740 } });
+  const nar = await ctx360.newPage();
+  await applyStub(nar, {});
+  await nar.goto(GAME_URL);
+  await nar.waitForTimeout(300);
+  await nar.click('#tModeSolo');
+  await nar.click('#tStartMatch');
+  await nar.waitForTimeout(300);
+  const fits = await nar.evaluate(() => {
+    const bad = [];
+    for (const lang of ['ru', 'en', 'fr', 'de']) {
+      for (const [key, btn] of [['thermo', 'toggleThermoBtn'], ['line', 'toggleLineBtn'], ['hint', 'toggleHintBtn']]) {
+        for (const on of [false, true]) {
+          const phrase = i18n[lang].tips && i18n[lang].tips[key] && i18n[lang].tips[key][on ? 1 : 0];
+          if (!phrase) { bad.push(lang + ' ' + key + ' нет фразы'); continue; }
+          currentLang = lang;
+          localStorage.removeItem('hc_tip_' + key);
+          firstTimeTip(key, btn, '🌡️', on);
+          const tip = document.getElementById('barTip').getBoundingClientRect();
+          const card = document.querySelector('.card').getBoundingClientRect();
+          if (tip.height > 40 || tip.left < card.left || tip.right > card.right) bad.push(lang + ' ' + phrase);
+        }
+      }
+    }
+    return bad;
+  });
+  check('все подсказки есть на четырёх языках и влезают в одну строку', fits.length === 0, fits.join('; '));
+  await ctx360.close();
+
+  const tp2 = await newGame(browser, {});
+  await tp2.click('#tModeSolo');
+  await tp2.click('#tStartMatch');
+  await tp2.waitForTimeout(300);
+  await tp2.click('#toggleThermoBtn');
+  await tp2.evaluate(() => quitToMenu());
+  // Экран игры в меню скрыт целиком — смотрим на саму подсказку: вернись
+  // в игру за эти секунды, она бы ещё висела
+  check('в меню подсказка не висит',
+    await tp2.evaluate(() => document.getElementById('barTip').classList.contains('hidden')));
+  await done(tp2);
 }
 
 // Галочки нарисованы свои: системный чекбокс — белый квадрат на тёмном экране
@@ -2069,6 +2205,7 @@ async function testFriends(browser) {
   await page.click('#friendsBtn');
   await page.waitForTimeout(500);
   check('со входом сразу открывается экран друзей', await page.locator('#screenFriends').isVisible());
+  check('у новичка без друзей поиск раскрыт сразу', await page.locator('#friendSearch').isVisible());
   const suggested = await page.evaluate(() => ({
     rows: [...document.querySelectorAll('#searchResults .friend-row')].map(r => r.dataset.name),
     btns: [...document.querySelectorAll('#searchResults .fr-btn')].map(b => b.textContent),
@@ -2705,42 +2842,54 @@ async function testRanked(browser) {
   // Описание правил убрано: его заменяют подписи разновидностей
   const modes = await page.evaluate(() => ({
     names: [...document.querySelectorAll('#rkModes .rm-name')].map(e => e.textContent),
-    elos: [...document.querySelectorAll('#rkModes .rm-elo')].map(e => e.textContent.replace(/[\s  ]/g, '')),
+    chips: [...document.querySelectorAll('#rkModes .rk-mode')].map(b => b.textContent),
+    heights: [...document.querySelectorAll('#rkModes .rk-mode')].map(b => Math.round(b.getBoundingClientRect().height)),
     active: [...document.querySelectorAll('.rk-mode')].map(b => b.classList.contains('active')),
     rules: !!document.getElementById('tRkRules'),
-    head: document.getElementById('rkModeName').textContent,
-    elo: document.getElementById('rkElo').textContent.replace(/[\s  ]/g, '')
+    title: document.getElementById('tOnlineScreen').textContent,
+    elo: document.getElementById('rkElo').textContent.replace(/[\s  ]/g, ''),
+    sub: document.getElementById('rkEloSub').textContent
   }));
+  check('у экрана есть название', modes.title === '🌐 Игра онлайн', modes.title);
   check('четыре разновидности с условиями прямо в названии',
     modes.names.join(' | ') === '1–100 | −100…100 | 1–100 · бонусы | −100…100 · бонусы',
     modes.names.join(' | '));
-  // Голое «1 000» под «1–100» читалось как вторая граница диапазона
-  check('у каждой свой рейтинг прямо на кнопке, и он подписан',
-    modes.elos.join() === 'рейтинг1180,рейтинг940,рейтинг1000,рейтинг1520', modes.elos.join());
+  // Рейтинг один раз — крупно под кнопками, а не ещё и на каждой кнопке
+  check('на кнопках разновидностей только название, без рейтинга',
+    modes.chips.join(' | ') === modes.names.join(' | '), modes.chips.join(' | '));
+  check('кнопки одной высоты — ничего не переносится', new Set(modes.heights).size === 1, modes.heights.join());
   check('длинного описания правил больше нет', !modes.rules);
   check('выбрана первая разновидность', modes.active.join() === 'true,false,false,false', modes.active.join());
-  check('в заголовке названа выбранная разновидность и её рейтинг',
-    modes.head === '1–100' && modes.elo.indexOf('1180') >= 0, modes.head + ' / ' + modes.elo);
+  check('крупно — рейтинг выбранной разновидности', modes.elo === '1180', modes.elo);
+  check('под ним — сколько сыграно', modes.sub === 'ваш рейтинг · игр: 7', modes.sub);
 
   const top0 = await page.evaluate(() =>
     [...document.querySelectorAll('#rkTopList .lb-row')].map(r => r.textContent));
   check('топ показан для выбранной разновидности',
     top0.length === 2 && top0[0].indexOf('Кира') >= 0, top0.join(' | '));
+  const topLook = await page.evaluate(() =>
+    [...document.querySelectorAll('#rkTopList .rk-top-row')].map(r => ({
+      place: r.querySelector('.rk-place').textContent, me: r.classList.contains('me'),
+      face: !!r.querySelector('.avatar') })));
+  check('в топе медали вместо номеров у первых трёх',
+    topLook.map(r => r.place).join() === '🥇,🥈', JSON.stringify(topLook));
+  check('своя строка выделена, у каждого — кружок',
+    topLook.map(r => r.me).join() === 'false,true' && topLook.every(r => r.face), JSON.stringify(topLook));
 
   // Переключение разновидности меняет и рейтинг, и топ
   await page.click('.rk-mode[data-mode="3"]');
   await page.waitForTimeout(600);
   const switched = await page.evaluate(() => ({
-    head: document.getElementById('rkModeName').textContent,
     elo: document.getElementById('rkElo').textContent.replace(/[\s  ]/g, ''),
+    sub: document.getElementById('rkEloSub').textContent,
     active: [...document.querySelectorAll('.rk-mode')].map(b => b.classList.contains('active')),
     top: [...document.querySelectorAll('#rkTopList .lb-row')].map(r => r.textContent)
   }));
   check('переключение меняет выбранную разновидность',
     switched.active.join() === 'false,false,false,true', switched.active.join());
   check('и показывает её рейтинг',
-    switched.head === '−100…100 · бонусы' && switched.elo.indexOf('1520') >= 0,
-    switched.head + ' / ' + switched.elo);
+    switched.elo === '1520' && switched.sub === 'ваш рейтинг · игр: 12',
+    switched.elo + ' / ' + switched.sub);
   check('и её собственный топ',
     switched.top.length === 1 && switched.top[0].indexOf('Лев') >= 0, switched.top.join(' | '));
 
@@ -2750,6 +2899,8 @@ async function testRanked(browser) {
     fr: [...document.querySelectorAll('#gamesList .friend-row')].map(r => r.dataset.id)
   }));
   check('рейтинговая игра лежит на экране рейтинга', lists.rk.join() === '7', lists.rk.join());
+  check('и её блок виден, раз игра есть',
+    await page.locator('#rkGamesBox').isVisible());
   check('вызов друга — на экране друзей', lists.fr.join() === '1', lists.fr.join());
 
   await page.click('#friendsBtn');
@@ -2763,6 +2914,20 @@ async function testRanked(browser) {
   check('экран друзей прячет рейтинг', !onFriends.ranked && onFriends.friends);
   check('и поиск игроков лежит именно на нём', onFriends.search);
   check('разновидностей рейтинга у друзей нет', onFriends.modes === 0, String(onFriends.modes));
+  await done(page);
+
+  // Рейтинговой игры нет — блока нет вовсе, без «игра не идёт»
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => { window.__matches = [
+    { id: 1, other: 'Кира', seat: 1, status: 'invited', round: 1, wins: [0, 0], my_turn: false, ranked: false }]; });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(600);
+  const idle = await page.evaluate(() => ({
+    box: !document.getElementById('rkGamesBox').classList.contains('hidden'),
+    text: document.getElementById('screenOnline').innerText
+  }));
+  check('без рейтинговой игры её блока нет', !idle.box);
+  check('и нигде не написано, что игра «не идёт»', !/не идёт/.test(idle.text), idle.text);
   await done(page);
 
   // Очередь: своя на каждую разновидность, и стоять можно только в одной
@@ -3501,13 +3666,33 @@ async function testNewLook(browser) {
   await page.waitForTimeout(400);
   const order = await page.evaluate(() => {
     const y = id => document.getElementById(id).getBoundingClientRect().top;
-    return { friends: y('friendsList'), games: y('gamesList'), search: y('friendSearch'),
+    return { friends: y('friendsList'), games: y('gamesList'), search: y('findBox'),
              titles: document.querySelectorAll('#screenFriends .lb-title:not(.hidden)').length,
              avatars: Object.fromEntries([...document.querySelectorAll('#friendsList .friend-row')]
                .map(r => [r.dataset.name, (r.querySelector('.avatar') || {}).textContent])) };
   });
   check('друзья и заявки выше игр', order.friends < order.games, JSON.stringify(order));
   check('поиск — последним', order.games < order.search, JSON.stringify(order));
+
+  // Друзья есть — поиск свёрнут в одну строку и раскрывается по нажатию
+  check('с друзьями поиск свёрнут', !(await page.locator('#friendSearch').isVisible()));
+  check('видна только строка «Найти игрока»',
+    (await page.locator('#tLblFindFriend').textContent()) === '🔍 Найти игрока' &&
+    await page.locator('#tLblFindFriend').isVisible());
+  await page.click('#tLblFindFriend');
+  await page.waitForTimeout(150);
+  check('нажатие раскрывает поиск', await page.locator('#friendSearch').isVisible());
+  await page.evaluate(() => loadFriends(true));
+  await page.waitForTimeout(300);
+  check('опрос списка раскрытый поиск не сворачивает', await page.locator('#friendSearch').isVisible());
+  await page.click('#tLblFindFriend');
+  await page.waitForTimeout(150);
+  check('повторное нажатие сворачивает', !(await page.locator('#friendSearch').isVisible()));
+  await page.evaluate(() => { window.__friends = []; loadFriends(true); });
+  await page.waitForTimeout(300);
+  check('и свёрнутый опрос тоже не трогает', !(await page.locator('#friendSearch').isVisible()));
+  await page.evaluate(() => { window.__friends = [{ username: 'Кира', relation: 'incoming' },
+    { username: 'Аня', relation: 'friend' }, { username: '#7', relation: 'friend' }]; });
   check('у каждого в списке кружок с буквой',
     order.avatars['Кира'] === 'К' && order.avatars['Аня'] === 'А', JSON.stringify(order.avatars));
   check('у удалённого игрока — знак вопроса, а не буква служебного имени',
@@ -3576,6 +3761,130 @@ async function testNewLook(browser) {
   await page.evaluate(() => { document.getElementById('langSwitcher').value = 'ru'; changeLanguage(); });
   check('поле ввода видно без прокрутки на экране высотой 700', duel.input <= 700, Math.round(duel.input) + 'px');
   await ctx.close();
+}
+
+// ------------------------------------ фора, названия экранов, раскладка
+async function testCalmScreens(browser) {
+  console.log('\nФора, названия экранов, раскладка');
+
+  // Фора — только жетоны, и в подписи имена, а не «Игрок 1»
+  let page = await newGame(browser);
+  await page.click('#tModeDuel');
+  await page.waitForTimeout(200);
+  await page.fill('#nameP1', 'Маша');
+  await page.fill('#nameP2', 'Петя');
+  const hc = await page.evaluate(() => [...document.querySelectorAll('#handicap option')].map(o => o.textContent));
+  check('в форе только «нет» и лишний жетон кому-то одному',
+    hc.join(' | ') === 'Нет | Маша — 2 жетона | Петя — 2 жетона', hc.join(' | '));
+  check('«всегда ходит первым» убрано', !hc.some(o => /перв/.test(o)), hc.join(' | '));
+  const setupLook = await page.evaluate(() => ({
+    title: document.getElementById('tSetupScreen').textContent,
+    p1: document.getElementById('nameP1').getBoundingClientRect().top,
+    p2: document.getElementById('nameP2').getBoundingClientRect().top
+  }));
+  check('у формы дуэли своё название', setupLook.title === '🤝 Игра с другом', setupLook.title);
+  check('имена игроков в одну строку', Math.abs(setupLook.p1 - setupLook.p2) < 1, JSON.stringify(setupLook));
+
+  await page.selectOption('#handicap', '2');
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  const r1 = await page.evaluate(() => ({ tokens: D.tokens.join(), starter: D.starter }));
+  check('фора даёт второй жетон выбранному', r1.tokens === '1,2', JSON.stringify(r1));
+  await page.evaluate(() => { D.roundOver = true; nextRound(); });
+  const r2 = await page.evaluate(() => ({ tokens: D.tokens.join(), starter: D.starter }));
+  check('в следующем раунде первый ход переходит к другому', r1.starter === 0 && r2.starter === 1,
+    JSON.stringify([r1, r2]));
+  check('а лишний жетон остаётся у того же', r2.tokens === '1,2', JSON.stringify(r2));
+  await done(page);
+
+  page = await newGame(browser);
+  await page.click('#tModeSolo');
+  await page.waitForTimeout(200);
+  check('у тренировки своё название',
+    (await page.locator('#tSetupScreen').textContent()) === '🎯 Тренировка');
+  await done(page);
+
+  // Шапка стоит на одном месте на всех экранах: окно прижато к верху
+  page = await newGame(browser, { user: 'Лев' });
+  const headTop = () => page.evaluate(() => Math.round(document.querySelector('.top-controls').getBoundingClientRect().top));
+  const tops = { menu: await headTop() };
+  await page.click('#tModeSolo'); await page.waitForTimeout(200); tops.setup = await headTop();
+  await page.click('#tStartMatch'); await page.waitForTimeout(300); tops.game = await headTop();
+  await page.evaluate(() => quitToMenu()); await page.waitForTimeout(200);
+  await page.click('#tModeRun'); await page.waitForTimeout(400); tops.run = await headTop();
+  check('шапка не прыгает между экранами', new Set(Object.values(tops)).size === 1, JSON.stringify(tops));
+  const hub = await page.evaluate(() => {
+    const b = document.getElementById('tRunStart').getBoundingClientRect();
+    const f = document.querySelector('#screenRunHub .frost-row').getBoundingClientRect();
+    return { gap: Math.round(f.top - b.bottom), title: document.getElementById('tRunScreen').textContent,
+             greet: document.getElementById('runGreeting').textContent };
+  });
+  check('у «Испытания» название, под ним — кто играет',
+    hub.title === '🏆 Испытание' && hub.greet.includes('Лев'), JSON.stringify(hub));
+  check('галочка не прилипает к кнопке', hub.gap >= 8, hub.gap + 'px');
+  await done(page);
+
+  // Вход: подпись под названием, а не узкой полоской сбоку
+  page = await newGame(browser);
+  await page.click('#tModeRun');
+  await page.waitForTimeout(300);
+  const choice = await page.evaluate(() => ['tRunChoiceRegister', 'tRunChoiceLogin'].map(id => {
+    const t = document.getElementById(id).getBoundingClientRect();
+    const sub = document.getElementById(id + 'Sub').getBoundingClientRect();
+    return { below: sub.top >= t.bottom - 1, lines: Math.round(sub.height / 17) };
+  }));
+  check('подпись под названием', choice.every(c => c.below), JSON.stringify(choice));
+  check('и не больше двух строк', choice.every(c => c.lines <= 2), JSON.stringify(choice));
+  await done(page);
+
+  // Строка статуса в игре — одна строка даже на узком телефоне, без пустого
+  // «Число загадано ✓»; «Меню» — значком с подписью для подсказки
+  for (const m of ['Solo', 'Duel']) {
+    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 } });
+    const p = await ctx.newPage();
+    p.on('pageerror', e => check('без ошибок JS', false, e.message));
+    await applyStub(p, {});
+    await p.goto(GAME_URL);
+    await p.waitForTimeout(300);
+    await p.click('#tMode' + m);
+    await p.waitForTimeout(200);
+    await p.click('#tStartMatch');
+    await p.waitForTimeout(300);
+    const bar = await p.evaluate(() => {
+      const b = document.getElementById('infoBar');
+      const tops = [...b.querySelectorAll('#attemptsLabel, .bar-actions')]
+        .map(e => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2));
+      const menu = document.getElementById('tMenu');
+      return { text: b.innerText, oneLine: Math.abs(tops[0] - tops[1]) <= 2,
+               menu: menu.textContent, label: menu.getAttribute('aria-label'), title: menu.title };
+    });
+    check(m + ': в строке статуса нет «Число загадано»', !/загадано/.test(bar.text), bar.text);
+    check(m + ': строка статуса в одну строку на 360px', bar.oneLine, JSON.stringify(bar));
+    check(m + ': «Меню» — значок с подписью', bar.menu === '☰' && bar.label === 'Меню' && bar.title === 'Меню',
+      JSON.stringify(bar));
+    await ctx.close();
+  }
+
+  // В «Испытании» на этом месте — «Пауза» словом, а топ оформлен как рейтинговый
+  page = await newGame(browser, { user: 'Лев' });
+  await page.click('#tModeRun');
+  await page.waitForTimeout(500);
+  const runTop = await page.evaluate(async () => {
+    // Два запроса подряд — как при быстром переключении вкладок
+    await Promise.all([renderRunLeaderboard(), renderRunLeaderboard()]);
+    return [...document.querySelectorAll('#runLeaderboardList .rk-top-row')].map(r => ({
+      place: r.querySelector('.rk-place').textContent, face: !!r.querySelector('.avatar'),
+      name: r.querySelector('.rk-who').textContent, me: r.classList.contains('me') }));
+  });
+  check('топ «Испытания» с медалями и кружками',
+    runTop.length > 0 && runTop[0].place === '🥇' && runTop.every(r => r.face), JSON.stringify(runTop));
+  check('два запроса подряд не задваивают строки',
+    new Set(runTop.map(r => r.name)).size === runTop.length, JSON.stringify(runTop));
+  await page.click('#tRunStart');
+  await page.waitForTimeout(400);
+  check('в «Испытании» кнопка называется «Пауза»',
+    (await page.locator('#tMenu').textContent()) === 'Пауза');
+  await done(page);
 }
 
 // ------------------------------------------ профиль: иконка, имя, PIN
@@ -3976,6 +4285,7 @@ async function testKeyPage(browser) {
     await testKeyPage(browser);
     await testNewLook(browser);
     await testProfile(browser);
+    await testCalmScreens(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
