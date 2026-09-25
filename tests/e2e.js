@@ -226,13 +226,13 @@ async function registerPlayer(p, name, pin) {
   // Фраза
   await B.page.click('#sayBtn');
   await B.page.waitForTimeout(300);
-  await B.page.click('#sayPad button[data-code="hot"]');
+  await B.page.click('#sayPad button[data-code="luck"]');
   await B.page.waitForTimeout(900);
   check('фраза записана в базу',
-    (await db.query('select code from match_chat where match_id = $1', [match.id])).rows[0].code === 'hot');
+    (await db.query('select code from match_chat where match_id = $1', [match.id])).rows[0].code === 'luck');
   await A.page.waitForTimeout(2600);
   const heard = await A.page.locator('#sayBubble').textContent();
-  check('фразу услышал соперник', heard.indexOf('Лада') >= 0 && heard.indexOf('теплее') >= 0, heard);
+  check('фразу услышал соперник', heard.indexOf('Лада') >= 0 && heard.indexOf('Удачи') >= 0, heard);
 
   // Победа
   await B.page.fill('#guessInput', String(started.secret));
@@ -341,6 +341,20 @@ async function registerPlayer(p, name, pin) {
   // перевернуться, иначе база откажет в переименовании целиком
   await db.query("select send_friend_phrase('Тимур', '1111', 'Лада', 'play')");
   for (const P of [A, B]) await P.page.evaluate(() => quitToMenu());
+
+  // Текст вне игры: грубое слово база прячет сама
+  await A.page.evaluate(() => openChat('Лада'));
+  await A.page.waitForTimeout(700);
+  await A.page.fill('#chatText', 'Привет, сука! Сыграем?');
+  await A.page.click('#tChatSend');
+  await A.page.waitForTimeout(900);
+  const bodies = (await db.query('select body from friend_chat where body is not null')).rows.map(r => r.body);
+  check('текст записан в базу, грубое слово под ***', bodies.join() === 'привет, ***! сыграем?', bodies.join());
+  const mineText = await A.page.evaluate(() =>
+    (document.querySelector('#chatList .chat-msg:last-child') || {}).textContent || '');
+  check('и в ленте у отправителя уже очищенный', mineText.indexOf('привет, ***! сыграем?') === 0, mineText);
+  await A.page.evaluate(() => quitToMenu());
+
   await A.page.click('#accountChip');
   await A.page.waitForTimeout(700);
   await A.page.click('#tAvatarStart');
@@ -391,9 +405,10 @@ async function registerPlayer(p, name, pin) {
   await B.page.click('#friendsList .friend-row[data-name="Артур"] .fr-name');
   await B.page.waitForTimeout(800);
   const thread = await B.page.evaluate(() =>
-    [...document.querySelectorAll('#chatList .chat-msg')].map(m => m.className));
-  check('переписка пережила переименование', thread.length === 1 && thread[0].indexOf('theirs') >= 0,
-    thread.join(', '));
+    [...document.querySelectorAll('#chatList .chat-msg')].map(m => ({ cls: m.className, text: m.textContent })));
+  check('переписка пережила переименование — и фраза, и текст',
+    thread.length === 2 && thread.every(m => m.cls.indexOf('theirs') >= 0) &&
+    thread[1].text.indexOf('привет, ***! сыграем?') === 0, JSON.stringify(thread));
 
   await A.page.click('#tPinStart');
   await A.page.fill('#pinOld', '1111');
@@ -411,7 +426,8 @@ async function registerPlayer(p, name, pin) {
 
   const calls = A.log.concat(B.log);
   check('профиль шёл через настоящие функции базы',
-    ['my_profile', 'set_avatar', 'avatars_for', 'rename_student', 'change_pin'].every(f => calls.includes(f)),
+    ['my_profile', 'set_avatar', 'avatars_for', 'rename_student', 'change_pin', 'send_friend_text', 'friend_thread']
+      .every(f => calls.includes(f)),
     [...new Set(calls)].join(', '));
   check('всё шло через настоящие функции базы',
     calls.includes('match_guess') && calls.includes('match_state') &&

@@ -2748,14 +2748,15 @@ async function testPhrases(browser) {
     mute: !!document.getElementById('sayMuteBtn')
   }));
   check('палитра открывается кнопкой', pad.open);
-  check('в ней восемь фраз', pad.codes.length === 8, pad.codes.join(','));
-  check('фразы про эту игру, а не общие',
-    pad.texts.some(t => t.indexOf('теплее') >= 0) && pad.texts.some(t => t.indexOf('холод') >= 0),
-    pad.texts.join(' | '));
+  check('в ней восемь фраз нового набора',
+    pad.codes.join() === 'hi,luck,nice,wow,think,almost,again,gg', pad.codes.join(','));
+  check('дружелюбные: без «Время идёт!» и «Ледяной холод!»',
+    pad.texts.some(t => t.indexOf('Удачи') >= 0) && pad.texts.some(t => t.indexOf('Почти') >= 0) &&
+    !pad.texts.some(t => /Время идёт|Ледяной/.test(t)), pad.texts.join(' | '));
   check('есть кнопка «скрыть фразы»', pad.mute);
 
   // Отправка
-  await page.click('#sayPad button[data-code="hot"]');
+  await page.click('#sayPad button[data-code="luck"]');
   await page.waitForTimeout(500);
   const sent = await page.evaluate(() => ({
     args: (window.__rpcCalls.filter(c => c.name === 'send_phrase').pop() || {}).args,
@@ -2763,8 +2764,8 @@ async function testPhrases(browser) {
     shown: !document.getElementById('sayBubble').classList.contains('hidden')
   }));
   check('фраза ушла кодом, а не текстом',
-    sent.args.p_code === 'hot' && sent.args.p_match_id === 1, JSON.stringify(sent.args));
-  check('своя фраза видна на доске', sent.shown && sent.bubble.indexOf('теплее') >= 0, sent.bubble);
+    sent.args.p_code === 'luck' && sent.args.p_match_id === 1, JSON.stringify(sent.args));
+  check('своя фраза видна на доске', sent.shown && sent.bubble.indexOf('Удачи') >= 0, sent.bubble);
   check('и подписана именем', sent.bubble.indexOf('Лев') >= 0, sent.bubble);
 
   // Фраза соперника приходит опросом
@@ -2773,7 +2774,7 @@ async function testPhrases(browser) {
   });
   await page.waitForTimeout(2600);
   const from = await page.evaluate(() => document.getElementById('sayBubble').textContent);
-  check('фраза соперника приходит сама', from.indexOf('Кира') >= 0, from);
+  check('фраза соперника приходит сама', from.indexOf('Кира') >= 0 && from.indexOf('Ого') >= 0, from);
 
   // Со временем гаснет
   await page.evaluate(() => { sayShownUntil = Date.now() - 1; renderSayBubble(); });
@@ -2787,7 +2788,7 @@ async function testPhrases(browser) {
   check('выбор «скрыть» записан в память',
     await page.evaluate(() => localStorage.getItem('hc_mute')) === '1');
   await page.evaluate(() => {
-    window.__match.chat.push({ id: 100, seat: 1, code: 'hurry', ago: 0 });
+    window.__match.chat.push({ id: 100, seat: 1, code: 'gg', ago: 0 });
   });
   await page.waitForTimeout(2600);
   check('с выключенными фразами чужая реплика не показывается',
@@ -3367,23 +3368,68 @@ async function testFriendChat(browser) {
     chat.msgs[0].text.indexOf('Сыграем?') === 0, chat.msgs[0].text);
   check('у каждой видно, когда она сказана',
     chat.msgs[0].text.indexOf('5 мин назад') > 0, chat.msgs[0].text);
-  check('на палитре шестнадцать фраз', chat.pad.length === 16, String(chat.pad.length));
-  check('среди них есть про рейтинг и про «позже»',
-    chat.pad.indexOf('playranked') >= 0 && chat.pad.indexOf('later') >= 0, chat.pad.join(','));
-  check('свободного ввода на экране нет',
-    await page.evaluate(() => !document.querySelector('#screenChat input, #screenChat textarea')));
+  // Вне игры пишут текстом; под рукой — четыре быстрых ответа
+  check('быстрых ответов четыре', chat.pad.join() === 'hi,play,later,bye', chat.pad.join(','));
+  check('есть поле для текста и кнопка отправки',
+    await page.locator('#chatText').isVisible() && await page.locator('#tChatSend').isVisible());
+  check('в поле не больше 200 символов',
+    (await page.getAttribute('#chatText', 'maxlength')) === '200');
 
   // Отправка фразы
-  await page.click('#chatPad button[data-code="yes"]');
+  await page.click('#chatPad button[data-code="bye"]');
   await page.waitForTimeout(600);
   const sent = await page.evaluate(() => ({
     calls: window.__rpcCalls.filter(c => c.name === 'send_friend_phrase').map(c => c.args.p_code),
     last: (document.querySelector('.chat-msg:last-child') || {}).dataset,
     count: document.querySelectorAll('.chat-msg').length
   }));
-  check('фраза ушла на сервер', sent.calls.join() === 'yes', sent.calls.join());
+  check('фраза ушла на сервер', sent.calls.join() === 'bye', sent.calls.join());
   check('и сразу появилась в ленте своей',
-    sent.count === 4 && sent.last.code === 'yes', JSON.stringify(sent));
+    sent.count === 4 && sent.last.code === 'bye', JSON.stringify(sent));
+
+  // Текст: пустое не уходит, Enter отправляет, разметка остаётся буквами
+  await page.fill('#chatText', '   ');
+  await page.click('#tChatSend');
+  await page.waitForTimeout(300);
+  check('пустое сообщение не отправляется',
+    await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'send_friend_text').length) === 0);
+  await page.fill('#chatText', '  Давай в 5? <b>жду</b>  ');
+  await page.press('#chatText', 'Enter');
+  await page.waitForTimeout(600);
+  const txt = await page.evaluate(() => {
+    const last = document.querySelector('.chat-msg:last-child');
+    return { args: (window.__rpcCalls.filter(c => c.name === 'send_friend_text').pop() || {}).args,
+             text: last.firstChild.textContent, bold: !!last.querySelector('b'),
+             mine: last.classList.contains('mine'), input: document.getElementById('chatText').value };
+  });
+  check('Enter отправляет текст без пробелов по краям',
+    txt.args && txt.args.p_to === 'Кира' && txt.args.p_text === 'Давай в 5? <b>жду</b>', JSON.stringify(txt.args));
+  check('текст в ленте как написан — разметка не срабатывает',
+    txt.text === 'Давай в 5? <b>жду</b>' && !txt.bold && txt.mine, JSON.stringify(txt));
+  check('поле очистилось', txt.input === '', txt.input);
+
+  // Близко к пределу — видно, сколько осталось
+  await page.fill('#chatText', 'а'.repeat(185));
+  const left = await page.evaluate(() => ({ shown: !document.getElementById('chatLeft').classList.contains('hidden'),
+                                            text: document.getElementById('chatLeft').textContent }));
+  check('у предела видно, сколько символов осталось', left.shown && left.text === 'Осталось символов: 15',
+    JSON.stringify(left));
+  await page.fill('#chatText', 'коротко');
+  check('в начале счётчика не видно', !(await page.locator('#chatLeft').isVisible()));
+  await page.evaluate(() => { window.__talkError = 'too_long'; });
+  await page.click('#tChatSend');
+  await page.waitForTimeout(400);
+  check('слишком длинное — так и сказано',
+    (await page.locator('#chatNote').textContent()).indexOf('до 200 символов') >= 0,
+    await page.locator('#chatNote').textContent());
+  await page.evaluate(() => { window.__talkError = 'Could not find the function public.send_friend_text'; });
+  await page.click('#tChatSend');
+  await page.waitForTimeout(400);
+  check('сервер без обновления — понятное объяснение',
+    (await page.locator('#chatNote').textContent()).indexOf('после обновления сервера') >= 0,
+    await page.locator('#chatNote').textContent());
+  check('и набранный текст не пропал', (await page.inputValue('#chatText')) === 'коротко');
+  await page.evaluate(() => { window.__talkError = null; });
 
   // Сервер отказал — человек должен прочитать почему
   await page.evaluate(() => { window.__talkError = 'too_fast'; });

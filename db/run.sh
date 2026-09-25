@@ -17,6 +17,7 @@ node "$DIR/run_curve_from_js.js"
 node "$DIR/bonus_count_from_js.js"
 node "$DIR/near_radius_from_js.js"
 node "$DIR/avatars_from_js.js"
+node "$DIR/say_codes_from_js.js"
 chmod a+r "$DIR"/*.csv
 
 su postgres -c "psql -q -d hotcold_test -v ON_ERROR_STOP=1 \
@@ -41,6 +42,7 @@ su postgres -c "psql -q -d hotcold_test -v ON_ERROR_STOP=1 \
   -f $ROOT/migration_friend_cancel.txt \
   -f $ROOT/migration_bonus_radius.txt \
   -f $ROOT/migration_profile.txt \
+  -f $ROOT/migration_chat_text.txt \
   -c \"select register_student('Лев','1234',null), register_student('Кира','4321',null), register_student('Максим','1111',null);\"" >/dev/null
 
 FAILED=0
