@@ -446,9 +446,21 @@ async function testPauseAndGiveUp(browser) {
   const info = await page.locator('#unfinishedInfo').textContent();
   check('в карточке видно раунд и очки', /Раунд\s*2/.test(info), info.trim());
 
-  // полная перезагрузка страницы — игра должна пережить закрытие приложения
-  await page.reload();
-  await page.waitForTimeout(400);
+  // полная перезагрузка страницы — игра должна пережить закрытие приложения.
+  // Заглушка держит «сервер» в хранилище страницы, а Chromium по file:// под
+  // нагрузкой изредка стирает его при перезагрузке (пойманный случай: забег
+  // был в хранилище до перезагрузки и пропал после, уцелели только ключи,
+  // которые заглушка пишет заново). Настоящий сервер так данных не теряет,
+  // поэтому стёртый «сервер» возвращаем и перезагружаем снова — игра о
+  // подмене не знает, и проверяется по-прежнему она, а не заглушка
+  const serverRun = await page.evaluate(() => localStorage.getItem('__stub_run'));
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.reload();
+    await page.waitForTimeout(400);
+    const kept = await page.evaluate(() => !!localStorage.getItem('__stub_run'));
+    if (kept) break;
+    await page.evaluate(v => localStorage.setItem('__stub_run', v), serverRun);
+  }
   await page.click('#tModeRun');
   // Ждём саму карточку, а не фиксированные полсекунды: под нагрузкой ответ
   // сервера приходил позже, и проверка падала на ровном месте
@@ -3425,12 +3437,31 @@ async function testNewLook(browser) {
     menu[3].sub.indexOf('Друз') < 0 && menu[3].sub.indexOf('сети') >= 0, menu[3].sub);
   check('«Игра с другом» объясняет, что это на одном телефоне',
     menu[1].sub.indexOf('одном телефоне') >= 0, menu[1].sub);
+
+  // Одиночный режим на очки назывался «Игра на рейтинг» — почти как кнопка
+  // «Играть на рейтинг» внутри «Игры онлайн», хотя это совсем другой режим
+  const runName = await page.evaluate(() => document.getElementById('tModeRun').textContent);
+  check('одиночный режим на очки называется «Испытание»', runName === 'Испытание', runName);
+  check('и больше не путается с рейтингом онлайн', runName.indexOf('рейтинг') < 0, runName);
+
+  // Два блока по тому, нужен ли интернет: подпись стоит перед своими режимами
+  const groups = await page.evaluate(() => {
+    const kids = [...document.querySelector('#screenMode .mode-list').children];
+    return kids.map(k => k.classList.contains('mode-group') ? 'G:' + k.textContent
+                                                            : k.className.replace('mode-btn ', ''));
+  });
+  check('меню разбито на «без интернета» и «нужен интернет»',
+    groups.join(',') === 'G:Без интернета,solo,duel,G:Нужен интернет,run,online', groups.join(','));
   for (const lang of ['en', 'fr', 'de']) {
     await setLang(page, lang);
     const subs = await page.evaluate(() =>
       [...document.querySelectorAll('#screenMode .mode-btn .m-sub')].map(e => e.textContent.trim()));
     check('пояснения режимов переведены: ' + lang, subs.length === 4 && subs.every(x => x.length > 0),
       subs.join(' | '));
+    const heads = await page.evaluate(() =>
+      [...document.querySelectorAll('#screenMode .mode-group')].map(e => e.textContent.trim()));
+    check('подписи блоков переведены: ' + lang, heads.length === 2 && heads.every(x => x.length > 0)
+      && heads[0] !== 'Без интернета', heads.join(' | '));
   }
   await setLang(page, 'ru');
   await done(page);
@@ -3537,6 +3568,11 @@ async function testNewLook(browser) {
   });
   check('в дуэли на телефоне ничего не вылезает за правый край', duel.out.length === 0, duel.out.join(', '));
   check('надпись на кнопке жетона помещается в кнопку', duel.spill.length === 0, duel.spill.join('; '));
+  const tokenText = await page.evaluate(() => document.getElementById('ptoken0').textContent.trim());
+  check('на кнопке жетона короткое «⚡ +1 ход»', tokenText.indexOf('⚡ +1 ход') === 0, tokenText);
+  // Шрифт больше не ужимается под ширину: короткой надписи хватает обычного
+  const tokenFont = await page.evaluate(() => parseFloat(getComputedStyle(document.getElementById('ptoken0')).fontSize));
+  check('и написана обычным шрифтом, а не мелким', tokenFont >= 12, tokenFont + 'px');
   // И на французском, где слово ещё длиннее
   await page.evaluate(() => { document.getElementById('langSwitcher').value = 'fr'; changeLanguage(); });
   await page.waitForTimeout(200);

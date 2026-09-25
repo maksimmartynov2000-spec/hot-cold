@@ -363,6 +363,11 @@
       transition: background 0.2s, border-color 0.2s;
     }
     .mode-btn:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255,255,255,0.3); }
+    .mode-group {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.45); margin: 4px 4px -2px;
+    }
+    .mode-group:not(:first-child) { margin-top: 14px; }
     .mode-btn .m-icon {
       flex: 0 0 auto;
       width: 44px; height: 44px;
@@ -878,12 +883,7 @@
       .card.wide .pcard.active { transform: none; }
       .card.wide .pcard .p-name { font-size: 14px; margin-bottom: 4px; }
       .card.wide .pcard .p-pips { margin-bottom: 8px; }
-      /* Самое длинное слово на кнопке — «Дополнительный», «supplémentaire» —
-         на узком телефоне упиралось в рамку. Шрифт считается от ширины
-         карточки игрока: где она уже, там и буквы мельче, но не крупнее 12px.
-         Первая строка — для браузеров, не знающих единиц контейнера */
-      .card.wide .pcard { container-type: inline-size; }
-      .card.wide .token-btn { padding: 6px 4px; font-size: 11px; font-size: min(12px, 7cqi); }
+      .card.wide .token-btn { padding: 6px 6px; }
       .card.wide .info-bar { margin-bottom: 10px; padding: 8px 12px; }
       .card.wide .turn-banner { margin-bottom: 10px; padding: 8px 12px; }
       .card.wide .thermo-wrap { margin: 0 0 4px; }
@@ -1335,8 +1335,13 @@
   <div id="screenMode">
     <div class="mode-list">
       <!-- У каждого режима значок и строка «что это». Без неё «Игра с другом»
-           и «Друзья» в шапке читались как одно и то же, а «Игра на рейтинг»
+           и «Друзья» в шапке читались как одно и то же, а «Испытание» (раньше —
+           «Игра на рейтинг»)
            и «Игра онлайн» — как два входа в рейтинг -->
+      <!-- Два блока по тому, нужен ли интернет: тренировка и игра вдвоём
+           целиком работают без сети (их кеширует service worker), испытание
+           и игра онлайн без сети не откроются — там вход и общая таблица -->
+      <div class="mode-group" id="tGroupOffline"></div>
       <button class="mode-btn solo" onclick="openSetup('solo')">
         <span class="m-icon">🎯</span>
         <span class="m-text">
@@ -1351,6 +1356,7 @@
           <span class="m-sub" id="tModeDuelSub"></span>
         </span>
       </button>
+      <div class="mode-group" id="tGroupOnline"></div>
       <button class="mode-btn run" onclick="openRunEntry()">
         <span class="m-icon">🏆</span>
         <span class="m-text">
@@ -1936,19 +1942,20 @@
       modeSolo: "Practice",
       modeDuel: "Play with a friend",
       modeSoloSub: "Guess the number on your own",
+      groupOffline: "No internet needed", groupOnline: "Needs internet",
       modeDuelSub: "Two players on one phone",
       lblP1: "Player 1", lblP2: "Player 2", defP1: "Player 1", defP2: "Player 2",
       lblWins: "Play until how many wins", lblHandicap: "Head start",
       lblRange: "Range", lblAttempts: "Attempts",
       hcNone: "None", hcTokens: "2 tokens", hcFirst: "always goes first",
       back: "Back", startMatch: "Start game", startGame: "Start game",
-      winsLabel: "Wins", tokenBtn: "⚡ Extra move", tokenArmed: "⚡ Extra move active", tokenSpent: "⚡ Token spent",
+      winsLabel: "Wins", tokenBtn: "⚡ +1 move", tokenArmed: "⚡ +1 move active", tokenSpent: "⚡ Token spent",
       turnOf: "Turn: ", roundLabel: "Round ",
       roundWin: " wins the round!", matchWin: " wins the game!",
       secretWas: "Number: ", nextRound: "Next round", newMatch: "New Game", toMenu: "Menu",
       recordLabel: "Best for this range: ", newRecord: "🏆 New record!",
       run: {
-        mode: "Rating game",
+        mode: "Trial",
         modeSub: "Rounds get harder, points go to the leaderboard",
         choiceLogin: "Log in",
         choiceLoginSub: "I already have a name and PIN",
@@ -2136,19 +2143,20 @@
       modeSolo: "Тренировка",
       modeDuel: "Игра с другом",
       modeSoloSub: "Угадайте число сами",
+      groupOffline: "Без интернета", groupOnline: "Нужен интернет",
       modeDuelSub: "Вдвоём на одном телефоне",
       lblP1: "Игрок 1", lblP2: "Игрок 2", defP1: "Игрок 1", defP2: "Игрок 2",
       lblWins: "Играем до скольких побед", lblHandicap: "Фора",
       lblRange: "Диапазон", lblAttempts: "Попыток",
       hcNone: "Нет", hcTokens: "2 жетона", hcFirst: "всегда ходит первым",
       back: "Назад", startMatch: "Начать игру", startGame: "Начать игру",
-      winsLabel: "Побед", tokenBtn: "⚡ Дополнительный ход", tokenArmed: "⚡ Дополнительный ход активен", tokenSpent: "⚡ Жетон потрачен",
+      winsLabel: "Побед", tokenBtn: "⚡ +1 ход", tokenArmed: "⚡ +1 ход активен", tokenSpent: "⚡ Жетон потрачен",
       turnOf: "Ходит: ", roundLabel: "Раунд ",
       roundWin: " выигрывает раунд!", matchWin: " выигрывает игру!",
       secretWas: "Число: ", nextRound: "Следующий раунд", newMatch: "Новая игра", toMenu: "В меню",
       recordLabel: "Рекорд для этого диапазона: ", newRecord: "🏆 Новый рекорд!",
       run: {
-        mode: "Игра на рейтинг",
+        mode: "Испытание",
         modeSub: "Раунды всё сложнее, очки — в\u00a0общий топ",
         choiceLogin: "Войти",
         choiceLoginSub: "У меня уже есть имя и PIN",
@@ -2336,19 +2344,20 @@
       modeSolo: "Entraînement",
       modeDuel: "Jouer à deux",
       modeSoloSub: "Devinez le nombre seul",
+      groupOffline: "Sans internet", groupOnline: "Avec internet",
       modeDuelSub: "À deux sur un seul téléphone",
       lblP1: "Joueur 1", lblP2: "Joueur 2", defP1: "Joueur 1", defP2: "Joueur 2",
       lblWins: "Jusqu'à combien de victoires", lblHandicap: "Avantage",
       lblRange: "Plage", lblAttempts: "Essais",
       hcNone: "Aucun", hcTokens: "2 jetons", hcFirst: "commence toujours",
       back: "Retour", startMatch: "Commencer la partie", startGame: "Commencer la partie",
-      winsLabel: "Victoires", tokenBtn: "⚡ Tour supplémentaire", tokenArmed: "⚡ Tour supplémentaire activé", tokenSpent: "⚡ Jeton utilisé",
+      winsLabel: "Victoires", tokenBtn: "⚡ +1 tour", tokenArmed: "⚡ +1 tour activé", tokenSpent: "⚡ Jeton utilisé",
       turnOf: "Au tour de : ", roundLabel: "Manche ",
       roundWin: " remporte la manche !", matchWin: " remporte la partie !",
       secretWas: "Nombre : ", nextRound: "Manche suivante", newMatch: "Nouvelle partie", toMenu: "Menu",
       recordLabel: "Meilleur score pour cette plage : ", newRecord: "🏆 Nouveau record !",
       run: {
-        mode: "Partie classée",
+        mode: "\u00c9preuve",
         modeSub: "Des manches de plus en plus dures, les points au classement",
         choiceLogin: "Se connecter",
         choiceLoginSub: "J'ai déjà un nom et un code PIN",
@@ -2536,19 +2545,20 @@
       modeSolo: "Training",
       modeDuel: "Zu zweit spielen",
       modeSoloSub: "Errate die Zahl allein",
+      groupOffline: "Ohne Internet", groupOnline: "Mit Internet",
       modeDuelSub: "Zu zweit auf einem Handy",
       lblP1: "Spieler 1", lblP2: "Spieler 2", defP1: "Spieler 1", defP2: "Spieler 2",
       lblWins: "Bis wie viele Siege", lblHandicap: "Vorsprung",
       lblRange: "Bereich", lblAttempts: "Versuche",
       hcNone: "Ohne", hcTokens: "2 Jetons", hcFirst: "beginnt immer",
       back: "Zurück", startMatch: "Spiel starten", startGame: "Spiel starten",
-      winsLabel: "Siege", tokenBtn: "⚡ Extrazug", tokenArmed: "⚡ Extrazug aktiv", tokenSpent: "⚡ Jeton verbraucht",
+      winsLabel: "Siege", tokenBtn: "⚡ +1 Zug", tokenArmed: "⚡ +1 Zug aktiv", tokenSpent: "⚡ Jeton verbraucht",
       turnOf: "Am Zug: ", roundLabel: "Runde ",
       roundWin: " gewinnt die Runde!", matchWin: " gewinnt das Spiel!",
       secretWas: "Zahl: ", nextRound: "Nächste Runde", newMatch: "Neues Spiel", toMenu: "Menü",
       recordLabel: "Bestwert für diesen Bereich: ", newRecord: "🏆 Neuer Rekord!",
       run: {
-        mode: "Ranglisten-Spiel",
+        mode: "Kraftprobe",
         modeSub: "Runden werden schwerer, Punkte kommen in die Rangliste",
         choiceLogin: "Anmelden",
         choiceLoginSub: "Ich habe schon Name und PIN",
@@ -3039,6 +3049,8 @@
 
     // экраны режима на рейтинг
     document.getElementById('tModeRun').textContent = L.run.mode;
+    document.getElementById('tGroupOffline').textContent = L.groupOffline;
+    document.getElementById('tGroupOnline').textContent = L.groupOnline;
     document.getElementById('tModeRunSub').textContent = L.run.modeSub;
     document.getElementById('tModeOnline').textContent = L.online.mode;
     document.getElementById('tModeOnlineSub').textContent = L.online.modeSub;
