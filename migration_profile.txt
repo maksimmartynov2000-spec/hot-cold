@@ -1,0 +1,253 @@
+-- Профиль: своя иконка, смена имени и смена PIN.
+--
+-- Иконку видят все — друзья, поиск, подсказки. Выбор только из готового
+-- набора животных: свободный текст в кружке у детского приложения — лишний
+-- риск, а набор проверяется самой базой.
+--
+-- Имя можно менять раз в сутки, старое сразу свободно. PIN меняется по
+-- текущему PIN; старая подсказка к нему при этом стирается — она подсказывала
+-- бы уже неверный PIN.
+
+-- 1. Набор иконок. Одна копия в базе — функция, на неё же опирается проверка
+-- столбца; вторая в браузере (AVATAR_CHOICES), они сверяются тестом
+create or replace function avatar_choices()
+returns text[]
+language sql
+immutable
+as $$
+  select array['🦊','🐼','🐯','🦁','🐨','🐸','🐵','🐧','🦉','🐙','🦄','🐲',
+               '🐶','🐱','🐰','🐻','🐮','🐷','🐔','🐢','🦋','🐝','🐬','🦈'];
+$$;
+
+alter table students add column if not exists avatar text;
+alter table students add column if not exists renamed_at timestamptz;
+alter table students drop constraint if exists student_avatar_allowed;
+alter table students add constraint student_avatar_allowed
+  check (avatar is null or avatar = any (avatar_choices()));
+
+-- 2. Правила имени — одни для регистрации и переименования. Имена на «#»
+-- зарезервированы за удалёнными аккаунтами: в списках такое имя показывается
+-- как «удалённый игрок», и живой человек под ним выдавал бы себя за пустое место
+create or replace function check_new_username(p_name text)
+returns void
+language plpgsql
+immutable
+as $$
+begin
+  if p_name is null or length(p_name) < 2 or length(p_name) > 20 then
+    raise exception 'invalid_username';
+  end if;
+  if p_name like '#%' then raise exception 'invalid_username'; end if;
+end;
+$$;
+
+-- Игра регистрирует через версию с подсказкой к PIN, а запрет на «#» когда-то
+-- добавили только в версию без подсказки. Теперь обе идут через одни правила,
+-- и лимит регистраций в час действует в обеих
+create or replace function register_student(p_username text, p_pin text, p_hint text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+begin
+  perform check_new_username(trim(p_username));
+  if p_pin !~ '^[0-9]{4}$' then raise exception 'invalid_pin'; end if;
+  if (select count(*) from students where created_at >= now() - interval '1 hour') >= 20 then
+    raise exception 'too_many_signups';
+  end if;
+  insert into students(username, pin_hash, pin_hint)
+  values (trim(p_username), crypt(p_pin, gen_salt('bf')),
+          nullif(left(trim(coalesce(p_hint, '')), 60), ''));
+  return true;
+exception when unique_violation then
+  return false;
+end;
+$$;
+
+create or replace function register_student(p_username text, p_pin text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+begin
+  return register_student(p_username, p_pin, null);
+end;
+$$;
+
+-- 3. Что игре знать о своём аккаунте. since — дата создания: имя освобождается
+-- сразу, и если его займёт другой человек с тем же PIN, устройство со старым
+-- входом по одному имени не поняло бы, что аккаунт уже чужой. По дате поймёт
+create or replace function my_profile(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; s students;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into s from students where username = me;
+  return jsonb_build_object(
+    'username', s.username,
+    'avatar', s.avatar,
+    'since', s.created_at,
+    'renameWaitHours', case
+      when s.renamed_at is null or s.renamed_at <= now() - interval '24 hours' then 0
+      else greatest(1, ceil(extract(epoch from (s.renamed_at + interval '24 hours' - now())) / 3600))::int
+    end);
+end;
+$$;
+
+create or replace function set_avatar(p_username text, p_pin text, p_avatar text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_avatar is not null and not (p_avatar = any (avatar_choices())) then
+    raise exception 'invalid_avatar';
+  end if;
+  update students set avatar = p_avatar where username = me;
+  return p_avatar;
+end;
+$$;
+
+-- Иконки тех, кого игрок видит в списках. Отдельным запросом, а не лишним
+-- столбцом в каждом списке: список друзей, поиск и подсказки остаются как
+-- были, а браузер спрашивает только тех, чьих иконок ещё не знает
+create or replace function avatars_for(p_username text, p_pin text, p_names text[])
+returns table(username text, avatar text)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if coalesce(array_length(p_names, 1), 0) > 200 then raise exception 'too_many_names'; end if;
+  return query
+  select s.username, s.avatar from students s
+  where s.username = any (p_names) and s.avatar is not null;
+end;
+$$;
+
+-- 4. Смена имени. Почти всё переезжает само: у таблиц, где имя — внешний
+-- ключ, стоит ON UPDATE CASCADE. Руками — то, где имя лежит без ключа
+-- (кто написал фразу, от кого уведомление, кто выигрывал подряд, таблица
+-- результатов испытания), и две таблицы, где пара имён хранится по алфавиту
+-- (a < b): новое имя может встать в алфавите по другую сторону от собеседника,
+-- и база отказала бы в переименовании целиком. Такие строки вынимаются и
+-- кладутся обратно уже по новому алфавиту
+create or replace function push_on_talk()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  -- Переписку при переименовании перекладывают заново; будить друга
+  -- уведомлением о каждой старой фразе нельзя
+  if current_setting('hotcold.quiet_chat', true) = 'on' then return new; end if;
+  insert into push_outbox(username, kind, who)
+  values (case when new.sender = new.a then new.b else new.a end, 'talk', new.sender);
+  return new;
+end;
+$$;
+
+create or replace function rename_student(p_username text, p_pin text, p_new text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; nn text; last_rename timestamptz; riv rivalry[]; chat friend_chat[];
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  nn := trim(coalesce(p_new, ''));
+  perform check_new_username(nn);
+  if nn = me then return me; end if;
+
+  select renamed_at into last_rename from students where username = me;
+  if last_rename is not null and last_rename > now() - interval '24 hours' then
+    raise exception 'rename_too_soon:%',
+      greatest(1, ceil(extract(epoch from (last_rename + interval '24 hours' - now())) / 3600))::int;
+  end if;
+
+  -- Смена одного регистра («максим» → «Максим») — то же имя, а не чужое
+  if exists (select 1 from students where username_lower = lower(nn) and username <> me) then
+    raise exception 'name_taken';
+  end if;
+
+  select coalesce(array_agg(r), '{}') into riv from rivalry r where r.a = me or r.b = me;
+  delete from rivalry where a = me or b = me;
+  select coalesce(array_agg(c), '{}') into chat from friend_chat c where c.a = me or c.b = me;
+  delete from friend_chat where a = me or b = me;
+
+  update students set username = nn, renamed_at = now() where username = me;
+
+  update push_outbox set who = nn where who = me;
+  update runs set username = nn where username = me;
+
+  insert into rivalry(a, b, winner, streak, last_game)
+  select least(x.a2, x.b2), greatest(x.a2, x.b2),
+         case when r.winner = me then nn else r.winner end, r.streak, r.last_game
+  from unnest(riv) r,
+       lateral (select case when r.a = me then nn else r.a end as a2,
+                       case when r.b = me then nn else r.b end as b2) x;
+
+  -- Номера фраз сохраняются: на них держится «прочитано до сюда»
+  perform set_config('hotcold.quiet_chat', 'on', true);
+  insert into friend_chat(id, a, b, sender, code, created_at) overriding system value
+  select c.id, least(x.a2, x.b2), greatest(x.a2, x.b2),
+         case when c.sender = me then nn else c.sender end, c.code, c.created_at
+  from unnest(chat) c,
+       lateral (select case when c.a = me then nn else c.a end as a2,
+                       case when c.b = me then nn else c.b end as b2) x;
+  perform set_config('hotcold.quiet_chat', 'off', true);
+
+  return nn;
+end;
+$$;
+
+-- 5. Смена PIN. Проверка текущего PIN — та же, что при входе: пять ошибок
+-- подряд запирают аккаунт на пять минут, перебором не подобрать
+create or replace function change_pin(p_username text, p_pin text, p_new_pin text, p_hint text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if coalesce(p_new_pin, '') !~ '^[0-9]{4}$' then raise exception 'invalid_pin'; end if;
+  update students
+  set pin_hash = crypt(p_new_pin, gen_salt('bf')),
+      pin_hint = nullif(left(trim(coalesce(p_hint, '')), 60), ''),
+      failed_logins = 0, locked_until = null
+  where username = me;
+  return true;
+end;
+$$;
+
+revoke execute on function check_new_username(text) from public, anon;
+revoke execute on function push_on_talk() from public, anon;
+grant execute on function avatar_choices() to anon;
+grant execute on function my_profile(text, text) to anon;
+grant execute on function set_avatar(text, text, text) to anon;
+grant execute on function avatars_for(text, text, text[]) to anon;
+grant execute on function rename_student(text, text, text) to anon;
+grant execute on function change_pin(text, text, text, text) to anon;
+grant execute on function register_student(text, text, text) to anon;
+grant execute on function register_student(text, text) to anon;

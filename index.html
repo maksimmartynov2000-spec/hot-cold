@@ -160,6 +160,11 @@
     .modal-card {
       width: 100%;
       max-width: 320px;
+      /* Профиль вырос: иконки, смена имени и PIN. На невысоком экране окно
+         прокручивается само, а не уезжает за край */
+      max-height: calc(100vh - 40px);
+      max-height: calc(100dvh - 40px);
+      overflow-y: auto;
       background: #1b1e3d;
       /* окно живёт за пределами .card, свой цвет текста ему нужен явно —
          иначе достаётся чёрный по умолчанию от body */
@@ -192,6 +197,32 @@
       font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.85);
     }
     .pf-row .lang-switcher { font-size: 14px; padding: 6px 8px; }
+    /* Иконка в кружке крупнее буквы: у эмодзи много воздуха вокруг рисунка */
+    .avatar.has-icon { font-size: 17px; }
+    .avatar-btn .has-icon { font-size: 18px; }
+    .pf-avatar.has-icon { font-size: 36px; }
+    .pf-label {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.5); text-align: left; margin: 2px 2px 8px;
+    }
+    /* Буква и 24 иконки — ровно 5×5. Клетка 44px — меньше детскому пальцу
+       попадать неудобно, в ряды по 8 они выходили по 32px */
+    .av-grid { display: grid; grid-template-columns: repeat(5, 44px); justify-content: center;
+               gap: 8px 12px; margin-bottom: 14px; }
+    .av-tile {
+      aspect-ratio: 1; border-radius: 50%; border: none; padding: 0; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; font-family: inherit; line-height: 1;
+      background: rgba(255, 255, 255, 0.08); color: #fff;
+    }
+    .av-tile.letter { font-weight: 800; font-size: 18px; color: #0f1430; }
+    .av-tile.sel { outline: 3px solid #fff; outline-offset: 1px; }
+    .pf-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    .pf-form input {
+      width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08);
+      color: #fff; font-size: 15px; font-family: inherit;
+    }
     .pf-confirm { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
     .pf-confirm .modal-text { font-size: 14px; margin-bottom: 12px; }
     /* Удалить аккаунт — редкое и безвозвратное действие. Оно есть, но не
@@ -1767,10 +1798,44 @@
     <div class="pf-sub" id="tAccountTitle"></div>
 
     <div id="pfAccount">
+      <!-- Своя иконка вместо буквы. Прячется, пока сервер не умеет профиль
+           (миграция не применена): обещать нечего -->
+      <div class="hidden" id="pfAvatarBox">
+        <div class="pf-label" id="tAvatarTitle"></div>
+        <div class="av-grid" id="avGrid"></div>
+        <div class="fr-note hidden" id="avNote"></div>
+      </div>
+
       <button class="btn-ghost btn-block" id="tShowPin" onclick="revealOwnPin()"></button>
       <button class="btn-ghost btn-block hidden" id="tPushToggle" style="margin-top:8px"
               onclick="togglePush()"></button>
       <div class="fr-note hidden" id="pushNote"></div>
+
+      <div class="hidden" id="pfEdit">
+        <button class="btn-ghost btn-block" id="tRenameStart" style="margin-top:8px"
+                onclick="openRename(true)"></button>
+        <div class="pf-form hidden" id="renameBox">
+          <input type="text" id="renameInput" maxlength="20" autocomplete="off" />
+          <div class="setup-row">
+            <button class="btn-ghost btn-block" id="tRenameCancel" onclick="openRename(false)"></button>
+            <button class="btn btn-block" id="tRenameSave" onclick="saveRename()"></button>
+          </div>
+        </div>
+        <div class="fr-note hidden" id="renameNote"></div>
+
+        <button class="btn-ghost btn-block" id="tPinStart" style="margin-top:8px"
+                onclick="openPinChange(true)"></button>
+        <div class="pf-form hidden" id="pinBox">
+          <input type="password" id="pinOld" inputmode="numeric" maxlength="4" autocomplete="off" />
+          <input type="password" id="pinNew" inputmode="numeric" maxlength="4" autocomplete="off" />
+          <input type="text" id="pinHintNew" maxlength="60" autocomplete="off" />
+          <div class="setup-row">
+            <button class="btn-ghost btn-block" id="tPinCancel" onclick="openPinChange(false)"></button>
+            <button class="btn btn-block" id="tPinSave" onclick="savePin()"></button>
+          </div>
+        </div>
+        <div class="fr-note hidden" id="pinNote"></div>
+      </div>
     </div>
 
     <label class="pf-row">
@@ -2012,6 +2077,17 @@
         noHint: "No reminder was saved for this name",
         account: "Your account",
         settings: "Settings", language: "Language", done: "Done",
+        avatarTitle: "Icon", save: "Save",
+        renameStart: "Change name", renameNew: "New name",
+        renameDone: "Name changed",
+        renameWait: "You can change your name once a day \u2014 wait {n} h more",
+        pinStart: "Change PIN", pinOld: "Current PIN", pinNew: "New PIN (4 digits)",
+        pinHintNew: "Hint (optional)",
+        pinDone: "PIN changed. The old hint was removed",
+        pinDoneHint: "PIN changed, the new hint is saved",
+        errWrongPin: "Wrong current PIN",
+        sessionExpired: "The name or PIN of this account was changed on another device \u2014 please log in again",
+        ownerChanged: "This name now belongs to another player \u2014 log in again with your new name",
         signIn: "Sign in or create an account",
         showPin: "Show PIN",
         yourPin: "Your PIN: ",
@@ -2210,6 +2286,17 @@
         noHint: "Для этого имени подсказки нет",
         account: "Ваш аккаунт",
         settings: "Настройки", language: "Язык", done: "Готово",
+        avatarTitle: "Иконка", save: "Сохранить",
+        renameStart: "Сменить имя", renameNew: "Новое имя",
+        renameDone: "Имя изменено",
+        renameWait: "Имя можно менять раз в сутки — подождите ещё {n} ч",
+        pinStart: "Сменить PIN", pinOld: "Текущий PIN", pinNew: "Новый PIN (4 цифры)",
+        pinHintNew: "Подсказка (необязательно)",
+        pinDone: "PIN изменён. Старая подсказка удалена",
+        pinDoneHint: "PIN изменён, новая подсказка сохранена",
+        errWrongPin: "Неверный текущий PIN",
+        sessionExpired: "Имя или PIN этого аккаунта сменили на другом устройстве — войдите заново",
+        ownerChanged: "Это имя теперь у другого игрока — войдите заново под своим новым именем",
         signIn: "Войти или создать аккаунт",
         showPin: "Показать PIN",
         yourPin: "Ваш PIN: ",
@@ -2408,6 +2495,17 @@
         noHint: "Aucune aide enregistrée pour ce nom",
         account: "Votre compte",
         settings: "R\u00e9glages", language: "Langue", done: "OK",
+        avatarTitle: "Ic\u00f4ne", save: "Enregistrer",
+        renameStart: "Changer de nom", renameNew: "Nouveau nom",
+        renameDone: "Nom modifi\u00e9",
+        renameWait: "Le nom se change une fois par jour \u2014 encore {n} h",
+        pinStart: "Changer le PIN", pinOld: "PIN actuel", pinNew: "Nouveau PIN (4 chiffres)",
+        pinHintNew: "Indice (facultatif)",
+        pinDone: "PIN modifi\u00e9. L\u2019ancien indice a \u00e9t\u00e9 supprim\u00e9",
+        pinDoneHint: "PIN modifi\u00e9, le nouvel indice est enregistr\u00e9",
+        errWrongPin: "PIN actuel incorrect",
+        sessionExpired: "Le nom ou le PIN de ce compte a \u00e9t\u00e9 chang\u00e9 sur un autre appareil \u2014 reconnectez-vous",
+        ownerChanged: "Ce nom appartient maintenant \u00e0 un autre joueur \u2014 reconnectez-vous avec votre nouveau nom",
         signIn: "Se connecter ou cr\u00e9er un compte",
         showPin: "Afficher le PIN",
         yourPin: "Votre PIN : ",
@@ -2606,6 +2704,17 @@
         noHint: "Für diesen Namen ist keine Hilfe gespeichert",
         account: "Dein Konto",
         settings: "Einstellungen", language: "Sprache", done: "Fertig",
+        avatarTitle: "Symbol", save: "Speichern",
+        renameStart: "Namen \u00e4ndern", renameNew: "Neuer Name",
+        renameDone: "Name ge\u00e4ndert",
+        renameWait: "Der Name l\u00e4sst sich einmal am Tag \u00e4ndern \u2014 noch {n} Std.",
+        pinStart: "PIN \u00e4ndern", pinOld: "Aktuelle PIN", pinNew: "Neue PIN (4 Ziffern)",
+        pinHintNew: "Hinweis (freiwillig)",
+        pinDone: "PIN ge\u00e4ndert. Der alte Hinweis wurde gel\u00f6scht",
+        pinDoneHint: "PIN ge\u00e4ndert, der neue Hinweis ist gespeichert",
+        errWrongPin: "Falsche aktuelle PIN",
+        sessionExpired: "Name oder PIN dieses Kontos wurden auf einem anderen Ger\u00e4t ge\u00e4ndert \u2014 bitte neu anmelden",
+        ownerChanged: "Dieser Name geh\u00f6rt jetzt einem anderen Spieler \u2014 melde dich mit deinem neuen Namen an",
         signIn: "Anmelden oder Konto erstellen",
         showPin: "PIN anzeigen",
         yourPin: "Deine PIN: ",
@@ -4339,6 +4448,39 @@
   function runLogout() {
     localStorage.removeItem('hc_run_user');
     localStorage.removeItem('hc_run_pin');
+    localStorage.removeItem('hc_run_since');
+    localStorage.removeItem('hc_run_avatar');
+    profileInfo = null;
+  }
+
+  // ================= ПРОФИЛЬ: иконка, имя, PIN =================
+  // Что сервер знает о своём аккаунте. null — не знаем: нет сети или сервер
+  // ещё без профиля (миграция не применена). Тогда новых кнопок не показываем
+  let profileInfo = null;
+
+  async function syncProfile() {
+    const auth = runAuth();
+    if (!auth || !sb) return null;
+    let data;
+    try {
+      data = await friendRpc('my_profile');
+    } catch (e) {
+      return null;
+    }
+    if (!data || typeof data !== 'object' || !('since' in data) || myName() !== auth.username) return null;
+    // Имя освобождается сразу после смены. Если его занял другой человек и
+    // PIN совпал, по одному имени и PIN не понять, что аккаунт уже чужой.
+    // Дата создания у каждого аккаунта своя — по ней и понятно
+    const known = localStorage.getItem('hc_run_since');
+    if (known && data.since && known !== String(data.since)) {
+      signedOutElsewhere(t().run.ownerChanged);
+      return null;
+    }
+    if (data.since) localStorage.setItem('hc_run_since', String(data.since));
+    setMyAvatar(data.avatar || '');
+    profileInfo = data;
+    updateAccountChip();
+    return data;
   }
 
   // Чип с именем ученика живёт рядом с переключателем языка и показывается
@@ -4358,9 +4500,70 @@
     const first = Array.from(String(name || '').trim())[0];
     return first ? first.toUpperCase() : '?';
   }
+  // Набор иконок. Вторая копия — в базе (avatar_choices), они сверяются тестом.
+  // Только животные из готового списка: свободный текст в кружке у детского
+  // приложения — лишний риск, а набор проверяет сама база
+  const AVATAR_CHOICES = ['🦊', '🐼', '🐯', '🦁', '🐨', '🐸', '🐵', '🐧', '🦉', '🐙', '🦄', '🐲', '🐶', '🐱', '🐰', '🐻', '🐮', '🐷', '🐔', '🐢', '🦋', '🐝', '🐬', '🦈'];
+
+  // Иконки других игроков: имя → иконка, '' — без иконки (буква). Заполняется
+  // по мере того, как имена появляются в списках, заново — при входе в «Друзья»
+  const avatarCache = {};
+
+  function myName() {
+    const a = runAuth();
+    return a ? a.username : null;
+  }
+
+  // Своя иконка хранится с именем: после выхода и входа под другим аккаунтом
+  // чужая иконка не должна остаться в шапке
+  function myAvatar() {
+    try {
+      const v = JSON.parse(localStorage.getItem('hc_run_avatar') || 'null');
+      return v && v.user === myName() ? (v.avatar || '') : '';
+    } catch (e) { return ''; }
+  }
+
+  function setMyAvatar(avatar) {
+    try {
+      localStorage.setItem('hc_run_avatar', JSON.stringify({ user: myName(), avatar: avatar || '' }));
+    } catch (e) {}
+  }
+
+  function avatarOf(name) {
+    if (name && name === myName()) return myAvatar();
+    return avatarCache[name] || '';
+  }
+
   function paintAvatar(el, name) {
-    el.textContent = avatarLetter(name);
+    const icon = avatarOf(name);
+    el.textContent = icon || avatarLetter(name);
+    el.classList.toggle('has-icon', !!icon);
     el.style.background = avatarColor(name);
+    el.dataset.avatarFor = name;
+  }
+
+  // Узнаём иконки тех, кого видно в списке, одним запросом — и только тех,
+  // чьих иконок ещё не знаем. Сервер без профиля отвечает ошибкой: тогда
+  // остаются буквы, и больше не спрашиваем
+  let avatarsSupported = true;
+  async function fetchAvatars(names) {
+    if (!avatarsSupported || !runAuth()) return;
+    const me = myName();
+    const want = [...new Set(names)].filter(n =>
+      n && n !== me && String(n).charAt(0) !== '#' && !(n in avatarCache)).slice(0, 200);
+    if (!want.length) return;
+    let rows;
+    try {
+      rows = await friendRpc('avatars_for', { p_names: want });
+    } catch (e) {
+      if (/avatars_for|function|schema/i.test(e.message)) avatarsSupported = false;
+      return;
+    }
+    want.forEach(n => { avatarCache[n] = ''; });
+    (Array.isArray(rows) ? rows : []).forEach(r => { avatarCache[r.username] = r.avatar || ''; });
+    document.querySelectorAll('.avatar[data-avatar-for]').forEach(el => {
+      if (want.indexOf(el.dataset.avatarFor) >= 0) paintAvatar(el, el.dataset.avatarFor);
+    });
   }
 
   function updateAccountChip() {
@@ -4426,6 +4629,21 @@
     document.getElementById('tLogoutStart').textContent = L.run.logout;
     document.getElementById('tLogoutCancel').textContent = L.run.cancel;
     document.getElementById('tLogoutConfirm').textContent = L.run.logout;
+    document.getElementById('tAvatarTitle').textContent = L.run.avatarTitle;
+    document.getElementById('tRenameStart').textContent = L.run.renameStart;
+    document.getElementById('tRenameSave').textContent = L.run.save;
+    document.getElementById('tRenameCancel').textContent = L.run.cancel;
+    document.getElementById('renameInput').placeholder = L.run.renameNew;
+    document.getElementById('tPinStart').textContent = L.run.pinStart;
+    document.getElementById('tPinSave').textContent = L.run.save;
+    document.getElementById('tPinCancel').textContent = L.run.cancel;
+    document.getElementById('pinOld').placeholder = L.run.pinOld;
+    document.getElementById('pinNew').placeholder = L.run.pinNew;
+    document.getElementById('pinHintNew').placeholder = L.run.pinHintNew;
+    // Иконки, имя и PIN — только когда сервер умеет профиль
+    document.getElementById('pfAvatarBox').classList.toggle('hidden', !(auth && profileInfo));
+    document.getElementById('pfEdit').classList.toggle('hidden', !(auth && profileInfo));
+    if (auth && profileInfo) renderAvatarGrid();
     if (auth) {
       document.getElementById('tShowPin').textContent = L.run.showPin;
       document.getElementById('tLogoutAsk').textContent = L.run.logoutAsk.replace('{name}', auth.username);
@@ -4437,12 +4655,156 @@
   function openLogoutModal() {
     const auth = runAuth();
     askLogout(false);
+    openRename(false);
+    openPinChange(false);
+    ['avNote', 'renameNote', 'pinNote'].forEach(id => setNote(id, ''));
     fillProfile();
     if (auth) {
       setNote('pushNote', '');
       loadPushState();
+      // Свежие иконку и «сколько ждать до смены имени» — с сервера; пока они
+      // идут, окно уже открыто с тем, что известно
+      syncProfile().then(() => {
+        if (!document.getElementById('logoutModal').classList.contains('hidden')) fillProfile();
+      });
     }
     document.getElementById('logoutModal').classList.remove('hidden');
+  }
+
+  function renderAvatarGrid() {
+    const grid = document.getElementById('avGrid');
+    const me = myName();
+    const current = myAvatar();
+    grid.innerHTML = '';
+    // Первая клетка — буква: вернуться к ней можно так же, как выбрать иконку
+    ['', ...AVATAR_CHOICES].forEach(icon => {
+      const b = document.createElement('button');
+      b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '');
+      b.dataset.icon = icon;
+      if (icon) b.textContent = icon;
+      else { b.textContent = avatarLetter(me); b.style.background = avatarColor(me); }
+      b.onclick = () => chooseAvatar(icon);
+      grid.appendChild(b);
+    });
+  }
+
+  // Выбор видно сразу; если сервер не принял — возвращаем прежнюю
+  async function chooseAvatar(icon) {
+    const before = myAvatar();
+    if (icon === before) return;
+    setMyAvatar(icon);
+    fillProfile();
+    updateAccountChip();
+    setNote('avNote', '');
+    try {
+      await friendRpc('set_avatar', { p_avatar: icon || null });
+      if (profileInfo) profileInfo.avatar = icon || null;
+    } catch (e) {
+      if (!runAuth()) return;
+      setMyAvatar(before);
+      fillProfile();
+      updateAccountChip();
+      setNote('avNote', friendErrorText(e.message), true);
+    }
+  }
+
+  function openRename(show) {
+    const L = t().run;
+    const wait = profileInfo ? profileInfo.renameWaitHours : 0;
+    // Раньше суток не пускаем и не открываем поле зря — говорим, сколько ждать
+    if (show && wait > 0) {
+      setNote('renameNote', L.renameWait.replace('{n}', wait), true);
+      return;
+    }
+    document.getElementById('renameBox').classList.toggle('hidden', !show);
+    document.getElementById('tRenameStart').classList.toggle('hidden', !!show);
+    syncProfileDone();
+    if (show) {
+      setNote('renameNote', '');
+      const input = document.getElementById('renameInput');
+      input.value = myName() || '';
+      input.focus();
+    }
+  }
+
+  function profileErrorText(message) {
+    const L = t().run;
+    const m = String(message || '');
+    const wait = m.match(/rename_too_soon:(\d+)/);
+    if (wait) return L.renameWait.replace('{n}', wait[1]);
+    if (m.indexOf('name_taken') >= 0) return L.errTaken;
+    if (m.indexOf('invalid_username') >= 0) return L.errName;
+    if (m.indexOf('invalid_pin') >= 0) return L.errPin;
+    if (m.indexOf('auth_failed') >= 0) return L.errWrongPin;
+    if (m.indexOf('locked_out') >= 0) return L.errLocked;
+    return friendErrorText(m);
+  }
+
+  async function saveRename() {
+    const L = t().run;
+    const next = (document.getElementById('renameInput').value || '').trim();
+    const before = myName();
+    if (next.length < 2 || next.length > 20 || next.charAt(0) === '#') {
+      return setNote('renameNote', L.errName, true);
+    }
+    if (next === before) return openRename(false);
+    const icon = myAvatar();
+    const btn = document.getElementById('tRenameSave');
+    btn.disabled = true;
+    try {
+      const renamed = await friendRpc('rename_student', { p_new: next });
+      localStorage.setItem('hc_run_user', renamed);
+      setMyAvatar(icon);
+      if (profileInfo) profileInfo.renameWaitHours = 24;
+      openRename(false);
+      fillProfile();
+      updateAccountChip();
+      renderGreeting(renamed);
+      setNote('renameNote', L.renameDone);
+    } catch (e) {
+      if (runAuth()) setNote('renameNote', profileErrorText(e.message), true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function openPinChange(show) {
+    document.getElementById('pinBox').classList.toggle('hidden', !show);
+    document.getElementById('tPinStart').classList.toggle('hidden', !!show);
+    syncProfileDone();
+    ['pinOld', 'pinNew', 'pinHintNew'].forEach(id => { document.getElementById(id).value = ''; });
+    if (show) {
+      setNote('pinNote', '');
+      document.getElementById('pinOld').focus();
+    }
+  }
+
+  // PIN меняется по текущему PIN, который вводят руками, — не тому, что лежит
+  // в браузере: случайно, мимоходом, его не сменить. Запрос идёт мимо
+  // friendRpc: неверный текущий PIN здесь — просто опечатка, а не повод выходить
+  async function savePin() {
+    const L = t().run;
+    const auth = runAuth();
+    if (!auth || !sb) return setNote('pinNote', L.errNoConn, true);
+    const old = document.getElementById('pinOld').value.trim();
+    const next = document.getElementById('pinNew').value.trim();
+    const hint = (document.getElementById('pinHintNew').value || '').trim().slice(0, 60);
+    if (!/^[0-9]{4}$/.test(old) || !/^[0-9]{4}$/.test(next)) return setNote('pinNote', L.errPin, true);
+    const btn = document.getElementById('tPinSave');
+    btn.disabled = true;
+    try {
+      const { error } = await sb.rpc('change_pin',
+        { p_username: auth.username, p_pin: old, p_new_pin: next, p_hint: hint || null });
+      if (error) return setNote('pinNote', profileErrorText(error.message), true);
+      localStorage.setItem('hc_run_pin', next);
+      openPinChange(false);
+      fillProfile();
+      setNote('pinNote', hint ? L.pinDoneHint : L.pinDone);
+    } catch (e) {
+      setNote('pinNote', L.errNoConn, true);
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   function closeLogoutModal() {
@@ -4454,8 +4816,15 @@
   function askLogout(show) {
     document.getElementById('logoutConfirmBox').classList.toggle('hidden', !show);
     document.getElementById('tLogoutStart').classList.toggle('hidden', !!show);
-    // Две синие кнопки подряд — «Выйти» и «Готово» — спорили бы, какая главная
-    document.getElementById('tProfileDone').classList.toggle('hidden', !!show);
+    syncProfileDone();
+  }
+
+  // Пока открыт вопрос о выходе или форма имени и PIN, у них своя синяя кнопка.
+  // Вторая синяя — «Готово» — спорила бы с ней, какая главная
+  function syncProfileDone() {
+    const open = ['logoutConfirmBox', 'renameBox', 'pinBox']
+      .some(id => !document.getElementById(id).classList.contains('hidden'));
+    document.getElementById('tProfileDone').classList.toggle('hidden', open);
   }
 
   function signInFromProfile() {
@@ -4513,6 +4882,8 @@
   let authReturn = 'runHub';
 
   function afterAuth() {
+    // Запомнить, чей это аккаунт, и подтянуть свою иконку
+    syncProfile();
     if (authReturn === 'mode') return showScreen('mode');
     if (authReturn === 'online') return openOnline();
     if (authReturn === 'friends') return openFriends();
@@ -4770,6 +5141,8 @@
     const auth = runAuth();
     if (!auth) { authReturn = 'friends'; return showScreen('authChoice'); }
     friendMenuOpen = null;
+    // Иконки могли смениться с прошлого раза — спрашиваем заново
+    Object.keys(avatarCache).forEach(k => { delete avatarCache[k]; });
     renderGreeting(auth.username);
     document.getElementById('searchResults').innerHTML = '';
     document.getElementById('friendSearch').value = '';
@@ -4832,8 +5205,32 @@
     if (!auth || !sb) throw new Error('no_conn');
     const { data, error } = await sb.rpc(name,
       Object.assign({ p_username: auth.username, p_pin: auth.pin }, args || {}));
-    if (error) throw new Error(error.message);
+    if (error) {
+      // Сохранённые имя и PIN больше не подходят: их сменили на другом
+      // устройстве. Повторять нельзя — каждая попытка считается ошибкой входа,
+      // и опрос раз в десять секунд запер бы хозяину его же аккаунт
+      if (String(error.message).indexOf('auth_failed') >= 0) signedOutElsewhere();
+      throw new Error(error.message);
+    }
     return data;
+  }
+
+  let signingOut = false;
+  function signedOutElsewhere(message) {
+    if (signingOut || !runAuth()) return;
+    signingOut = true;
+    runLogout();
+    stopFriendsPoll();
+    stopRankedPoll();
+    stopOnlinePoll();
+    stopChatPoll();
+    closeLogoutModal();
+    online = null;
+    mode = null;
+    applyTranslations();
+    showScreen('mode');
+    signingOut = false;
+    alert(message || t().run.sessionExpired);
   }
 
   // Входящие заявки первыми: это единственное, что требует действия
@@ -4924,6 +5321,7 @@
         if (r.unread > 0) notifyAway('talkfrom-' + r.username + '-' + r.unread);
         box.appendChild(friendRow(r.username, r.relation, r.unread));
       });
+    fetchAvatars(rows.map(r => r.username));
   }
 
   // quiet — это опрос по таймеру: молча, иначе на экране будет мигать ошибка
@@ -5118,6 +5516,7 @@
       const rows = (await friendRpc('suggest_students')) || [];
       box.innerHTML = '';
       rows.forEach(r => box.appendChild(friendRow(r.username, null)));
+      fetchAvatars(rows.map(r => r.username));
       setNote('searchNote', rows.length ? t().online.whoPlays : t().online.nobodyYet);
     } catch (e) {
       setNote('searchNote', friendErrorText(e.message), true);
@@ -5135,6 +5534,7 @@
     try {
       const rows = (await friendRpc('find_students', { p_query: q })) || [];
       rows.forEach(r => box.appendChild(friendRow(r.username, r.relation)));
+      fetchAvatars(rows.map(r => r.username));
       setNote('searchNote', rows.length ? '' : t().online.nobody);
     } catch (e) {
       setNote('searchNote', friendErrorText(e.message), true);
@@ -6338,6 +6738,8 @@
   document.getElementById('winsNeeded').value = '3';
   applyTranslations();
   showScreen('mode');
+  // Подтянуть свою иконку и проверить, что сохранённый вход ещё наш
+  if (runAuth()) syncProfile();
 
   checkRemoteConfig();
   setInterval(checkRemoteConfig, 60000);

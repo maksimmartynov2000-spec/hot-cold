@@ -3578,6 +3578,227 @@ async function testNewLook(browser) {
   await ctx.close();
 }
 
+// ------------------------------------------ профиль: иконка, имя, PIN
+async function testProfile(browser) {
+  console.log('\nПрофиль: иконка, имя, PIN');
+
+  // Своя иконка приходит с сервера и стоит в шапке вместо буквы
+  let page = await newGame(browser, { user: 'Максим', profile: { avatar: '🦊' } });
+  await page.waitForTimeout(300);
+  const head = await page.evaluate(() => document.getElementById('accountChip').textContent.trim());
+  check('своя иконка в шапке вместо буквы', head === '🦊', head);
+
+  // Выбор иконки: буква и 24 животных, выбранная отмечена
+  await page.click('#accountChip');
+  await page.waitForTimeout(300);
+  const grid = await page.evaluate(() => {
+    const tiles = [...document.querySelectorAll('#avGrid .av-tile')];
+    return { n: tiles.length, first: tiles[0].textContent, firstLetter: tiles[0].classList.contains('letter'),
+             sel: tiles.filter(t => t.classList.contains('sel')).map(t => t.dataset.icon) };
+  });
+  check('в профиле буква и 24 иконки', grid.n === 25 && grid.firstLetter && grid.first === 'М',
+    JSON.stringify(grid));
+  check('выбранная иконка отмечена', grid.sel.join() === '🦊', grid.sel.join());
+
+  await page.click('#avGrid .av-tile[data-icon="🐼"]');
+  await page.waitForTimeout(300);
+  const picked = await page.evaluate(() => ({
+    sent: (window.__profile.calls.filter(c => c.name === 'set_avatar').pop() || {}).args,
+    head: document.getElementById('accountChip').textContent.trim(),
+    big: document.getElementById('pfAvatar').textContent.trim()
+  }));
+  check('выбор уходит на сервер', picked.sent && picked.sent.p_avatar === '🐼', JSON.stringify(picked.sent));
+  check('и сразу виден в шапке и в профиле', picked.head === '🐼' && picked.big === '🐼', JSON.stringify(picked));
+
+  await page.click('#avGrid .av-tile.letter');
+  await page.waitForTimeout(300);
+  const back = await page.evaluate(() => ({
+    sent: (window.__profile.calls.filter(c => c.name === 'set_avatar').pop() || {}).args,
+    head: document.getElementById('accountChip').textContent.trim()
+  }));
+  check('к букве можно вернуться', back.sent && back.sent.p_avatar === null && back.head === 'М', JSON.stringify(back));
+
+  // Клетки выбора — не меньше 44px: мельче детскому пальцу попадать неудобно
+  const tile = await page.evaluate(() => {
+    const r = document.querySelector('#avGrid .av-tile').getBoundingClientRect();
+    const tops = new Set([...document.querySelectorAll('#avGrid .av-tile')].map(t => Math.round(t.getBoundingClientRect().top)));
+    return { w: r.width, h: r.height, rows: tops.size };
+  });
+  check('клетки иконок крупные и сетка ровная 5×5', tile.w >= 44 && tile.h >= 44 && tile.rows === 5,
+    JSON.stringify(tile));
+
+  // Смена имени
+  await page.click('#tRenameStart');
+  await page.waitForTimeout(150);
+  check('поле нового имени заполнено текущим',
+    (await page.inputValue('#renameInput')) === 'Максим');
+  check('пока открыта форма, «Готово» не спорит с «Сохранить»',
+    !(await page.locator('#tProfileDone').isVisible()));
+  await page.fill('#renameInput', '#77');
+  await page.click('#tRenameSave');
+  await page.waitForTimeout(200);
+  const bad = await page.evaluate(() => ({
+    note: document.getElementById('renameNote').textContent,
+    calls: window.__profile.calls.filter(c => c.name === 'rename_student').length
+  }));
+  check('имя на «#» не уходит на сервер', bad.calls === 0 && bad.note.indexOf('от 2 до 20') >= 0, bad.note);
+
+  await page.evaluate(() => { window.__rpcError = { name: 'rename_student', message: 'rename_too_soon:5' }; });
+  await page.fill('#renameInput', 'Максимус');
+  await page.click('#tRenameSave');
+  await page.waitForTimeout(250);
+  const soon = await page.evaluate(() => document.getElementById('renameNote').textContent);
+  check('второй раз за сутки — сказано, сколько ждать', soon.indexOf('раз в сутки') >= 0 && soon.indexOf('5 ч') >= 0, soon);
+  check('и из аккаунта не выбросило', await page.evaluate(() => !!localStorage.getItem('hc_run_user')));
+
+  await page.evaluate(() => { window.__rpcError = { name: 'rename_student', message: 'name_taken' }; });
+  await page.click('#tRenameSave');
+  await page.waitForTimeout(250);
+  const taken = await page.evaluate(() => document.getElementById('renameNote').textContent);
+  check('занятое имя — так и сказано', taken.indexOf('уже занято') >= 0, taken);
+
+  await page.evaluate(() => { window.__rpcError = null; });
+  await page.click('#tRenameSave');
+  await page.waitForTimeout(300);
+  const renamed = await page.evaluate(() => ({
+    user: localStorage.getItem('hc_run_user'),
+    note: document.getElementById('renameNote').textContent,
+    name: document.getElementById('accountName').textContent,
+    head: document.getElementById('accountChip').textContent.trim()
+  }));
+  check('после смены имени вход идёт под новым', renamed.user === 'Максимус', renamed.user);
+  check('в профиле новое имя и «Имя изменено»',
+    renamed.name === 'Максимус' && renamed.note.indexOf('Имя изменено') >= 0, JSON.stringify(renamed));
+
+  // Раньше суток форму даже не открываем — сразу говорим, сколько ждать
+  await page.click('#tRenameStart');
+  await page.waitForTimeout(150);
+  const again = await page.evaluate(() => ({
+    open: !document.getElementById('renameBox').classList.contains('hidden'),
+    note: document.getElementById('renameNote').textContent
+  }));
+  check('сменить имя снова сразу нельзя — и видно почему', !again.open && again.note.indexOf('24 ч') >= 0,
+    JSON.stringify(again));
+
+  // Смена PIN: по текущему PIN, набранному руками
+  await page.click('#tPinStart');
+  await page.waitForTimeout(150);
+  await page.fill('#pinOld', '0000');
+  await page.fill('#pinNew', '5678');
+  await page.click('#tPinSave');
+  await page.waitForTimeout(300);
+  const wrong = await page.evaluate(() => ({
+    note: document.getElementById('pinNote').textContent,
+    pin: localStorage.getItem('hc_run_pin'), user: localStorage.getItem('hc_run_user')
+  }));
+  check('неверный текущий PIN — сказано, PIN не сменился', wrong.note.indexOf('Неверный текущий PIN') >= 0 &&
+    wrong.pin === '1234', JSON.stringify(wrong));
+  check('опечатка в текущем PIN не выбрасывает из аккаунта', wrong.user === 'Максимус');
+
+  await page.fill('#pinOld', '1234');
+  await page.fill('#pinNew', '56');
+  await page.click('#tPinSave');
+  await page.waitForTimeout(150);
+  check('короткий новый PIN не уходит на сервер',
+    await page.evaluate(() => window.__profile.calls.filter(c => c.name === 'change_pin').length === 1));
+
+  await page.fill('#pinNew', '5678');
+  await page.click('#tPinSave');
+  await page.waitForTimeout(300);
+  const pinOk = await page.evaluate(() => ({
+    note: document.getElementById('pinNote').textContent,
+    pin: localStorage.getItem('hc_run_pin'), hint: window.__profile.hint
+  }));
+  check('новый PIN сохранён на устройстве', pinOk.pin === '5678', pinOk.pin);
+  check('форма закрылась — «Готово» снова на месте', await page.locator('#tProfileDone').isVisible());
+  check('и сказано, что старая подсказка удалена', pinOk.note.indexOf('Старая подсказка удалена') >= 0 &&
+    pinOk.hint === null, JSON.stringify(pinOk));
+
+  await page.click('#tPinStart');
+  await page.fill('#pinOld', '5678');
+  await page.fill('#pinNew', '4321');
+  await page.fill('#pinHintNew', 'год кота');
+  await page.click('#tPinSave');
+  await page.waitForTimeout(300);
+  const withHint = await page.evaluate(() => ({ note: document.getElementById('pinNote').textContent,
+                                                hint: window.__profile.hint }));
+  check('новая подсказка уходит вместе с PIN', withHint.hint === 'год кота' &&
+    withHint.note.indexOf('новая подсказка сохранена') >= 0, JSON.stringify(withHint));
+  await done(page);
+
+  // Иконки друзей видны в списке, у кого иконки нет — буква
+  page = await newGame(browser, { user: 'Лев', profile: { avatars: { 'Аня': '🐼' } } });
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' }, { username: 'Аня', relation: 'friend' }];
+  });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(600);
+  const faces = await page.evaluate(() => Object.fromEntries(
+    [...document.querySelectorAll('#friendsList .friend-row')].map(r => [r.dataset.name, r.querySelector('.avatar').textContent])));
+  check('у друга с иконкой — иконка', faces['Аня'] === '🐼', JSON.stringify(faces));
+  check('у друга без иконки — буква', faces['Кира'] === 'К', JSON.stringify(faces));
+  await done(page);
+
+  // Сервер без миграции профиля: новых кнопок нет, ничего не ломается
+  page = await newGame(browser, { user: 'Лев', profile: { unsupported: true } });
+  await page.click('#accountChip');
+  await page.waitForTimeout(400);
+  const old = await page.evaluate(() => ({
+    grid: !document.getElementById('pfAvatarBox').classList.contains('hidden'),
+    edit: !document.getElementById('pfEdit').classList.contains('hidden'),
+    head: document.getElementById('accountChip').textContent.trim(),
+    user: localStorage.getItem('hc_run_user')
+  }));
+  check('без миграции иконок и смены имени нет', !old.grid && !old.edit, JSON.stringify(old));
+  check('а буква и вход на месте', old.head === 'Л' && old.user === 'Лев', JSON.stringify(old));
+  await done(page);
+
+  // Имя или PIN сменили на другом устройстве: это устройство выходит сразу,
+  // а не стучится со старым PIN, запирая хозяину аккаунт
+  page = await newGame(browser, { user: 'Лев' });
+  const dialogs = [];
+  page.on('dialog', d => { dialogs.push(d.message()); d.accept(); });
+  await page.evaluate(() => { window.__rpcError = { name: 'list_friends', message: 'auth_failed' }; });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(600);
+  const out = await page.evaluate(() => ({
+    user: localStorage.getItem('hc_run_user'),
+    menu: !document.getElementById('screenMode').classList.contains('hidden')
+  }));
+  check('чужой PIN на устройстве — выход, а не повторы', out.user === null && out.menu, JSON.stringify(out));
+  check('и сказано почему', dialogs.some(m => m.indexOf('другом устройстве') >= 0), dialogs.join(' | '));
+  const lists = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'list_friends').length);
+  await page.waitForTimeout(11000);
+  const listsLater = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'list_friends').length);
+  check('опрос после выхода остановлен', listsLater === lists, lists + ' → ' + listsLater);
+  await done(page);
+
+  // Имя освободилось и его занял другой с тем же PIN: по дате создания видно подмену
+  // Сообщение всплывает при самом запуске — слушать надо до загрузки страницы
+  const ctx2 = await browser.newContext({ viewport: PHONE });
+  page = await ctx2.newPage();
+  const dialogs2 = [];
+  page.on('dialog', d => { dialogs2.push(d.message()); d.accept(); });
+  page.on('pageerror', e => check('без ошибок JS', false, e.message));
+  await applyStub(page, { user: 'Лев', profile: { since: '2026-05-05T00:00:00+00:00' } });
+  await page.addInitScript(() => localStorage.setItem('hc_run_since', '2026-01-01T00:00:00+00:00'));
+  await page.goto(GAME_URL);
+  await page.waitForTimeout(600);
+  check('чужой аккаунт под тем же именем — выход с объяснением',
+    (await page.evaluate(() => localStorage.getItem('hc_run_user'))) === null &&
+    dialogs2.some(m => m.indexOf('у другого игрока') >= 0), dialogs2.join(' | '));
+  await done(page);
+
+  // Первый запуск после обновления: дату создания запоминаем, из аккаунта не выбрасываем
+  page = await newGame(browser, { user: 'Лев' });
+  await page.waitForTimeout(500);
+  const first = await page.evaluate(() => ({ since: localStorage.getItem('hc_run_since'),
+                                             user: localStorage.getItem('hc_run_user') }));
+  check('дата создания запомнена при первом запуске',
+    first.since === '2026-01-01T00:00:00+00:00' && first.user === 'Лев', JSON.stringify(first));
+  await done(page);
+}
+
 // ------------------------------------------ страница создания ключей VAPID
 async function testKeyPage(browser) {
   console.log('\nСтраница ключей');
@@ -3721,6 +3942,7 @@ async function testKeyPage(browser) {
     await testPushNotifications(browser);
     await testKeyPage(browser);
     await testNewLook(browser);
+    await testProfile(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

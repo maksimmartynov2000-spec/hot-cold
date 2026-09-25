@@ -37,6 +37,33 @@ function stubSupabase(opts) {
           if (name === 'remove_friend') return { data: true, error: null };
           if (name === 'cancel_friend_request') return { data: true, error: null };
 
+          // Профиль: иконка, имя, PIN. «Сервер» — window.__profile; ошибку
+          // конкретного вызова тест подкладывает через window.__rpcError.
+          // unsupported — сервер без миграции профиля: функций нет вовсе
+          if (['my_profile', 'set_avatar', 'avatars_for', 'rename_student', 'change_pin'].indexOf(name) >= 0) {
+            const P = window.__profile;
+            P.calls.push({ name, args });
+            if (P.unsupported) {
+              return { data: null, error: { message: 'Could not find the function public.' + name } };
+            }
+            if (name === 'my_profile') {
+              return { data: { username: args.p_username, avatar: P.avatar, since: P.since,
+                               renameWaitHours: P.wait }, error: null };
+            }
+            if (name === 'set_avatar') { P.avatar = args.p_avatar; return { data: args.p_avatar, error: null }; }
+            if (name === 'avatars_for') {
+              return { data: (args.p_names || []).filter(n => P.avatars[n])
+                .map(n => ({ username: n, avatar: P.avatars[n] })), error: null };
+            }
+            if (name === 'rename_student') return { data: args.p_new, error: null };
+            if (name === 'change_pin') {
+              if (args.p_pin !== P.pin) return { data: null, error: { message: 'auth_failed' } };
+              if (!/^[0-9]{4}$/.test(args.p_new_pin || '')) return { data: null, error: { message: 'invalid_pin' } };
+              P.pin = args.p_new_pin; P.hint = args.p_hint;
+              return { data: true, error: null };
+            }
+          }
+
           // Матчи: заглушка ведёт себя как сервер — держит состояние, проверяет
           // очередь и НЕ отдаёт загаданное число, пока раунд не кончился
           // Забег: заглушка считает его так же, как сервер, и так же не отдаёт
@@ -269,6 +296,10 @@ function stubSupabase(opts) {
       else window.PushManager = function () {};
     }
 
+    window.__profile = Object.assign({ avatar: null, since: '2026-01-01T00:00:00+00:00', wait: 0,
+                                       avatars: {}, pin: '1234', hint: null, unsupported: false },
+                                     opts.profile || {});
+    window.__profile.calls = [];
     window.__talk = {};
     window.__rankedQ = { inQueue: false, mode: 0, matchId: null, queue: 1,
                          lastAgo: null, joined: 0,
