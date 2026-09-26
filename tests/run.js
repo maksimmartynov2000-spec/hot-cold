@@ -52,12 +52,13 @@ async function testModes(browser) {
   const names = await page.evaluate(() => [
     document.getElementById('tModeSolo').textContent,
     document.getElementById('tModeDuel').textContent,
+    document.getElementById('tModeBot').textContent,
     document.getElementById('tModeRun').textContent,
     document.getElementById('tModeOnline').textContent
   ]);
-  check('в меню четыре режима с названиями', names.every(n => n && n.trim()), names.join(' / '));
-  check('карточек в меню тоже четыре',
-    await page.evaluate(() => document.querySelectorAll('#screenMode .mode-btn').length) === 4);
+  check('в меню пять режимов с названиями', names.every(n => n && n.trim()), names.join(' / '));
+  check('карточек в меню тоже пять',
+    await page.evaluate(() => document.querySelectorAll('#screenMode .mode-btn').length) === 5);
 
   // Тренировка
   await page.click('#tModeSolo');
@@ -2840,7 +2841,7 @@ async function testRanked(browser) {
   check('«Игра онлайн» ведёт сразу на рейтинг', split.ranked && !split.friends);
   check('вкладок внутри больше нет', split.tabs === 0, String(split.tabs));
   check('в списке режимов «Друзей» нет — они не режим игры',
-    split.menu.length === 4, split.menu.join(' | '));
+    split.menu.length === 5 && !split.menu.some(n => /Друз/.test(n)), split.menu.join(' | '));
   check('зато есть кнопка в шапке', split.hdr);
 
   // Описание правил убрано: его заменяют подписи разновидностей
@@ -3692,7 +3693,7 @@ async function testNewLook(browser) {
                                                             : k.className.replace('mode-btn ', ''));
   });
   check('меню разбито на «без интернета» и «нужен интернет»',
-    groups.join(',') === 'G:Без интернета,solo,duel,G:Нужен интернет,run,online', groups.join(','));
+    groups.join(',') === 'G:Без интернета,solo,duel,bot,G:Нужен интернет,run,online', groups.join(','));
   for (const lang of ['en', 'fr', 'de']) {
     await setLang(page, lang);
     const heads = await page.evaluate(() =>
@@ -4478,6 +4479,283 @@ async function testDuelReview(browser) {
   await done(page);
 }
 
+// ------------------------------------------ боты
+async function testBots(browser) {
+  console.log('\nБоты');
+  let page = await newGame(browser);
+
+  const look = await page.evaluate(() => ({
+    owl: playerName('@bot:owl'), upper: playerName('@BOT:OWL'), human: playerName('Лев'),
+    icon: avatarOf('@bot:fox'), color: colorOf('@bot:panda'),
+    order: BOTS.map(b => b.key).join(), rising: BOTS.every((b, i) => i === 0 || b.level > BOTS[i - 1].level) }));
+  check('бот подписан именем персонажа и 🤖', look.owl === '🦉 Сова 🤖' && look.upper === look.owl, look.owl);
+  check('у бота своя иконка и свой цвет', look.icon === '🦊' && look.color === '#e2e8f0', look.icon + look.color);
+  check('человек подписан по-прежнему своим именем', look.human === 'Лев', look.human);
+  check('персонажей пять, от слабого к сильному',
+    look.order === 'turtle,panda,dolphin,fox,owl' && look.rising, look.order);
+
+  // Движок: возможные числа — ровно те, что сходятся со всеми видимыми ответами
+  const eng = await page.evaluate(() => {
+    RANGE_MIN = 1; RANGE_MAX = 100; FEEDBACK_META = buildFeedbackMeta(100);
+    const bands = reviewBands(FEEDBACK_META);
+    const tier = (g, x) => bandOf(Math.abs(g - x), bands);
+    const list = cand => { const r = []; cand.forEach((c, i) => { if (c) r.push(i + 1); }); return r.join(); };
+    const brute = (moves, sec) => {
+      const r = [];
+      for (let x = 1; x <= 100; x++) if (moves.every(m => tier(m.guess, x) === tier(m.guess, sec))) r.push(x);
+      return r.join();
+    };
+    const mk = (g, p, sec) => ({ guess: g, labelIndex: tier(g, sec), p });
+    const m1 = [mk(50, 0, 37), mk(20, 1, 37), mk(30, 0, 37)];
+    // Ходы подобраны так, что каждая помеха меняет итог: иначе проверка
+    // прошла бы и без неё
+    const m2 = [mk(40, 0, 1), mk(27, 1, 1), mk(38, 0, 1), mk(60, 1, 1)];
+    const full = list(botCandidates(m2, 1, {}, false));
+    const views = [list(botCandidates(m2, 1, { fog: true }, false)), list(botCandidates(m2, 1, { blind: true }, false)),
+                   list(botCandidates(m2, 1, { shortMemory: true }, false)), list(botCandidates(m2, 1, {}, true))];
+    return {
+      differ: views.every(v => v !== full) && new Set(views).size === 4,
+      plain: list(botCandidates(m1, 1, {}, false)) === brute(m1, 37),
+      secretIn: list(botCandidates(m1, 1, {}, false)).split(',').includes('37'),
+      fog: list(botCandidates(m2, 1, { fog: true }, false)) === brute(m2.filter(m => m.p === 1), 1),
+      blind: list(botCandidates(m2, 1, { blind: true }, false)) === brute(m2.filter(m => m.p === 0), 1),
+      memory: list(botCandidates(m2, 1, { shortMemory: true }, false)) === brute(m2.slice(-2), 1),
+      careless: list(botCandidates(m2, 1, {}, true)) === brute(m2.slice(-1), 1),
+      timeouts: list(botCandidates(m1.concat([{ timeout: true, p: 1 }]), 1, {}, false)) === brute(m1, 37)
+    };
+  });
+  check('бот считает возможные числа так же, как перебор', eng.plain && eng.secretIn && eng.timeouts, JSON.stringify(eng));
+  check('под туманом бот не видит чужих ходов, под слепотой — своих',
+    eng.fog && eng.blind, JSON.stringify(eng));
+  check('короткая память — два последних хода, рассеянность — один', eng.memory && eng.careless, JSON.stringify(eng));
+  check('каждая помеха в этом примере меняет то, что видит бот', eng.differ, JSON.stringify(eng));
+
+  const pool = await page.evaluate(() => {
+    const bands = reviewBands(FEEDBACK_META);
+    const S = [35, 36, 37, 38, 39];
+    const cand = new Uint8Array(100);
+    S.forEach(v => { cand[v - 1] = 1; });
+    const H = x => {
+      const c = {};
+      S.forEach(v => { const b = bandOf(Math.abs(x - v), bands); c[b] = (c[b] || 0) + 1; });
+      return Object.values(c).reduce((h, n) => h - n / 5 * Math.log2(n / 5), 0);
+    };
+    let hb = 0;
+    for (let x = 1; x <= 100; x++) hb = Math.max(hb, H(x));
+    const best = botPool(cand, true, 1);
+    const ok = botPool(cand, false, 0.5);
+    const tier = (g, x) => bandOf(Math.abs(g - x), bands);
+    // Две «лавы» по бокам оставляют одно число — его бот и называет
+    const two = [{ guess: 43, labelIndex: tier(43, 44), p: 0 }, { guess: 45, labelIndex: tier(45, 44), p: 1 }];
+    return {
+      best: best.length > 0 && best.every(x => Math.abs(H(x) - hb) < 1e-9 && S.includes(x)),
+      ok: ok.every(x => H(x) >= 0.5 * hb - 1e-9) && ok.length > best.length,
+      single: [0.1, 0.5, 0.99].every(r => botPick(two, 0, {}, 0.9, () => r) === 44)
+    };
+  });
+  check('лучший ход бота — самый информативный и может сразу попасть', pool.best, JSON.stringify(pool));
+  check('«неплохие» ходы не хуже заданной доли от лучшего', pool.ok, JSON.stringify(pool));
+  check('когда число одно, бот его и называет', pool.single);
+
+  // Сила: партии бот против бота. Уровни подобраны перебором, здесь — что
+  // порядок сохранился: сильный обыгрывает слабого, равные — поровну
+  const power = await page.evaluate(() => {
+    RANGE_MIN = 1; RANGE_MAX = 100; FEEDBACK_META = buildFeedbackMeta(100);
+    const bands = reviewBands(FEEDBACK_META);
+    let seed = 12345;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const round = (La, Lb, starter) => {
+      const sec = 1 + Math.floor(rnd() * 100);
+      const moves = [];
+      let cur = starter;
+      for (let n = 0; n < 80; n++) {
+        const g = botPick(moves, cur, {}, cur === 0 ? La : Lb, rnd);
+        const li = bandOf(Math.abs(g - sec), bands);
+        moves.push({ guess: g, labelIndex: li, p: cur });
+        if (li === 8) return cur;
+        cur = 1 - cur;
+      }
+      return -1;
+    };
+    const rate = (a, b, n) => { let w = 0; for (let i = 0; i < n; i++) if (round(a, b, i % 2) === 0) w++; return w / n; };
+    return { strong: rate(1, 0, 200), mid: rate(0.5, 0, 200), even: rate(0.5, 0.5, 200) };
+  });
+  check('сильный бот обыгрывает слабого', power.strong > 0.75, JSON.stringify(power));
+  check('средний тоже сильнее слабого, равные — примерно поровну',
+    power.mid > 0.6 && Math.abs(power.even - 0.5) < 0.12, JSON.stringify(power));
+  await done(page);
+
+  // ---- Игра с ботом без интернета
+  page = await newGame(browser);
+  await page.click('.mode-btn.bot');
+  await page.waitForTimeout(150);
+  const setup = await page.evaluate(() => ({
+    title: document.getElementById('tSetupScreen').textContent,
+    tiles: [...document.querySelectorAll('#botPick .bot-tile')].map(el => el.dataset.bot),
+    active: (document.querySelector('#botPick .bot-tile.active') || {}).dataset.bot,
+    power: [...document.querySelectorAll('#botPick .bt-power')].map(el => (el.textContent.match(/●/g) || []).length),
+    names: !document.getElementById('namesPair').classList.contains('hidden'),
+    hc: !document.getElementById('handicapField').classList.contains('hidden') }));
+  check('игра с ботом: пять персонажей, сначала выбрана 🐼',
+    setup.tiles.join() === 'turtle,panda,dolphin,fox,owl' && setup.active === 'panda' && /бот/.test(setup.title),
+    JSON.stringify(setup));
+  check('сила персонажей — точками от одной до пяти', setup.power.join() === '1,2,3,4,5', setup.power.join());
+  check('имён игроков и форы в игре с ботом нет', !setup.names && !setup.hc);
+  await page.click('.bot-tile[data-bot="owl"]');
+  check('выбор бота запоминается', await page.evaluate(() =>
+    localStorage.getItem('hc_bot') === 'owl' && document.querySelector('#botPick .bot-tile.active').dataset.bot === 'owl'));
+  await page.selectOption('#rangeMax', '100');
+  await page.selectOption('#winsNeeded', '1');
+  await page.evaluate(() => { BOT_SPEED = 0; });
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(800);
+  const start = await page.evaluate(() => ({ names: D.names.slice(), bot: vsBot && vsBot.bot.key,
+    bubble: document.getElementById('sayBubble').classList.contains('hidden') ? '' : document.getElementById('sayBubble').textContent }));
+  check('партия: вы против Совы', start.bot === 'owl' && start.names[0] === 'Вы' && start.names[1] === '🦉 Сова 🤖',
+    JSON.stringify(start));
+  check('Сова желает удачи', /Сова/.test(start.bubble) && /Удачи/.test(start.bubble), start.bubble);
+
+  await page.evaluate(() => { secret = 77; });
+  await page.fill('#guessInput', '1');
+  await page.click('#tSubmitGuess');
+  await page.waitForFunction(() => history.length >= 2 || D.roundOver, null, { timeout: 3000 });
+  check('бот ходит сам после хода человека', await page.evaluate(() => history[1] && history[1].p === 1 && D.cur === 0));
+
+  // В ход бота человек за него не ходит и жетон его не трогает
+  await page.evaluate(() => { BOT_SPEED = 1000; });
+  await page.fill('#guessInput', '2');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(100);
+  const stolen = await page.evaluate(() => {
+    const before = history.length;
+    document.getElementById('guessInput').value = '3';
+    duelGuess();
+    useToken(1);
+    return { same: history.length === before, armed: D.armed, cur: D.cur,
+             forcedHidden: document.getElementById('forcedTurn').classList.contains('hidden') };
+  });
+  check('в ход бота за него не сходить и жетон не взвести', stolen.same && !stolen.armed && stolen.cur === 1,
+    JSON.stringify(stolen));
+
+  // Помехи в игре с ботом прячут ходы только пока ходит человек
+  const hide = await page.evaluate(() => {
+    D.fog[0] = true;
+    const botRow = history.find(h => h.p === 1);
+    const myRow = history.find(h => h.p === 0);
+    const whileBot = hiddenRow(1, botRow);
+    D.cur = 0;
+    const whileMe = hiddenRow(1, botRow);
+    D.cur = 1;
+    D.fog[0] = false;
+    // Помеха на боте человеку ничего не прячет: смотрит в экран он
+    D.fog[1] = true;
+    D.blind[1] = false;
+    const botFog = hiddenRow(0, myRow);
+    D.fog[1] = false;
+    return { whileBot, whileMe, botFog };
+  });
+  check('туман прячет ходы бота, только пока ходит человек', !hide.whileBot && hide.whileMe, JSON.stringify(hide));
+  check('туман на боте не прячет ходы от человека', !hide.botFog, JSON.stringify(hide));
+
+  // Отнятый ход бота бот делает сам, кнопку человеку не показывают
+  const lava = await page.evaluate(() => {
+    stopBot();
+    D.autoLava[1] = true;
+    renderAll();
+    return document.getElementById('forcedTurn').classList.contains('hidden');
+  });
+  check('отнятый ход бота человеку не показывается кнопкой', lava);
+  await page.evaluate(() => { BOT_SPEED = 0; stopBot(); botTick(); });
+  await page.waitForFunction(() => !D.autoLava[1], null, { timeout: 3000 });
+  check('бросок в лаву за бота сделан сам', await page.evaluate(() => {
+    const last = history.filter(h => h.p === 1).pop();
+    return !!last && last.forced === true && last.meta.labelIndex >= 6;
+  }));
+
+  // Доигрываем: человек ходит как сильный бот, бот отвечает сам
+  for (let i = 0; i < 60; i++) {
+    const st = await page.evaluate(() => ({ over: D.matchOver, cur: D.cur, ro: D.roundOver }));
+    if (st.over) break;
+    if (st.cur !== 0 || st.ro) { await page.waitForTimeout(40); continue; }
+    const g = await page.evaluate(() => botPick(history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex, p: h.p })), 0, {}, 1));
+    await page.fill('#guessInput', String(g));
+    await page.click('#tSubmitGuess');
+    await page.waitForTimeout(40);
+  }
+  const fin = await page.evaluate(() => ({ over: D.matchOver,
+    bubble: document.getElementById('sayBubble').textContent,
+    review: (document.getElementById('reviewBtn') || {}).textContent || '' }));
+  check('партия с ботом доигрывается до конца', fin.over, JSON.stringify(fin));
+  check('в конце бот говорит «Хорошая игра!»', /Хорошая игра/.test(fin.bubble), fin.bubble);
+  check('после партии с ботом есть разбор с точностью обоих', /Вы \d+% · 🦉 Сова 🤖 (\d+%|—) · Разбор/.test(fin.review), fin.review);
+
+  // Выход в меню останавливает бота
+  await page.evaluate(() => { newMatch(); BOT_SPEED = 1000; D.cur = 1; renderAll(); quitToMenu(); });
+  check('выход в меню останавливает бота', await page.evaluate(() => botTimer === null && vsBot === null));
+  // Обычная игра с другом после игры с ботом — снова двое людей
+  await page.click('.mode-btn.duel');
+  await page.waitForTimeout(100);
+  const again = await page.evaluate(() => ({
+    names: !document.getElementById('namesPair').classList.contains('hidden'),
+    pick: !document.getElementById('botPickField').classList.contains('hidden') }));
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(150);
+  check('после бота «Игра с другом» — снова с именами и без бота',
+    again.names && !again.pick && await page.evaluate(() => vsBot === null && !/🤖/.test(D.names[1])));
+  await done(page);
+
+  // ---- Рейтинг: ожидание и партия с ботом
+  page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => { window.__rankedQ.botWait = 15; openOnlineEntry(); });
+  await page.waitForTimeout(300);
+  await page.click('#tRkPlay');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { window.__rankedQ.joined = Date.now() - 6000; return loadRanked(true); });
+  const soon = await page.evaluate(() => document.getElementById('rkWaitSub').textContent);
+  check('в очереди сказано, когда будет бот', /через (8|9) с сыграете с ботом/.test(soon), soon);
+  await page.evaluate(() => { window.__rankedQ.joined = Date.now() - 20000; return loadRanked(true); });
+  const now = await page.evaluate(() => document.getElementById('rkWaitSub').textContent);
+  check('после 15 секунд — «Зовём бота»', /Зовём бота/.test(now), now);
+  await page.evaluate(() => { delete window.__rankedQ.botWait; return loadRanked(true); });
+  const old = await page.evaluate(() => document.getElementById('rkWaitSub').textContent);
+  check('без ботов на сервере о боте не говорим', !/бот/i.test(old), old);
+
+  await page.evaluate(() => {
+    Object.assign(window.__match, { names: ['Максим', '@bot:fox'], botSeat: 1, ranked: true, rankedMode: 0,
+      moves: [{ seat: 0, guess: 50, tier: 3 }, { seat: 1, guess: 35, tier: 4 }], cur: 0 });
+    window.__rankedQ.matchId = 1;
+    return loadRanked(true);
+  });
+  await page.waitForTimeout(300);
+  const board = await page.evaluate(() => ({
+    game: !document.getElementById('screenGame').classList.contains('hidden'),
+    p1: document.getElementById('pname1').textContent,
+    who: [...document.querySelectorAll('#historyList .h-who')].map(e => e.textContent) }));
+  check('нашёлся бот — открылась доска с ним', board.game && /🦊 Лис 🤖/.test(board.p1), JSON.stringify(board));
+  check('ходы бота подписаны его именем', board.who.includes('🦊 Лис 🤖'), board.who.join());
+
+  await page.evaluate(() => {
+    Object.assign(window.__match, { roundOver: true, matchOver: true, status: 'finished', wins: [3, 1],
+      roundWinner: 0, eloDelta: [10, 0], elo: 1010 });
+    return refreshMatch(true);
+  });
+  const endBot = await page.evaluate(() => (document.querySelector('#resultBox .r-elo-note') || {}).textContent || '');
+  check('в итоге сказано, что с ботом рейтинг вдвое меньше', /вдвое меньше/.test(endBot), endBot);
+  await page.evaluate(() => { window.__match.botSeat = null; return refreshMatch(true); });
+  check('с человеком такой приписки нет', await page.evaluate(() => !document.querySelector('#resultBox .r-elo-note')));
+
+  // Реванш с ботом начинается сразу, без «ждём согласия»
+  await page.evaluate(() => { window.__match.botSeat = 1; return refreshMatch(true); });
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('#resultBox .btn')].find(x => /Реванш/.test(x.textContent));
+    b.click();
+  });
+  await page.waitForTimeout(300);
+  const re = await page.evaluate(() => ({ id: online && online.id, sent: online && online.rematchSent, n: window.__rematched }));
+  check('реванш с ботом открывает новую партию сразу', re.n === 1 && re.id === 99 && !re.sent, JSON.stringify(re));
+  await done(page);
+}
+
 // ------------------------------------------ профиль: иконка, имя, PIN
 async function testProfile(browser) {
   console.log('\nПрофиль: иконка, имя, PIN');
@@ -4881,6 +5159,7 @@ async function testKeyPage(browser) {
     await testAvatarColor(browser);
     await testReview(browser);
     await testDuelReview(browser);
+    await testBots(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

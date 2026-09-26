@@ -434,6 +434,54 @@ async function registerPlayer(p, name, pin) {
     (await A.page.evaluate(() => localStorage.getItem('hc_run_user'))) === 'Артур' &&
     (await A.page.locator('#screenFriends').isVisible()));
 
+  // ---- Бот в рейтинге: никого нет 15 секунд — играет бот
+  await B.page.evaluate(() => { quitToMenu(); });
+  await B.page.click('#tModeOnline');
+  await B.page.waitForTimeout(700);
+  await B.page.click('.rk-mode[data-mode="0"]');
+  await B.page.waitForTimeout(400);
+  await B.page.click('#tRkPlay');
+  await B.page.waitForTimeout(900);
+  check('с ботом: игрок встал в очередь', await B.page.locator('#rkWaitBox').isVisible());
+  const botSoon = await B.page.locator('#rkWaitSub').textContent();
+  check('в очереди сказано, когда будет бот', /сыграете с ботом/.test(botSoon), botSoon);
+  await db.query("update ranked_queue set joined_at = now() - interval '16 seconds' where username = 'Лада'");
+  await B.page.waitForTimeout(3600);
+  const bm = (await db.query("select * from matches where p0 = 'Лада' and bot_seat is not null " +
+                             "order by id desc limit 1")).rows[0];
+  check('через 15 секунд создана партия с ботом', bm && bm.status === 'active' && bm.bot_seat === 1 &&
+    /^@bot:/.test(bm.p1) && bm.ranked_mode === 0, JSON.stringify(bm && { p1: bm.p1, s: bm.status }));
+  check('доска с ботом открылась сама', await B.page.locator('#screenGame').isVisible());
+  const botLabel = await B.page.locator('#pname1').textContent();
+  check('бот подписан персонажем и 🤖', /🤖/.test(botLabel) && !/@bot/.test(botLabel), botLabel);
+
+  const miss = bm.secret === 50 ? 51 : 50;
+  await B.page.fill('#guessInput', String(miss));
+  await B.page.click('#tSubmitGuess');
+  await B.page.waitForTimeout(600);
+  // Раздумья бота — несколько секунд; сдвигаем начало его хода в прошлое
+  await db.query("update matches set turn_deadline = turn_deadline - interval '20 seconds' where id = $1", [bm.id]);
+  await B.page.waitForTimeout(2600);
+  const botMoves = +(await db.query('select count(*) from match_moves where match_id = $1 and seat = 1', [bm.id])).rows[0].count;
+  check('бот походил сам, пока игрок смотрит на доску', botMoves >= 1, String(botMoves));
+  const whoRows = await B.page.evaluate(() => [...document.querySelectorAll('#historyList .h-who')].map(e => e.textContent));
+  check('ход бота виден у игрока', whoRows.some(w => /🤖/.test(w)), whoRows.join());
+  check('бот поздоровался в чате партии',
+    +(await db.query('select count(*) from match_chat where match_id = $1 and seat = 1', [bm.id])).rows[0].count >= 1);
+
+  await B.page.evaluate(() => leaveGame());
+  await B.page.waitForTimeout(200);
+  await B.page.click('#tResignGo');
+  await B.page.waitForTimeout(900);
+  const bEnd = (await db.query('select status, elo_delta from matches where id = $1', [bm.id])).rows[0];
+  const skill = (await db.query("select level, streak from bot_skill where username = 'Лада' and mode = 0")).rows[0];
+  check('сдача боту — поражение, рейтинг вдвое меньше',
+    bEnd.status === 'finished' && bEnd.elo_delta[0] === -10 && bEnd.elo_delta[1] === 0, JSON.stringify(bEnd));
+  check('после поражения следующий бот слабее',
+    skill && Math.abs(skill.level - 0.23) < 0.001 && skill.streak === -1, JSON.stringify(skill));
+  check('у бота рейтинга нет',
+    (await db.query("select count(*) from elo_ratings where username like '@bot:%'")).rows[0].count === '0');
+
   const calls = A.log.concat(B.log);
   check('профиль шёл через настоящие функции базы',
     ['my_profile', 'set_avatar', 'set_avatar_color', 'avatars_for', 'rename_student', 'change_pin', 'send_friend_text', 'friend_thread']

@@ -331,7 +331,7 @@ function stubSupabase(opts) {
                queueMode: queued ? Q.mode : null,
                waited: queued ? Math.floor((Date.now() - Q.joined) / 1000) : 0,
                queue: Q.queue, elo: mine.elo, games: mine.games,
-               ratings: Q.ratings, lastAgo: Q.lastAgo };
+               ratings: Q.ratings, lastAgo: Q.lastAgo, botWait: Q.botWait };
     };
 
     // Сервер отдаёт число только когда раунд кончился — заглушка обязана так же,
@@ -360,6 +360,7 @@ function stubSupabase(opts) {
         lastTimeout: !!M.lastTimeout, forced: M.forced || null, chat: M.chat || [],
         ranked: !!M.ranked,
         rankedMode: M.rankedMode === undefined ? null : M.rankedMode,
+        botSeat: M.botSeat === undefined ? null : M.botSeat,
         forfeitBy: M.forfeitBy === undefined ? null : M.forfeitBy,
         eloDelta: M.eloDelta || null,
         elo: M.elo === undefined ? 1000 : M.elo,
