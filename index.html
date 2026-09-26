@@ -1218,7 +1218,10 @@
     .review-card { max-width: 380px; }
     .rv-title { font-size: 18px; font-weight: 800; text-align: center; }
     .rv-acc { display: flex; flex-direction: column; align-items: center; margin: 10px 0 6px; }
-    .rv-acc-num { font-size: 40px; font-weight: 800; color: #81b64c; line-height: 1.1; }
+    .rv-acc-num { font-size: 40px; font-weight: 800; color: #81b64c; line-height: 1.1;
+                  display: flex; gap: 28px; justify-content: center; }
+    .rv-acc-player { display: flex; flex-direction: column; align-items: center; font-size: 34px; }
+    .rv-acc-player small { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
     .rv-acc-label { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
     .rv-sum { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 8px 0 12px; }
     .rv-chip { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 700;
@@ -2200,8 +2203,8 @@
       roundWin: " wins the round!", matchWin: " wins the game!",
       secretWas: "Number: ", nextRound: "Next round", newMatch: "New Game", toMenu: "Menu",
       recordLabel: "Best for this range: ", newRecord: "🏆 New record!",
-      review: { open: "Review", title: "Game review", accuracy: "Accuracy", better: "best: {n}", finalGuess: "last guess",
-        grades: { brilliant: "Brilliant", best: "Best", excellent: "Excellent", good: "Good", inaccuracy: "Inaccuracy", mistake: "Mistake", blunder: "Blunder", hit: "Bullseye!" } },
+      review: { open: "Review", title: "Game review", titleRound: "Round review", accuracy: "Accuracy", better: "best: {n}", finalGuess: "last guess",
+        grades: { brilliant: "Brilliant", best: "Best", excellent: "Excellent", good: "Good", inaccuracy: "Inaccuracy", mistake: "Mistake", blunder: "Blunder", hit: "Bullseye!", forced: "Lava toss \u2014 not graded", limited: "Didn\u2019t see every move \u2014 not graded" } },
       run: {
         mode: "Trial",
         choiceLogin: "Log in",
@@ -2416,8 +2419,8 @@
       roundWin: " выигрывает раунд!", matchWin: " выигрывает игру!",
       secretWas: "Число: ", nextRound: "Следующий раунд", newMatch: "Новая игра", toMenu: "В меню",
       recordLabel: "Рекорд для этого диапазона: ", newRecord: "🏆 Новый рекорд!",
-      review: { open: "Разбор", title: "Разбор партии", accuracy: "Точность", better: "лучше {n}", finalGuess: "последняя догадка",
-        grades: { brilliant: "Блестяще", best: "Лучший", excellent: "Отлично", good: "Хорошо", inaccuracy: "Неточность", mistake: "Ошибка", blunder: "Зевок", hit: "В точку!" } },
+      review: { open: "Разбор", title: "Разбор партии", titleRound: "Разбор раунда", accuracy: "Точность", better: "лучше {n}", finalGuess: "последняя догадка",
+        grades: { brilliant: "Блестяще", best: "Лучший", excellent: "Отлично", good: "Хорошо", inaccuracy: "Неточность", mistake: "Ошибка", blunder: "Зевок", hit: "В точку!", forced: "Бросок в лаву — без оценки", limited: "Видел не все ходы — без оценки" } },
       run: {
         mode: "Испытание",
         choiceLogin: "Войти",
@@ -2632,8 +2635,8 @@
       roundWin: " remporte la manche !", matchWin: " remporte la partie !",
       secretWas: "Nombre : ", nextRound: "Manche suivante", newMatch: "Nouvelle partie", toMenu: "Menu",
       recordLabel: "Meilleur score pour cette plage : ", newRecord: "🏆 Nouveau record !",
-      review: { open: "Analyse", title: "Analyse de la partie", accuracy: "Pr\u00e9cision", better: "meilleur : {n}", finalGuess: "derni\u00e8re r\u00e9ponse",
-        grades: { brilliant: "Brillant", best: "Meilleur coup", excellent: "Excellent", good: "Bon", inaccuracy: "Impr\u00e9cision", mistake: "Erreur", blunder: "Gaffe", hit: "Dans le mille !" } },
+      review: { open: "Analyse", title: "Analyse de la partie", titleRound: "Analyse de la manche", accuracy: "Pr\u00e9cision", better: "meilleur : {n}", finalGuess: "derni\u00e8re r\u00e9ponse",
+        grades: { brilliant: "Brillant", best: "Meilleur coup", excellent: "Excellent", good: "Bon", inaccuracy: "Impr\u00e9cision", mistake: "Erreur", blunder: "Gaffe", hit: "Dans le mille !", forced: "Jet de lave \u2014 non not\u00e9", limited: "N\u2019a pas vu tous les coups \u2014 non not\u00e9" } },
       run: {
         mode: "\u00c9preuve",
         choiceLogin: "Se connecter",
@@ -2848,8 +2851,8 @@
       roundWin: " gewinnt die Runde!", matchWin: " gewinnt das Spiel!",
       secretWas: "Zahl: ", nextRound: "Nächste Runde", newMatch: "Neues Spiel", toMenu: "Menü",
       recordLabel: "Bestwert für diesen Bereich: ", newRecord: "🏆 Neuer Rekord!",
-      review: { open: "Analyse", title: "Partieanalyse", accuracy: "Genauigkeit", better: "besser: {n}", finalGuess: "letzter Tipp",
-        grades: { brilliant: "Brillant", best: "Bester Zug", excellent: "Exzellent", good: "Gut", inaccuracy: "Ungenauigkeit", mistake: "Fehler", blunder: "Patzer", hit: "Volltreffer!" } },
+      review: { open: "Analyse", title: "Partieanalyse", titleRound: "Rundenanalyse", accuracy: "Genauigkeit", better: "besser: {n}", finalGuess: "letzter Tipp",
+        grades: { brilliant: "Brillant", best: "Bester Zug", excellent: "Exzellent", good: "Gut", inaccuracy: "Ungenauigkeit", mistake: "Fehler", blunder: "Patzer", hit: "Volltreffer!", forced: "Lavawurf \u2014 ohne Wertung", limited: "Nicht alle Z\u00fcge gesehen \u2014 ohne Wertung" } },
       run: {
         mode: "Kraftprobe",
         choiceLogin: "Anmelden",
@@ -3797,10 +3800,13 @@
     duelPlay(guess);
   }
 
-  function duelPlay(guess) {
+  function duelPlay(guess, forced) {
     const distance = Math.abs(guess - secret);
     const meta = getFeedback(distance);
-    history.push({ guess, distance, meta, p: D.cur });
+    // Для разбора: ход сделан сам (бросок в лаву) или игрок видел не все
+    // ходы (туман, слепота, короткая память) — такие ходы не оцениваются
+    const limited = !!(D.fog[D.cur] || D.blind[D.cur] || D.shortMemory[D.cur]);
+    history.push({ guess, distance, meta, p: D.cur, forced: !!forced, limited });
     soundForGuess(meta);
 
     const hit = D.bonuses.find(b => !b.taken && b.value === guess);
@@ -3909,7 +3915,7 @@
       return;
     }
     // Бросок идёт обычным ходом, поэтому жетон сработает внутри duelPlay
-    duelPlay(value);
+    duelPlay(value, true);
   }
 
   // ================= РЕНДЕР =================
@@ -4383,6 +4389,19 @@
       secretLine.className = 'r-secret';
       secretLine.textContent = L.secretWas + secret;
 
+      // Точность обоих — и нажатие открывает разбор раунда
+      const drv = online ? null : currentReview();
+      let reviewBtn = null;
+      if (drv) {
+        reviewBtn = document.createElement('button');
+        reviewBtn.className = 'r-review';
+        reviewBtn.id = 'reviewBtn';
+        const pct = a => a === null ? '—' : a + '%';
+        reviewBtn.textContent = '📊 ' + D.names[0] + ' ' + pct(drv.accuracy[0]) + ' · ' +
+          D.names[1] + ' ' + pct(drv.accuracy[1]) + ' · ' + L.review.open;
+        reviewBtn.onclick = openReview;
+      }
+
       // Рейтинговый матч заканчивается двумя способами, и второй надо назвать
       // словами: иначе победа «из ничего» выглядит ошибкой
       let forfeitLine = null;
@@ -4433,6 +4452,7 @@
       if (forfeitLine) box.appendChild(forfeitLine);
       box.appendChild(score);
       box.appendChild(secretLine);
+      if (reviewBtn) box.appendChild(reviewBtn);
       if (eloLine) box.appendChild(eloLine);
       if (sentLine) box.appendChild(sentLine);
       box.appendChild(actions);
@@ -4522,8 +4542,8 @@
     section.classList.remove('hidden');
     list.innerHTML = '';
 
-    // После партии тренировки у каждого хода — значок оценки, как на chess.com
-    const rv = mode === 'solo' ? currentReview() : null;
+    // После партии у каждого хода — значок оценки, как на chess.com
+    const rv = currentReview();
 
     // Видны только последние ходы: остальное игрок держит в голове. Номера
     // остаются настоящими, поэтому пропуск виден и без пояснений
@@ -4568,9 +4588,10 @@
   // возможного хода в этой же позиции
   const GRADES = ['brilliant', 'best', 'excellent', 'good', 'inaccuracy', 'mistake', 'blunder'];
   const GRADE_ICON = { brilliant: '!!', best: '★', excellent: '👍', good: '✓',
-                       inaccuracy: '?!', mistake: '?', blunder: '??', hit: '🎯' };
+                       inaccuracy: '?!', mistake: '?', blunder: '??', hit: '🎯', forced: '🌋', limited: '🙈' };
   const GRADE_COLOR = { brilliant: '#1baca6', best: '#81b64c', excellent: '#81b64c', good: '#95b776',
-                        inaccuracy: '#f7c631', mistake: '#ffa459', blunder: '#fa412d', hit: '#4ade80' };
+                        inaccuracy: '#f7c631', mistake: '#ffa459', blunder: '#fa412d', hit: '#4ade80',
+                        forced: 'rgba(255,255,255,0.25)', limited: 'rgba(255,255,255,0.25)' };
   // Пороги доли от лучшего хода. Блестящий — лучший ход (кроме первого),
   // который не совпадает с «очевидной серединой»: его нашёл тот, кто понимает
   // пояса, а не просто делит отрезок пополам
@@ -4591,26 +4612,80 @@
     return b ? b.idx : 0;
   }
 
+  // Информационная сторона позиции: сколько бит даёт каждый возможный ход.
+  // Общая для тренировки, дуэли и (позже) бота
+  function infoScan(cand, min, max, bands) {
+    const N = max - min + 1;
+    const P = new Int32Array(N + 1);
+    for (let i = 0; i < N; i++) P[i + 1] = P[i] + cand[i];
+    const total = P[N];
+    const count = (a, b) => {
+      const ia = Math.max(a, min) - min, ib = Math.min(b, max) - min;
+      return ia > ib ? 0 : P[ib + 1] - P[ia];
+    };
+    const H = x => {
+      let h = 0;
+      const add = c => { if (c > 0) { const p = c / total; h -= p * Math.log2(p); } };
+      add(x >= min && x <= max ? cand[x - min] : 0);
+      for (const b of bands) add(count(x - b.hi, x - b.lo) + count(x + b.lo, x + b.hi));
+      return h;
+    };
+    let hBest = -1;
+    const hs = new Float64Array(N);
+    for (let x = min; x <= max; x++) {
+      const h = H(x);
+      hs[x - min] = h;
+      if (h > hBest) hBest = h;
+    }
+    // Лучших ходов бывает несколько. Сначала — те, что могут сразу попасть
+    // в загаданное (когда осталось одно число, информации не даёт ни один
+    // ход, и лучший — само это число), потом — ближайший к сделанному
+    const pickBest = g => {
+      let best = null;
+      for (let x = min; x <= max; x++) {
+        if (hs[x - min] < hBest - BEST_EPS) continue;
+        if (best === null) { best = x; continue; }
+        const cx = cand[x - min], cb = cand[best - min];
+        if (cx !== cb ? cx > cb : Math.abs(x - g) < Math.abs(best - g)) best = x;
+      }
+      return best;
+    };
+    return { total, H, hBest, pickBest };
+  }
+
+  // Оценка по доле от лучшего; «блестяще» — лучший ход (не первый), который не
+  // совпадает с очевидной серединой
+  function gradeOf(r, isFirst, total, midRatio, isMid) {
+    if (r >= 1 - BEST_EPS) {
+      return (!isFirst && total >= 6 && midRatio < 0.97 && !isMid) ? 'brilliant' : 'best';
+    }
+    for (const [name, lim] of GRADE_LIMITS) { if (r >= lim) return name; }
+    return 'blunder';
+  }
+
+  function hullMid(cand, min) {
+    return Math.round((cand.indexOf(1) + cand.lastIndexOf(1)) / 2) + min;
+  }
+
+  function narrow(cand, min, bands, g, labelIndex) {
+    for (let i = 0; i < cand.length; i++) {
+      if (cand[i] && bandOf(Math.abs(g - (i + min)), bands) !== labelIndex) cand[i] = 0;
+    }
+  }
+
   // moves — [{ guess, labelIndex }] по порядку; final — последняя догадка или null
   function analyseGame(moves, min, max, meta, final) {
     const N = max - min + 1;
     const bands = reviewBands(meta);
     const cand = new Uint8Array(N).fill(1);
-    const P = new Int32Array(N + 1);
-    const count = (a, b) => {
-      const ia = Math.max(a, min) - min, ib = Math.min(b, max) - min;
-      return ia > ib ? 0 : P[ib + 1] - P[ia];
-    };
     const out = [];
     const steps = moves.map(m => ({ guess: m.guess, labelIndex: m.labelIndex, final: false }));
     if (final !== null && final !== undefined) steps.push({ guess: final, labelIndex: null, final: true });
 
     for (const step of steps) {
-      for (let i = 0; i < N; i++) P[i + 1] = P[i] + cand[i];
-      const total = P[N];
-      if (!total) break;
       const g = step.guess;
       const inCand = g >= min && g <= max && cand[g - min] === 1;
+      if (!cand.includes(1)) break;
       let res;
       if (step.final) {
         // Последняя догадка без подсказки: лучший ход — любое из возможных чисел
@@ -4618,54 +4693,22 @@
         res = { guess: g, final: true, grade: inCand ? 'best' : 'blunder', score: inCand ? 100 : 0,
                 best: inCand ? g : firstCand };
       } else {
-        const H = x => {
-          let h = 0;
-          const add = c => { if (c > 0) { const p = c / total; h -= p * Math.log2(p); } };
-          add(x >= min && x <= max ? cand[x - min] : 0);
-          for (const b of bands) add(count(x - b.hi, x - b.lo) + count(x + b.lo, x + b.hi));
-          return h;
-        };
-        let hBest = -1;
-        const hs = new Float64Array(N);
-        for (let x = min; x <= max; x++) {
-          const h = H(x);
-          hs[x - min] = h;
-          if (h > hBest) hBest = h;
-        }
-        // Лучших ходов бывает несколько. Сначала — те, что могут сразу попасть
-        // в загаданное (когда осталось одно число, информации не даёт ни один
-        // ход, и лучший — само это число), потом — ближайший к сделанному
-        let best = null;
-        const better = (x, y) => {
-          const cx = cand[x - min], cy = cand[y - min];
-          if (cx !== cy) return cx > cy;
-          return Math.abs(x - g) < Math.abs(y - g);
-        };
-        for (let x = min; x <= max; x++) {
-          if (hs[x - min] >= hBest - BEST_EPS && (best === null || better(x, best))) best = x;
-        }
-        const hg = H(g);
-        const r = hBest > 0 ? hg / hBest : 0;
+        const scan = infoScan(cand, min, max, bands);
+        const best = scan.pickBest(g);
+        const r = scan.hBest > 0 ? scan.H(g) / scan.hBest : 0;
         let grade;
         if (step.labelIndex === 8) grade = 'hit';
-        else if (total === 1) grade = 'blunder';           // ответ был уже известен
-        else if (r >= 1 - BEST_EPS) {
-          const lo = cand.indexOf(1) + min, hi = cand.lastIndexOf(1) + min;
-          const mid = Math.round((lo + hi) / 2);
+        else if (scan.total === 1) grade = 'blunder';     // ответ был уже известен
+        else {
+          const mid = hullMid(cand, min);
           // Первый ход — как дебют в шахматах: лучший первый ход один и тот же
           // для диапазона, его можно просто запомнить. «Блестяще» за него не даём
-          grade = (out.length > 0 && total >= 6 && hBest > 0 && H(mid) / hBest < 0.97 && g !== mid)
-            ? 'brilliant' : 'best';
-        } else {
-          grade = 'blunder';
-          for (const [name, lim] of GRADE_LIMITS) { if (r >= lim) { grade = name; break; } }
+          grade = gradeOf(r, out.length === 0, scan.total, scan.H(mid) / scan.hBest, g === mid);
         }
         const score = (grade === 'hit' || grade === 'brilliant' || grade === 'best') ? 100 : Math.round(r * 100);
         res = { guess: g, final: false, grade, score, best, ratio: r };
         // Ответ отсекает всё, что с ним не сходится
-        for (let i = 0; i < N; i++) {
-          if (cand[i] && bandOf(Math.abs(g - (i + min)), bands) !== step.labelIndex) cand[i] = 0;
-        }
+        narrow(cand, min, bands, g, step.labelIndex);
       }
       out.push(res);
     }
@@ -4673,9 +4716,145 @@
     return { moves: out, accuracy };
   }
 
-  // Разбор текущей партии тренировки — только когда она закончилась
+  // ---------- Дуэль ----------
+  // Оба видят все ходы, поэтому ход, дающий много информации, помогает и
+  // сопернику. Пока чисел много, угадать сразу почти нельзя, и мера та же, что
+  // в тренировке, — информация. Когда их осталось DUEL_EXACT и меньше,
+  // считаем точно: вероятность угадать первым, если дальше оба играют лучше
+  // всех. Иногда выгоднее рискнуть и назвать число, иногда — не дать
+  // сопернику подсказку
+  const DUEL_EXACT = 10;
+
+  // Все разные разбиения набора чисел, которые может дать какой-нибудь ход.
+  // Разбиение меняется, только когда |g − s| переходит границу пояса, поэтому
+  // достаточно проверить ходы у этих границ
+  function duelSplits(S, min, max, bands) {
+    const edges = [0];
+    bands.forEach(b => { edges.push(b.lo); if (b.hi !== Infinity) edges.push(b.hi + 1); });
+    const pts = new Set([min, max]);
+    S.forEach(s => edges.forEach(e => [s - e, s + e].forEach(v => [v - 1, v, v + 1].forEach(x => {
+      if (x >= min && x <= max) pts.add(x);
+    }))));
+    const seen = new Map();
+    for (const g of pts) {
+      const sp = splitOf(S, g, bands);
+      // «Пас» — ход, который ничего не отсекает и не может попасть: соперник
+      // получает ту же позицию. В поиске лучшего хода его нет, иначе два
+      // идеальных игрока пасовали бы бесконечно
+      if (sp.parts.length === 1 && !sp.parts[0].hit) continue;
+      const key = S.map(s => bandOf(Math.abs(g - s), bands)).join(',');
+      if (!seen.has(key)) seen.set(key, Object.assign(sp, { g }));
+    }
+    return [...seen.values()];
+  }
+
+  function splitOf(S, g, bands) {
+    const parts = {};
+    S.forEach(s => { const k = bandOf(Math.abs(g - s), bands); (parts[k] || (parts[k] = [])).push(s); });
+    return { parts: Object.keys(parts).map(k => ({ hit: k === '8', set: parts[k] })) };
+  }
+
+  // Вероятность угадать первым тому, кто ходит сейчас; memo — общий на партию
+  function duelWin(S, min, max, bands, memo) {
+    const key = S.join(',');
+    if (memo.has(key)) return memo.get(key);
+    let best = 0;
+    for (const sp of duelSplits(S, min, max, bands)) {
+      const v = duelMoveValue(sp, S.length, false, min, max, bands, memo);
+      if (v > best) best = v;
+    }
+    memo.set(key, best);
+    return best;
+  }
+
+  // Ценность хода: попал — выиграл; иначе ходит соперник (или снова я, если
+  // у меня следующий ход — жетон или пропуск у соперника)
+  function duelMoveValue(sp, n, sameNext, min, max, bands, memo) {
+    let v = 0;
+    for (const part of sp.parts) {
+      const p = part.set.length / n;
+      if (part.hit) { v += p; continue; }
+      // Пас: позиция та же, её ценность — уже посчитанная (или считаемая) для S
+      const w = duelWin(part.set, min, max, bands, memo);
+      v += p * (sameNext ? w : 1 - w);
+    }
+    return v;
+  }
+
+  // moves — [{ guess, labelIndex, p, forced, limited }] раунда по порядку
+  function analyseDuel(moves, min, max, meta) {
+    const N = max - min + 1;
+    const bands = reviewBands(meta);
+    const cand = new Uint8Array(N).fill(1);
+    const memo = new Map();
+    const out = [];
+    moves.forEach((m, k) => {
+      const g = m.guess;
+      const next = moves[k + 1];
+      const sameNext = !!next && next.p === m.p;
+      let res;
+      if (m.forced || m.limited) {
+        res = { guess: g, p: m.p, grade: m.forced ? 'forced' : 'limited', score: null, best: null };
+      } else if (m.labelIndex === 8) {
+        res = { guess: g, p: m.p, grade: 'hit', score: 100, best: g };
+      } else {
+        const S = [];
+        for (let i = 0; i < N; i++) if (cand[i]) S.push(i + min);
+        let r, best, midRatio, isMid;
+        const mid = hullMid(cand, min);
+        if (S.length > DUEL_EXACT) {
+          const scan = infoScan(cand, min, max, bands);
+          best = scan.pickBest(g);
+          r = scan.hBest > 0 ? scan.H(g) / scan.hBest : 0;
+          midRatio = scan.hBest > 0 ? scan.H(mid) / scan.hBest : 1;
+        } else {
+          const splits = duelSplits(S, min, max, bands);
+          const valOf = x => duelMoveValue(splitOf(S, x, bands), S.length, sameNext, min, max, bands, memo);
+          let vBest = -1;
+          splits.forEach(sp => { sp.v = duelMoveValue(sp, S.length, sameNext, min, max, bands, memo); if (sp.v > vBest) vBest = sp.v; });
+          // Лучший ход для показа: с лучшей ценностью, попадающий, ближайший.
+          // Ценности разбиений уже запомнены, так что перебор всех ходов дешёвый
+          best = null;
+          for (let x = min; x <= max; x++) {
+            if (valOf(x) < vBest - BEST_EPS) continue;
+            if (best === null) { best = x; continue; }
+            const cx = cand[x - min], cb = cand[best - min];
+            if (cx !== cb ? cx > cb : Math.abs(x - g) < Math.abs(best - g)) best = x;
+          }
+          // Пас бывает выгоднее хода, который дарит сопернику подсказку, —
+          // тогда доля больше единицы, и это честно «лучший»
+          r = vBest > 0 ? Math.min(1, valOf(g) / vBest) : 0;
+          midRatio = vBest > 0 ? valOf(mid) / vBest : 1;
+        }
+        isMid = g === mid;
+        const grade = S.length === 1 ? 'blunder' : gradeOf(r, k === 0, S.length, midRatio, isMid);
+        const score = (grade === 'brilliant' || grade === 'best') ? 100 : Math.round(r * 100);
+        res = { guess: g, p: m.p, grade, score, best, ratio: r };
+      }
+      narrow(cand, min, bands, g, m.labelIndex);
+      out.push(res);
+    });
+    const acc = p => {
+      const own = out.filter(x => x.p === p && x.score !== null);
+      return own.length ? Math.round(own.reduce((a, x) => a + x.score, 0) / own.length) : null;
+    };
+    return { moves: out, accuracy: [acc(0), acc(1)] };
+  }
+
+  // Разбор текущей партии тренировки или раунда игры с другом — только когда
+  // он закончился. Онлайн — позже
   let reviewCache = null;
   function currentReview() {
+    if (mode === 'duel' && !online && D.roundOver) {
+      const key = 'duel:' + D.round + ':' + history.length + ':' + secret;
+      if (reviewCache && reviewCache.key === key) return reviewCache.data;
+      const data = analyseDuel(history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex, p: h.p,
+                                                   forced: !!h.forced, limited: !!h.limited })),
+                               RANGE_MIN, RANGE_MAX, FEEDBACK_META);
+      data.duel = true;
+      reviewCache = { key, data };
+      return data;
+    }
     if (mode !== 'solo' || !(gameOverType === 'win' || gameOverType === 'lose')) return null;
     const key = history.length + ':' + finalGuessValue + ':' + secret;
     if (reviewCache && reviewCache.key === key) return reviewCache.data;
@@ -4700,14 +4879,29 @@
     const rv = currentReview();
     if (!rv) return;
     const L = t();
-    document.getElementById('tReviewTitle').textContent = L.review.title;
-    document.getElementById('rvAcc').textContent = rv.accuracy + '%';
+    document.getElementById('tReviewTitle').textContent = rv.duel ? L.review.titleRound : L.review.title;
+    const accBox = document.getElementById('rvAcc');
+    accBox.innerHTML = '';
+    if (rv.duel) {
+      // У каждого своя точность — цветом игрока
+      [0, 1].forEach(p => {
+        const el = document.createElement('span');
+        el.className = 'rv-acc-player';
+        el.style.color = P_COLORS[p];
+        const name = document.createElement('small');
+        name.textContent = D.names[p];
+        el.append(name, document.createTextNode(rv.accuracy[p] === null ? '—' : rv.accuracy[p] + '%'));
+        accBox.appendChild(el);
+      });
+    } else {
+      accBox.textContent = rv.accuracy + '%';
+    }
     document.getElementById('tRvAcc').textContent = L.review.accuracy;
     document.getElementById('tReviewClose').textContent = L.run.done;
     // Сводка: сколько ходов какого класса — только те, что были
     const sum = document.getElementById('rvSum');
     sum.innerHTML = '';
-    ['hit', ...GRADES].forEach(gr => {
+    ['hit', ...GRADES, 'forced', 'limited'].forEach(gr => {
       const n = rv.moves.filter(m => m.grade === gr).length;
       if (!n) return;
       const chip = document.createElement('span');
@@ -4727,6 +4921,10 @@
       const num = document.createElement('span');
       num.className = 'rv-num';
       num.textContent = '#' + (i + 1);
+      if (rv.duel) {
+        row.style.borderLeft = '3px solid ' + P_COLORS[m.p];
+        row.dataset.p = m.p;
+      }
       const guess = document.createElement('span');
       guess.className = 'rv-guess';
       guess.textContent = m.guess;
@@ -4736,7 +4934,7 @@
       name.textContent = L.review.grades[m.grade];
       row.append(num, guess, gradeBadge(m.grade), name);
       // Лучший ход показываем там, где сделанный им не был
-      const good = m.grade === 'hit' || m.grade === 'best' || m.grade === 'brilliant';
+      const good = ['hit', 'best', 'brilliant', 'forced', 'limited'].includes(m.grade);
       if (!good && m.best !== null && m.best !== undefined) {
         const better = document.createElement('span');
         better.className = 'rv-better';
