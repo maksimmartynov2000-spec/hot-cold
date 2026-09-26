@@ -1,0 +1,1024 @@
+-- Боты в рейтинговой игре. Применять в Supabase: SQL Editor → вставить
+-- целиком → Run. Применить ДО мёржа: новая игра ждёт от базы бота.
+--
+-- Кто прождал соперника 15 секунд, играет с ботом. Бот — один из пяти
+-- персонажей (🐢 Черепаха, 🐼 Панда, 🐬 Дельфин, 🦊 Лис, 🦉 Сова) и помечен
+-- в игре 🤖: выдавать его за человека нельзя. Силу бот подбирает под игрока
+-- так, чтобы тот выигрывал примерно каждую вторую партию: победа делает
+-- следующего бота сильнее, поражение — слабее, серия — быстрее.
+--
+-- Загаданное число бот не знает: он видит только ответы на ходы, как и
+-- человек, а под туманом, слепотой и короткой памятью видит меньше — ровно
+-- как человек. Ходит бот сам, когда игра спрашивает у базы состояние партии:
+-- отдельного сервера не нужно. Рейтинг за игру с ботом — вдвое меньше.
+
+-- 1. Место под ботов
+alter table students add column if not exists is_bot boolean not null default false;
+alter table matches add column if not exists bot_seat int;
+alter table matches add column if not exists bot_level real;
+alter table matches drop constraint if exists match_bot_seat;
+alter table matches add constraint match_bot_seat check (bot_seat is null or bot_seat in (0, 1));
+
+-- Сила бота для каждого игрока и режима: 0 — самый слабый, 1 — самый сильный
+create table if not exists bot_skill (
+  username text not null references students(username) on update cascade on delete cascade,
+  mode int not null,
+  level real not null,
+  streak int not null default 0,
+  games int not null default 0,
+  primary key (username, mode)
+);
+alter table bot_skill enable row level security;
+
+-- 2. Персонажи. Та же пятёрка — в index.html (BOTS), сверяется тестом.
+-- lo..hi — какой силе соответствует персонаж; greet — фраза в начале,
+-- react — на выигранный игроком раунд; think — секунды «на подумать»
+create or replace function bot_personas()
+returns table(username text, icon text, color text, lo real, hi real,
+              greet text, react text, think_lo real, think_hi real)
+language sql
+immutable
+as $$
+  values ('@bot:turtle',  '🐢', '#34d399', 0.0::real, 0.2::real, 'hi',   'wow',    4::real, 8::real),
+         ('@bot:panda',   '🐼', '#e2e8f0', 0.2::real, 0.4::real, 'hi',   'nice',   3::real, 7::real),
+         ('@bot:dolphin', '🐬', '#60a5fa', 0.4::real, 0.6::real, 'luck', 'nice',   3::real, 6::real),
+         ('@bot:fox',     '🦊', '#fb923c', 0.6::real, 0.8::real, 'luck', 'almost', 2::real, 5::real),
+         ('@bot:owl',     '🦉', '#a78bfa', 0.8::real, 1.01::real, 'luck', 'wow',   3::real, 6::real);
+$$;
+
+create or replace function bot_wait_seconds()
+returns int
+language sql
+immutable
+as $$ select 15; $$;
+
+-- Боты — обычные строки в students (матчи ссылаются на игроков), но войти
+-- под ними нельзя: PIN — хэш случайной строки, которую никто не знает.
+-- Дата создания — в прошлом, чтобы не съесть лимит регистраций в час
+create or replace function bot_seed()
+returns void
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+begin
+  insert into students(username, pin_hash, is_bot, avatar, avatar_color, created_at)
+  select p.username, crypt(encode(gen_random_bytes(24), 'hex'), gen_salt('bf')), true,
+         p.icon, p.color, timestamptz '2000-01-01'
+  from bot_personas() p
+  on conflict do nothing;
+  -- Имя бота кто-то уже занял — остановиться, а не отдать боту чужой аккаунт
+  if exists (select 1 from bot_personas() p join students s on s.username_lower = lower(p.username)
+             where not s.is_bot) then
+    raise exception 'bot_name_taken';
+  end if;
+end;
+$$;
+select bot_seed();
+
+-- 3. Имя бота занять нельзя; ботов не найти в поиске и не позвать в друзья
+create or replace function check_new_username(p_name text)
+returns void
+language plpgsql
+immutable
+as $$
+begin
+  if p_name is null or length(p_name) < 2 or length(p_name) > 20 then
+    raise exception 'invalid_username';
+  end if;
+  if p_name like '#%' then raise exception 'invalid_username'; end if;
+  if lower(p_name) like '@bot:%' then raise exception 'invalid_username'; end if;
+end;
+$$;
+
+create or replace function friendships_no_bots()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if exists (select 1 from students s
+             where s.username in (new.requester, new.addressee) and s.is_bot) then
+    raise exception 'no_such_student';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists friendships_no_bots on friendships;
+create trigger friendships_no_bots before insert on friendships
+  for each row execute function friendships_no_bots();
+
+create or replace function find_students(p_username text, p_pin text, p_query text)
+returns table(username text, best_run_score int, relation text)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; q text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  q := lower(trim(coalesce(p_query, '')));
+  if length(q) < 2 then raise exception 'query_too_short'; end if;
+
+  return query
+  select s.username, s.best_run_score, friend_status(me, s.username)
+  from students s
+  where s.username_lower like q || '%'
+    and s.username <> me
+    and s.username not like '#%'
+    and not s.is_bot
+  order by s.username
+  limit 10;
+end;
+$$;
+
+create or replace function suggest_students(p_username text, p_pin text)
+returns table(username text, best_run_score int, last_seen timestamptz)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  return query
+  select s.username, s.best_run_score, act.seen
+  from students s
+  cross join lateral (
+    select greatest(
+      s.created_at,
+      coalesce((select max(r.created_at) from runs r where r.username = s.username), s.created_at),
+      coalesce((select max(m.updated_at) from matches m
+                where m.p0 = s.username or m.p1 = s.username), s.created_at)
+    ) as seen
+  ) act
+  where s.username <> me
+    and s.username not like '#%'
+    and not s.is_bot
+    and friend_status(me, s.username) is null
+  order by act.seen desc, s.username
+  limit 10;
+end;
+$$;
+
+-- 4. Ход без PIN — для бота. Человеку эти функции не открыты: он ходит
+-- через прежние match_guess и do_forced_turn, которые проверяют PIN и
+-- дальше делают ровно то же самое
+create or replace function match_guess_core(p_match_id bigint, p_seat int, p_guess int)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; seat int; dist int; band int; used_double boolean;
+        hit record; btype text; radius int; done boolean;
+begin
+  seat := p_seat;
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  if m.status <> 'active' then raise exception 'not_playing'; end if;
+  if m.round_over or m.match_over then raise exception 'round_over'; end if;
+  if m.cur <> seat then raise exception 'not_your_turn'; end if;
+  if m.skip_turn[seat + 1] or m.auto_lava[seat + 1] then raise exception 'forced_turn'; end if;
+  if p_guess is null or p_guess < m.range_min or p_guess > m.range_max then
+    raise exception 'out_of_range';
+  end if;
+
+  dist := abs(p_guess - m.secret);
+  band := feedback_tier(match_span(m), dist);
+  insert into match_moves(match_id, round, seat, guess, tier)
+  values (p_match_id, m.round, seat, p_guess, band);
+
+  radius := bonus_near_radius(match_span(m));
+  select * into hit from match_bonuses b
+  where b.match_id = p_match_id and b.round = m.round and not b.taken and b.value = p_guess;
+
+  btype := null;
+  if hit.type is not null then
+    btype := hit.type;
+    if match_bonus_blocked(m, btype, 1 - seat) then btype := 'extra'; end if;
+    update match_bonuses set taken = true
+    where match_id = p_match_id and round = m.round and value = p_guess;
+  end if;
+
+  -- Сходил — значит на месте: счётчик молчания обнуляется
+  update matches
+  set last_bonus = btype,
+      last_bonus_by = seat,
+      last_timeout = false,
+      timeouts[seat + 1] = 0,
+      near_bonus = (btype is null and exists (
+        select 1 from match_bonuses b
+        where b.match_id = p_match_id and b.round = m.round and not b.taken
+          and abs(b.value - p_guess) <= radius))
+  where id = p_match_id;
+
+  if btype is not null then perform apply_match_bonus(p_match_id, btype, seat); end if;
+
+  select * into m from matches where id = p_match_id;
+  used_double := m.armed;
+
+  if dist = 0 then
+    done := (m.wins[seat + 1] + 1) >= m.wins_needed;
+    update matches
+    set round_over = true, round_winner = seat,
+        wins[seat + 1] = m.wins[seat + 1] + 1,
+        match_over = done,
+        status = case when done then 'finished' else status end,
+        armed = false, turn_deadline = null, updated_at = now()
+    where id = p_match_id;
+    if done then perform apply_elo(p_match_id, seat); end if;
+  elsif used_double then
+    update matches set armed = false, updated_at = now() where id = p_match_id;
+    select * into m from matches where id = p_match_id;
+    update matches set turn_deadline = now() + make_interval(secs => turn_seconds(m))
+    where id = p_match_id;
+  else
+    perform pass_turn(p_match_id, false);
+  end if;
+
+  return band;
+end;
+$$;
+
+create or replace function match_guess(p_username text, p_pin text,
+                                       p_match_id bigint, p_guess int)
+returns int
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; seat int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  seat := match_seat(m, me);
+  if seat is null then raise exception 'not_your_match'; end if;
+  return match_guess_core(p_match_id, seat, p_guess);
+end;
+$$;
+
+create or replace function forced_turn_core(p_match_id bigint, p_seat int)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; seat int; kind text; v int;
+begin
+  seat := p_seat;
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  kind := forced_turn_kind(m);
+  if kind is null then raise exception 'nothing_forced'; end if;
+  if m.cur <> seat then raise exception 'not_your_turn'; end if;
+
+  if kind = 'skip' then
+    update matches set skip_turn[seat + 1] = false where id = p_match_id;
+    if m.armed then
+      -- Пропуск засчитан первым ходом: жетон тратится, ход остаётся за игроком
+      update matches set armed = false, last_timeout = false, updated_at = now()
+      where id = p_match_id;
+      select * into m from matches where id = p_match_id;
+      update matches set turn_deadline = now() + make_interval(secs => turn_seconds(m))
+      where id = p_match_id;
+      return 'skip';
+    end if;
+    perform pass_turn(p_match_id, false);
+    return 'skip';
+  end if;
+
+  update matches set auto_lava[seat + 1] = false where id = p_match_id;
+  select * into m from matches where id = p_match_id;
+  v := lava_value(m);
+  if v is null then
+    perform pass_turn(p_match_id, false);
+    return 'lava';
+  end if;
+  -- Бросок идёт обычным ходом, поэтому взведённый жетон там же и сработает
+  perform match_guess_core(p_match_id, seat, v);
+  return 'lava';
+end;
+$$;
+
+create or replace function do_forced_turn(p_username text, p_pin text, p_match_id bigint)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; seat int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  seat := match_seat(m, me);
+  if seat is null then raise exception 'not_your_match'; end if;
+  return forced_turn_core(p_match_id, seat);
+end;
+$$;
+
+-- 5. У бота время не кончается: он ходит, когда игру спрашивают о партии.
+-- Иначе закрытая вкладка превращала бы ход бота в пропуск, а два пропуска —
+-- в его поражение
+create or replace function apply_turn_timeout(p_match_id bigint)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; gone int; rival int;
+begin
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then return false; end if;
+  if m.status <> 'active' or m.round_over or m.match_over then return false; end if;
+  if m.turn_deadline is null or m.turn_deadline > now() then return false; end if;
+  if m.bot_seat is not null and m.cur = m.bot_seat then return false; end if;
+
+  insert into match_moves(match_id, round, seat, guess, tier, kind)
+  values (p_match_id, m.round, m.cur, null, null, 'timeout');
+
+  gone := m.timeouts[m.cur + 1] + 1;
+  rival := 1 - m.cur;
+
+  update matches
+  set skip_turn[m.cur + 1] = false,
+      auto_lava[m.cur + 1] = false,
+      near_bonus = false,
+      last_bonus = null,
+      timeouts[m.cur + 1] = gone
+  where id = p_match_id;
+
+  -- Два пропуска подряд — это минута молчания. Человек ушёл, и держать
+  -- соперника у экрана дальше незачем
+  if gone >= 2 then
+    update matches
+    set round_over = true,
+        round_winner = rival,
+        match_over = true,
+        status = 'finished',
+        forfeit_by = m.cur,
+        turn_deadline = null,
+        updated_at = now()
+    where id = p_match_id;
+    perform apply_elo(p_match_id, rival);
+    return true;
+  end if;
+
+  perform pass_turn(p_match_id, true);
+  return true;
+end;
+$$;
+
+-- 6. Как бот выбирает ход. Та же логика — в index.html (botPick), для игры
+-- с ботом без интернета.
+--
+-- Возможные числа — те, что сходятся со всеми ответами, которые бот видел.
+-- Под туманом он не видит чужих ходов, под слепотой — своих, при короткой
+-- памяти — только два последних. Ход тем лучше, чем ровнее он делит
+-- возможные числа по поясам (энтропия, как в разборе партии).
+--
+-- Сила L от 0 до 1 решает три вещи:
+--   — рассеянность: с вероятностью 0,9·(1−L)² бот помнит только последний ход;
+--   — с вероятностью 0,05 + 0,9·L он берёт лучший ход (сначала — такой,
+--     что может сразу попасть);
+--   — иначе любой ход не хуже 0,85·L от лучшего.
+-- Параметры подобраны перебором: бот с L = 0 выигрывает у бота с L = 0,5
+-- около 13 % раундов, с L = 0,3 — около 40 %, с L = 1 — около 56 %.
+create or replace function bot_dist_bands(p_span int)
+returns int[]
+language sql
+immutable
+as $$
+  select array_agg(feedback_tier(p_span, d) order by d) from generate_series(0, p_span - 1) d;
+$$;
+
+create or replace function bot_candidates(p_match_id bigint, p_seat int, p_careless boolean)
+returns int[]
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; db int[]; mv record; cand boolean[]; n int; i int; res int[] := '{}';
+begin
+  select * into m from matches where id = p_match_id;
+  n := match_span(m);
+  db := bot_dist_bands(n);
+  cand := array_fill(true, array[n]);
+  for mv in
+    select k.guess, k.tier from (
+      select x.guess, x.tier, x.id from match_moves x
+      where x.match_id = p_match_id and x.round = m.round
+        and x.guess is not null and x.tier is not null
+        and not (m.fog[p_seat + 1] and x.seat <> p_seat)
+        and not (m.blind[p_seat + 1] and x.seat = p_seat)
+      order by x.id desc
+      limit case when p_careless then 1 when m.short_memory[p_seat + 1] then 2 else null end
+    ) k
+  loop
+    for i in 1..n loop
+      if cand[i] and db[abs(m.range_min + i - 1 - mv.guess) + 1] <> mv.tier then
+        cand[i] := false;
+      end if;
+    end loop;
+  end loop;
+  for i in 1..n loop
+    if cand[i] then res := res || (m.range_min + i - 1); end if;
+  end loop;
+  -- Ответы честные, поэтому загаданное всегда среди возможных и пусто не
+  -- бывает. На всякий случай — весь диапазон, а не ошибка посреди партии
+  if coalesce(array_length(res, 1), 0) = 0 then
+    select array_agg(g order by g) into res from generate_series(m.range_min, m.range_max) g;
+  end if;
+  return res;
+end;
+$$;
+
+-- Ходы на выбор: лучшие (p_best) или не хуже доли p_thr от лучшего
+create or replace function bot_pool(p_match_id bigint, p_cand int[], p_best boolean, p_thr double precision)
+returns int[]
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; db int[]; n int; res int[]; hit int[];
+begin
+  select * into m from matches where id = p_match_id;
+  db := bot_dist_bands(match_span(m));
+  n := array_length(p_cand, 1);
+  with xs as (select generate_series(m.range_min, m.range_max) as x),
+       cnt as (select xs.x, db[abs(xs.x - s) + 1] as b, count(*) as c
+               from xs cross join unnest(p_cand) s group by 1, 2),
+       ent as (select cnt.x, -sum((cnt.c::double precision / n) * ln(cnt.c::double precision / n)) as h
+               from cnt group by cnt.x),
+       top as (select max(ent.h) as hb from ent)
+  select array_agg(e.x order by e.x) into res
+  from ent e, top t
+  where case when p_best then e.h >= t.hb - 1e-9 else e.h >= p_thr * t.hb - 1e-9 end;
+  if p_best then
+    select array_agg(r order by r) into hit from unnest(res) r where r = any(p_cand);
+    if hit is not null then res := hit; end if;
+  end if;
+  return res;
+end;
+$$;
+
+create or replace function bot_pick(p_match_id bigint, p_seat int, p_level double precision)
+returns int
+language plpgsql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+declare s int[]; pool int[];
+begin
+  s := bot_candidates(p_match_id, p_seat, random() < 0.9 * (1 - p_level) * (1 - p_level));
+  if array_length(s, 1) = 1 then return s[1]; end if;
+  pool := bot_pool(p_match_id, s, random() < 0.05 + 0.9 * p_level, 0.85 * p_level);
+  return pool[1 + floor(random() * array_length(pool, 1))::int];
+end;
+$$;
+
+-- Один шаг бота. Зовётся из match_state: партия идёт, пока её кто-то смотрит
+create or replace function bot_act(p_match_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; bs int; p record; nmoves int; started timestamptz;
+        think double precision; lvl double precision; s int[];
+begin
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null or m.bot_seat is null then return; end if;
+  bs := m.bot_seat;
+  select * into p from bot_personas() x
+  where x.username = case when bs = 0 then m.p0 else m.p1 end;
+  if p.username is null then return; end if;
+
+  -- Фразы: привет в начале, «хорошая игра» в конце, иногда — на раунд,
+  -- который выиграл человек. Каждая один раз
+  if m.status = 'finished' then
+    if not exists (select 1 from match_chat c where c.match_id = m.id and c.seat = bs and c.code = 'gg') then
+      insert into match_chat(match_id, seat, code) values (m.id, bs, 'gg');
+    end if;
+    return;
+  end if;
+  if m.status <> 'active' then return; end if;
+  if not exists (select 1 from match_chat c where c.match_id = m.id and c.seat = bs) then
+    insert into match_chat(match_id, seat, code) values (m.id, bs, p.greet);
+  end if;
+  if m.round_over then
+    if m.round_winner = 1 - bs and abs(hashtext(m.id || ':' || m.round)) % 2 = 0
+       and not exists (select 1 from match_chat c where c.match_id = m.id and c.seat = bs
+                       and c.created_at >= m.updated_at) then
+      insert into match_chat(match_id, seat, code) values (m.id, bs, p.react);
+    end if;
+    return;
+  end if;
+  if m.cur <> bs then return; end if;
+
+  -- Бот «думает» несколько секунд: время своё на каждый ход, но одно и то же
+  -- при каждом опросе, иначе частый опрос ускорял бы бота
+  select count(*) into nmoves from match_moves where match_id = m.id and round = m.round;
+  started := coalesce(m.turn_deadline - make_interval(secs => turn_seconds(m)), m.updated_at);
+  think := p.think_lo + (abs(hashtext(m.id || ':' || m.round || ':' || nmoves))
+                         % (((p.think_hi - p.think_lo) * 10)::int + 1)) / 10.0;
+  if now() < started + make_interval(secs => think) then return; end if;
+
+  if forced_turn_kind(m) is not null then
+    perform forced_turn_core(m.id, bs);
+    return;
+  end if;
+
+  -- Жетон: когда осталось два числа, два хода подряд выигрывают наверняка
+  lvl := coalesce(m.bot_level, 0.5);
+  if m.tokens[bs + 1] > 0 and not m.armed and nmoves > 0 then
+    s := bot_candidates(m.id, bs, false);
+    if (array_length(s, 1) = 2 and random() < 0.2 + 0.8 * lvl)
+       or (array_length(s, 1) = 3 and random() < 0.5 * lvl) then
+      update matches set armed = true, tokens[bs + 1] = m.tokens[bs + 1] - 1, updated_at = now()
+      where id = m.id;
+    end if;
+  end if;
+
+  perform match_guess_core(m.id, bs, bot_pick(m.id, bs, lvl));
+end;
+$$;
+
+-- 7. Сила бота под игрока. Начало — от рейтинга в этом режиме; дальше
+-- «лесенка»: победа человека — бот сильнее, поражение — слабее. Такая
+-- лесенка сама сходится к половине побед. Серия из двух-трёх подряд
+-- двигает быстрее: игрок не должен десять раз подряд проигрывать
+create or replace function bot_start_level(p_username text, p_mode int)
+returns real
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select least(0.95, greatest(0.05, (coalesce(
+    (select e.elo from elo_ratings e where e.username = p_username and e.mode = p_mode), 1000) - 700) / 1000.0))::real;
+$$;
+
+create or replace function bot_level_for(p_username text, p_mode int)
+returns real
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare lvl real;
+begin
+  insert into bot_skill(username, mode, level)
+  values (p_username, p_mode, bot_start_level(p_username, p_mode))
+  on conflict (username, mode) do nothing;
+  select level into lvl from bot_skill where username = p_username and mode = p_mode;
+  return lvl;
+end;
+$$;
+
+create or replace function bot_for_level(p_level real)
+returns text
+language sql
+immutable
+as $$
+  select coalesce(
+    (select p.username from bot_personas() p where p_level >= p.lo and p_level < p.hi limit 1),
+    case when p_level < 0 then '@bot:turtle' else '@bot:owl' end);
+$$;
+
+create or replace function bot_skill_after(p_username text, p_mode int, p_won boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare b bot_skill; st int; step real;
+begin
+  perform bot_level_for(p_username, p_mode);
+  select * into b from bot_skill where username = p_username and mode = p_mode for update;
+  st := case when p_won then greatest(b.streak, 0) + 1 else least(b.streak, 0) - 1 end;
+  step := 0.07 * (1 + 0.5 * least(abs(st) - 1, 2));
+  update bot_skill
+  set level = least(1.0, greatest(0.0, b.level + case when p_won then step else -step end)),
+      streak = st,
+      games = b.games + 1
+  where username = p_username and mode = p_mode;
+end;
+$$;
+
+-- 8. Рейтинг. С ботом — вдвое меньше: бот подобран так, что шансы равны,
+-- поэтому ожидание — ровно половина, и победа даёт k/4 (10 новичку, 6
+-- опытному), поражение столько же отнимает. У бота рейтинга нет
+create or replace function apply_elo(p_match_id bigint, p_winner int)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; wn text; ln text; we int; le int; wg int; lg int; md int;
+        expect double precision; kw int; kl int; delta int; mult double precision;
+        hs int; hn text; he int; hg int;
+begin
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null or not m.ranked or m.elo_applied or p_winner is null then return; end if;
+  md := coalesce(m.ranked_mode, 0);
+
+  if m.bot_seat is not null then
+    hs := 1 - m.bot_seat;
+    hn := case when hs = 0 then m.p0 else m.p1 end;
+    insert into elo_ratings(username, mode) values (hn, md) on conflict (username, mode) do nothing;
+    select elo, games into he, hg from elo_ratings where username = hn and mode = md;
+    delta := round((case when hg < 10 then 40 else 24 end) * 0.5 * 0.5);
+    if p_winner = hs then
+      update elo_ratings set elo = elo + delta, games = games + 1
+      where username = hn and mode = md;
+    else
+      update elo_ratings set elo = greatest(100, elo - delta), games = games + 1
+      where username = hn and mode = md
+      returning elo - he into delta;
+    end if;
+    update matches set elo_delta[hs + 1] = delta, elo_delta[m.bot_seat + 1] = 0, elo_applied = true
+    where id = p_match_id;
+    perform bot_skill_after(hn, md, p_winner = hs);
+    return;
+  end if;
+
+  wn := case when p_winner = 0 then m.p0 else m.p1 end;
+  ln := case when p_winner = 0 then m.p1 else m.p0 end;
+
+  -- Строку рейтинга заводим при первой же игре, а не при регистрации: режимов
+  -- четыре, и большинство из них человек может не открыть никогда
+  insert into elo_ratings(username, mode) values (wn, md), (ln, md)
+  on conflict (username, mode) do nothing;
+
+  select elo, games into we, wg from elo_ratings where username = wn and mode = md;
+  select elo, games into le, lg from elo_ratings where username = ln and mode = md;
+
+  expect := 1.0 / (1.0 + power(10.0, (le - we) / 400.0));
+  kw := case when wg < 10 then 40 else 24 end;
+  kl := case when lg < 10 then 40 else 24 end;
+  -- Серия считается по паре целиком, а не по каждому режиму отдельно: иначе
+  -- накрутку можно было бы размазать по четырём режимам и получить вчетверо
+  mult := elo_multiplier(wn, ln);
+
+  delta := round(kw * (1 - expect) * mult);
+  update elo_ratings set elo = elo + delta, games = games + 1
+  where username = wn and mode = md;
+  update matches set elo_delta[p_winner + 1] = delta where id = p_match_id;
+
+  -- Проигравший не падает ниже пола, и показать надо ровно то, что он потерял,
+  -- а не то, что отняла бы формула
+  delta := round(kl * (1 - expect) * mult);
+  update elo_ratings set elo = greatest(100, elo - delta), games = games + 1
+  where username = ln and mode = md
+  returning elo - le into delta;
+  update matches set elo_delta[2 - p_winner] = delta, elo_applied = true
+  where id = p_match_id;
+end;
+$$;
+
+-- 9. Очередь. Соперника-человека теперь ищем при каждом опросе, а не только
+-- при входе в очередь: окно по рейтингу со временем растёт, и двое ждущих
+-- раньше так и не встречались. Через 15 секунд без человека — бот
+create or replace function ranked_pair(p_me text, p_mode int)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare mine ranked_queue; opp ranked_queue; r record; new_id bigint; lvl real;
+begin
+  select * into mine from ranked_queue where username = p_me for update;
+  if mine.username is null or mine.match_id is not null or mine.mode <> p_mode then return null; end if;
+
+  select * into opp from ranked_queue q
+  where q.username <> p_me and q.match_id is null and q.mode = p_mode
+    and abs(q.elo - mine.elo) <= greatest(queue_window(q.joined_at), queue_window(mine.joined_at))
+  order by abs(q.elo - mine.elo), q.joined_at
+  limit 1
+  for update skip locked;
+
+  select * into r from ranked_rules(p_mode);
+
+  if opp.username is not null then
+    -- Кто ждал дольше, тот и ходит первым: маленькая компенсация за ожидание
+    insert into matches(p0, p1, wins_needed, range_min, range_max, frost,
+                        bonuses_on, ranked, ranked_mode, status, starter)
+    values (opp.username, p_me, 3, r.range_min, r.range_max, r.frost,
+            r.bonuses, true, p_mode, 'active', 0)
+    returning id into new_id;
+    perform start_match_round(new_id);
+    update ranked_queue set match_id = new_id where username = opp.username;
+    delete from ranked_queue where username = p_me;
+    return new_id;
+  end if;
+
+  if mine.joined_at > now() - make_interval(secs => bot_wait_seconds()) then return null; end if;
+
+  -- Человек ждал — он и ходит первым
+  lvl := bot_level_for(p_me, p_mode);
+  insert into matches(p0, p1, wins_needed, range_min, range_max, frost,
+                      bonuses_on, ranked, ranked_mode, status, starter, bot_seat, bot_level)
+  values (p_me, bot_for_level(lvl), 3, r.range_min, r.range_max, r.frost,
+          r.bonuses, true, p_mode, 'active', 0, 1, lvl)
+  returning id into new_id;
+  perform start_match_round(new_id);
+  delete from ranked_queue where username = p_me;
+  return new_id;
+end;
+$$;
+
+create or replace function join_ranked_queue(p_username text, p_pin text, p_mode int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; my_elo int; mid bigint; new_id bigint; mine ranked_queue;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_mode is null or p_mode < 0 or p_mode > 3 then raise exception 'bad_mode'; end if;
+
+  perform expire_stale_matches();
+
+  select id into mid from matches
+  where ranked and status = 'active' and (p0 = me or p1 = me)
+  order by id desc limit 1;
+  if mid is not null then
+    delete from ranked_queue where username = me;
+    return jsonb_build_object('matchId', mid);
+  end if;
+
+  select * into mine from ranked_queue where username = me;
+  if mine.match_id is not null then
+    delete from ranked_queue where username = me;
+    return jsonb_build_object('matchId', mine.match_id);
+  end if;
+  -- В очереди можно стоять только в одном режиме: иначе человека затянуло бы
+  -- в две партии сразу, и обе с таймером
+  if mine.username is not null and mine.mode is distinct from p_mode then
+    delete from ranked_queue where username = me;
+    mine := null;
+  end if;
+
+  -- Брошенные строки: и те, кто ушёл не дождавшись, и те, кому матч уже
+  -- нашёлся, но забрать его никто не пришёл
+  delete from ranked_queue
+  where username <> me
+    and ((match_id is null and joined_at < now() - interval '5 minutes')
+      or (match_id is not null and joined_at < now() - interval '30 minutes'));
+
+  select coalesce(e.elo, 1000) into my_elo from (select 1) x
+  left join elo_ratings e on e.username = me and e.mode = p_mode;
+  insert into ranked_queue(username, elo, mode) values (me, my_elo, p_mode)
+  on conflict (username) do nothing;
+
+  new_id := ranked_pair(me, p_mode);
+  if new_id is null then
+    return jsonb_build_object('matchId', null, 'waiting', true);
+  end if;
+  return jsonb_build_object('matchId', new_id);
+end;
+$$;
+
+create or replace function ranked_status(p_username text, p_pin text, p_mode int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; mine ranked_queue; mid bigint; waiting int; last_at timestamptz;
+        my_elo int; my_games int; all_r jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_mode is null or p_mode < 0 or p_mode > 3 then raise exception 'bad_mode'; end if;
+
+  perform expire_stale_matches();
+
+  select id into mid from matches
+  where ranked and status = 'active' and (p0 = me or p1 = me)
+  order by id desc limit 1;
+
+  -- Ждёт в этом режиме — пробуем свести с человеком, а после 15 секунд — с ботом
+  if mid is null then mid := ranked_pair(me, p_mode); end if;
+
+  select * into mine from ranked_queue where username = me;
+  if mid is null and mine.match_id is not null then mid := mine.match_id; end if;
+  if mid is not null then delete from ranked_queue where username = me; end if;
+
+  select count(*) into waiting from ranked_queue
+  where match_id is null and mode = p_mode and joined_at > now() - interval '5 minutes';
+
+  -- Когда в этом режиме играли в последний раз люди между собой: по этому
+  -- числу видно, есть ли смысл ждать человека. Партии с ботом не в счёт
+  select max(updated_at) into last_at from matches
+  where ranked and coalesce(ranked_mode, 0) = p_mode and bot_seat is null;
+
+  -- Все четыре рейтинга сразу: переключение режима не должно ждать сервер
+  select jsonb_object_agg(g.mode, jsonb_build_object(
+           'elo', coalesce(e.elo, 1000), 'games', coalesce(e.games, 0)))
+    into all_r
+  from generate_series(0, 3) g(mode)
+  left join elo_ratings e on e.username = me and e.mode = g.mode;
+
+  my_elo := coalesce((all_r -> p_mode::text ->> 'elo')::int, 1000);
+  my_games := coalesce((all_r -> p_mode::text ->> 'games')::int, 0);
+
+  return jsonb_build_object(
+    'mode', p_mode,
+    'matchId', mid,
+    'inQueue', mine.username is not null and mine.match_id is null and mid is null
+               and mine.mode = p_mode,
+    'queueMode', case when mine.username is not null and mine.match_id is null and mid is null
+                      then mine.mode else null end,
+    'waited', case when mine.username is null then 0
+                   else floor(extract(epoch from (now() - mine.joined_at)))::int end,
+    'botWait', bot_wait_seconds(),
+    'queue', waiting,
+    'elo', my_elo,
+    'games', my_games,
+    'ratings', all_r,
+    'lastAgo', case when last_at is null then null
+                    else floor(extract(epoch from (now() - last_at)))::int end);
+end;
+$$;
+
+-- 10. Состояние партии: сначала ход бота, потом — не кончилось ли время
+create or replace function match_state(p_username text, p_pin text, p_match_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; my_seat int; moves jsonb; reveal boolean;
+        visible int; hide_mine boolean; hide_theirs boolean; chat jsonb; my_elo int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  my_seat := match_seat(m, me);
+  if my_seat is null then raise exception 'not_your_match'; end if;
+
+  -- Партии людей бот не трогает: лишняя блокировка строки на каждом опросе
+  if m.bot_seat is not null then perform bot_act(p_match_id); end if;
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id;
+
+  reveal := m.round_over or m.match_over or m.status <> 'active';
+  hide_mine := (not reveal) and m.blind[my_seat + 1] and m.cur = my_seat;
+  hide_theirs := (not reveal) and m.fog[my_seat + 1] and m.cur = my_seat;
+  visible := case when (not reveal) and m.short_memory[my_seat + 1] and m.cur = my_seat then 2 else 4 end;
+
+  select coalesce(jsonb_agg(x order by x_id), '[]'::jsonb) into moves from (
+    select mv.id as x_id,
+           case
+             when mv.kind = 'timeout'
+               then jsonb_build_object('seat', mv.seat, 'timeout', true)
+             when (mv.seat = my_seat and hide_mine) or (mv.seat <> my_seat and hide_theirs)
+               then jsonb_build_object('seat', mv.seat, 'hidden', true)
+             else jsonb_build_object('seat', mv.seat, 'guess', mv.guess, 'tier', mv.tier)
+           end as x
+    from (select * from match_moves mv2
+          where mv2.match_id = p_match_id and mv2.round = m.round
+          order by mv2.id desc limit visible) mv
+  ) q;
+
+  -- Фразы отдаём вместе с возрастом: клиент сам решит, показывать ли ещё
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', c.id, 'seat', c.seat, 'code', c.code,
+           'ago', floor(extract(epoch from (now() - c.created_at)))::int) order by c.id), '[]'::jsonb)
+    into chat
+  from (select * from match_chat c2 where c2.match_id = p_match_id
+        order by c2.id desc limit 6) c;
+
+  select e.elo into my_elo from elo_ratings e
+  where e.username = me and e.mode = coalesce(m.ranked_mode, 0);
+
+  return jsonb_build_object(
+    'id', m.id, 'seat', my_seat,
+    'names', jsonb_build_array(m.p0, m.p1),
+    'status', m.status, 'winsNeeded', m.wins_needed,
+    'rangeMin', m.range_min, 'rangeMax', m.range_max, 'frost', m.frost,
+    'round', m.round, 'wins', m.wins, 'cur', m.cur, 'tokens', m.tokens, 'armed', m.armed,
+    'roundOver', m.round_over, 'roundWinner', m.round_winner, 'matchOver', m.match_over,
+    'moves', moves,
+    'secret', case when reveal then to_jsonb(m.secret) else 'null'::jsonb end,
+    'bonusesOn', m.bonuses_on,
+    'fog', m.fog, 'blind', m.blind, 'autoLava', m.auto_lava,
+    'skip', m.skip_turn, 'shortMemory', m.short_memory, 'rush', m.rush,
+    'nearBonus', m.near_bonus, 'lastBonus', m.last_bonus, 'lastBonusBy', m.last_bonus_by,
+    'lastTimeout', m.last_timeout,
+    'forced', forced_turn_kind(m),
+    'turnSeconds', turn_seconds(m),
+    'secondsLeft', case when m.turn_deadline is null then null
+                        else greatest(0, ceil(extract(epoch from (m.turn_deadline - now()))))::int end,
+    'chat', chat,
+    'ranked', m.ranked,
+    'rankedMode', m.ranked_mode,
+    'botSeat', m.bot_seat,
+    'forfeitBy', m.forfeit_by,
+    'eloDelta', case when m.elo_applied then to_jsonb(m.elo_delta) else 'null'::jsonb end,
+    'elo', coalesce(my_elo, 1000),
+    'updatedAt', m.updated_at
+  );
+end;
+$$;
+
+-- 11. Реванш с ботом начинается сразу: ждать согласия бота незачем. Сила —
+-- по лесенке, но в пределах того же персонажа: реванш — с тем же соперником
+create or replace function rematch(p_username text, p_pin text, p_match_id bigint)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; other text; live int; new_id bigint; p record; lvl real;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  if match_seat(m, me) is null then raise exception 'not_your_match'; end if;
+  if m.status in ('invited', 'active') then raise exception 'match_already_live'; end if;
+
+  other := case when m.p0 = me then m.p1 else m.p0 end;
+  if other like '#%' then raise exception 'no_such_student'; end if;
+
+  select count(*) into live from matches
+  where status in ('invited', 'active')
+    and ((p0 = me and p1 = other) or (p0 = other and p1 = me));
+  if live > 0 then raise exception 'match_already_live'; end if;
+
+  if m.bot_seat is not null then
+    select * into p from bot_personas() x where x.username = other;
+    lvl := least(p.hi - 0.001, greatest(p.lo, bot_level_for(me, coalesce(m.ranked_mode, 0))));
+    insert into matches(p0, p1, wins_needed, range_min, range_max, frost,
+                        bonuses_on, bonus_count, ranked, ranked_mode, status, starter,
+                        bot_seat, bot_level)
+    values (me, other, m.wins_needed, m.range_min, m.range_max, m.frost,
+            m.bonuses_on, m.bonus_count, m.ranked, m.ranked_mode, 'active', 0, 1, lvl)
+    returning id into new_id;
+    perform start_match_round(new_id);
+    return new_id;
+  end if;
+
+  insert into matches(p0, p1, wins_needed, range_min, range_max, frost,
+                      bonuses_on, bonus_count, ranked, ranked_mode, status)
+  values (me, other, m.wins_needed, m.range_min, m.range_max, m.frost,
+          m.bonuses_on, m.bonus_count, m.ranked, m.ranked_mode, 'invited')
+  returning id into new_id;
+  return new_id;
+end;
+$$;
+
+-- 12. Права: всё, что ходит без PIN, игре напрямую не открыто
+revoke execute on function bot_seed() from public, anon;
+revoke execute on function bot_dist_bands(int) from public, anon;
+revoke execute on function friendships_no_bots() from public, anon;
+revoke execute on function match_guess_core(bigint, int, int) from public, anon;
+revoke execute on function forced_turn_core(bigint, int) from public, anon;
+revoke execute on function bot_candidates(bigint, int, boolean) from public, anon;
+revoke execute on function bot_pool(bigint, int[], boolean, double precision) from public, anon;
+revoke execute on function bot_pick(bigint, int, double precision) from public, anon;
+revoke execute on function bot_act(bigint) from public, anon;
+revoke execute on function bot_start_level(text, int) from public, anon;
+revoke execute on function bot_level_for(text, int) from public, anon;
+revoke execute on function bot_skill_after(text, int, boolean) from public, anon;
+revoke execute on function ranked_pair(text, int) from public, anon;
+revoke execute on function apply_elo(bigint, int) from public, anon;
+revoke execute on function apply_turn_timeout(bigint) from public, anon;
+grant execute on function match_guess(text, text, bigint, int) to anon;
+grant execute on function do_forced_turn(text, text, bigint) to anon;
+grant execute on function join_ranked_queue(text, text, int) to anon;
+grant execute on function ranked_status(text, text, int) to anon;
+grant execute on function match_state(text, text, bigint) to anon;
+grant execute on function rematch(text, text, bigint) to anon;
+grant execute on function find_students(text, text, text) to anon;
+grant execute on function suggest_students(text, text) to anon;

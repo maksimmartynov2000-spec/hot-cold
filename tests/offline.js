@@ -68,8 +68,8 @@ function serve() {
   await page.waitForTimeout(600);
 
   check('без сети страница открывается', await page.locator('#screenMode').isVisible());
-  check('без сети видны все четыре режима',
-    (await page.locator('#screenMode .mode-btn').count()) === 4);
+  check('без сети видны все пять режимов',
+    (await page.locator('#screenMode .mode-btn').count()) === 5);
 
   // Онлайн — первый режим, которому сеть нужна по существу. И рейтинг, и друзья
   // должны сказать об этом словами, а не молча зависнуть на пустом списке
@@ -130,6 +130,20 @@ function serve() {
   await page.waitForTimeout(300);
   check('без сети тренировка доигрывается до победы',
     (await page.locator('#resultBox').textContent()).includes('Победа'));
+
+  // Игра с ботом — тоже целиком без сети: бот думает в браузере
+  await page.evaluate(() => quitToMenu());
+  await page.click('.mode-btn.bot');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { BOT_SPEED = 0; });
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  const miss = await page.evaluate(() => secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN);
+  await page.fill('#guessInput', String(miss));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(600);
+  check('без сети бот отвечает на ход сам',
+    await page.evaluate(() => vsBot !== null && history.some(h => h.p === 1)));
 
   check('без сети нет ошибок JS', errors.length === 0, errors.join('; '));
 

@@ -436,6 +436,21 @@
     .mode-btn.solo { border-left: 3px solid var(--p0); }
     .mode-btn.run { border-left: 3px solid #4ade80; }
     .mode-btn.online { border-left: 3px solid #38bdf8; }
+    .mode-btn.bot { border-left: 3px solid #a78bfa; }
+    .r-elo .r-elo-note { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
+    /* Выбор бота: пять персонажей столбиком, от слабого к сильному. В ряд
+       на телефоне не влезали имена: «Чере…», «Дель…» */
+    .bot-pick { display: flex; flex-direction: column; gap: 5px; }
+    .bot-tile {
+      display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+      padding: 7px 12px; border-radius: 12px; cursor: pointer; font-family: inherit; color: #fff;
+      background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .bot-tile.active { border-color: #a78bfa; background: rgba(167, 139, 250, 0.18); }
+    .bot-tile .bt-icon { font-size: 22px; line-height: 1; }
+    .bot-tile .bt-name { font-size: 15px; font-weight: 700; }
+    .bot-tile .bt-sub { font-size: 13px; color: rgba(255, 255, 255, 0.55); flex: 1; }
+    .bot-tile .bt-power { font-size: 11px; letter-spacing: 1px; color: #a78bfa; white-space: nowrap; }
 
     /* ---------- Онлайн: друзья ---------- */
     .friend-list { margin-bottom: 4px; }
@@ -1537,6 +1552,12 @@
           <span class="m-title" id="tModeDuel">Play with a friend</span>
         </span>
       </button>
+      <button class="mode-btn bot" onclick="openSetup('duel', true)">
+        <span class="m-icon">🤖</span>
+        <span class="m-text">
+          <span class="m-title" id="tModeBot">Play the bot</span>
+        </span>
+      </button>
       <div class="mode-group" id="tGroupOnline"></div>
       <button class="mode-btn run" onclick="openRunEntry()">
         <span class="m-icon">🏆</span>
@@ -1572,6 +1593,11 @@
     </div>
 
     <div id="duelOnlyFields">
+      <div class="setup-field hidden" id="botPickField">
+        <label id="tLblBot">Opponent</label>
+        <div class="bot-pick" id="botPick"></div>
+      </div>
+
       <label class="frost-row">
         <input type="checkbox" id="bonusSetup" onchange="setBonusMode(this.checked)" />
         <span id="tBonusSetup"></span>
@@ -1583,7 +1609,7 @@
       </div>
 
       <!-- Имена рядом, а не столбиком: форма дуэли не влезала в экран -->
-      <div class="setup-pair">
+      <div class="setup-pair" id="namesPair">
         <div class="setup-field">
           <label id="tLblP1">Player 1</label>
           <input type="text" id="nameP1" maxlength="14" oninput="buildHandicapOptions()" />
@@ -1603,7 +1629,7 @@
           <option value="9">9</option>
         </select>
       </div>
-      <div class="setup-field">
+      <div class="setup-field" id="handicapField">
         <label id="tLblHandicap">Handicap</label>
         <select class="field" id="handicap"></select>
       </div>
@@ -2179,7 +2205,10 @@
         rkLeftYou: "You left the game",
         rkDelta: "Rating: {n} ({d})",
         rkResign: "Resign",
-        rkResignAsk: "Leaving a ranked game counts as a loss. Sure?"
+        rkResignAsk: "Leaving a ranked game counts as a loss. Sure?",
+        rkBotSoon: "Nobody yet \u2014 in {n} s you\u2019ll play a bot \ud83e\udd16",
+        rkBotNow: "Calling a bot \ud83e\udd16\u2026",
+        rkBotHalf: "vs a bot \u2014 half the rating"
       },
       bonusLabel: "Bonuses", bonusNear: "something is near", lblBonusCount: "Bonuses on the board", bonusAuto: "as usual ({n})",
       bonusNames: { extra: "Two in reserve", fog: "Fog", blind: "Blind move", lava: "Lava toss", skip: "Skipped turn", gift: "Gift to the rival", memory: "Short memory", rush: "Rush" },
@@ -2199,6 +2228,9 @@
 
       modeSolo: "Practice",
       modeDuel: "Play with a friend",
+      modeBot: "Play the bot", lblBot: "Opponent", you: "You",
+      bots: { turtle: "Turtle", panda: "Panda", dolphin: "Dolphin", fox: "Fox", owl: "Owl" },
+      botsSub: { turtle: "Beginner", panda: "Learning", dolphin: "Steady", fox: "Sly", owl: "Master" },
       groupOffline: "No internet needed", groupOnline: "Needs internet",
       lblP1: "Player 1", lblP2: "Player 2", defP1: "Player 1", defP2: "Player 2",
       lblWins: "Play until how many wins", lblHandicap: "Head start",
@@ -2395,7 +2427,10 @@
         rkLeftYou: "Вы вышли из игры",
         rkDelta: "Рейтинг: {n} ({d})",
         rkResign: "Сдаться",
-        rkResignAsk: "Выйти из рейтинговой игры — это поражение. Точно?"
+        rkResignAsk: "Выйти из рейтинговой игры — это поражение. Точно?",
+        rkBotSoon: "Если никого не будет — через {n} с сыграете с ботом \ud83e\udd16",
+        rkBotNow: "Зовём бота \ud83e\udd16\u2026",
+        rkBotHalf: "с ботом рейтинг вдвое меньше"
       },
       bonusLabel: "Бонусы", bonusNear: "рядом что-то есть", lblBonusCount: "Бонусов на поле", bonusAuto: "как обычно ({n})",
       bonusNames: { extra: "Два про запас", fog: "Туман", blind: "Слепой ход", lava: "Бросок в лаву", skip: "Пропуск хода", gift: "Подарок сопернику", memory: "Короткая память", rush: "Спешка" },
@@ -2415,6 +2450,9 @@
 
       modeSolo: "Тренировка",
       modeDuel: "Игра с другом",
+      modeBot: "Игра с ботом", lblBot: "Соперник", you: "Вы",
+      bots: { turtle: "Черепаха", panda: "Панда", dolphin: "Дельфин", fox: "Лис", owl: "Сова" },
+      botsSub: { turtle: "Новичок", panda: "Учится", dolphin: "Уверенный", fox: "Хитрый", owl: "Мастер" },
       groupOffline: "Без интернета", groupOnline: "Нужен интернет",
       lblP1: "Игрок 1", lblP2: "Игрок 2", defP1: "Игрок 1", defP2: "Игрок 2",
       lblWins: "Играем до скольких побед", lblHandicap: "Фора",
@@ -2611,7 +2649,10 @@
         rkLeftYou: "Vous avez quitt\u00e9 la partie",
         rkDelta: "Classement : {n} ({d})",
         rkResign: "Abandonner",
-        rkResignAsk: "Quitter une partie class\u00e9e compte comme une d\u00e9faite. C'est s\u00fbr ?"
+        rkResignAsk: "Quitter une partie class\u00e9e compte comme une d\u00e9faite. C'est s\u00fbr ?",
+        rkBotSoon: "Personne ? Dans {n} s, vous jouerez contre un bot \ud83e\udd16",
+        rkBotNow: "On appelle un bot \ud83e\udd16\u2026",
+        rkBotHalf: "contre un bot \u2014 moiti\u00e9 du classement"
       },
       bonusLabel: "Bonus", bonusNear: "quelque chose est tout près", lblBonusCount: "Bonus sur le plateau", bonusAuto: "comme d\u2019habitude ({n})",
       bonusNames: { extra: "Deux en réserve", fog: "Brouillard", blind: "Coup aveugle", lava: "Jet de lave", skip: "Tour perdu", gift: "Cadeau à l\u2019adversaire", memory: "Mémoire courte", rush: "Hâte" },
@@ -2631,6 +2672,9 @@
 
       modeSolo: "Entraînement",
       modeDuel: "Jouer à deux",
+      modeBot: "Jouer contre le bot", lblBot: "Adversaire", you: "Vous",
+      bots: { turtle: "Tortue", panda: "Panda", dolphin: "Dauphin", fox: "Renard", owl: "Chouette" },
+      botsSub: { turtle: "D\u00e9butant", panda: "Apprenti", dolphin: "Solide", fox: "Rus\u00e9", owl: "Ma\u00eetre" },
       groupOffline: "Sans internet", groupOnline: "Avec internet",
       lblP1: "Joueur 1", lblP2: "Joueur 2", defP1: "Joueur 1", defP2: "Joueur 2",
       lblWins: "Jusqu'à combien de victoires", lblHandicap: "Avantage",
@@ -2827,7 +2871,10 @@
         rkLeftYou: "Sie haben die Partie verlassen",
         rkDelta: "Punkte: {n} ({d})",
         rkResign: "Aufgeben",
-        rkResignAsk: "Eine Ranglistenpartie zu verlassen z\u00e4hlt als Niederlage. Sicher?"
+        rkResignAsk: "Eine Ranglistenpartie zu verlassen z\u00e4hlt als Niederlage. Sicher?",
+        rkBotSoon: "Niemand da? In {n} s spielst du gegen einen Bot \ud83e\udd16",
+        rkBotNow: "Ein Bot \ud83e\udd16 kommt\u2026",
+        rkBotHalf: "gegen einen Bot \u2014 halbe Wertung"
       },
       bonusLabel: "Boni", bonusNear: "etwas ist in der Nähe", lblBonusCount: "Boni auf dem Feld", bonusAuto: "wie üblich ({n})",
       bonusNames: { extra: "Zwei in Reserve", fog: "Nebel", blind: "Blindzug", lava: "Lavawurf", skip: "Zug verloren", gift: "Geschenk an den Gegner", memory: "Kurzes Gedächtnis", rush: "Hetze" },
@@ -2847,6 +2894,9 @@
 
       modeSolo: "Training",
       modeDuel: "Zu zweit spielen",
+      modeBot: "Gegen den Bot", lblBot: "Gegner", you: "Du",
+      bots: { turtle: "Schildkr\u00f6te", panda: "Panda", dolphin: "Delfin", fox: "Fuchs", owl: "Eule" },
+      botsSub: { turtle: "Anf\u00e4nger", panda: "Lernt", dolphin: "Sicher", fox: "Schlau", owl: "Meister" },
       groupOffline: "Ohne Internet", groupOnline: "Mit Internet",
       lblP1: "Spieler 1", lblP2: "Spieler 2", defP1: "Spieler 1", defP2: "Spieler 2",
       lblWins: "Bis wie viele Siege", lblHandicap: "Vorsprung",
@@ -3212,6 +3262,11 @@
   // разборе партии она — такой же ход
   let finalGuessValue = null;
 
+  // Игра с ботом без интернета: та же дуэль, второй игрок — бот
+  let vsBot = null;        // { bot } — с кем играем, или null
+  let botTimer = null;
+  let BOT_SPEED = 1;       // множитель «раздумий»; тесты ставят 0
+
   // ---------- состояние дуэли ----------
   const D = {
     names: ["", ""],
@@ -3372,6 +3427,8 @@
 
     document.getElementById('tModeSolo').textContent = L.modeSolo;
     document.getElementById('tModeDuel').textContent = L.modeDuel;
+    document.getElementById('tModeBot').textContent = L.modeBot;
+    document.getElementById('tLblBot').textContent = L.lblBot;
     // У каждого экрана своё название — с тем же значком, что в меню
     document.getElementById('tSetupScreen').textContent =
       mode === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo;
@@ -3506,6 +3563,8 @@
 
   function quitToMenu() {
     hideBarTip();
+    stopBot();
+    vsBot = null;
     mode = null;
     D.matchOver = false;
     applyTranslations();
@@ -3523,16 +3582,23 @@
   }
 
   // ================= ОБЩАЯ НАСТРОЙКА (диапазон/попытки/дуэль) =================
-  function openSetup(m) {
+  // Игра с ботом — та же дуэль: вместо второго имени и форы выбирается бот
+  let setupBot = false;
+  function openSetup(m, bot) {
     mode = m;
+    setupBot = !!bot && m === 'duel';
     const L = t();
     document.getElementById('duelOnlyFields').classList.toggle('hidden', m !== 'duel');
     document.getElementById('attemptsField').classList.toggle('hidden', m !== 'solo');
+    document.getElementById('botPickField').classList.toggle('hidden', !setupBot);
+    document.getElementById('namesPair').classList.toggle('hidden', setupBot);
+    document.getElementById('handicapField').classList.toggle('hidden', setupBot);
     document.getElementById('tStartMatch').textContent = (m === 'duel') ? L.startMatch : L.startGame;
     document.getElementById('tSetupScreen').textContent =
-      m === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo;
+      setupBot ? '🤖 ' + L.modeBot : m === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo;
     buildRangeOptions();
     if (m === 'duel') buildHandicapOptions();
+    if (setupBot) renderBotPick();
     renderBonusSetup();
     showScreen('setup');
   }
@@ -3731,10 +3797,14 @@
   function startMatch() {
     const L = t();
     mode = 'duel';
-    D.names[0] = (document.getElementById('nameP1').value || '').trim() || L.defP1;
-    D.names[1] = (document.getElementById('nameP2').value || '').trim() || L.defP2;
+    stopBot();
+    vsBot = setupBot ? { bot: BOTS.find(b => b.key === botChoice()) || BOTS[1] } : null;
+    D.names[0] = vsBot ? (myName() || L.you)
+                       : (document.getElementById('nameP1').value || '').trim() || L.defP1;
+    D.names[1] = vsBot ? botName(vsBot.bot)
+                       : (document.getElementById('nameP2').value || '').trim() || L.defP2;
     D.winsNeeded = parseInt(document.getElementById('winsNeeded').value);
-    D.handicap = parseInt(document.getElementById('handicap').value);
+    D.handicap = vsBot ? 0 : parseInt(document.getElementById('handicap').value);
     D.wins = [0, 0];
     D.round = 1;
     D.matchOver = false;
@@ -3742,6 +3812,7 @@
     startRound();
     applyTranslations();
     showScreen('game');
+    if (vsBot) setTimeout(() => botSay(vsBot && vsBot.bot.greet), 600);
   }
 
   function startRound() {
@@ -3785,6 +3856,7 @@
     if (mode !== 'duel' || D.roundOver || D.matchOver) return;
     if (p !== D.cur) return;
     if (online) { if (p === online.seat) onlineToken(); return; }
+    if (vsBot && p === 1) return;
     if (D.armed) {
       D.armed = false;
       D.tokens[p]++;
@@ -3800,6 +3872,7 @@
 
   function duelGuess() {
     if (D.roundOver || D.matchOver) return;
+    if (vsBot && D.cur === 1) return;
     const input = document.getElementById('guessInput');
     const guess = parseInt(input.value);
     if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
@@ -3838,6 +3911,7 @@
       D.roundWinner = D.cur;
       D.wins[D.cur]++;
       if (D.wins[D.cur] >= D.winsNeeded) D.matchOver = true;
+      if (vsBot) botSay(D.matchOver ? 'gg' : (D.cur === 0 && Math.random() < 0.5 ? vsBot.bot.react : null));
     } else if (!usedDouble) {
       D.cur = 1 - D.cur;
     }
@@ -3872,6 +3946,13 @@
     if (mode !== 'duel' || D.roundOver || D.matchOver) return null;
     // Онлайн: решает сервер, и только для того, чей сейчас ход
     if (online) return (D.cur === online.seat) ? online.forced : null;
+    // Отнятый ход бота бот делает сам — кнопку человеку не показываем
+    if (vsBot && D.cur === 1) return null;
+    return localForced();
+  }
+
+  function localForced() {
+    if (mode !== 'duel' || D.roundOver || D.matchOver) return null;
     if (D.skip[D.cur]) return 'skip';
     if (D.autoLava[D.cur]) return 'lava';
     return null;
@@ -3900,8 +3981,8 @@
     }
   }
 
-  function doForcedTurn() {
-    const kind = forcedTurn();
+  function doForcedTurn(byBot) {
+    const kind = byBot ? localForced() : forcedTurn();
     if (!kind) return;
     if (online) return onlineForcedTurn();
     if (kind === 'skip') {
@@ -3934,6 +4015,9 @@
     if (online) return !!(h && h.masked);
     if (mode !== 'duel' || D.roundOver || D.matchOver) return false;
     if (ownerP === null || ownerP === undefined) return false;
+    // С ботом экран один и смотрит в него человек. Как и в онлайне, помехи
+    // прячут ходы только пока ходит он сам
+    if (vsBot && D.cur !== 0) return false;
     const viewer = D.cur;
     const mine = ownerP === viewer;
     if (D.fog[viewer] && !mine) return true;
@@ -3985,6 +4069,7 @@
     renderSayBubble();
     syncScaleBox();
     if (duel) renderPlayers();
+    botTick();
   }
 
   function renderBonusLine() {
@@ -4428,6 +4513,13 @@
           eloLine.textContent = L.online.rkDelta
             .replace('{n}', formatNum(online.elo))
             .replace('{d}', (d > 0 ? '+' : '') + d);
+          // С ботом рейтинг вдвое меньше — мелкой строкой под числом
+          if (online.botSeat !== null) {
+            const half = document.createElement('small');
+            half.className = 'r-elo-note';
+            half.textContent = L.online.rkBotHalf;
+            eloLine.appendChild(half);
+          }
         }
       }
 
@@ -4989,7 +5081,148 @@
   // его как есть незачем, но и терять из истории тоже нельзя
   function playerName(name) {
     const n = String(name == null ? '' : name);
+    const bot = botOf(n);
+    if (bot) return botName(bot);
     return n.charAt(0) === '#' ? t().online.deletedPlayer : n;
+  }
+
+  // ================= БОТЫ =================
+  // Пять персонажей от слабого к сильному. Тот же список — в базе
+  // (bot_personas), сверяется тестом. level — сила в игре без интернета;
+  // в рейтинге силу подбирает сервер под игрока. Бот всегда подписан 🤖:
+  // выдавать его за человека нельзя
+  const BOTS = [
+    { id: '@bot:turtle', key: 'turtle', icon: '🐢', color: '#34d399', level: 0.1, think: [2, 4], greet: 'hi', react: 'wow' },
+    { id: '@bot:panda', key: 'panda', icon: '🐼', color: '#e2e8f0', level: 0.3, think: [1.5, 3.5], greet: 'hi', react: 'nice' },
+    { id: '@bot:dolphin', key: 'dolphin', icon: '🐬', color: '#60a5fa', level: 0.5, think: [1.5, 3], greet: 'luck', react: 'nice' },
+    { id: '@bot:fox', key: 'fox', icon: '🦊', color: '#fb923c', level: 0.7, think: [1, 2.5], greet: 'luck', react: 'almost' },
+    { id: '@bot:owl', key: 'owl', icon: '🦉', color: '#a78bfa', level: 0.9, think: [1.5, 3], greet: 'luck', react: 'wow' }
+  ];
+
+  function botOf(name) {
+    const n = String(name == null ? '' : name).toLowerCase();
+    return BOTS.find(b => b.id === n) || null;
+  }
+
+  function botName(bot) {
+    return bot.icon + ' ' + t().bots[bot.key] + ' 🤖';
+  }
+
+  // Какого бота выбрали в прошлый раз. Сначала — 🐼: слабый, но не беспомощный
+  function botChoice() {
+    try {
+      const k = localStorage.getItem('hc_bot');
+      if (BOTS.some(b => b.key === k)) return k;
+    } catch (e) {}
+    return 'panda';
+  }
+
+  function renderBotPick() {
+    const box = document.getElementById('botPick');
+    const L = t();
+    const chosen = botChoice();
+    box.replaceChildren(...BOTS.map(b => {
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'bot-tile' + (b.key === chosen ? ' active' : '');
+      tile.dataset.bot = b.key;
+      const icon = document.createElement('span');
+      icon.className = 'bt-icon';
+      icon.textContent = b.icon;
+      const name = document.createElement('span');
+      name.className = 'bt-name';
+      name.textContent = L.bots[b.key];
+      const sub = document.createElement('span');
+      sub.className = 'bt-sub';
+      sub.textContent = L.botsSub[b.key];
+      // Сила — точками: пятый из пяти самый сильный
+      const power = document.createElement('span');
+      power.className = 'bt-power';
+      const n = BOTS.indexOf(b) + 1;
+      power.textContent = '●'.repeat(n) + '○'.repeat(BOTS.length - n);
+      tile.append(icon, name, sub, power);
+      tile.onclick = () => {
+        try { localStorage.setItem('hc_bot', b.key); } catch (e) {}
+        renderBotPick();
+      };
+      return tile;
+    }));
+  }
+
+  // ---------- как бот выбирает ход ----------
+  // Та же логика — в базе (bot_pick), для рейтинга. Бот видит только ответы
+  // на ходы, загаданного не знает. Под туманом не видит чужих ходов, под
+  // слепотой — своих, при короткой памяти — только два последних.
+  // Сила L от 0 до 1: с вероятностью 0,9·(1−L)² бот рассеян и помнит только
+  // последний ход; с вероятностью 0,05 + 0,9·L берёт лучший ход (сначала —
+  // такой, что может сразу попасть), иначе любой не хуже 0,85·L от лучшего
+  function botCandidates(moves, seat, flags, careless) {
+    let seen = moves.filter(m => !m.timeout && typeof m.guess === 'number' &&
+                                 m.labelIndex !== null && m.labelIndex !== undefined &&
+                                 !(flags.fog && m.p !== seat) && !(flags.blind && m.p === seat));
+    const keep = careless ? 1 : (flags.shortMemory ? 2 : seen.length);
+    seen = seen.slice(Math.max(0, seen.length - keep));
+    const bands = reviewBands(FEEDBACK_META);
+    const cand = new Uint8Array(RANGE_MAX - RANGE_MIN + 1).fill(1);
+    seen.forEach(m => narrow(cand, RANGE_MIN, bands, m.guess, m.labelIndex));
+    // Ответы честные, загаданное всегда среди возможных. На всякий случай
+    if (!cand.includes(1)) cand.fill(1);
+    return cand;
+  }
+
+  function botPool(cand, best, thr) {
+    const scan = infoScan(cand, RANGE_MIN, RANGE_MAX, reviewBands(FEEDBACK_META));
+    let pool = [];
+    for (let x = RANGE_MIN; x <= RANGE_MAX; x++) {
+      const h = scan.H(x);
+      if (best ? h >= scan.hBest - 1e-9 : h >= thr * scan.hBest - 1e-9) pool.push(x);
+    }
+    if (best) {
+      const hit = pool.filter(x => cand[x - RANGE_MIN]);
+      if (hit.length) pool = hit;
+    }
+    return pool;
+  }
+
+  function botPick(moves, seat, flags, level, rnd) {
+    rnd = rnd || Math.random;
+    const cand = botCandidates(moves, seat, flags, rnd() < 0.9 * (1 - level) * (1 - level));
+    const left = [];
+    for (let i = 0; i < cand.length; i++) if (cand[i]) left.push(i + RANGE_MIN);
+    if (left.length === 1) return left[0];
+    const pool = botPool(cand, rnd() < 0.05 + 0.9 * level, 0.85 * level);
+    return pool[Math.floor(rnd() * pool.length)];
+  }
+
+  // Ход бота в игре без интернета: после «раздумий», как у человека
+  function botTick() {
+    if (!vsBot || online || mode !== 'duel' || screen !== 'game') return;
+    if (D.roundOver || D.matchOver || D.cur !== 1 || botTimer) return;
+    const [lo, hi] = vsBot.bot.think;
+    botTimer = setTimeout(botMove, (lo + Math.random() * (hi - lo)) * 1000 * BOT_SPEED);
+  }
+
+  function stopBot() {
+    if (botTimer) { clearTimeout(botTimer); botTimer = null; }
+  }
+
+  function botMove() {
+    botTimer = null;
+    if (!vsBot || online || mode !== 'duel' || screen !== 'game') return;
+    if (D.roundOver || D.matchOver || D.cur !== 1) return;
+    if (localForced()) return doForcedTurn(true);
+    const moves = history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex, p: h.p, timeout: !!h.timeout }));
+    const flags = { fog: D.fog[1], blind: D.blind[1], shortMemory: D.shortMemory[1] };
+    const level = vsBot.bot.level;
+    // Жетон: когда осталось два числа, два хода подряд выигрывают наверняка
+    if (!D.armed && D.tokens[1] > 0 && history.length > 0) {
+      const left = botCandidates(moves, 1, flags, false).reduce((a, c) => a + c, 0);
+      if ((left === 2 && Math.random() < 0.2 + 0.8 * level) || (left === 3 && Math.random() < 0.5 * level)) {
+        D.tokens[1]--;
+        D.armed = true;
+      }
+    }
+    duelPlay(botPick(moves, 1, flags, level));
   }
 
   function escapeHtml(s) {
@@ -5281,11 +5514,13 @@
 
   function avatarOf(name) {
     if (name && name === myName()) return myAvatar();
+    if (botOf(name)) return botOf(name).icon;
     return (avatarCache[name] || {}).icon || '';
   }
 
   // Выбранный цвет, а если не выбран — тот, что считается из имени
   function colorOf(name) {
+    if (botOf(name)) return botOf(name).color;
     const chosen = (name && name === myName()) ? myColor() : (avatarCache[name] || {}).color;
     return chosen || avatarColor(name);
   }
@@ -7027,9 +7262,12 @@
       L.rkWaited.replace('{n}', st.waited),
       st.queue > 1 ? L.rkQueueMany.replace('{n}', st.queue) : L.rkQueueOne
     ].join(' · ');
-    // Когда ждёшь один, единственное полезное — давно ли тут вообще играли
+    // Когда ждёшь один, полезно знать две вещи: скоро ли бот и давно ли тут
+    // вообще играли люди
+    const botLine = !st.botWait ? ''
+      : (st.waited < st.botWait ? L.rkBotSoon.replace('{n}', st.botWait - st.waited) : L.rkBotNow);
     document.getElementById('rkWaitSub').textContent =
-      st.queue > 1 ? '' : rankedAgoText(st.lastAgo);
+      st.queue > 1 ? botLine : [botLine, rankedAgoText(st.lastAgo)].filter(Boolean).join(' · ');
   }
 
   async function loadRanked(quiet) {
@@ -7173,6 +7411,7 @@
     online.forfeitBy = (st.forfeitBy === null || st.forfeitBy === undefined) ? null : st.forfeitBy;
     online.eloDelta = st.eloDelta || null;
     online.elo = st.elo;
+    online.botSeat = (st.botSeat === null || st.botSeat === undefined) ? null : st.botSeat;
     mode = 'duel';
     RANGE_MIN = st.rangeMin;
     RANGE_MAX = st.rangeMax;
@@ -7259,6 +7498,8 @@
   }
 
   async function openMatch(id) {
+    stopBot();
+    vsBot = null;
     online = { id: id, seat: 0, status: 'active' };
     sayLastId = 0;
     sayShownUntil = 0;
@@ -7331,11 +7572,14 @@
   async function offerRematch() {
     if (!online || online.rematchSent) return;
     const other = D.names[1 - online.seat];
+    let newId;
     try {
-      await friendRpc('rematch', { p_match_id: online.id });
+      newId = await friendRpc('rematch', { p_match_id: online.id });
     } catch (e) {
       return setMatchNote(onlineMatchError(e.message));
     }
+    // Бот согласия не ждёт: новая партия уже идёт
+    if (online.botSeat !== null && newId) { stopMatchPoll(); return openMatch(newId); }
     online.rematchSent = other;
     setMatchNote('');
     renderAll();
@@ -7437,7 +7681,20 @@
   function renderSayBubble() {
     const box = document.getElementById('sayBubble');
     if (!box) return;
-    if (!online || Date.now() > sayShownUntil) box.classList.add('hidden');
+    if ((!online && !vsBot) || Date.now() > sayShownUntil) box.classList.add('hidden');
+  }
+
+  // Фраза бота в игре без интернета — тот же пузырь, что у соперника онлайн
+  function botSay(code) {
+    if (!code || !vsBot || online || screen !== 'game' || sayMuted) return;
+    const box = document.getElementById('sayBubble');
+    if (!box) return;
+    sayShownUntil = Date.now() + SAY_SHOW_MS;
+    box.innerHTML = '<span class="s-who" style="color:' + P_COLORS[1] + '">' +
+      escapeHtml(D.names[1]) + '</span>' + escapeHtml(t().say[code] || '');
+    box.style.borderColor = P_COLORS[1];
+    box.classList.remove('hidden');
+    setTimeout(renderSayBubble, SAY_SHOW_MS + 50);
   }
 
   // ================= ПАУЗА И СОХРАНЁННАЯ ИГРА =================
