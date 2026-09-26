@@ -1,0 +1,201 @@
+-- Переписка с другом текстом, фильтр грубых слов, новые фразы в игре.
+-- Применять в Supabase: SQL Editor → вставить целиком → Run.
+-- Применить ДО мёржа: новая игра шлёт фразы, которых старая база не знает.
+--
+-- Вне игры друзья пишут друг другу текстом до 200 символов; готовые фразы
+-- остаются (быстрые ответы и вся старая переписка). Грубые слова база
+-- заменяет на *** сама — в обход игры их тоже не отправить.
+
+-- 1. Фразы в игре. Новый набор дружелюбнее: без «Время идёт!» (подгоняет)
+-- и «Ледяной холод!» (звучит как насмешка над ходом). Старые коды база
+-- по-прежнему принимает: у кого открыта прежняя версия игры, не сломается
+create or replace function chat_codes()
+returns text[]
+language sql
+immutable
+as $$
+  select array['hi', 'luck', 'nice', 'wow', 'think', 'almost', 'again', 'gg',
+               'hot', 'cold', 'hurry'];
+$$;
+
+-- 2. Сообщение — либо готовая фраза (code), либо текст (body), ровно одно
+alter table friend_chat alter column code drop not null;
+alter table friend_chat add column if not exists body text;
+alter table friend_chat drop constraint if exists friend_chat_one_kind;
+alter table friend_chat add constraint friend_chat_one_kind
+  check ((code is null) <> (body is null));
+alter table friend_chat drop constraint if exists friend_chat_body_len;
+alter table friend_chat add constraint friend_chat_body_len
+  check (body is null or char_length(body) between 1 and 200);
+
+-- 3. Фильтр грубых слов: русский, английский, французский, немецкий.
+-- Регистр и «ё» приводятся вручную (translate), а не через lower(): lower()
+-- зависит от настроек базы и кириллицу может не понизить. Если грубое
+-- слово нашлось, всё слово целиком становится «***», а сообщение — в нижнем
+-- регистре (заглавные теряются только у таких сообщений). Обходы вроде
+-- «х у й» или латиницы вместо кириллицы фильтр не ловит — это фильтр,
+-- а не модерация
+create or replace function chat_clean(p text)
+returns text
+language plpgsql
+immutable
+set search_path = public, pg_temp
+as $$
+declare
+  norm text;
+  l constant text := '[a-zа-я0-9àâäçéèêëîïôöûùüÿœæß]';
+  b constant text := '(?<![a-zа-я0-9àâäçéèêëîïôöûùüÿœæß])';
+  e constant text := '(?![a-zа-я0-9àâäçéèêëîïôöûùüÿœæß])';
+  pat text;
+begin
+  if p is null then return null; end if;
+  norm := translate(p,
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯёÀÂÄÇÉÈÊËÎÏÔÖÛÙÜŸŒÆ',
+    'abcdefghijklmnopqrstuvwxyzабвгдеежзийклмнопрстуфхцчшщъыьэюяеàâäçéèêëîïôöûùüÿœæ');
+  pat :=
+    -- внутри любого слова
+    l || '*(?:пизд|fuck|shit|bitch|cunt|whore|slut|asshole|nigg|fagg|dickhead|bastard|merde|encul|connard|connasse|salope|arschloch|hurensohn|scheiss|scheiß|wichser)' || l || '*'
+    -- с начала слова, в том числе с приставкой
+    || '|' || b || '(?:за|по|вы|у|на|от|отъ|об|подъ|под|при|раз|разъ|съ|до|пере|недо|ни|о|вз)?(?:ху[йеяи]|еб' || l || ')' || l || '*'
+    || '|' || b || '(?:бля|муда|мудак|мудил|долбоеб|пидор|пидар|пидр|залуп|шлюх|гандон|гондон|дерьм|говн|жоп|сран|срат|ублюд|putain|pute|batard|bâtard|couill|niquer|arsch|hure|fotze|schlampe|missgeburt|kacke)' || l || '*'
+    -- только целым словом
+    || '|' || b || '(?:сук[аиуе]|сукой|сукин|нах|nique|con|conne|dick|cock|pussy|ass|fag|ntm|fdp|fick|ficken|fickt|fickst|ficker)' || e;
+  if norm ~ pat then
+    return regexp_replace(norm, pat, '***', 'g');
+  end if;
+  return p;
+end;
+$$;
+revoke execute on function chat_clean(text) from public;
+
+-- 4. Отправить текст другу
+create or replace function send_friend_text(p_username text, p_pin text,
+                                            p_to text, p_text text)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; other text; lo text; hi text; new_id bigint; recent int; msg text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  -- Переносы и служебные символы — в пробелы, пробелы подряд — в один
+  msg := regexp_replace(coalesce(p_text, ''), E'[\\x01-\\x1f\\x7f]', ' ', 'g');
+  msg := btrim(regexp_replace(msg, ' {2,}', ' ', 'g'));
+  if msg = '' then raise exception 'empty_text'; end if;
+  if char_length(msg) > 200 then raise exception 'too_long'; end if;
+
+  select s.username into other from students s where s.username_lower = lower(trim(p_to));
+  if other is null then raise exception 'no_such_student'; end if;
+  if friend_status(me, other) is distinct from 'friend' then raise exception 'not_a_friend'; end if;
+
+  lo := least(me, other); hi := greatest(me, other);
+
+  -- Лимит общий с готовыми фразами: десять сообщений в минуту
+  select count(*) into recent from friend_chat
+  where a = lo and b = hi and sender = me and created_at > now() - interval '1 minute';
+  if recent >= 10 then raise exception 'too_fast'; end if;
+
+  insert into friend_chat(a, b, sender, body) values (lo, hi, me, chat_clean(msg))
+  returning id into new_id;
+
+  delete from friend_chat
+  where a = lo and b = hi
+    and id <= coalesce((select id from friend_chat c
+                        where c.a = lo and c.b = hi
+                        order by c.id desc offset 50 limit 1), 0);
+
+  return new_id;
+end;
+$$;
+grant execute on function send_friend_text(text, text, text, text) to anon;
+
+-- 5. Лента отдаёт и текст
+create or replace function friend_thread(p_username text, p_pin text, p_to text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; mate text; lo text; hi text; rows jsonb; top bigint;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select s.username into mate from students s where s.username_lower = lower(trim(p_to));
+  if mate is null then raise exception 'no_such_student'; end if;
+  if friend_status(me, mate) is distinct from 'friend' then raise exception 'not_a_friend'; end if;
+
+  lo := least(me, mate); hi := greatest(me, mate);
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', c.id, 'mine', c.sender = me, 'code', c.code, 'text', c.body,
+           'ago', floor(extract(epoch from (now() - c.created_at)))::int) order by c.id), '[]'::jsonb),
+         max(c.id)
+    into rows, top
+  from friend_chat c where c.a = lo and c.b = hi;
+
+  insert into friend_chat_read(username, other, last_id) values (me, mate, coalesce(top, 0))
+  on conflict (username, other) do update set last_id = greatest(friend_chat_read.last_id, excluded.last_id);
+
+  return jsonb_build_object('other', mate, 'messages', rows);
+end;
+$$;
+
+-- 6. Смена имени переносит и текст сообщений (раньше переносились только коды)
+create or replace function rename_student(p_username text, p_pin text, p_new text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; nn text; last_rename timestamptz; riv rivalry[]; chat friend_chat[];
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  nn := trim(coalesce(p_new, ''));
+  perform check_new_username(nn);
+  if nn = me then return me; end if;
+
+  select renamed_at into last_rename from students where username = me;
+  if last_rename is not null and last_rename > now() - interval '24 hours' then
+    raise exception 'rename_too_soon:%',
+      greatest(1, ceil(extract(epoch from (last_rename + interval '24 hours' - now())) / 3600))::int;
+  end if;
+
+  if exists (select 1 from students where username_lower = lower(nn) and username <> me) then
+    raise exception 'name_taken';
+  end if;
+
+  select coalesce(array_agg(r), '{}') into riv from rivalry r where r.a = me or r.b = me;
+  delete from rivalry where a = me or b = me;
+  select coalesce(array_agg(c), '{}') into chat from friend_chat c where c.a = me or c.b = me;
+  delete from friend_chat where a = me or b = me;
+
+  update students set username = nn, renamed_at = now() where username = me;
+
+  update push_outbox set who = nn where who = me;
+  update runs set username = nn where username = me;
+
+  insert into rivalry(a, b, winner, streak, last_game)
+  select least(x.a2, x.b2), greatest(x.a2, x.b2),
+         case when r.winner = me then nn else r.winner end, r.streak, r.last_game
+  from unnest(riv) r,
+       lateral (select case when r.a = me then nn else r.a end as a2,
+                       case when r.b = me then nn else r.b end as b2) x;
+
+  perform set_config('hotcold.quiet_chat', 'on', true);
+  insert into friend_chat(id, a, b, sender, code, body, created_at) overriding system value
+  select c.id, least(x.a2, x.b2), greatest(x.a2, x.b2),
+         case when c.sender = me then nn else c.sender end, c.code, c.body, c.created_at
+  from unnest(chat) c,
+       lateral (select case when c.a = me then nn else c.a end as a2,
+                       case when c.b = me then nn else c.b end as b2) x;
+  perform set_config('hotcold.quiet_chat', 'off', true);
+
+  return nn;
+end;
+$$;

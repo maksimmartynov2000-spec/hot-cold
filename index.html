@@ -526,26 +526,44 @@
       background: rgba(255, 255, 255, 0.07);
       border: 1px solid rgba(255, 255, 255, 0.14);
     }
+    /* Время — мелко в той же строке: отдельной строкой оно удваивало пузырь */
     .chat-msg .cm-ago {
-      display: block;
+      float: right;
       font-size: 11px;
+      line-height: 1;
       opacity: 0.45;
-      margin-top: 2px;
+      margin: 7px 0 0 10px;
+      white-space: nowrap;
     }
+    .chat-head { display: flex; align-items: center; gap: 10px; }
+    .chat-msg { overflow-wrap: anywhere; }
+    .chat-compose { display: flex; gap: 8px; margin-top: 10px; }
+    .chat-compose input {
+      flex: 1; min-width: 0; padding: 11px 14px; border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08);
+      color: #fff; font-size: 15px; font-family: inherit;
+    }
+    .chat-compose .btn { flex: 0 0 auto; width: 46px; padding: 0; border-radius: 50%; font-size: 17px; }
+    .chat-left { font-size: 12px; color: rgba(255, 255, 255, 0.45); text-align: right; margin-top: 4px; }
+    /* Четыре быстрых ответа — ровной сеткой 2×2: в строку они не влезают
+       ни на одном языке, а «три и одна» смотрелось случайно */
     .chat-pad {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 6px;
     }
     .chat-pad button {
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.14);
       color: rgba(255, 255, 255, 0.85);
-      border-radius: 10px;
-      padding: 9px 6px;
+      border-radius: 999px;
+      padding: 7px 10px;
       font-size: 13px;
       font-family: inherit;
       cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .chat-pad button:disabled { opacity: 0.4; }
     .chat-modes-label {
@@ -1121,7 +1139,7 @@
 
     .result-box {
       border-radius: 14px;
-      padding: 18px 14px;
+      padding: 14px 14px 16px;
       margin-bottom: 16px;
       text-align: center;
       line-height: 1.4;
@@ -1129,8 +1147,9 @@
     .result-win { background: rgba(22, 163, 74, 0.16); border: 1px solid #16a34a; color: #86efac; }
     .result-lose { background: rgba(239, 68, 68, 0.16); border: 1px solid #ef4444; color: #fca5a5; }
     .result-round { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255,255,255,0.2); color: #fff; }
-    .result-box .r-icon { font-size: 32px; line-height: 1; margin-bottom: 6px; }
-    .result-box .r-title { font-size: 18px; font-weight: 800; }
+    /* Значок в строку с заголовком, а не отдельным этажом над ним */
+    .result-box .r-icon { font-size: 18px; line-height: 1; margin-right: 5px; vertical-align: -1px; }
+    .result-box .r-title { font-size: 17px; font-weight: 800; }
     /* Имена сверху, счёт отдельной строкой под ними: в одну строку
        «Лев 0 : 3 Кира» глаз не находит, где чей счёт */
     .result-box .r-score {
@@ -1138,7 +1157,7 @@
       grid-template-columns: 1fr auto 1fr;
       align-items: baseline;
       row-gap: 2px;
-      margin-top: 14px;
+      margin-top: 10px;
     }
     .result-box .rs-name {
       font-size: 13px; font-weight: 600; text-align: center;
@@ -1147,12 +1166,14 @@
     .result-box .rs-num { font-size: 30px; font-weight: 800; text-align: center; line-height: 1.1; }
     /* Двоеточие едет по потоку сетки во вторую строку: явный grid-row сбивал
        раскладку и уводил «1» в среднюю колонку */
+    /* Двоеточие того же кегля, что и цифры: по базовой линии мелкое «:»
+       садилось ниже середины счёта */
     .result-box .r-vs {
-      font-size: 18px; font-weight: 700;
-      color: rgba(255,255,255,0.35); padding: 0 12px;
+      font-size: 30px; font-weight: 700; line-height: 1.1;
+      color: rgba(255,255,255,0.3); padding: 0 12px;
     }
     .result-box .r-secret { margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.45); }
-    .result-box .r-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: center; flex-wrap: wrap; }
+    .result-box .r-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: center; flex-wrap: wrap; }
 
     .guess-section { margin-bottom: 16px; }
     .guess-section p { margin-bottom: 8px; font-size: 14px; color: rgba(255, 255, 255, 0.65); font-weight: 500; }
@@ -1795,10 +1816,18 @@
   <!-- ЭКРАН: переписка с одним другом. Текст готовыми фразами — по той же
        причине, что и в матче: читают на разных языках -->
   <div id="screenChat" class="hidden">
-    <div class="lb-title" id="chatWho"></div>
+    <div class="screen-title chat-head"><span class="avatar" id="chatFace"></span><span id="chatWho"></span></div>
     <div class="fr-note hidden" id="chatNote"></div>
     <div id="chatList" class="chat-list"></div>
+    <!-- Вне игры пишут текстом; четыре готовые фразы — для тех, кто печатает
+         медленно. Грубые слова база заменяет на *** сама -->
     <div id="chatPad" class="chat-pad"></div>
+    <div class="chat-compose">
+      <input type="text" id="chatText" maxlength="200" autocomplete="off" enterkeyhint="send"
+             oninput="renderChatLeft()" onkeydown="if (event.key === 'Enter') { event.preventDefault(); sendChatText(); }" />
+      <button class="btn" id="tChatSend" onclick="sendChatText()">➤</button>
+    </div>
+    <div class="chat-left hidden" id="chatLeft"></div>
 
     <div class="fr-block">
       <div class="lb-title" id="tChatInvite"></div>
@@ -1973,7 +2002,8 @@
         hot: "\ud83d\udd25 Getting warm\u2026",
         cold: "\ud83e\uddca Ice cold!",
         nice: "\ud83c\udfaf Nice guess!",
-        wow: "\ud83d\ude2e How did you do that?",
+        wow: "\ud83d\ude2e Wow!",
+        luck: "\ud83c\udf40 Good luck!", almost: "\ud83d\ude05 So close!", again: "\ud83d\udd01 One more round?",
         think: "\ud83e\udd14 Let me think\u2026",
         hurry: "\u23f1\ufe0f Clock is running!",
         gg: "\ud83e\udd1d Good game!",
@@ -2016,8 +2046,9 @@
         nobodyYet: "Nobody else has played yet",
         errNotPlaying: "The game is not running",
         errNoRequest: "The request is gone",
-        talkWith: "Talk to {name}",
         chatEmpty: "Nothing written yet",
+        chatPh: "Message\u2026", chatSendLabel: "Send", chatLeft: "{n} characters left",
+        errTooLong: "Too long \u2014 up to 200 characters", errTextOff: "Text messages will work after the server update",
         chatInvite: "Invite to play",
         chatFriendly: "A friendly game",
         chatRanked: "Or straight to ranked:",
@@ -2183,7 +2214,8 @@
         hot: "\ud83d\udd25 Уже теплее\u2026",
         cold: "\ud83e\uddca Ледяной холод!",
         nice: "\ud83c\udfaf Хороший ход!",
-        wow: "\ud83d\ude2e Как ты это сделал?",
+        wow: "\ud83d\ude2e Ого!",
+        luck: "\ud83c\udf40 Удачи!", almost: "\ud83d\ude05 Почти!", again: "\ud83d\udd01 Ещё раунд?",
         think: "\ud83e\udd14 Дай подумать\u2026",
         hurry: "\u23f1\ufe0f Время идёт!",
         gg: "\ud83e\udd1d Хорошая игра!",
@@ -2226,8 +2258,9 @@
         nobodyYet: "Пока больше никто не играл",
         errNotPlaying: "Игра не идёт",
         errNoRequest: "Заявки больше нет",
-        talkWith: "Переписка: {name}",
         chatEmpty: "Пока ничего не написано",
+        chatPh: "Сообщение\u2026", chatSendLabel: "Отправить", chatLeft: "Осталось символов: {n}",
+        errTooLong: "Слишком длинное \u2014 до 200 символов", errTextOff: "Сообщения текстом заработают после обновления сервера",
         chatInvite: "Позвать играть",
         chatFriendly: "Дружеская игра",
         chatRanked: "Или сразу на рейтинг:",
@@ -2393,7 +2426,8 @@
         hot: "\ud83d\udd25 \u00c7a chauffe\u2026",
         cold: "\ud83e\uddca Glacial !",
         nice: "\ud83c\udfaf Beau coup !",
-        wow: "\ud83d\ude2e Comment as-tu fait ?",
+        wow: "\ud83d\ude2e Waouh !",
+        luck: "\ud83c\udf40 Bonne chance !", almost: "\ud83d\ude05 Presque !", again: "\ud83d\udd01 Encore une manche ?",
         think: "\ud83e\udd14 Je r\u00e9fl\u00e9chis\u2026",
         hurry: "\u23f1\ufe0f Le temps passe !",
         gg: "\ud83e\udd1d Belle partie !",
@@ -2436,8 +2470,9 @@
         nobodyYet: "Personne d\u2019autre n\u2019a encore jou\u00e9",
         errNotPlaying: "La partie n\u2019est pas en cours",
         errNoRequest: "La demande n'existe plus",
-        talkWith: "Discussion avec {name}",
         chatEmpty: "Rien d\u2019\u00e9crit pour l\u2019instant",
+        chatPh: "Message\u2026", chatSendLabel: "Envoyer", chatLeft: "Caract\u00e8res restants : {n}",
+        errTooLong: "Trop long \u2014 200 caract\u00e8res maximum", errTextOff: "Les messages texte fonctionneront apr\u00e8s la mise \u00e0 jour du serveur",
         chatInvite: "Inviter \u00e0 jouer",
         chatFriendly: "Une partie amicale",
         chatRanked: "Ou directement en class\u00e9 :",
@@ -2603,7 +2638,8 @@
         hot: "\ud83d\udd25 Es wird w\u00e4rmer\u2026",
         cold: "\ud83e\uddca Eiskalt!",
         nice: "\ud83c\udfaf Guter Zug!",
-        wow: "\ud83d\ude2e Wie hast du das gemacht?",
+        wow: "\ud83d\ude2e Wow!",
+        luck: "\ud83c\udf40 Viel Gl\u00fcck!", almost: "\ud83d\ude05 Knapp!", again: "\ud83d\udd01 Noch eine Runde?",
         think: "\ud83e\udd14 Lass mich denken\u2026",
         hurry: "\u23f1\ufe0f Die Zeit l\u00e4uft!",
         gg: "\ud83e\udd1d Gutes Spiel!",
@@ -2646,8 +2682,9 @@
         nobodyYet: "Sonst hat noch niemand gespielt",
         errNotPlaying: "Die Partie l\u00e4uft nicht",
         errNoRequest: "Die Anfrage gibt es nicht mehr",
-        talkWith: "Gespr\u00e4ch mit {name}",
         chatEmpty: "Noch nichts geschrieben",
+        chatPh: "Nachricht\u2026", chatSendLabel: "Senden", chatLeft: "Noch {n} Zeichen",
+        errTooLong: "Zu lang \u2014 h\u00f6chstens 200 Zeichen", errTextOff: "Textnachrichten gehen nach dem Server-Update",
         chatInvite: "Zum Spielen einladen",
         chatFriendly: "Ein Freundschaftsspiel",
         chatRanked: "Oder gleich um Punkte:",
@@ -3277,6 +3314,9 @@
     document.getElementById('tFriendsScreen').textContent = L.online.menuFriends;
     document.getElementById('tDeleteAccount').textContent = L.online.deleteAccount;
     document.getElementById('tChatInvite').textContent = L.online.chatInvite;
+    document.getElementById('chatText').placeholder = L.online.chatPh;
+    document.getElementById('tChatSend').title = L.online.chatSendLabel;
+    document.getElementById('tChatSend').setAttribute('aria-label', L.online.chatSendLabel);
     document.getElementById('tChatFriendly').textContent = L.online.chatFriendly;
     document.getElementById('tChatRanked').textContent = L.online.chatRanked;
     document.getElementById('tChatBack').textContent = L.online.chatBack;
@@ -3932,8 +3972,12 @@
 
   function renderThermo() {
     const wrap = document.getElementById('thermoWrap');
-    wrap.classList.toggle('hidden', !showThermo);
-    if (!showThermo) return;
+    // На итогах градусник только повторяет карточку («в точку!»), а ответ и
+    // так отмечен на прямой — убираем его, чтобы итог и история попыток
+    // поместились на экран
+    const hide = !showThermo || (mode !== 'run' && roundOver());
+    wrap.classList.toggle('hidden', hide);
+    if (hide) return;
 
     const fill = document.getElementById('thermoFill');
     const bulb = document.getElementById('thermoBulb');
@@ -4221,14 +4265,14 @@
       const w = D.roundWinner;
       box.className = 'result-box ' + (D.matchOver ? 'result-win' : 'result-round');
 
-      const icon = document.createElement('div');
-      icon.className = 'r-icon';
-      icon.textContent = D.matchOver ? '🏆' : '🎯';
-
       const title = document.createElement('div');
       title.className = 'r-title';
       title.style.color = D.matchOver ? P_COLORS[w] : '#fff';
-      title.textContent = D.names[w] + (D.matchOver ? L.matchWin : L.roundWin);
+      const icon = document.createElement('span');
+      icon.className = 'r-icon';
+      icon.textContent = D.matchOver ? '🏆' : '🎯';
+      title.appendChild(icon);
+      title.appendChild(document.createTextNode(D.names[w] + (D.matchOver ? L.matchWin : L.roundWin)));
 
       // Сетка из трёх колонок: имя стоит ровно над своим счётом
       const score = document.createElement('div');
@@ -4291,7 +4335,7 @@
         sentLine.textContent = L.online.rematchSent.replace('{name}', online.rematchSent);
       }
 
-      box.appendChild(icon); box.appendChild(title);
+      box.appendChild(title);
       if (forfeitLine) box.appendChild(forfeitLine);
       box.appendChild(score);
       box.appendChild(secretLine);
@@ -5812,12 +5856,9 @@
   // и следующий раунд уходят на сервер, а не считаются здесь
   const MATCH_POLL_MS = 2000;
   // ================= ПЕРЕПИСКА С ДРУГОМ =================
-  // Свободного текста здесь нет по той же причине, что и в матче: играют дети
-  // из разных стран, и код фразы переводится у читающего, а не у пишущего
-  const TALK_CODES = ['hi', 'howru', 'play', 'playranked',
-                      'later', 'hour', 'tomorrow', 'cantnow',
-                      'ready', 'yes', 'no', 'thanks',
-                      'gg', 'strong', 'revenge', 'bye'];
+  // Вне игры друзья пишут текстом. Готовые фразы остались кодами: код
+  // переводится у читающего, поэтому «Привет!» дойдёт до француза по-французски.
+  // Во время матча — только готовые фразы (SAY_CODES): там не до переписки
   const CHAT_POLL_MS = 5000;
   let chatWith = null;
   let chatTimer = null;
@@ -5840,9 +5881,13 @@
     chatWith = name;
     chatLastId = 0;
     const L = t().online;
-    document.getElementById('chatWho').textContent =
-      L.talkWith.replace('{name}', playerName(name));
+    // Заголовок — сам друг: кружок и имя, как в списке друзей
+    document.getElementById('chatWho').textContent = playerName(name);
+    paintAvatar(document.getElementById('chatFace'), name);
+    fetchAvatars([name]);
     document.getElementById('chatList').innerHTML = '';
+    document.getElementById('chatText').value = '';
+    renderChatLeft();
     setNote('chatNote', '');
     renderChatPad();
     renderChatModes();
@@ -5852,11 +5897,17 @@
     loadChat();
   }
 
+  // Из шестнадцати старых фраз под рукой четыре: остальное пишут текстом.
+  // Переводы всех шестнадцати остаются — ими показана прежняя переписка
+  const QUICK_TALK = ['hi', 'play', 'later', 'bye'];
+  const CHAT_MAX = 200;
+  const CHAT_WARN = 170;
+
   function renderChatPad() {
     const pad = document.getElementById('chatPad');
     const L = t().online.talk;
     pad.innerHTML = '';
-    TALK_CODES.forEach(code => {
+    QUICK_TALK.forEach(code => {
       const b = document.createElement('button');
       b.dataset.code = code;
       b.textContent = L[code];
@@ -5897,8 +5948,13 @@
     messages.forEach(m => {
       const el = document.createElement('div');
       el.className = 'chat-msg ' + (m.mine ? 'mine' : 'theirs');
-      el.dataset.code = m.code;
-      el.textContent = L.talk[m.code] || m.code;
+      // Текст показываем как есть — через textContent, разметкой он не станет
+      if (m.text !== null && m.text !== undefined) {
+        el.textContent = m.text;
+      } else {
+        el.dataset.code = m.code;
+        el.textContent = L.talk[m.code] || m.code;
+      }
       const ago = document.createElement('span');
       ago.className = 'cm-ago';
       ago.textContent = agoShort(m.ago);
@@ -5949,6 +6005,45 @@
       chatBusy = false;
       renderChatPad();
     }
+  }
+
+  function renderChatLeft() {
+    const n = (document.getElementById('chatText').value || '').length;
+    const left = CHAT_MAX - n;
+    const el = document.getElementById('chatLeft');
+    el.classList.toggle('hidden', n < CHAT_WARN);
+    el.textContent = t().online.chatLeft.replace('{n}', left);
+  }
+
+  async function sendChatText() {
+    const input = document.getElementById('chatText');
+    const text = (input.value || '').trim();
+    if (!text || chatBusy || !chatWith) return;
+    chatBusy = true;
+    renderChatPad();
+    document.getElementById('tChatSend').disabled = true;
+    try {
+      await friendRpc('send_friend_text', { p_to: chatWith, p_text: text });
+      input.value = '';
+      renderChatLeft();
+      setNote('chatNote', '');
+      await loadChat(true);
+    } catch (e) {
+      setNote('chatNote', chatTextError(e.message), true);
+    } finally {
+      chatBusy = false;
+      renderChatPad();
+      document.getElementById('tChatSend').disabled = false;
+    }
+  }
+
+  function chatTextError(message) {
+    const L = t().online;
+    const m = String(message || '');
+    if (m.indexOf('too_long') >= 0) return L.errTooLong;
+    // Сервер ещё без миграции: функции нет вовсе
+    if (m.indexOf('send_friend_text') >= 0 || m.indexOf('PGRST202') >= 0) return L.errTextOff;
+    return onlineMatchError(m);
   }
 
   // Дружеская игра настраивается, поэтому уводим в то же окно вызова
@@ -6563,7 +6658,9 @@
   // Свободного текста нет намеренно: играют дети из разных стран, которых никто
   // не сводил лично. Восемь фраз переводятся на все языки сами, так что ответ
   // приходит на языке читающего, а не пишущего
-  const SAY_CODES = ['hi', 'hot', 'cold', 'nice', 'wow', 'think', 'hurry', 'gg'];
+  // Набор дружелюбный: без «Время идёт!» (подгоняет) и «Ледяной холод!»
+  // (звучит как насмешка над ходом). Их переводы остались — для старых реплик
+  const SAY_CODES = ['hi', 'luck', 'nice', 'wow', 'think', 'almost', 'again', 'gg'];
   const SAY_SHOW_MS = 6000;
   let sayMuted = localStorage.getItem('hc_mute') === '1';
   let sayPadOpen = false;

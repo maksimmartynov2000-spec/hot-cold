@@ -140,7 +140,7 @@ function stubSupabase(opts) {
           }
           if (name === 'send_phrase') {
             const M = window.__match;
-            if (['hi','hot','cold','nice','wow','think','hurry','gg'].indexOf(args.p_code) < 0) {
+            if (['hi','luck','nice','wow','think','almost','again','gg','hot','cold','hurry'].indexOf(args.p_code) < 0) {
               return { data: null, error: { message: 'bad_phrase' } };
             }
             M.chat = M.chat || [];
@@ -193,6 +193,12 @@ function stubSupabase(opts) {
             if (window.__talkError) return { data: null, error: { message: window.__talkError } };
             const T = window.__talk[args.p_to] || (window.__talk[args.p_to] = []);
             T.push({ id: T.length + 1, mine: true, code: args.p_code, ago: 0 });
+            return { data: T.length, error: null };
+          }
+          if (name === 'send_friend_text') {
+            if (window.__talkError) return { data: null, error: { message: window.__talkError } };
+            const T = window.__talk[args.p_to] || (window.__talk[args.p_to] = []);
+            T.push({ id: T.length + 1, mine: true, code: null, text: String(args.p_text).trim(), ago: 0 });
             return { data: T.length, error: null };
           }
           if (name === 'challenge_friend_ranked') {
