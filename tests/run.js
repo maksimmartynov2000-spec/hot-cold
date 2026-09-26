@@ -4176,6 +4176,11 @@ async function testReview(browser) {
           const r = hb > 0 ? H(moves[k].guess) / hb : 0;
           if (Math.abs(H(m.best) - hb) > 1e-9) bad.push('лучший ход не лучший ' + JSON.stringify(m));
           if (m.ratio !== undefined && Math.abs(m.ratio - r) > 1e-9) bad.push('доля ' + m.ratio + ' / ' + r);
+          // 100% — только у лучшего: округлённое «Отлично 100%» сбивало бы с толку
+          const top = ['best', 'brilliant', 'hit'].includes(m.grade);
+          if (top ? m.score !== 100 : !(m.score <= 99 && m.score === Math.min(99, Math.round(r * 100)))) {
+            bad.push('процент ' + m.score + ' у «' + m.grade + '»');
+          }
           if (!cand.includes(secretN)) bad.push('загаданное выпало из возможных');
           cand = cand.filter(x => bandOf(Math.abs(moves[k].guess - x), bands) === moves[k].labelIndex);
         });
@@ -4185,6 +4190,8 @@ async function testReview(browser) {
     return bad.slice(0, 5);
   });
   check('движок совпадает с лобовым пересчётом в 90 случайных партиях', cross.length === 0, cross.join('; '));
+  check('почти лучший ход — 99%, а не 100%', await page.evaluate(() =>
+    movePct(0.996) === 99 && movePct(0.5) === 50 && movePct(0) === 0));
 
   // Партия из одних лучших ходов — точность 100%
   const perfect = await page.evaluate(() => {
@@ -4238,20 +4245,55 @@ async function testReview(browser) {
     shown: !document.getElementById('reviewModal').classList.contains('hidden'),
     acc: document.getElementById('rvAcc').textContent,
     rows: [...document.querySelectorAll('#rvList .rv-row')].map(r => ({
-      g: r.querySelector('.rv-guess').textContent, name: r.querySelector('.rv-name').textContent,
-      better: (r.querySelector('.rv-better') || {}).textContent || '' })),
+      g: r.querySelector('.rv-guess').textContent, name: r.querySelector('.g-name').textContent,
+      pct: (r.querySelector('.g-pct') || {}).textContent || '', text: r.textContent })),
     chips: [...document.querySelectorAll('#rvSum .rv-chip')].map(c => c.textContent.trim()) }));
   check('разбор открывается: точность, сводка и все ходы', modal.shown && /^\d+%$/.test(modal.acc) &&
     modal.rows.length === 6 && modal.chips.length > 0, JSON.stringify(modal));
-  check('у неточного хода подсказан лучший, у лучшего — нет',
-    modal.rows[0].better === 'лучше 21' && modal.rows[5].better === '' && modal.rows[5].name === 'В точку!',
-    JSON.stringify(modal.rows));
+  check('рядом с оценкой — процент хода, у «в точку» процента нет',
+    modal.rows.every((r, i) => i === 5 ? r.pct === '' : r.pct === res.rv.moves[i].score + '%') &&
+    modal.rows[5].name === 'В точку!', JSON.stringify(modal.rows));
+  check('лучший ход в разборе не подсказывается', !modal.rows.some(r => /лучше|21/.test(r.text)),
+    JSON.stringify(modal.rows.map(r => r.text)));
   await page.click('#tReviewClose');
   check('разбор закрывается', !(await page.locator('#reviewModal').isVisible()));
   await page.click('#resultBox .btn');
   await page.waitForTimeout(250);
   check('в новой партии значков и кнопки разбора нет', await page.evaluate(() =>
     !document.getElementById('reviewBtn') && !document.querySelector('#historyList .gr-badge')));
+  await done(page);
+
+  // Во время тренировки оценка видна сразу после хода — и та же, что потом в разборе
+  page = await soloGame(browser, 100, 37, [50]);
+  const live1 = await page.evaluate(() => {
+    const g = document.querySelector('#historyList .h-grade');
+    return g && { grade: g.dataset.grade, name: g.querySelector('.g-name').textContent,
+                  pct: g.querySelector('.g-pct').textContent, row: g.closest('.history-item').textContent };
+  });
+  check('в тренировке оценка и процент — сразу после хода',
+    !!live1 && live1.grade === 'good' && live1.name === 'Хорошо' && /^\d+%$/.test(live1.pct), JSON.stringify(live1));
+  check('во время игры лучший ход не подсказывается', !!live1 && !/21|лучше/.test(live1.row), live1 && live1.row);
+  check('кнопки разбора до конца партии нет', await page.evaluate(() => !document.getElementById('reviewBtn')));
+  for (const g of [90, 30]) { await page.fill('#guessInput', String(g)); await page.click('#tSubmitGuess'); await page.waitForTimeout(80); }
+  const live3 = await page.evaluate(() =>
+    [...document.querySelectorAll('#historyList .h-grade')].reverse().map(g => g.dataset.grade + ' ' + g.querySelector('.g-pct').textContent));
+  for (const g of [40, 36, 37]) { await page.fill('#guessInput', String(g)); await page.click('#tSubmitGuess'); await page.waitForTimeout(80); }
+  await page.waitForTimeout(200);
+  const after = await page.evaluate(() => currentReview().moves.slice(0, 3).map(m => m.grade + ' ' + m.score + '%'));
+  check('оценки по ходу игры совпадают с разбором после', live3.join() === after.join(), live3.join() + ' / ' + after.join());
+  await done(page);
+
+  // В забеге оценок по ходу нет: там очки и рекорды
+  page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeRun');
+  await page.waitForTimeout(300);
+  await page.click('#tRunStart');
+  await page.waitForTimeout(250);
+  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret > RANGE_MIN + 30 ? RANGE_MIN : RANGE_MAX)));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(200);
+  check('в забеге оценок по ходу нет', await page.evaluate(() =>
+    history.length === 1 && !document.querySelector('#historyList .h-grade')));
   await done(page);
 
   // Последняя догадка после исчерпанных попыток — тоже ход в разборе
@@ -4295,11 +4337,146 @@ async function testReview(browser) {
   await page.fill('#guessInput', String(s2));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(300);
-  check('в игре с другом разбора пока нет', await page.evaluate(() =>
-    !document.getElementById('reviewBtn') && !document.querySelector('#historyList .gr-badge')));
+  // Раунд выигран первым же ходом: разбор есть, в нём один ход «в точку»
+  check('в игре с другом после раунда — разбор', await page.evaluate(() =>
+    !!document.getElementById('reviewBtn') && currentReview().moves.map(m => m.grade).join() === 'hit'));
   await done(page);
 }
 const GRADES_OK = ['brilliant', 'best', 'excellent', 'good', 'inaccuracy', 'mistake', 'blunder', 'hit'];
+
+async function testDuelReview(browser) {
+  console.log('\nРазбор раунда в игре с другом');
+  let page = await newGame(browser);
+  // Точная часть движка сверяется с перебором ВСЕХ ходов подряд (без поиска
+  // по границам поясов) на маленьком диапазоне
+  const exact = await page.evaluate(() => {
+    const min = 1, max = 30, meta = buildFeedbackMeta(20), bands = reviewBands(meta);
+    const naiveMemo = new Map();
+    const naiveW = S => {
+      const key = S.join(',');
+      if (naiveMemo.has(key)) return naiveMemo.get(key);
+      let best = 0;
+      for (let g = min; g <= max; g++) {
+        const sp = splitOf(S, g, bands);
+        if (sp.parts.length === 1 && !sp.parts[0].hit) continue;
+        let v = 0;
+        sp.parts.forEach(pt => { v += pt.hit ? pt.set.length / S.length : pt.set.length / S.length * (1 - naiveW(pt.set)); });
+        best = Math.max(best, v);
+      }
+      naiveMemo.set(key, best);
+      return best;
+    };
+    const bad = [];
+    const memo = new Map();
+    for (let t = 0; t < 60; t++) {
+      const n = 1 + (t % 7);
+      const S = [...new Set(Array.from({ length: n }, () => min + Math.floor(Math.random() * (max - min + 1))))].sort((a, b) => a - b);
+      const a = duelWin(S, min, max, bands, memo), b = naiveW(S);
+      if (Math.abs(a - b) > 1e-9) bad.push(S.join(',') + ': ' + a + ' / ' + b);
+    }
+    return { bad: bad.slice(0, 3), one: duelWin([7], min, max, bands, memo), two: duelWin([7, 8], min, max, bands, memo) };
+  });
+  check('точная часть совпадает с перебором всех ходов', exact.bad.length === 0, exact.bad.join('; '));
+  check('одно число — ходящий выигрывает, два — пополам', exact.one === 1 && exact.two === 0.5, JSON.stringify(exact));
+
+  // Жетон: если следующий ход снова мой, подсказка достаётся мне, а не сопернику
+  const token = await page.evaluate(() => {
+    const meta = buildFeedbackMeta(100), bands = reviewBands(meta), memo = new Map();
+    const S = [36, 37, 38];
+    const sp = splitOf(S, 1, bands); // далёкий ход: все три в одном поясе — пас
+    const info = splitOf(S, 40, bands);
+    return { alt: duelMoveValue(info, 3, false, 1, 100, bands, memo), same: duelMoveValue(info, 3, true, 1, 100, bands, memo),
+             pass: sp.parts.length };
+  });
+  check('ход перед своим же ходом ценнее, чем перед ходом соперника', token.same > token.alt, JSON.stringify(token));
+
+  // Эндшпиль дуэли: самый информативный ход бывает проигрышным — он дарит
+  // подсказку сопернику. Ищем такую позицию и проверяем, что дуэльный разбор
+  // его «лучшим» не называет (а разбор тренировки — называет)
+  const endgame = await page.evaluate(() => {
+    const min = 1, max = 100, meta = buildFeedbackMeta(100), bands = reviewBands(meta);
+    for (let secretN = 20; secretN <= 80; secretN++) {
+      for (const first of [50, 30, 70, 40, 60]) {
+        const cand = new Uint8Array(100).fill(1);
+        narrow(cand, min, bands, first, bandOf(Math.abs(first - secretN), bands));
+        const S = []; cand.forEach((c, i) => { if (c) S.push(i + 1); });
+        if (S.length < 3 || S.length > DUEL_EXACT) continue;
+        const scan = infoScan(cand, min, max, bands);
+        const gE = scan.pickBest(1);
+        if (gE === secretN) continue;
+        const moves = [first, gE].map((g, i) => ({ guess: g, labelIndex: bandOf(Math.abs(g - secretN), bands), p: i % 2 }));
+        moves.push({ guess: secretN, labelIndex: 8, p: 0 });
+        const duel = analyseDuel(moves, min, max, meta).moves[1];
+        const solo = analyseGame(moves.slice(0, 2), min, max, meta, null).moves[1];
+        if (duel.grade !== 'best' && duel.grade !== 'brilliant') {
+          return { found: true, secretN, first, gE, duel: duel.grade, solo: solo.grade, S: S.join(',') };
+        }
+      }
+    }
+    return { found: false };
+  });
+  check('в эндшпиле дуэли самый информативный ход бывает не лучшим — дуэль считает шанс угадать первым',
+    endgame.found && ['best', 'brilliant'].includes(endgame.solo), JSON.stringify(endgame));
+
+  // Вынужденные и «вслепую» ходы не оцениваются и в точность не идут
+  const skip = await page.evaluate(() => {
+    const meta = buildFeedbackMeta(100), bands = reviewBands(meta), secretN = 42;
+    const mk = (g, p, extra) => Object.assign({ guess: g, labelIndex: bandOf(Math.abs(g - secretN), bands), p }, extra || {});
+    const rv = analyseDuel([mk(50, 0), mk(10, 1, { forced: true }), mk(40, 0, { limited: true }), mk(42, 1)], 1, 100, meta);
+    return { grades: rv.moves.map(m => m.grade), acc: rv.accuracy };
+  });
+  check('бросок в лаву и ход вслепую — без оценки', skip.grades.join() === skip.grades[0] + ',forced,limited,hit',
+    skip.grades.join());
+  check('и в точность не идут', skip.acc[1] === 100 && typeof skip.acc[0] === 'number', JSON.stringify(skip.acc));
+
+  const speed = await page.evaluate(() => {
+    const meta = buildFeedbackMeta(2000), bands = reviewBands(meta), secretN = 777;
+    const moves = [0, 900, 700, 800, 780, 760, 775, 778, 776, 777].map((g, i) => ({ guess: g, labelIndex: bandOf(Math.abs(g - secretN), bands), p: i % 2 }));
+    const t0 = performance.now();
+    analyseDuel(moves, -1000, 1000, meta);
+    return performance.now() - t0;
+  });
+  check('разбор раунда на большом диапазоне быстрый', speed < 600, Math.round(speed) + ' мс');
+  await done(page);
+
+  // Настоящий раунд
+  page = await newGame(browser);
+  await page.click('#tModeDuel');
+  await page.fill('#nameP1', 'Маша');
+  await page.fill('#nameP2', 'Петя');
+  await page.selectOption('#rangeMax', '100');
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { secret = 37; renderAll(); });
+  await page.fill('#guessInput', '50');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(100);
+  check('пока раунд идёт, разбора и значков нет', await page.evaluate(() =>
+    !currentReview() && !document.querySelector('#historyList .gr-badge')));
+  for (const g of [20, 30, 45, 36, 38, 37]) {
+    await page.fill('#guessInput', String(g));
+    await page.click('#tSubmitGuess');
+    await page.waitForTimeout(100);
+  }
+  await page.waitForTimeout(250);
+  const btn = await page.evaluate(() => (document.getElementById('reviewBtn') || {}).textContent || '');
+  check('в итоге раунда — точность обоих и «Разбор»', /Маша \d+% · Петя \d+% · Разбор/.test(btn), btn);
+  check('у ходов в истории значки', await page.evaluate(() => document.querySelectorAll('#historyList .gr-badge').length > 0));
+  await page.click('#reviewBtn');
+  await page.waitForTimeout(200);
+  const m = await page.evaluate(() => ({
+    title: document.getElementById('tReviewTitle').textContent,
+    players: [...document.querySelectorAll('#rvAcc .rv-acc-player')].map(e => e.textContent),
+    rows: [...document.querySelectorAll('#rvList .rv-row')].map(r => r.dataset.p) }));
+  check('разбор раунда: у каждого своя точность', m.title === 'Разбор раунда' && m.players.length === 2 &&
+    /^Маша\d+%$/.test(m.players[0]) && /^Петя\d+%$/.test(m.players[1]), JSON.stringify(m));
+  check('ходы подписаны игроками по очереди', m.rows.join() === '0,1,0,1,0,1,0', m.rows.join());
+  await page.click('#tReviewClose');
+  await page.click('#resultBox .btn');
+  await page.waitForTimeout(250);
+  check('в новом раунде разбора нет', await page.evaluate(() => !currentReview() && !document.getElementById('reviewBtn')));
+  await done(page);
+}
 
 // ------------------------------------------ профиль: иконка, имя, PIN
 async function testProfile(browser) {
@@ -4703,6 +4880,7 @@ async function testKeyPage(browser) {
     await testFriendsBoard(browser);
     await testAvatarColor(browser);
     await testReview(browser);
+    await testDuelReview(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
