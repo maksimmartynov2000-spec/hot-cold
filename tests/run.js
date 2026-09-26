@@ -4176,6 +4176,11 @@ async function testReview(browser) {
           const r = hb > 0 ? H(moves[k].guess) / hb : 0;
           if (Math.abs(H(m.best) - hb) > 1e-9) bad.push('лучший ход не лучший ' + JSON.stringify(m));
           if (m.ratio !== undefined && Math.abs(m.ratio - r) > 1e-9) bad.push('доля ' + m.ratio + ' / ' + r);
+          // 100% — только у лучшего: округлённое «Отлично 100%» сбивало бы с толку
+          const top = ['best', 'brilliant', 'hit'].includes(m.grade);
+          if (top ? m.score !== 100 : !(m.score <= 99 && m.score === Math.min(99, Math.round(r * 100)))) {
+            bad.push('процент ' + m.score + ' у «' + m.grade + '»');
+          }
           if (!cand.includes(secretN)) bad.push('загаданное выпало из возможных');
           cand = cand.filter(x => bandOf(Math.abs(moves[k].guess - x), bands) === moves[k].labelIndex);
         });
@@ -4185,6 +4190,8 @@ async function testReview(browser) {
     return bad.slice(0, 5);
   });
   check('движок совпадает с лобовым пересчётом в 90 случайных партиях', cross.length === 0, cross.join('; '));
+  check('почти лучший ход — 99%, а не 100%', await page.evaluate(() =>
+    movePct(0.996) === 99 && movePct(0.5) === 50 && movePct(0) === 0));
 
   // Партия из одних лучших ходов — точность 100%
   const perfect = await page.evaluate(() => {
@@ -4238,20 +4245,55 @@ async function testReview(browser) {
     shown: !document.getElementById('reviewModal').classList.contains('hidden'),
     acc: document.getElementById('rvAcc').textContent,
     rows: [...document.querySelectorAll('#rvList .rv-row')].map(r => ({
-      g: r.querySelector('.rv-guess').textContent, name: r.querySelector('.rv-name').textContent,
-      better: (r.querySelector('.rv-better') || {}).textContent || '' })),
+      g: r.querySelector('.rv-guess').textContent, name: r.querySelector('.g-name').textContent,
+      pct: (r.querySelector('.g-pct') || {}).textContent || '', text: r.textContent })),
     chips: [...document.querySelectorAll('#rvSum .rv-chip')].map(c => c.textContent.trim()) }));
   check('разбор открывается: точность, сводка и все ходы', modal.shown && /^\d+%$/.test(modal.acc) &&
     modal.rows.length === 6 && modal.chips.length > 0, JSON.stringify(modal));
-  check('у неточного хода подсказан лучший, у лучшего — нет',
-    modal.rows[0].better === 'лучше 21' && modal.rows[5].better === '' && modal.rows[5].name === 'В точку!',
-    JSON.stringify(modal.rows));
+  check('рядом с оценкой — процент хода, у «в точку» процента нет',
+    modal.rows.every((r, i) => i === 5 ? r.pct === '' : r.pct === res.rv.moves[i].score + '%') &&
+    modal.rows[5].name === 'В точку!', JSON.stringify(modal.rows));
+  check('лучший ход в разборе не подсказывается', !modal.rows.some(r => /лучше|21/.test(r.text)),
+    JSON.stringify(modal.rows.map(r => r.text)));
   await page.click('#tReviewClose');
   check('разбор закрывается', !(await page.locator('#reviewModal').isVisible()));
   await page.click('#resultBox .btn');
   await page.waitForTimeout(250);
   check('в новой партии значков и кнопки разбора нет', await page.evaluate(() =>
     !document.getElementById('reviewBtn') && !document.querySelector('#historyList .gr-badge')));
+  await done(page);
+
+  // Во время тренировки оценка видна сразу после хода — и та же, что потом в разборе
+  page = await soloGame(browser, 100, 37, [50]);
+  const live1 = await page.evaluate(() => {
+    const g = document.querySelector('#historyList .h-grade');
+    return g && { grade: g.dataset.grade, name: g.querySelector('.g-name').textContent,
+                  pct: g.querySelector('.g-pct').textContent, row: g.closest('.history-item').textContent };
+  });
+  check('в тренировке оценка и процент — сразу после хода',
+    !!live1 && live1.grade === 'good' && live1.name === 'Хорошо' && /^\d+%$/.test(live1.pct), JSON.stringify(live1));
+  check('во время игры лучший ход не подсказывается', !!live1 && !/21|лучше/.test(live1.row), live1 && live1.row);
+  check('кнопки разбора до конца партии нет', await page.evaluate(() => !document.getElementById('reviewBtn')));
+  for (const g of [90, 30]) { await page.fill('#guessInput', String(g)); await page.click('#tSubmitGuess'); await page.waitForTimeout(80); }
+  const live3 = await page.evaluate(() =>
+    [...document.querySelectorAll('#historyList .h-grade')].reverse().map(g => g.dataset.grade + ' ' + g.querySelector('.g-pct').textContent));
+  for (const g of [40, 36, 37]) { await page.fill('#guessInput', String(g)); await page.click('#tSubmitGuess'); await page.waitForTimeout(80); }
+  await page.waitForTimeout(200);
+  const after = await page.evaluate(() => currentReview().moves.slice(0, 3).map(m => m.grade + ' ' + m.score + '%'));
+  check('оценки по ходу игры совпадают с разбором после', live3.join() === after.join(), live3.join() + ' / ' + after.join());
+  await done(page);
+
+  // В забеге оценок по ходу нет: там очки и рекорды
+  page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeRun');
+  await page.waitForTimeout(300);
+  await page.click('#tRunStart');
+  await page.waitForTimeout(250);
+  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret > RANGE_MIN + 30 ? RANGE_MIN : RANGE_MAX)));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(200);
+  check('в забеге оценок по ходу нет', await page.evaluate(() =>
+    history.length === 1 && !document.querySelector('#historyList .h-grade')));
   await done(page);
 
   // Последняя догадка после исчерпанных попыток — тоже ход в разборе
