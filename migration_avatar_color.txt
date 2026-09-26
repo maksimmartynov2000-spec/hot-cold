@@ -1,0 +1,88 @@
+-- Цвет фона у кружка игрока. Применять в Supabase: SQL Editor → вставить
+-- целиком → Run. Применить ДО мёржа: новая игра спрашивает цвет у базы.
+--
+-- Цвет выбирается из десяти готовых — как и иконка, свободного значения нет:
+-- набор проверяет сама база. Пока цвет не выбран, он считается из имени,
+-- как раньше, — у тех, кто ничего не менял, ничего и не изменится
+
+-- 1. Набор цветов. Вторая копия — в index.html (AVATAR_BG), сверяются тестом
+create or replace function avatar_colors()
+returns text[]
+language sql
+immutable
+as $$
+  select array['#fbbf24', '#34d399', '#60a5fa', '#f472b6', '#a78bfa',
+               '#fb923c', '#2dd4bf', '#a3e635', '#f87171', '#e2e8f0'];
+$$;
+
+alter table students add column if not exists avatar_color text;
+alter table students drop constraint if exists student_avatar_color_allowed;
+alter table students add constraint student_avatar_color_allowed
+  check (avatar_color is null or avatar_color = any (avatar_colors()));
+
+-- 2. Профиль отдаёт и цвет
+create or replace function my_profile(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; s students;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into s from students where username = me;
+  return jsonb_build_object(
+    'username', s.username,
+    'avatar', s.avatar,
+    'color', s.avatar_color,
+    'since', s.created_at,
+    'renameWaitHours', case
+      when s.renamed_at is null or s.renamed_at <= now() - interval '24 hours' then 0
+      else greatest(1, ceil(extract(epoch from (s.renamed_at + interval '24 hours' - now())) / 3600))::int
+    end);
+end;
+$$;
+
+-- 3. Выбрать цвет; null — вернуть цвет «из имени»
+create or replace function set_avatar_color(p_username text, p_pin text, p_color text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_color is not null and not (p_color = any (avatar_colors())) then
+    raise exception 'invalid_color';
+  end if;
+  update students set avatar_color = p_color where username = me;
+  return p_color;
+end;
+$$;
+
+-- 4. Иконки других игроков — теперь и с цветом. Тип ответа поменялся,
+-- поэтому функцию пересоздаём
+drop function if exists avatars_for(text, text, text[]);
+create function avatars_for(p_username text, p_pin text, p_names text[])
+returns table(username text, avatar text, color text)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if coalesce(array_length(p_names, 1), 0) > 200 then raise exception 'too_many_names'; end if;
+  return query
+  select s.username, s.avatar, s.avatar_color from students s
+  where s.username = any (p_names) and (s.avatar is not null or s.avatar_color is not null);
+end;
+$$;
+
+grant execute on function avatar_colors() to anon;
+grant execute on function set_avatar_color(text, text, text) to anon;
+grant execute on function avatars_for(text, text, text[]) to anon;
