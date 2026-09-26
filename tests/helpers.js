@@ -40,20 +40,29 @@ function stubSupabase(opts) {
           // Профиль: иконка, имя, PIN. «Сервер» — window.__profile; ошибку
           // конкретного вызова тест подкладывает через window.__rpcError.
           // unsupported — сервер без миграции профиля: функций нет вовсе
-          if (['my_profile', 'set_avatar', 'avatars_for', 'rename_student', 'change_pin'].indexOf(name) >= 0) {
+          // noColor — сервер с профилем, но ещё без цвета (своя миграция не применена)
+          if (['my_profile', 'set_avatar', 'set_avatar_color', 'avatars_for', 'rename_student', 'change_pin'].indexOf(name) >= 0) {
             const P = window.__profile;
             P.calls.push({ name, args });
             if (P.unsupported) {
               return { data: null, error: { message: 'Could not find the function public.' + name } };
             }
+            if (name === 'set_avatar_color' && P.noColor) {
+              return { data: null, error: { message: 'Could not find the function public.set_avatar_color' } };
+            }
             if (name === 'my_profile') {
-              return { data: { username: args.p_username, avatar: P.avatar, since: P.since,
-                               renameWaitHours: P.wait }, error: null };
+              const d = { username: args.p_username, avatar: P.avatar, since: P.since, renameWaitHours: P.wait };
+              if (!P.noColor) d.color = P.color;
+              return { data: d, error: null };
+            }
+            if (name === 'set_avatar_color') {
+              if (P.colorError) return { data: null, error: { message: P.colorError } };
+              P.color = args.p_color; return { data: args.p_color, error: null };
             }
             if (name === 'set_avatar') { P.avatar = args.p_avatar; return { data: args.p_avatar, error: null }; }
             if (name === 'avatars_for') {
-              return { data: (args.p_names || []).filter(n => P.avatars[n])
-                .map(n => ({ username: n, avatar: P.avatars[n] })), error: null };
+              return { data: (args.p_names || []).filter(n => P.avatars[n] || P.colors[n])
+                .map(n => ({ username: n, avatar: P.avatars[n] || null, color: P.colors[n] || null })), error: null };
             }
             if (name === 'rename_student') return { data: args.p_new, error: null };
             if (name === 'change_pin') {
@@ -302,8 +311,9 @@ function stubSupabase(opts) {
       else window.PushManager = function () {};
     }
 
-    window.__profile = Object.assign({ avatar: null, since: '2026-01-01T00:00:00+00:00', wait: 0,
-                                       avatars: {}, pin: '1234', hint: null, unsupported: false },
+    window.__profile = Object.assign({ avatar: null, color: null, since: '2026-01-01T00:00:00+00:00', wait: 0,
+                                       avatars: {}, colors: {}, pin: '1234', hint: null, unsupported: false,
+                                       noColor: false, colorError: null },
                                      opts.profile || {});
     window.__profile.calls = [];
     window.__talk = {};

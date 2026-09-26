@@ -2430,15 +2430,15 @@ async function testOnlineMatch(browser) {
 
   // Вызов приходит и его можно принять
   const invite = await page.evaluate(() => {
-    const r = document.querySelector('#gamesList .friend-row');
+    const r = document.querySelector('#screenFriends .friend-row[data-id]');
     return { state: r && r.dataset.state,
              btns: r ? [...r.querySelectorAll('.fr-btn')].map(b => b.textContent) : [] };
   });
-  check('входящий вызов виден', invite.state === 'incoming', JSON.stringify(invite));
+  check('входящий вызов виден прямо в строке друга', invite.state === 'incoming', JSON.stringify(invite));
   check('и его можно принять или отклонить',
-    invite.btns.join() === 'Принять,Отклонить', invite.btns.join());
+    invite.btns.join() === 'Принять,✕', invite.btns.join());
 
-  await page.click('#gamesList .friend-row .fr-btn.yes');
+  await page.click('#screenFriends .friend-row[data-id] .fr-btn.yes');
   await page.waitForTimeout(500);
   check('после принятия открывается матч', await page.locator('#screenGame').isVisible());
   check('на доске имена обоих',
@@ -2562,7 +2562,7 @@ async function testOnlineClock(browser) {
   });
   await page.click('#friendsBtn');
   await page.waitForTimeout(400);
-  await page.click('#gamesList .friend-row .fr-btn');
+  await page.click('#screenFriends .friend-row[data-id] .fr-btn');
   await page.waitForTimeout(600);
 
   // Часы
@@ -2623,7 +2623,7 @@ async function testOnlineClock(browser) {
   });
   await p2.click('#friendsBtn');
   await p2.waitForTimeout(400);
-  await p2.click('#gamesList .friend-row .fr-btn');
+  await p2.click('#screenFriends .friend-row[data-id] .fr-btn');
   await p2.waitForTimeout(600);
   const fog = await p2.evaluate(() => ({
     guesses: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent),
@@ -2649,7 +2649,7 @@ async function testOnlineClock(browser) {
   });
   await p3.click('#friendsBtn');
   await p3.waitForTimeout(400);
-  await p3.click('#gamesList .friend-row .fr-btn');
+  await p3.click('#screenFriends .friend-row[data-id] .fr-btn');
   await p3.waitForTimeout(600);
   check('вынужденный ход объявлен', await p3.locator('#forcedTurn').isVisible());
   check('поля ввода при этом нет',
@@ -2671,7 +2671,7 @@ async function testOnlineClock(browser) {
   });
   await p3b.click('#friendsBtn');
   await p3b.waitForTimeout(400);
-  await p3b.click('#gamesList .friend-row .fr-btn');
+  await p3b.click('#screenFriends .friend-row[data-id] .fr-btn');
   await p3b.waitForTimeout(600);
   const p3bArm = await p3b.evaluate(() => document.getElementById('ptoken0').disabled === false);
   check('на отнятом ходе жетон доступен и в онлайне', p3bArm);
@@ -2733,7 +2733,7 @@ async function testPhrases(browser) {
   });
   await page.click('#friendsBtn');
   await page.waitForTimeout(400);
-  await page.click('#gamesList .friend-row .fr-btn');
+  await page.click('#screenFriends .friend-row[data-id] .fr-btn');
   await page.waitForTimeout(600);
 
   check('кнопка фраз появилась в матче', await page.locator('#sayBtn').isVisible());
@@ -2900,7 +2900,7 @@ async function testRanked(browser) {
   // Списки игр разъехались по экранам
   const lists = await page.evaluate(() => ({
     rk: [...document.querySelectorAll('#rkGamesList .friend-row')].map(r => r.dataset.id),
-    fr: [...document.querySelectorAll('#gamesList .friend-row')].map(r => r.dataset.id)
+    fr: [...document.querySelectorAll('#screenFriends .friend-row[data-id]')].map(r => r.dataset.id)
   }));
   check('рейтинговая игра лежит на экране рейтинга', lists.rk.join() === '7', lists.rk.join());
   check('и её блок виден, раз игра есть',
@@ -3308,15 +3308,16 @@ async function testFriendChat(browser) {
     const rows = [...document.querySelectorAll('#friendsList .friend-row')];
     const friend = rows.find(r => r.dataset.name === 'Кира');
     const incoming = rows.find(r => r.dataset.name === 'Гриша');
+    const st = r => (r.querySelector('.fr-status') || {}).textContent || '';
     return {
-      badge: friend ? (friend.querySelector('.fr-unread') || {}).textContent : null,
-      clickable: friend ? friend.querySelector('.fr-name').style.cursor : null,
+      badge: friend ? st(friend) : null,
+      clickable: friend ? getComputedStyle(friend).cursor : null,
       // На заявке переписки быть не может — друзьями ещё не стали
-      noBadge: incoming ? !incoming.querySelector('.fr-unread') : false,
-      noClick: incoming ? incoming.querySelector('.fr-name').style.cursor !== 'pointer' : false
+      noBadge: incoming ? st(incoming).indexOf('💬') < 0 : false,
+      noClick: incoming ? getComputedStyle(incoming).cursor !== 'pointer' : false
     };
   });
-  check('непрочитанное видно прямо на имени', list.badge === '3', String(list.badge));
+  check('непрочитанное видно прямо под именем', list.badge === '💬 3 новых', String(list.badge));
 
   // Значок в шапке считает и фразы, и неотвеченные заявки
   const hdr = await page.evaluate(() => ({
@@ -3327,7 +3328,7 @@ async function testFriendChat(browser) {
   check('кнопка «Друзья» живёт в шапке', hdr.btn);
   check('на ней видно, сколько всего ждёт ответа',
     hdr.shown && hdr.text === '4', JSON.stringify(hdr));
-  check('и по имени друга можно нажать', list.clickable === 'pointer', String(list.clickable));
+  check('и на строку друга можно нажать', list.clickable === 'pointer', String(list.clickable));
   check('у неотвеченной заявки переписки нет', list.noBadge && list.noClick);
 
   // Открываем переписку
@@ -3748,8 +3749,11 @@ async function testNewLook(browser) {
              avatars: Object.fromEntries([...document.querySelectorAll('#friendsList .friend-row')]
                .map(r => [r.dataset.name, (r.querySelector('.avatar') || {}).textContent])) };
   });
-  check('друзья и заявки выше игр', order.friends < order.games, JSON.stringify(order));
-  check('поиск — последним', order.games < order.search, JSON.stringify(order));
+  // Отдельного списка игр больше нет: игры — в строках друзей, а блок
+  // «чужих» игр без таких игр скрыт
+  check('отдельного списка игр при обычных друзьях нет',
+    !(await page.locator('#gamesBox').isVisible()), JSON.stringify(order));
+  check('поиск — последним', order.friends < order.search, JSON.stringify(order));
 
   // Друзья есть — поиск свёрнут в одну строку и раскрывается по нажатию
   check('с друзьями поиск свёрнут', !(await page.locator('#friendSearch').isVisible()));
@@ -3964,6 +3968,162 @@ async function testCalmScreens(browser) {
   await done(page);
 }
 
+// ------------------------------------ друзья: один список со статусами
+async function testFriendsBoard(browser) {
+  console.log('\nДрузья: один список со статусами');
+  let page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__friends = [
+      { username: 'Егор', relation: 'friend' },
+      { username: 'GABI', relation: 'outgoing' },
+      { username: 'Аня', relation: 'friend', unread: 2 },
+      { username: 'Вика', relation: 'friend' },
+      { username: 'Кира', relation: 'incoming' },
+      { username: 'Боря', relation: 'friend' },
+      { username: 'Гоша', relation: 'friend' },
+      { username: 'Дима', relation: 'friend' }];
+    window.__matches = [
+      { id: 1, other: 'Боря', seat: 1, status: 'invited', round: 1, wins: [0, 0], my_turn: false },
+      { id: 2, other: 'Вика', seat: 0, status: 'active', round: 2, wins: [1, 0], my_turn: true },
+      { id: 3, other: 'Гоша', seat: 0, status: 'active', round: 1, wins: [0, 0], my_turn: false },
+      { id: 4, other: 'Дима', seat: 0, status: 'invited', round: 1, wins: [0, 0], my_turn: false },
+      { id: 9, other: 'Незнакомец', seat: 0, status: 'active', round: 1, wins: [0, 0], my_turn: true }];
+  });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(800);
+  const rows = await page.evaluate(() => [...document.querySelectorAll('#friendsList .friend-row')].map(r => ({
+    name: r.dataset.name, state: r.dataset.state || '', status: (r.querySelector('.fr-status') || {}).textContent,
+    hot: !!r.querySelector('.fr-status.hot'), btns: [...r.querySelectorAll('.fr-btn')].map(b => b.textContent) })));
+  const by = Object.fromEntries(rows.map(r => [r.name, r]));
+  check('порядок по срочности: заявка, зовут играть, ваш ход, сообщения, ход друга, вызов, остальные, ждут ответа',
+    rows.map(r => r.name).join() === 'Кира,Боря,Вика,Аня,Гоша,Дима,Егор,GABI', rows.map(r => r.name).join());
+  check('заявка в друзья — «Хочет дружить», принять или ✕',
+    by['Кира'].status === 'Хочет дружить' && by['Кира'].btns.join() === 'Принять,✕', JSON.stringify(by['Кира']));
+  check('друг зовёт играть — принять или ✕, без «⋯»',
+    by['Боря'].status === 'Зовёт играть' && by['Боря'].btns.join() === 'Принять,✕' && by['Боря'].hot,
+    JSON.stringify(by['Боря']));
+  check('ваш ход — «Играть», и статус выделен',
+    by['Вика'].status === 'Ваш ход' && by['Вика'].btns.join() === 'Играть,⋯' && by['Вика'].hot, JSON.stringify(by['Вика']));
+  check('новые сообщения видны под именем',
+    by['Аня'].status === '💬 2 новых' && by['Аня'].btns.join() === 'Вызвать,⋯', JSON.stringify(by['Аня']));
+  check('ход друга — спокойным цветом',
+    by['Гоша'].status === 'Ход друга' && !by['Гоша'].hot, JSON.stringify(by['Гоша']));
+  check('свой вызов можно отменить ✕',
+    by['Дима'].status === 'Вызов отправлен' && by['Дима'].btns.join() === '✕,⋯', JSON.stringify(by['Дима']));
+  check('без событий — «Написать» и «Вызвать»',
+    by['Егор'].status === 'Написать' && by['Егор'].btns.join() === 'Вызвать,⋯', JSON.stringify(by['Егор']));
+  check('своя заявка — «Ждёт ответа» и «Отменить»',
+    by['GABI'].status === 'Ждёт ответа' && by['GABI'].btns.join() === 'Отменить', JSON.stringify(by['GABI']));
+  const orphans = await page.evaluate(() => ({
+    shown: !document.getElementById('gamesBox').classList.contains('hidden'),
+    ids: [...document.querySelectorAll('#gamesList .friend-row')].map(r => r.dataset.id) }));
+  check('игра с тем, кого нет в друзьях, не пропала — отдельным блоком',
+    orphans.shown && orphans.ids.join() === '9', JSON.stringify(orphans));
+
+  // Нажатие на строку открывает переписку, на кнопку — нет
+  await page.click('#friendsList .friend-row[data-name="Вика"] .fr-btn.yes');
+  await page.waitForTimeout(500);
+  check('«Играть» открывает игру, а не переписку', await page.locator('#screenGame').isVisible());
+  await page.evaluate(() => openFriends());
+  await page.waitForTimeout(700);
+  await page.click('#friendsList .friend-row[data-name="Егор"] .fr-status');
+  await page.waitForTimeout(500);
+  check('нажатие на строку друга открывает переписку',
+    await page.locator('#screenChat').isVisible() &&
+    (await page.locator('#chatWho').textContent()) === 'Егор');
+  await page.evaluate(() => openFriends());
+  await page.waitForTimeout(700);
+  await page.click('#friendsList .friend-row[data-name="Кира"] .fr-name');
+  await page.waitForTimeout(300);
+  check('строка заявки переписку не открывает', await page.locator('#screenFriends').isVisible());
+
+  // Вызов — окно наверху списка
+  await page.click('#friendsList .friend-row[data-name="Егор"] .fr-btn.yes');
+  await page.waitForTimeout(300);
+  const ch = await page.evaluate(() => ({
+    shown: !document.getElementById('challengeBox').classList.contains('hidden'),
+    title: document.getElementById('challengeTitle').textContent,
+    above: document.getElementById('challengeBox').getBoundingClientRect().top <
+           document.getElementById('friendsList').getBoundingClientRect().top }));
+  check('«Вызвать» открывает окно вызова над списком', ch.shown && ch.above && ch.title.indexOf('Егор') >= 0,
+    JSON.stringify(ch));
+  await done(page);
+
+  // Текст выхода — только вопрос
+  page = await newGame(browser, { user: 'Лев' });
+  await page.click('#accountChip');
+  await page.waitForTimeout(200);
+  await page.click('#tLogoutStart');
+  const ask = await page.locator('#tLogoutAsk').textContent();
+  check('при выходе — только вопрос, без лишнего про прогресс и PIN', ask === 'Выйти из аккаунта Лев?', ask);
+  await done(page);
+}
+
+// ------------------------------------------------------------ цвет фона кружка
+async function testAvatarColor(browser) {
+  console.log('\nЦвет фона кружка');
+  let page = await newGame(browser, { user: 'Максим', profile: { avatar: '🦊', colors: { 'Аня': '#f472b6' } } });
+  await page.waitForTimeout(300);
+  await page.click('#accountChip');
+  await page.waitForTimeout(300);
+  await page.click('#tAvatarStart');
+  await page.waitForTimeout(150);
+  const pick = await page.evaluate(() => ({
+    colors: [...document.querySelectorAll('#avGrid .av-color')].map(b => b.dataset.color),
+    rows: new Set([...document.querySelectorAll('#avGrid .av-color')].map(b => Math.round(b.getBoundingClientRect().top))).size,
+    tiles: document.querySelectorAll('#avGrid .av-tile').length }));
+  check('в выборе десять цветов двумя рядами', pick.colors.length === 10 && pick.rows === 2, JSON.stringify(pick));
+  check('и по-прежнему буква и 24 иконки', pick.tiles === 25, String(pick.tiles));
+
+  await page.click('#avGrid .av-color[data-color="#a78bfa"]');
+  await page.waitForTimeout(300);
+  const after = await page.evaluate(() => ({
+    sent: (window.__profile.calls.filter(c => c.name === 'set_avatar_color').pop() || {}).args,
+    chip: getComputedStyle(document.getElementById('accountChipName')).backgroundColor,
+    big: getComputedStyle(document.getElementById('pfAvatar')).backgroundColor,
+    tile: getComputedStyle(document.querySelector('#avGrid .av-tile[data-icon="🐼"]')).backgroundColor,
+    sel: [...document.querySelectorAll('#avGrid .av-color.sel')].map(b => b.dataset.color),
+    open: !document.getElementById('avGrid').classList.contains('hidden') }));
+  const violet = 'rgb(167, 139, 250)';
+  check('цвет уходит на сервер', after.sent && after.sent.p_color === '#a78bfa', JSON.stringify(after.sent));
+  check('и сразу виден в шапке, в профиле и под иконками',
+    after.chip === violet && after.big === violet && after.tile === violet, JSON.stringify(after));
+  check('выбранный цвет отмечен', after.sel.join() === '#a78bfa', after.sel.join());
+  check('после цвета выбор не закрывается — можно выбрать и животное', after.open);
+
+  // Сервер не принял — цвет возвращается
+  await page.evaluate(() => { window.__profile.colorError = 'invalid_color'; });
+  await page.click('#avGrid .av-color[data-color="#f87171"]');
+  await page.waitForTimeout(300);
+  const back = await page.evaluate(() => getComputedStyle(document.getElementById('pfAvatar')).backgroundColor);
+  check('отказ сервера возвращает прежний цвет', back === violet, back);
+  await done(page);
+
+  // Цвет друга виден в списке
+  page = await newGame(browser, { user: 'Лев', profile: { colors: { 'Аня': '#e2e8f0' } } });
+  await page.evaluate(() => { window.__friends = [{ username: 'Аня', relation: 'friend' }]; });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(800);
+  const friendBg = await page.evaluate(() =>
+    getComputedStyle(document.querySelector('#friendsList .friend-row[data-name="Аня"] .avatar')).backgroundColor);
+  check('у друга — его цвет', friendBg === 'rgb(226, 232, 240)', friendBg);
+  await done(page);
+
+  // Сервер без миграции цвета: выбора цвета нет, всё остальное работает
+  page = await newGame(browser, { user: 'Лев', profile: { noColor: true } });
+  await page.click('#accountChip');
+  await page.waitForTimeout(400);
+  await page.click('#tAvatarStart');
+  await page.waitForTimeout(150);
+  const old = await page.evaluate(() => ({
+    colors: document.querySelectorAll('#avGrid .av-color').length,
+    tiles: document.querySelectorAll('#avGrid .av-tile').length,
+    label: document.getElementById('tAvatarStart').textContent }));
+  check('без миграции цвета выбора цвета нет, иконки на месте',
+    old.colors === 0 && old.tiles === 25 && old.label === 'Сменить иконку', JSON.stringify(old));
+  await done(page);
+}
+
 // ------------------------------------------ профиль: иконка, имя, PIN
 async function testProfile(browser) {
   console.log('\nПрофиль: иконка, имя, PIN');
@@ -3984,8 +4144,8 @@ async function testProfile(browser) {
     pen: document.getElementById('pfAvatar').classList.contains('editable')
   }));
   check('сетка иконок при открытии профиля свёрнута', !folded.grid, JSON.stringify(folded));
-  check('на её месте кнопка «Сменить иконку», на кружке карандаш',
-    folded.btn === 'Сменить иконку' && folded.pen, JSON.stringify(folded));
+  check('на её месте кнопка «Иконка и цвет», на кружке карандаш',
+    folded.btn === 'Иконка и цвет' && folded.pen, JSON.stringify(folded));
 
   // Нажатие на большой кружок раскрывает сетку, повторное — сворачивает
   await page.click('#pfAvatar');
@@ -4363,6 +4523,8 @@ async function testKeyPage(browser) {
     await testNewLook(browser);
     await testProfile(browser);
     await testCalmScreens(browser);
+    await testFriendsBoard(browser);
+    await testAvatarColor(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

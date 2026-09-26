@@ -228,6 +228,13 @@
       background: rgba(255, 255, 255, 0.08); color: #fff;
     }
     .av-tile.letter { font-weight: 800; font-size: 18px; color: #0f1430; }
+    .av-color {
+      aspect-ratio: 1; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.25);
+      padding: 0; cursor: pointer;
+    }
+    .av-color.sel { outline: 3px solid #fff; outline-offset: 2px; border-color: transparent; }
+    /* Черта между цветами и иконками — во всю ширину сетки */
+    .av-sep { grid-column: 1 / -1; height: 1px; background: rgba(255, 255, 255, 0.12); margin: 2px 0; }
     .av-tile.sel { outline: 3px solid #fff; outline-offset: 1px; }
     .pf-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
     .pf-form input {
@@ -452,6 +459,28 @@
       white-space: nowrap;
     }
     .friend-row .fr-wait { font-size: 12px; color: rgba(255, 255, 255, 0.4); }
+    /* Имя и под ним — что с другом сейчас */
+    .friend-row .fr-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .friend-row .fr-main .fr-name { flex: none; }
+    /* До двух строк: на узком телефоне «Ход друга · 💬 1 новое» в строку
+       не влезает, а обрезанный статус ничего не сообщает */
+    .friend-row .fr-status {
+      font-size: 12px; line-height: 1.3; color: rgba(255, 255, 255, 0.45);
+      overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .friend-row .fr-status.hot { color: #fbbf24; font-weight: 600; }
+    .friend-row.tap { cursor: pointer; border-radius: 12px; }
+    .friend-row.tap:hover { background: rgba(255, 255, 255, 0.04); }
+    /* Заявка в друзья — заметной карточкой: на неё надо ответить */
+    .friend-row.req {
+      background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: 12px; padding: 10px; margin-bottom: 6px;
+    }
+    .fr-btn.x { padding: 5px 9px; }
+    #challengeBox {
+      margin: 0 0 14px; padding: 14px; border-radius: 14px;
+      background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12);
+    }
     .fr-btn {
       flex: 0 0 auto;
       background: rgba(255, 255, 255, 0.1);
@@ -1743,21 +1772,11 @@
   <div id="screenFriends" class="hidden">
     <div class="screen-title" id="tFriendsScreen"></div>
     <div id="olFriends">
-    <!-- Порядок — по срочности: сначала те, кто ждёт ответа, и друзья, потом
-         идущие игры, поиск новых — последним. Раньше сверху стоял поиск, а
-         входящая заявка оказывалась в самом низу экрана -->
-    <div class="fr-block first">
-      <div class="lb-title hidden" id="tFriendsTitle">Friends</div>
-      <div class="fr-note hidden" id="friendsNote"></div>
-      <div id="friendsList" class="friend-list"></div>
-    </div>
-
-    <div class="fr-block">
-      <div class="lb-title" id="tGamesTitle">Games</div>
-      <div class="fr-note hidden" id="gamesNote"></div>
-      <div id="gamesList" class="friend-list"></div>
-    </div>
-
+    <!-- Один список: у каждого друга под именем — что с ним сейчас (ваш ход,
+         зовёт играть, новые сообщения). Игра с другом — прямо в его строке,
+         отдельного списка игр нет. Порядок — по срочности: заявки в друзья,
+         потом те, кто ждёт от вас действия, потом остальные -->
+    <div class="fr-note hidden" id="gamesNote"></div>
     <div class="fr-block hidden" id="challengeBox">
       <div class="lb-title" id="challengeTitle"></div>
       <div class="setup-field tight">
@@ -1790,6 +1809,18 @@
         <button class="btn-ghost" id="tChCancel" onclick="closeChallenge()">Cancel</button>
         <button class="btn btn-block" id="tChSend" onclick="sendChallenge()">Send</button>
       </div>
+    </div>
+
+    <div class="fr-block first">
+      <div class="lb-title hidden" id="tFriendsTitle">Friends</div>
+      <div class="fr-note hidden" id="friendsNote"></div>
+      <div id="friendsList" class="friend-list"></div>
+    </div>
+
+    <!-- Игры с теми, кто уже не в друзьях. Обычно пусто — тогда блока нет -->
+    <div class="fr-block hidden" id="gamesBox">
+      <div class="lb-title" id="tGamesTitle">Games</div>
+      <div id="gamesList" class="friend-list"></div>
     </div>
 
     <!-- Поиск свёрнут: он нужен изредка, а список «недавно играли» занимал
@@ -2026,6 +2057,8 @@
         errDeclined: "The request was declined \u2014 try tomorrow",
         errTooMany: "Too many requests are waiting",
         games: "\ud83c\udfae Games", noGames: "No games yet \u2014 challenge a friend",
+        stWantsFriend: "Wants to be friends", stInvite: "Invites you to play", stSent: "Challenge sent", stWrite: "Send a message",
+        msgForms: ["new", "new"], stTheirTurn: "Their move", stPlay: "Play",
         challenge: "Challenge", play: "Continue", cancelGame: "Cancel",
         yourTurn: "your turn", theirTurn: "their turn",
         chTitle: "Challenge {name}", chRange: "Range", chWins: "Play until how many wins",
@@ -2162,7 +2195,7 @@
         newBest: "🏆 New personal best!",
         greeting: "Playing as {name}",
         noScores: "No results yet — be the first",
-        logoutAsk: "Log out of {name}? Your result stays in the leaderboard — log back in with the same name and PIN.",
+        logoutAsk: "Log out of {name}?",
         cancel: "Cancel",
         errLocked: "Too many wrong PINs. Try again in 5 minutes.",
         errTooMany: "Too many new accounts right now. Try again later.",
@@ -2189,7 +2222,7 @@
         noHint: "No reminder was saved for this name",
         account: "Your account",
         settings: "Settings", language: "Language", done: "Done",
-        avatarChange: "Change icon", save: "Save",
+        avatarChange: "Change icon", avatarColorChange: "Icon and colour", save: "Save",
         renameStart: "Change name", renameNew: "New name",
         renameDone: "Name changed",
         renameWait: "You can change your name once a day \u2014 wait {n} h more",
@@ -2238,6 +2271,8 @@
         errDeclined: "Заявку отклонили — попробуйте завтра",
         errTooMany: "Слишком много заявок ждёт ответа",
         games: "\ud83c\udfae Игры", noGames: "Игр пока нет — вызовите друга",
+        stWantsFriend: "Хочет дружить", stInvite: "Зовёт играть", stSent: "Вызов отправлен", stWrite: "Написать",
+        msgForms: ["новое", "новых", "новых"], stTheirTurn: "Ход друга", stPlay: "Играть",
         challenge: "Вызвать", play: "Продолжить", cancelGame: "Отменить",
         yourTurn: "ваш ход", theirTurn: "ходит соперник",
         chTitle: "Вызов: {name}", chRange: "Диапазон", chWins: "Играем до скольких побед",
@@ -2374,7 +2409,7 @@
         newBest: "🏆 Новый личный рекорд!",
         greeting: "Играет {name}",
         noScores: "Результатов пока нет — ваш может стать первым",
-        logoutAsk: "Выйти из аккаунта {name}? Результат останется в топе — вернуться можно по тому же имени и PIN.",
+        logoutAsk: "Выйти из аккаунта {name}?",
         cancel: "Отмена",
         errLocked: "Слишком много неверных PIN. Попробуйте через 5 минут.",
         errTooMany: "Сейчас регистрируется слишком много игроков. Попробуйте позже.",
@@ -2401,7 +2436,7 @@
         noHint: "Для этого имени подсказки нет",
         account: "Ваш аккаунт",
         settings: "Настройки", language: "Язык", done: "Готово",
-        avatarChange: "Сменить иконку", save: "Сохранить",
+        avatarChange: "Сменить иконку", avatarColorChange: "Иконка и цвет", save: "Сохранить",
         renameStart: "Сменить имя", renameNew: "Новое имя",
         renameDone: "Имя изменено",
         renameWait: "Имя можно менять раз в сутки — подождите ещё {n} ч",
@@ -2450,6 +2485,8 @@
         errDeclined: "La demande a \u00e9t\u00e9 refus\u00e9e \u2014 r\u00e9essayez demain",
         errTooMany: "Trop de demandes en attente",
         games: "\ud83c\udfae Parties", noGames: "Pas encore de partie \u2014 d\u00e9fiez un ami",
+        stWantsFriend: "Veut \u00eatre ton ami", stInvite: "T\u2019invite \u00e0 jouer", stSent: "D\u00e9fi envoy\u00e9", stWrite: "\u00c9crire",
+        msgForms: ["nouveau", "nouveaux"], stTheirTurn: "\u00c0 son tour", stPlay: "Jouer",
         challenge: "D\u00e9fier", play: "Continuer", cancelGame: "Annuler",
         yourTurn: "\u00e0 vous", theirTurn: "\u00e0 l\u2019adversaire",
         chTitle: "D\u00e9fi \u00e0 {name}", chRange: "Plage", chWins: "Jouer jusqu\u2019\u00e0 combien de victoires",
@@ -2586,7 +2623,7 @@
         newBest: "🏆 Nouveau record personnel !",
         greeting: "Vous jouez en tant que {name}",
         noScores: "Pas encore de résultats — à vous de commencer",
-        logoutAsk: "Se déconnecter de {name} ? Le résultat reste au classement — reconnectez-vous avec le même nom et PIN.",
+        logoutAsk: "Se déconnecter de {name} ?",
         cancel: "Annuler",
         errLocked: "Trop de PIN incorrects. Réessayez dans 5 minutes.",
         errTooMany: "Trop de nouveaux comptes en ce moment. Réessayez plus tard.",
@@ -2613,7 +2650,7 @@
         noHint: "Aucune aide enregistrée pour ce nom",
         account: "Votre compte",
         settings: "R\u00e9glages", language: "Langue", done: "OK",
-        avatarChange: "Changer d\u2019ic\u00f4ne", save: "Enregistrer",
+        avatarChange: "Changer d\u2019ic\u00f4ne", avatarColorChange: "Ic\u00f4ne et couleur", save: "Enregistrer",
         renameStart: "Changer de nom", renameNew: "Nouveau nom",
         renameDone: "Nom modifi\u00e9",
         renameWait: "Le nom se change une fois par jour \u2014 encore {n} h",
@@ -2662,6 +2699,8 @@
         errDeclined: "Die Anfrage wurde abgelehnt \u2014 versuch es morgen",
         errTooMany: "Zu viele Anfragen warten",
         games: "\ud83c\udfae Partien", noGames: "Noch keine Partie \u2014 fordere einen Freund heraus",
+        stWantsFriend: "M\u00f6chte befreundet sein", stInvite: "L\u00e4dt dich zum Spielen ein", stSent: "Herausforderung gesendet", stWrite: "Schreiben",
+        msgForms: ["neue", "neue"], stTheirTurn: "Gegen\u00fcber ist dran", stPlay: "Spielen",
         challenge: "Herausfordern", play: "Weiter", cancelGame: "Abbrechen",
         yourTurn: "du bist dran", theirTurn: "Gegner ist dran",
         chTitle: "Herausforderung an {name}", chRange: "Bereich", chWins: "Spiel bis wie viele Siege",
@@ -2798,7 +2837,7 @@
         newBest: "🏆 Neuer persönlicher Rekord!",
         greeting: "Du spielst als {name}",
         noScores: "Noch keine Ergebnisse — mach den Anfang",
-        logoutAsk: "Von {name} abmelden? Das Ergebnis bleibt in der Rangliste — melde dich mit demselben Namen und PIN wieder an.",
+        logoutAsk: "Von {name} abmelden?",
         cancel: "Abbrechen",
         errLocked: "Zu viele falsche PINs. Versuche es in 5 Minuten erneut.",
         errTooMany: "Gerade registrieren sich zu viele Spieler. Versuche es später.",
@@ -2825,7 +2864,7 @@
         noHint: "Für diesen Namen ist keine Hilfe gespeichert",
         account: "Dein Konto",
         settings: "Einstellungen", language: "Sprache", done: "Fertig",
-        avatarChange: "Symbol \u00e4ndern", save: "Speichern",
+        avatarChange: "Symbol \u00e4ndern", avatarColorChange: "Symbol und Farbe", save: "Speichern",
         renameStart: "Namen \u00e4ndern", renameNew: "Neuer Name",
         renameDone: "Name ge\u00e4ndert",
         renameWait: "Der Name l\u00e4sst sich einmal am Tag \u00e4ndern \u2014 noch {n} Std.",
@@ -4674,7 +4713,8 @@
       return null;
     }
     if (data.since) localStorage.setItem('hc_run_since', String(data.since));
-    setMyAvatar(data.avatar || '');
+    // Старый сервер цвета не знает — тогда свой выбор не трогаем
+    setMyLook(data.avatar || '', 'color' in data ? (data.color || '') : myColor());
     profileInfo = data;
     updateAccountChip();
     return data;
@@ -4700,10 +4740,16 @@
   // Набор иконок. Вторая копия — в базе (avatar_choices), они сверяются тестом.
   // Только животные из готового списка: свободный текст в кружке у детского
   // приложения — лишний риск, а набор проверяет сама база
+  // Цвета фона на выбор. Вторая копия — в базе (avatar_colors), сверяются
+  // тестом. Первые восемь — те же, что считаются из имени: кто цвет не
+  // выбирал, у того он и остаётся прежним
+  const AVATAR_BG = ['#fbbf24', '#34d399', '#60a5fa', '#f472b6', '#a78bfa',
+                     '#fb923c', '#2dd4bf', '#a3e635', '#f87171', '#e2e8f0'];
   const AVATAR_CHOICES = ['🦊', '🐼', '🐯', '🦁', '🐨', '🐸', '🐵', '🐧', '🦉', '🐙', '🦄', '🐲', '🐶', '🐱', '🐰', '🐻', '🐮', '🐷', '🐔', '🐢', '🦋', '🐝', '🐬', '🦈'];
 
-  // Иконки других игроков: имя → иконка, '' — без иконки (буква). Заполняется
-  // по мере того, как имена появляются в списках, заново — при входе в «Друзья»
+  // Иконки других игроков: имя → { icon, color }; пустые — буква и цвет из
+  // имени. Заполняется по мере того, как имена появляются в списках, заново —
+  // при входе в «Друзья»
   const avatarCache = {};
 
   function myName() {
@@ -4711,32 +4757,49 @@
     return a ? a.username : null;
   }
 
-  // Своя иконка хранится с именем: после выхода и входа под другим аккаунтом
-  // чужая иконка не должна остаться в шапке
-  function myAvatar() {
+  // Своя иконка и цвет хранятся с именем: после выхода и входа под другим
+  // аккаунтом чужие не должны остаться в шапке
+  function myLook() {
     try {
       const v = JSON.parse(localStorage.getItem('hc_run_avatar') || 'null');
-      return v && v.user === myName() ? (v.avatar || '') : '';
-    } catch (e) { return ''; }
+      if (v && v.user === myName()) return { avatar: v.avatar || '', color: v.color || '' };
+    } catch (e) {}
+    return { avatar: '', color: '' };
   }
-
-  function setMyAvatar(avatar) {
+  function setMyLook(avatar, color) {
     try {
-      localStorage.setItem('hc_run_avatar', JSON.stringify({ user: myName(), avatar: avatar || '' }));
+      localStorage.setItem('hc_run_avatar',
+        JSON.stringify({ user: myName(), avatar: avatar || '', color: color || '' }));
     } catch (e) {}
   }
+  function myAvatar() { return myLook().avatar; }
+  function myColor() { return myLook().color; }
+  function setMyAvatar(avatar) { setMyLook(avatar, myColor()); }
+  function setMyColor(color) { setMyLook(myAvatar(), color); }
 
   function avatarOf(name) {
     if (name && name === myName()) return myAvatar();
-    return avatarCache[name] || '';
+    return (avatarCache[name] || {}).icon || '';
+  }
+
+  // Выбранный цвет, а если не выбран — тот, что считается из имени
+  function colorOf(name) {
+    const chosen = (name && name === myName()) ? myColor() : (avatarCache[name] || {}).color;
+    return chosen || avatarColor(name);
   }
 
   function paintAvatar(el, name) {
     const icon = avatarOf(name);
     el.textContent = icon || avatarLetter(name);
     el.classList.toggle('has-icon', !!icon);
-    el.style.background = avatarColor(name);
+    el.style.background = colorOf(name);
     el.dataset.avatarFor = name;
+  }
+
+  function repaintAvatarsOf(name) {
+    document.querySelectorAll('.avatar[data-avatar-for], #pfAvatar[data-avatar-for]').forEach(el => {
+      if (el.dataset.avatarFor === name) paintAvatar(el, name);
+    });
   }
 
   // Узнаём иконки тех, кого видно в списке, одним запросом — и только тех,
@@ -4756,8 +4819,10 @@
       if (/avatars_for|function|schema/i.test(e.message)) avatarsSupported = false;
       return;
     }
-    want.forEach(n => { avatarCache[n] = ''; });
-    (Array.isArray(rows) ? rows : []).forEach(r => { avatarCache[r.username] = r.avatar || ''; });
+    want.forEach(n => { avatarCache[n] = { icon: '', color: '' }; });
+    (Array.isArray(rows) ? rows : []).forEach(r => {
+      avatarCache[r.username] = { icon: r.avatar || '', color: r.color || '' };
+    });
     document.querySelectorAll('.avatar[data-avatar-for]').forEach(el => {
       if (want.indexOf(el.dataset.avatarFor) >= 0) paintAvatar(el, el.dataset.avatarFor);
     });
@@ -4774,7 +4839,7 @@
     const face = document.getElementById('accountChipName');
     if (auth) {
       paintAvatar(face, auth.username);
-      chip.style.background = avatarColor(auth.username);
+      chip.style.background = colorOf(auth.username);
       chip.title = auth.username;
     } else {
       face.textContent = '⚙';
@@ -4826,7 +4891,8 @@
     document.getElementById('tLogoutStart').textContent = L.run.logout;
     document.getElementById('tLogoutCancel').textContent = L.run.cancel;
     document.getElementById('tLogoutConfirm').textContent = L.run.logout;
-    document.getElementById('tAvatarStart').textContent = L.run.avatarChange;
+    document.getElementById('tAvatarStart').textContent =
+      colorsSupported() ? L.run.avatarColorChange : L.run.avatarChange;
     document.getElementById('tRenameStart').textContent = L.run.renameStart;
     document.getElementById('tRenameSave').textContent = L.run.save;
     document.getElementById('tRenameCancel').textContent = L.run.cancel;
@@ -4879,21 +4945,66 @@
     showAvatarPicker(document.getElementById('avGrid').classList.contains('hidden'));
   }
 
+  // Сервер умеет цвет — значит, миграция с цветом применена
+  function colorsSupported() {
+    return !!(profileInfo && 'color' in profileInfo);
+  }
+
   function renderAvatarGrid() {
     const grid = document.getElementById('avGrid');
     const me = myName();
     const current = myAvatar();
+    const bg = colorOf(me);
     grid.innerHTML = '';
+    // Сверху — цвета фона, два ряда по пять; ниже — буква и животные уже на
+    // выбранном цвете: сразу видно, как это будет выглядеть
+    if (colorsSupported()) {
+      AVATAR_BG.forEach(color => {
+        const c = document.createElement('button');
+        c.className = 'av-color' + (color === bg ? ' sel' : '');
+        c.dataset.color = color;
+        c.style.background = color;
+        c.setAttribute('aria-label', color);
+        c.onclick = () => chooseColor(color);
+        grid.appendChild(c);
+      });
+      const sep = document.createElement('div');
+      sep.className = 'av-sep';
+      grid.appendChild(sep);
+    }
     // Первая клетка — буква: вернуться к ней можно так же, как выбрать иконку
     ['', ...AVATAR_CHOICES].forEach(icon => {
       const b = document.createElement('button');
       b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '');
       b.dataset.icon = icon;
-      if (icon) b.textContent = icon;
-      else { b.textContent = avatarLetter(me); b.style.background = avatarColor(me); }
+      b.textContent = icon || avatarLetter(me);
+      b.style.background = bg;
       b.onclick = () => chooseAvatar(icon);
       grid.appendChild(b);
     });
+  }
+
+  // Цвет виден сразу; сетка не сворачивается — после цвета часто выбирают и
+  // животное. Сервер не принял — возвращаем прежний
+  async function chooseColor(color) {
+    const before = myColor();
+    if (color === colorOf(myName())) return;
+    setMyColor(color);
+    fillProfile();
+    updateAccountChip();
+    repaintAvatarsOf(myName());
+    setNote('avNote', '');
+    try {
+      await friendRpc('set_avatar_color', { p_color: color });
+      if (profileInfo) profileInfo.color = color;
+    } catch (e) {
+      if (!runAuth()) return;
+      setMyColor(before);
+      fillProfile();
+      updateAccountChip();
+      repaintAvatarsOf(myName());
+      setNote('avNote', friendErrorText(e.message), true);
+    }
   }
 
   // Выбор видно сразу; если сервер не принял — возвращаем прежнюю
@@ -4959,12 +5070,13 @@
     }
     if (next === before) return openRename(false);
     const icon = myAvatar();
+    const color = myColor();
     const btn = document.getElementById('tRenameSave');
     btn.disabled = true;
     try {
       const renamed = await friendRpc('rename_student', { p_new: next });
       localStorage.setItem('hc_run_user', renamed);
-      setMyAvatar(icon);
+      setMyLook(icon, color);
       if (profileInfo) profileInfo.renameWaitHours = 24;
       openRename(false);
       fillProfile();
@@ -5403,6 +5515,8 @@
     const auth = runAuth();
     if (!auth) { authReturn = 'friends'; return showScreen('authChoice'); }
     friendMenuOpen = null;
+    friendsData = null;
+    friendMatches = [];
     document.getElementById('findBox').open = false;
     findDecided = false;
     // Иконки могли смениться с прошлого раза — спрашиваем заново
@@ -5500,12 +5614,48 @@
   // Входящие заявки первыми: это единственное, что требует действия
   const FRIEND_ORDER = { incoming: 0, friend: 1, outgoing: 2 };
 
-  function friendRow(name, relation, unread) {
+  // Что с другом сейчас и что с этим делать. Чем меньше rank, тем выше в
+  // списке: сначала те, кто ждёт от вас действия
+  function friendState(relation, unread, m) {
+    const L = t().online;
+    const parts = [];
+    let rank = 5, hot = false;
+    if (relation === 'incoming') return { rank: 0, text: L.stWantsFriend, hot: true };
+    if (relation === 'outgoing') return { rank: 9, text: capFirst(L.waiting), hot: false };
+    if (relation !== 'friend') return { rank: 9, text: '', hot: false };
+    if (m && m.status === 'invited' && m.seat === 1) { parts.push(L.stInvite); rank = 0; hot = true; }
+    else if (m && m.status === 'active' && m.my_turn) { parts.push(capFirst(L.yourTurn)); rank = 1; hot = true; }
+    else if (m && m.status === 'active') { parts.push(L.stTheirTurn); rank = 3; }
+    else if (m) { parts.push(L.stSent); rank = 4; }
+    if (unread > 0) {
+      parts.push('💬 ' + withPlural(unread, L.msgForms));
+      rank = Math.min(rank, 2); hot = true;
+    }
+    if (!parts.length) parts.push(L.stWrite);
+    return { rank, text: parts.join(' · '), hot };
+  }
+
+  function capFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+  // Главная игра с другом, если их вдруг несколько: сначала та, где ждут вас
+  function matchRank(m) {
+    if (m.status === 'invited' && m.seat === 1) return 0;
+    if (m.status === 'active' && m.my_turn) return 1;
+    if (m.status === 'active') return 2;
+    return 3;
+  }
+
+  function friendRow(name, relation, unread, match) {
     const L = t().online;
     const row = document.createElement('div');
     row.className = 'friend-row';
     row.dataset.name = name;
     row.dataset.relation = relation || 'none';
+    if (relation === 'incoming') row.classList.add('req');
+    if (match) {
+      row.dataset.id = match.id;
+      row.dataset.state = match.status === 'invited' ? (match.seat === 1 ? 'incoming' : 'outgoing') : 'active';
+    }
 
     // Кружок с буквой, как в шапке: друзей узнают по цвету раньше, чем прочтут имя.
     // У удалённого игрока имени нет — вместо буквы знак вопроса и серый круг
@@ -5519,21 +5669,26 @@
     }
     row.appendChild(face);
 
+    const main = document.createElement('span');
+    main.className = 'fr-main';
     const who = document.createElement('span');
     who.className = 'fr-name';
     who.textContent = playerName(name);
-    // По имени друга открывается переписка с ним — отдельной кнопки не надо
-    if (relation === 'friend') {
-      who.style.cursor = 'pointer';
-      who.onclick = () => openChat(name);
-      if (unread > 0) {
-        const badge = document.createElement('span');
-        badge.className = 'fr-unread';
-        badge.textContent = unread;
-        who.appendChild(badge);
-      }
+    main.appendChild(who);
+    const st = friendState(relation, unread, match);
+    if (st.text) {
+      const status = document.createElement('span');
+      status.className = 'fr-status' + (st.hot ? ' hot' : '');
+      status.textContent = st.text;
+      main.appendChild(status);
     }
-    row.appendChild(who);
+    row.appendChild(main);
+
+    // С другом переписка открывается нажатием на всю строку, кроме кнопок
+    if (relation === 'friend') {
+      row.classList.add('tap');
+      row.onclick = e => { if (!e.target.closest('button')) openChat(name); };
+    }
 
     const button = (label, cls, fn) => {
       const b = document.createElement('button');
@@ -5541,13 +5696,27 @@
       b.textContent = label;
       b.onclick = fn;
       row.appendChild(b);
+      return b;
     };
 
     if (relation === 'incoming') {
       button(L.accept, 'yes', () => respondFriend(name, true));
-      button(L.decline, 'no', () => respondFriend(name, false));
+      button('✕', 'no x', () => respondFriend(name, false)).setAttribute('aria-label', L.decline);
     } else if (relation === 'friend') {
-      button(L.challenge, 'yes', () => openChallenge(name));
+      // Одна главная кнопка — по тому, что сейчас с другом
+      // Друг зовёт играть — ответить и есть всё, что сейчас нужно: «⋯» не
+      // показываем, иначе на телефоне трём кнопкам тесно и статус обрезается
+      if (match && match.status === 'invited' && match.seat === 1) {
+        button(L.accept, 'yes', () => answerChallenge(match.id, true));
+        button('✕', 'no x', () => answerChallenge(match.id, false)).setAttribute('aria-label', L.decline);
+        return row;
+      } else if (match && match.status === 'invited') {
+        button('✕', 'x', () => dropMatch(match.id)).setAttribute('aria-label', L.cancelGame);
+      } else if (match) {
+        button(L.stPlay, match.my_turn ? 'yes' : '', () => openMatch(match.id));
+      } else {
+        button(L.challenge, 'yes', () => openChallenge(name));
+      }
       // «Убрать» стояло вровень с «Вызвать» — промахнулся пальцем, и друга нет.
       // Теперь оно за «⋯»: сначала открыть, потом нажать. Какая строка открыта,
       // помним отдельно: список перерисовывается опросом каждые несколько
@@ -5562,10 +5731,6 @@
         });
       }
     } else if (relation === 'outgoing') {
-      const wait = document.createElement('span');
-      wait.className = 'fr-wait';
-      wait.textContent = L.waiting;
-      row.appendChild(wait);
       // Заявку было не забрать назад: отправил не тому — и она висела вечно
       button(L.cancelReq, '', () => cancelFriendRequest(name));
     } else if (relation !== 'declined') {
@@ -5574,18 +5739,43 @@
     return row;
   }
 
+  // Список и игры приходят разными запросами; строка друга собирается из обоих
+  let friendsData = null;
+  let friendMatches = [];
+
   function renderFriends(rows) {
-    const box = document.getElementById('friendsList');
-    box.innerHTML = '';
-    rows.slice()
-      .sort((a, b) => (FRIEND_ORDER[a.relation] - FRIEND_ORDER[b.relation]) ||
-                      String(a.username).localeCompare(String(b.username)))
-      .forEach(r => {
-        if (r.relation === 'incoming') notifyAway('friend-' + r.username);
-        if (r.unread > 0) notifyAway('talkfrom-' + r.username + '-' + r.unread);
-        box.appendChild(friendRow(r.username, r.relation, r.unread));
-      });
+    friendsData = rows;
+    rows.forEach(r => {
+      if (r.relation === 'incoming') notifyAway('friend-' + r.username);
+      if (r.unread > 0) notifyAway('talkfrom-' + r.username + '-' + r.unread);
+    });
+    renderFriendsList();
     fetchAvatars(rows.map(r => r.username));
+  }
+
+  function renderFriendsList() {
+    if (!friendsData) return;
+    const box = document.getElementById('friendsList');
+    const friends = new Set(friendsData.filter(r => r.relation === 'friend').map(r => r.username));
+    const best = {};
+    friendMatches.forEach(m => {
+      if (!friends.has(m.other)) return;
+      if (!best[m.other] || matchRank(m) < matchRank(best[m.other])) best[m.other] = m;
+    });
+    box.innerHTML = '';
+    friendsData
+      .map(r => ({ r, st: friendState(r.relation, r.unread, best[r.username]) }))
+      .sort((a, b) => (FRIEND_ORDER[a.r.relation] - FRIEND_ORDER[b.r.relation]) ||
+                      (a.st.rank - b.st.rank) ||
+                      String(a.r.username).localeCompare(String(b.r.username)))
+      .forEach(({ r }) => box.appendChild(friendRow(r.username, r.relation, r.unread, best[r.username])));
+
+    // Игры с теми, кого нет в друзьях (удалили из друзей посреди игры), — отдельно
+    const rest = friendMatches.filter(m => best[m.other] !== m);
+    const games = document.getElementById('gamesList');
+    games.innerHTML = '';
+    rest.forEach(m => games.appendChild(matchRow(m)));
+    document.getElementById('gamesBox').classList.toggle('hidden', !rest.length);
   }
 
   // quiet — это опрос по таймеру: молча, иначе на экране будет мигать ошибка
@@ -5659,20 +5849,13 @@
   async function loadMatches(quiet) {
     try {
       const rows = (await friendRpc('list_matches')) || [];
-      const L = t().online;
-      const split = [
-        { rows: rows.filter(m => !m.ranked), box: 'gamesList', note: 'gamesNote', empty: L.noGames },
-        { rows: rows.filter(m => m.ranked), box: 'rkGamesList', note: null, empty: '' }
-      ];
-      split.forEach(part => {
-        const box = document.getElementById(part.box);
-        box.innerHTML = '';
-        part.rows.forEach(m => {
-          if (m.status === 'invited' && m.seat === 1) notifyAway('invite-' + m.id);
-          box.appendChild(matchRow(m));
-        });
-        if (part.note) setNote(part.note, part.rows.length ? '' : part.empty);
-      });
+      rows.forEach(m => { if (m.status === 'invited' && m.seat === 1) notifyAway('invite-' + m.id); });
+      // Дружеские игры — в строках друзей; рейтинговые — на экране рейтинга
+      friendMatches = rows.filter(m => !m.ranked);
+      renderFriendsList();
+      const rk = document.getElementById('rkGamesList');
+      rk.innerHTML = '';
+      rows.filter(m => m.ranked).forEach(m => rk.appendChild(matchRow(m)));
       document.getElementById('rkGamesBox').classList.toggle('hidden', !rows.some(m => m.ranked));
     } catch (e) {
       if (!quiet) {
@@ -5730,6 +5913,8 @@
     document.getElementById('challengeTitle').textContent =
       t().online.chTitle.replace('{name}', name);
     box.classList.remove('hidden');
+    // Окно вызова стоит над списком: друг мог быть внизу, прокручиваем к окну
+    if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
   function closeChallenge() {

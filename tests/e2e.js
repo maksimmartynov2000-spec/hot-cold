@@ -182,10 +182,10 @@ async function registerPlayer(p, name, pin) {
 
   await B.page.waitForTimeout(11000);
   const invite = await B.page.evaluate(() =>
-    [...document.querySelectorAll('#gamesList .friend-row')].map(r => r.dataset.state));
+    [...document.querySelectorAll('#screenFriends .friend-row[data-id]')].map(r => r.dataset.state));
   check('вызов доехал до соперника', invite.join() === 'incoming', invite.join());
 
-  await B.page.click('#gamesList .friend-row .fr-btn.yes');
+  await B.page.click('#screenFriends .friend-row[data-id] .fr-btn.yes');
   await B.page.waitForTimeout(1500);
   check('у принявшего открылась доска', await B.page.locator('#screenGame').isVisible());
   const started = (await db.query('select secret, status, cur from matches where id = $1', [match.id])).rows[0];
@@ -200,9 +200,9 @@ async function registerPlayer(p, name, pin) {
   // Вызвавший тоже должен открыть матч: у него в списке он стал активным
   await A.page.waitForTimeout(11000);
   const mine = await A.page.evaluate(() =>
-    [...document.querySelectorAll('#gamesList .friend-row')].map(r => r.dataset.state));
+    [...document.querySelectorAll('#screenFriends .friend-row[data-id]')].map(r => r.dataset.state));
   check('у вызвавшего игра стала активной', mine.join() === 'active', mine.join());
-  await A.page.click('#gamesList .friend-row .fr-btn');
+  await A.page.click('#screenFriends .friend-row[data-id] .fr-btn');
   await A.page.waitForTimeout(1500);
   check('доска открылась и у вызвавшего', await A.page.locator('#screenGame').isVisible());
 
@@ -362,6 +362,11 @@ async function registerPlayer(p, name, pin) {
   await A.page.waitForTimeout(500);
   check('иконка записана в базу',
     (await db.query("select avatar from students where username = 'Тимур'")).rows[0].avatar === '🦊');
+  await A.page.click('#tAvatarStart');
+  await A.page.click('#avGrid .av-color[data-color="#2dd4bf"]');
+  await A.page.waitForTimeout(600);
+  check('цвет фона записан в базу',
+    (await db.query("select avatar_color from students where username = 'Тимур'")).rows[0].avatar_color === '#2dd4bf');
 
   await B.page.click('#friendsBtn');
   await B.page.waitForTimeout(900);
@@ -370,6 +375,11 @@ async function registerPlayer(p, name, pin) {
     return row ? row.querySelector('.avatar').textContent : null;
   });
   check('второй игрок видит иконку друга', face === '🦊', String(face));
+  const faceBg = await B.page.evaluate(() => {
+    const row = document.querySelector('#friendsList .friend-row[data-name="Тимур"]');
+    return row ? getComputedStyle(row.querySelector('.avatar')).backgroundColor : null;
+  });
+  check('и его цвет фона', faceBg === 'rgb(45, 212, 191)', String(faceBg));
 
   await A.page.click('#tRenameStart');
   await A.page.fill('#renameInput', 'Артур');
@@ -426,7 +436,7 @@ async function registerPlayer(p, name, pin) {
 
   const calls = A.log.concat(B.log);
   check('профиль шёл через настоящие функции базы',
-    ['my_profile', 'set_avatar', 'avatars_for', 'rename_student', 'change_pin', 'send_friend_text', 'friend_thread']
+    ['my_profile', 'set_avatar', 'set_avatar_color', 'avatars_for', 'rename_student', 'change_pin', 'send_friend_text', 'friend_thread']
       .every(f => calls.includes(f)),
     [...new Set(calls)].join(', '));
   check('всё шло через настоящие функции базы',
