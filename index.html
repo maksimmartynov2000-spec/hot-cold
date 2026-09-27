@@ -1178,6 +1178,15 @@
     .p-effects { margin-top: 6px; font-size: 15px; letter-spacing: 3px; }
     .p-effects:empty { display: none; }
     .history-item .h-masked { opacity: 0.45; }
+    .mode-btn.tut { border-color: rgba(251, 191, 36, 0.55); background: rgba(251, 191, 36, 0.1); }
+    .mode-btn .m-sub { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); margin-top: 2px; }
+    .mode-btn.locked { opacity: 0.6; }
+    .coach { margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.4;
+             background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.45); color: #fde68a; }
+    .result-box .r-lesson { margin-top: 10px; font-weight: 700; color: #fbbf24; }
+    .bonus-card { text-align: center; }
+    .bonus-card .bc-icon { font-size: 48px; line-height: 1.1; }
+    .bonus-card .bc-title { font-size: 18px; font-weight: 800; margin: 6px 0 4px; }
     .r-next { margin-top: 10px; font-size: 13px; color: rgba(255, 255, 255, 0.55); text-align: center; }
     .turn-banner.count { font-size: 1.4em; letter-spacing: 0.02em; }
     .turn-banner .tb-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); letter-spacing: 0; }
@@ -1581,6 +1590,15 @@
       <!-- Два блока по тому, нужен ли интернет: тренировка и игра вдвоём
            целиком работают без сети (их кеширует service worker), испытание
            и игра онлайн без сети не откроются — там вход и общая таблица -->
+      <!-- Обучение для новичка: три коротких урока. Пока не пройдены первые
+           два, онлайн закрыт — как в Hearthstone, где сначала учебные бои -->
+      <button class="mode-btn tut hidden" id="tutCard" onclick="startNextLesson()">
+        <span class="m-icon">🎓</span>
+        <span class="m-text">
+          <span class="m-title" id="tTutTitle"></span>
+          <span class="m-sub" id="tTutSub"></span>
+        </span>
+      </button>
       <div class="mode-group" id="tGroupOffline"></div>
       <button class="mode-btn solo" onclick="openSetup('solo')">
         <span class="m-icon">🎯</span>
@@ -1605,12 +1623,14 @@
         <span class="m-icon">🏆</span>
         <span class="m-text">
           <span class="m-title" id="tModeRun"></span>
+          <span class="m-sub hidden" id="tRunLock"></span>
         </span>
       </button>
       <button class="mode-btn online" onclick="openOnlineEntry()">
         <span class="m-icon">🌐</span>
         <span class="m-text">
           <span class="m-title" id="tModeOnline"></span>
+          <span class="m-sub hidden" id="tOnlineLock"></span>
         </span>
       </button>
     </div>
@@ -1721,6 +1741,9 @@
                каждую: без подписи 🌡️ 📏 💡 непонятны, а место под слова нет -->
           <div class="bar-tip hidden" id="barTip" role="status"></div>
         </div>
+
+        <!-- Подсказка учителя во время урока -->
+        <div class="coach hidden" id="coach" role="status"></div>
 
         <div class="turn-banner hidden" id="turnBanner"></div>
 
@@ -1854,6 +1877,7 @@
         <div class="rk-elo" id="rkElo"></div>
         <div class="rk-stars hidden" id="rkStars"></div>
         <div class="rk-elo-sub" id="rkEloSub"></div>
+        <div class="rk-elo-sub hidden" id="rkApprentice"></div>
       </div>
       <div class="fr-note hidden" id="rkNote"></div>
       <button class="btn btn-block" id="tRkPlay" onclick="startRanked()"></button>
@@ -2138,6 +2162,8 @@
 
     <button class="btn-ghost btn-block hidden" id="tSignIn" style="margin-top:14px"
             onclick="signInFromProfile()"></button>
+    <button class="btn-ghost btn-block" id="tTutReplay" style="margin-top:8px"
+            onclick="closeLogoutModal(); startLesson(1)"></button>
 
     <div id="pfLogout">
       <button class="btn-ghost btn-block" id="tLogoutStart" style="margin-top:14px"
@@ -2158,6 +2184,26 @@
 </div>
 
 <!-- Удаление аккаунта: отдельное окно, потому что это навсегда -->
+<!-- Онлайн закрыт, пока не пройдены два урока. Можно пропустить -->
+<div class="modal-backdrop hidden" id="gateModal" onclick="if (event.target === this) closeGate()">
+  <div class="modal-card">
+    <div class="modal-text" id="gateText"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="gateGo" onclick="closeGate(); startNextLesson()"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="gateSkip" onclick="skipTutorial()"></button>
+  </div>
+</div>
+
+<!-- Бонус встретился впервые: карточка, что он делает. Восемь видов бонусов
+     не вываливаются на новичка разом — каждый объясняется, когда появился -->
+<div class="modal-backdrop hidden" id="bonusCard">
+  <div class="modal-card bonus-card">
+    <div class="bc-icon" id="bcIcon"></div>
+    <div class="bc-title" id="bcTitle"></div>
+    <div class="modal-text" id="bcDesc"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="bcOk" onclick="closeBonusCard()"></button>
+  </div>
+</div>
+
 <!-- Друг: всё, что с ним можно сделать, кроме игры -->
 <div class="modal-backdrop hidden" id="friendSheet" onclick="if (event.target === this) closeFriendSheet()">
   <div class="modal-card">
@@ -2210,6 +2256,7 @@
 <script>
   const i18n = {
     en: {
+      tut: {"tutTitle": "🎓 Tutorial · lesson {n} of 3", "tutSub": ["How to read the hints", "A duel with a bot", "Bonuses and traps"], "tutLocked": "🔒 after lessons 1–2", "gateText": "🔒 Online opens after two short lessons (about 3 minutes): how to read the hints and how to play against an opponent.", "gateGo": "🎓 Start lesson {n}", "gateSkip": "Skip the tutorial", "coach": {"1": ["🎓 I picked a number from 1 to 20. Type any number and press «Check».", "The hint tells you how close you are: 🔥 hot — near, ❄️ cold — far. Try another number.", "The line under the thermometer keeps all your moves. Look between them — it's faster."], "2": ["🎓 Now a duel with a bot: you take turns. Whoever names the number first wins.", "The bot's moves are hints too: watch its «hot / cold» as well.", "⚡ «+1 move» is a token: two moves in a row. Press it before your move when you're close."], "3": ["🎓 Bonuses 🎁 are hidden on the line. Step on one and it fires: good ones hit the opponent, traps hit you.", "❓ «Something is near» — a bonus is close. Risk it or go around — your call.", "A bonus fired! What it does is on the card. Keep playing."]}, "lessonDone": "🎓 Lesson {n} done!", "lessonOpen": "🔓 Online is open", "tutAllDone": "Tutorial complete! Your 🎓 icon is in the profile.", "lessonNext": "🎓 Lesson {n}", "lessonFinish": "🎓 Done", "tutReplay": "🎓 Replay the tutorial", "bcTitle": "New bonus: {name}", "bcNear": "❓ Something is near", "bcOk": "Got it", "bcDesc": {"extra": "Whoever steps on it gets two «+1 move» tokens. A token gives two moves in a row.", "fog": "Fog falls on the opponent: until the end of the round they can't see the other player's moves.", "blind": "Blindness falls on the opponent: until the end of the round they can't see their own moves.", "lava": "The opponent's next move is thrown into the lava — a random number.", "skip": "A trap: whoever steps on it skips their next turn.", "gift": "A trap: whoever steps on it gives the opponent a «+1 move» token.", "memory": "A trap: whoever steps on it sees only the last two moves until the end of the round.", "near": "A bonus lies a few steps from your number — a good one or a trap. Risk it or go around — your call."}, "lgApprentice": "🎓 Apprentice: no star lost", "rkApprentice": "🎓 Apprentice: games without losing stars left: {n}", "tutIconLocked": "Opens after the tutorial"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
       frostLabel: "Frost and Heat", frostHint: "Negative numbers too \u2014 e.g. \u221250 to 50", bonusHint: "Some numbers hide surprises \u2014 a help or a trap",
@@ -2437,6 +2484,7 @@
       }
     },
     ru: {
+      tut: {"tutTitle": "🎓 Обучение · урок {n} из 3", "tutSub": ["Как читать подсказки", "Дуэль с ботом", "Бонусы и ловушки"], "tutLocked": "🔒 после уроков 1–2", "gateText": "🔒 Онлайн откроется после двух коротких уроков (минуты три): как читать подсказки и как играть против соперника.", "gateGo": "🎓 Начать урок {n}", "gateSkip": "Пропустить обучение", "coach": {"1": ["🎓 Я загадал число от 1 до 20. Введите любое и нажмите «Проверить».", "Подсказка говорит, насколько вы близко: 🔥 горячо — рядом, ❄️ холодно — далеко. Попробуйте другое число.", "Прямая под градусником помнит все ходы. Ищите между ними — так быстрее."], "2": ["🎓 Теперь дуэль с ботом: ходите по очереди. Кто первым назовёт число — выиграл.", "Ход бота — тоже подсказка: смотрите и на его «горячо / холодно».", "⚡ «+1 ход» — жетон: два хода подряд. Нажмите перед ходом, когда число почти найдено."], "3": ["🎓 На прямой спрятаны бонусы 🎁. Наступили — сработал: полезные бьют по сопернику, ловушки — по вам.", "❓ «Рядом что-то есть» — значит, рядом бонус. Рискнуть или обойти — решать вам.", "Сработал бонус! Что он делает — на карточке. Играйте дальше."]}, "lessonDone": "🎓 Урок {n} пройден!", "lessonOpen": "🔓 Онлайн открыт", "tutAllDone": "Обучение пройдено! Иконка 🎓 — в профиле.", "lessonNext": "🎓 Урок {n}", "lessonFinish": "🎓 Готово", "tutReplay": "🎓 Пройти обучение заново", "bcTitle": "Новый бонус: {name}", "bcNear": "❓ Рядом что-то есть", "bcOk": "Понятно", "bcDesc": {"extra": "Кто наступил, получает два жетона «+1 ход». Жетон — два хода подряд.", "fog": "Туман ложится на соперника: до конца раунда он не видит чужих ходов.", "blind": "Слепота ложится на соперника: до конца раунда он не видит своих ходов.", "lava": "Следующий ход соперника уходит в лаву — случайное число.", "skip": "Ловушка: кто наступил, пропускает следующий ход.", "gift": "Ловушка: кто наступил, дарит сопернику жетон «+1 ход».", "memory": "Ловушка: кто наступил, до конца раунда видит только два последних хода.", "near": "В нескольких шагах от вашего числа лежит бонус — полезный или ловушка. Рискнуть или обойти — решать вам."}, "lgApprentice": "🎓 Ученик: звезда не снята", "rkApprentice": "🎓 Ученик: партий без потери звёзд осталось {n}", "tutIconLocked": "Откроется после обучения"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
       frostLabel: "Мороз и Жара", frostHint: "Есть и отрицательные числа \u2014 например, от \u221250 до 50", bonusHint: "На некоторых числах спрятаны сюрпризы \u2014 помощь или ловушка",
@@ -2664,6 +2712,7 @@
       }
     },
     fr: {
+      tut: {"tutTitle": "🎓 Tutoriel · leçon {n} sur 3", "tutSub": ["Lire les indices", "Un duel contre un bot", "Bonus et pièges"], "tutLocked": "🔒 après les leçons 1–2", "gateText": "🔒 Le jeu en ligne s'ouvre après deux courtes leçons (environ 3 minutes) : lire les indices et jouer contre un adversaire.", "gateGo": "🎓 Commencer la leçon {n}", "gateSkip": "Passer le tutoriel", "coach": {"1": ["🎓 J'ai choisi un nombre de 1 à 20. Tape un nombre et appuie sur « Vérifier ».", "L'indice dit à quel point tu es proche : 🔥 chaud — tout près, ❄️ froid — loin. Essaie un autre nombre.", "La ligne sous le thermomètre garde tous tes coups. Cherche entre eux — c'est plus rapide."], "2": ["🎓 Maintenant un duel contre un bot : chacun son tour. Le premier qui trouve le nombre gagne.", "Les coups du bot sont aussi des indices : regarde aussi ses « chaud / froid ».", "⚡ « +1 coup » est un jeton : deux coups d'affilée. Appuie avant ton coup quand tu es tout près."], "3": ["🎓 Des bonus 🎁 sont cachés sur la ligne. Marche dessus et il se déclenche : les bons frappent l'adversaire, les pièges te frappent.", "❓ « Quelque chose est proche » — un bonus est tout près. Risquer ou contourner — à toi de voir.", "Un bonus s'est déclenché ! Ce qu'il fait est sur la carte. Continue."]}, "lessonDone": "🎓 Leçon {n} réussie !", "lessonOpen": "🔓 Le jeu en ligne est ouvert", "tutAllDone": "Tutoriel terminé ! Ton icône 🎓 est dans le profil.", "lessonNext": "🎓 Leçon {n}", "lessonFinish": "🎓 Terminé", "tutReplay": "🎓 Refaire le tutoriel", "bcTitle": "Nouveau bonus : {name}", "bcNear": "❓ Quelque chose est proche", "bcOk": "Compris", "bcDesc": {"extra": "Qui marche dessus reçoit deux jetons « +1 coup ». Un jeton donne deux coups d'affilée.", "fog": "Le brouillard tombe sur l'adversaire : jusqu'à la fin de la manche, il ne voit plus les coups de l'autre.", "blind": "La cécité tombe sur l'adversaire : jusqu'à la fin de la manche, il ne voit plus ses propres coups.", "lava": "Le prochain coup de l'adversaire part dans la lave — un nombre au hasard.", "skip": "Un piège : qui marche dessus passe son prochain tour.", "gift": "Un piège : qui marche dessus offre un jeton « +1 coup » à l'adversaire.", "memory": "Un piège : qui marche dessus ne voit que les deux derniers coups jusqu'à la fin de la manche.", "near": "Un bonus se trouve à quelques pas de ton nombre — bon ou piège. Risquer ou contourner — à toi de voir."}, "lgApprentice": "🎓 Apprenti : aucune étoile perdue", "rkApprentice": "🎓 Apprenti : parties sans perte d'étoiles restantes : {n}", "tutIconLocked": "S'ouvre après le tutoriel"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
       frostLabel: "Gel et Chaleur", frostHint: "Aussi des nombres n\u00e9gatifs \u2014 par ex. de \u221250 \u00e0 50", bonusHint: "Certains nombres cachent des surprises \u2014 un coup de pouce ou un pi\u00e8ge",
@@ -2891,6 +2940,7 @@
       }
     },
     de: {
+      tut: {"tutTitle": "🎓 Tutorial · Lektion {n} von 3", "tutSub": ["Hinweise lesen", "Ein Duell gegen einen Bot", "Boni und Fallen"], "tutLocked": "🔒 nach den Lektionen 1–2", "gateText": "🔒 Online öffnet sich nach zwei kurzen Lektionen (etwa 3 Minuten): Hinweise lesen und gegen einen Gegner spielen.", "gateGo": "🎓 Lektion {n} starten", "gateSkip": "Tutorial überspringen", "coach": {"1": ["🎓 Ich habe eine Zahl von 1 bis 20 gewählt. Gib eine Zahl ein und drücke „Prüfen“.", "Der Hinweis sagt, wie nah du bist: 🔥 heiß — nah, ❄️ kalt — weit weg. Versuch eine andere Zahl.", "Die Linie unter dem Thermometer merkt sich alle Züge. Such zwischen ihnen — das geht schneller."], "2": ["🎓 Jetzt ein Duell gegen einen Bot: ihr zieht abwechselnd. Wer die Zahl zuerst nennt, gewinnt.", "Die Züge des Bots sind auch Hinweise: achte auch auf sein „heiß / kalt“.", "⚡ „+1 Zug“ ist eine Marke: zwei Züge hintereinander. Drück sie vor deinem Zug, wenn du nah dran bist."], "3": ["🎓 Auf der Linie sind Boni 🎁 versteckt. Tritt darauf und er wirkt: gute treffen den Gegner, Fallen treffen dich.", "❓ „Etwas ist in der Nähe“ — ein Bonus liegt nah. Riskieren oder umgehen — du entscheidest.", "Ein Bonus hat gewirkt! Was er tut, steht auf der Karte. Spiel weiter."]}, "lessonDone": "🎓 Lektion {n} geschafft!", "lessonOpen": "🔓 Online ist offen", "tutAllDone": "Tutorial geschafft! Dein 🎓-Symbol ist im Profil.", "lessonNext": "🎓 Lektion {n}", "lessonFinish": "🎓 Fertig", "tutReplay": "🎓 Tutorial wiederholen", "bcTitle": "Neuer Bonus: {name}", "bcNear": "❓ Etwas ist in der Nähe", "bcOk": "Verstanden", "bcDesc": {"extra": "Wer darauf tritt, bekommt zwei „+1 Zug“-Marken. Eine Marke gibt zwei Züge hintereinander.", "fog": "Nebel legt sich auf den Gegner: bis zum Rundenende sieht er die Züge des anderen nicht.", "blind": "Blindheit legt sich auf den Gegner: bis zum Rundenende sieht er seine eigenen Züge nicht.", "lava": "Der nächste Zug des Gegners fliegt in die Lava — eine zufällige Zahl.", "skip": "Eine Falle: wer darauf tritt, setzt den nächsten Zug aus.", "gift": "Eine Falle: wer darauf tritt, schenkt dem Gegner eine „+1 Zug“-Marke.", "memory": "Eine Falle: wer darauf tritt, sieht bis zum Rundenende nur die letzten zwei Züge.", "near": "Ein paar Schritte von deiner Zahl liegt ein Bonus — gut oder Falle. Riskieren oder umgehen — du entscheidest."}, "lgApprentice": "🎓 Lehrling: kein Stern verloren", "rkApprentice": "🎓 Lehrling: Partien ohne Sternverlust übrig: {n}", "tutIconLocked": "Öffnet sich nach dem Tutorial"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze", frostHint: "Auch negative Zahlen \u2014 z. B. \u221250 bis 50", bonusHint: "Manche Zahlen verstecken \u00dcberraschungen \u2014 Hilfe oder Falle",
@@ -3594,6 +3644,7 @@
     document.getElementById('tGroupOffline').textContent = L.groupOffline;
     document.getElementById('tGroupOnline').textContent = L.groupOnline;
     document.getElementById('tModeOnline').textContent = L.online.mode;
+    renderTutorialMenu();
     // Значок — как у «🎮 Игры»: разделы экрана подписаны одинаково
     document.getElementById('tLblFindFriend').textContent = '🔍 ' + L.online.find;
     document.getElementById('tFindBtn').textContent = L.online.findBtn;
@@ -3693,6 +3744,7 @@
   }
 
   function quitToMenu() {
+    endLessonMode();
     hideBarTip();
     stopBot();
     vsBot = null;
@@ -3741,6 +3793,7 @@
   // Игра с ботом — та же дуэль: вместо второго имени и форы выбирается бот
   let setupBot = false;
   function openSetup(m, bot) {
+    endLessonMode();
     mode = m;
     setupBot = !!bot && m === 'duel';
     const L = t();
@@ -4241,6 +4294,10 @@
     renderSayBubble();
     syncScaleBox();
     if (duel) renderPlayers();
+    // Сначала итог урока: он отмечает урок пройденным, и подсказка гаснет
+    renderLessonResult();
+    renderCoach();
+    checkBonusCard();
     botTick();
   }
 
@@ -5290,6 +5347,8 @@
     const lines = [];
     if (d === 2) lines.push(L.lgStreak);
     if (d === 0 && after < 150 && after % 15 === 0 && D.roundWinner !== seat) lines.push(L.lgFloor);
+    // Проиграл, а звезда на месте и это не ступень — значит, Ученик
+    else if (d === 0 && after < 150 && D.roundWinner !== seat) lines.push(t().tut.lgApprentice);
     const promoted = ladderPos(after).league > ladderPos(was).league;
     if (promoted) lines.push(L.lgNew.replace('{l}', leagueLabel(after).replace(/ \d+$/, '')));
     const unlock = (stars.unlock || [])[seat];
@@ -5941,6 +6000,10 @@
     // Старый сервер цвета не знает — тогда свой выбор не трогаем
     setMyLook(data.avatar || '', 'color' in data ? (data.color || '') : myColor());
     profileInfo = data;
+    // Обучение прошли, пока не были в аккаунте, — отметить в базе
+    if ('tutorialDone' in data && !data.tutorialDone && tutorialComplete()) {
+      friendRpc('tutorial_finished', {}).then(() => { if (profileInfo) profileInfo.tutorialDone = true; }).catch(() => {});
+    }
     updateAccountChip();
     return data;
   }
@@ -6224,9 +6287,12 @@
       grid.appendChild(sep);
     }
     // Первая клетка — буква: вернуться к ней можно так же, как выбрать иконку
-    ['', ...AVATAR_CHOICES, ...rewardsOf('icon')].forEach(icon => {
+    // Иконка за обучение — когда сервер о ней знает (миграция 037)
+    const tutIcon = profileInfo && 'tutorialDone' in profileInfo ? [TUTORIAL_ICON] : [];
+    ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon].forEach(icon => {
       const b = document.createElement('button');
-      const locked = rewardLeague('icon', icon) > 0 && !rewardOpen('icon', icon);
+      const locked = icon === TUTORIAL_ICON ? !tutorialIconOpen()
+        : rewardLeague('icon', icon) > 0 && !rewardOpen('icon', icon);
       b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '') + (locked ? ' locked' : '');
       b.dataset.icon = icon;
       b.textContent = icon || avatarLetter(me);
@@ -6268,8 +6334,19 @@
   }
 
   // Выбор видно сразу; если сервер не принял — возвращаем прежнюю
+  function tutorialIconOpen() {
+    return !!(profileInfo && profileInfo.tutorialDone) || tutorialComplete();
+  }
+
   async function chooseAvatar(icon) {
     if (lockedNote('icon', icon)) return;
+    if (icon === TUTORIAL_ICON) {
+      if (!tutorialIconOpen()) return setNote('avNote', t().tut.tutIconLocked, true);
+      // Обучение пройдено без входа — сначала сказать базе, иначе иконку не примет
+      if (!(profileInfo && profileInfo.tutorialDone)) {
+        try { await friendRpc('tutorial_finished', {}); if (profileInfo) profileInfo.tutorialDone = true; } catch (e) {}
+      }
+    }
     const before = myAvatar();
     // Выбрал — сетка сворачивается: новая иконка видна в большом кружке
     showAvatarPicker(false);
@@ -6475,16 +6552,19 @@
   }
 
   function openRunEntry() {
+    if (!onlineOpen()) return openLessonGate();
     authReturn = 'runHub';
     if (runAuth()) openRunHub(); else showScreen('authChoice');
   }
 
   function openOnlineEntry() {
+    if (!onlineOpen()) return openLessonGate();
     authReturn = 'online';
     if (runAuth()) openOnline(); else showScreen('authChoice');
   }
 
   function openFriendsEntry() {
+    if (!onlineOpen()) return openLessonGate();
     authReturn = 'friends';
     if (runAuth()) openFriends(); else showScreen('authChoice');
   }
@@ -7282,6 +7362,220 @@
     }
   }
 
+  // ================= ОБУЧЕНИЕ =================
+  // Три урока: подсказки, дуэль с ботом, бонусы. Пока не пройдены первые два,
+  // онлайн закрыт. Кто уже играл до появления обучения, ничего не проходит —
+  // его узнаём по следам прошлых игр в браузере
+  const TUTORIAL_ICON = '🎓';
+  const TUT_KEY = 'hc_tutorial';
+  const SEEN_BONUS_KEY = 'hc_seen_bonus';
+  let lesson = null;   // { n, prev, done } — идёт урок n
+
+  function tutState() {
+    try { return JSON.parse(localStorage.getItem(TUT_KEY)) || { done: [], skipped: false }; }
+    catch (e) { return { done: [], skipped: false }; }
+  }
+  function tutSave(st) {
+    try { localStorage.setItem(TUT_KEY, JSON.stringify(st)); } catch (e) {}
+  }
+  function tutInit() {
+    try {
+      if (localStorage.getItem(TUT_KEY) !== null) return;
+      const quiet = ['hc_lang', 'hc_mute', 'hc_sound', TUT_KEY, SEEN_BONUS_KEY];
+      let veteran = false;
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf('hc_') === 0 && quiet.indexOf(k) < 0) veteran = true;
+      }
+      tutSave({ done: [], skipped: veteran, veteran: veteran });
+      // Старые игроки бонусы уже видели: карточки им ни к чему
+      if (veteran) localStorage.setItem(SEEN_BONUS_KEY, JSON.stringify(BONUS_TYPES.concat(['near'])));
+    } catch (e) {}
+  }
+  function onlineOpen() {
+    const st = tutState();
+    return st.skipped || (st.done.indexOf(1) >= 0 && st.done.indexOf(2) >= 0);
+  }
+  function tutorialComplete() { return tutState().done.length >= 3; }
+  function nextLessonNo() {
+    const done = tutState().done;
+    return [1, 2, 3].find(n => done.indexOf(n) < 0) || 1;
+  }
+
+  function renderTutorialMenu() {
+    const T = t().tut;
+    const st = tutState();
+    const show = !st.skipped && st.done.length < 3;
+    const card = document.getElementById('tutCard');
+    card.classList.toggle('hidden', !show);
+    if (show) {
+      const n = nextLessonNo();
+      document.getElementById('tTutTitle').textContent = T.tutTitle.replace('{n}', n);
+      document.getElementById('tTutSub').textContent = T.tutSub[n - 1];
+    }
+    const locked = !onlineOpen();
+    ['run', 'online'].forEach(k => {
+      document.querySelector('.mode-btn.' + k).classList.toggle('locked', locked);
+      const sub = document.getElementById(k === 'run' ? 'tRunLock' : 'tOnlineLock');
+      sub.textContent = T.tutLocked;
+      sub.classList.toggle('hidden', !locked);
+    });
+    document.getElementById('tTutReplay').textContent = T.tutReplay;
+  }
+
+  function openLessonGate() {
+    const T = t().tut;
+    document.getElementById('gateText').textContent = T.gateText;
+    document.getElementById('gateGo').textContent = T.gateGo.replace('{n}', nextLessonNo());
+    document.getElementById('gateSkip').textContent = T.gateSkip;
+    document.getElementById('gateModal').classList.remove('hidden');
+  }
+  function closeGate() { document.getElementById('gateModal').classList.add('hidden'); }
+  function skipTutorial() {
+    const st = tutState();
+    st.skipped = true;
+    tutSave(st);
+    closeGate();
+    renderTutorialMenu();
+  }
+
+  // Урок идёт обычной игрой с заданными условиями. Настройки игрока (бонусы,
+  // мороз, число бонусов) урок не трогает: берёт на время и возвращает
+  function startLesson(n) {
+    if (lesson) endLessonMode();
+    lesson = { n: n, done: false, prev: { bonusMode, bonusCountChoice, frostMode } };
+    frostMode = false;
+    stopBot();
+    vsBot = null;
+    if (n === 1) {
+      mode = 'solo';
+      applyBounds(20);
+      MAX_GUESSES = minAttempts(rangeCount()) + 3;
+      applyRangeToInputs();
+      startSolo();
+      return;
+    }
+    const L = t();
+    mode = 'duel';
+    setupBot = true;
+    bonusMode = n === 3;
+    bonusCountChoice = n === 3 ? 5 : 0;
+    applyBounds(50);
+    applyRangeToInputs();
+    // Черепаха — самый мягкий соперник: урок про правила, а не про победу
+    vsBot = { bot: BOTS[0] };
+    D.names[0] = myName() || L.you;
+    D.names[1] = botName(vsBot.bot);
+    D.winsNeeded = 1;
+    D.handicap = 0;
+    D.wins = [0, 0];
+    D.round = 1;
+    D.matchOver = false;
+    D.starter = 0;
+    startRound();
+    applyTranslations();
+    showScreen('game');
+  }
+
+  function startNextLesson() { startLesson(nextLessonNo()); }
+
+  function endLessonMode() {
+    if (!lesson) return;
+    bonusMode = lesson.prev.bonusMode;
+    bonusCountChoice = lesson.prev.bonusCountChoice;
+    frostMode = lesson.prev.frostMode;
+    lesson = null;
+  }
+
+  function lessonFinished() {
+    if (!lesson) return false;
+    if (lesson.n === 1) return gameOverType === 'win' || gameOverType === 'lose';
+    return D.matchOver;
+  }
+
+  function finishLesson() {
+    lesson.done = true;
+    const st = tutState();
+    if (st.done.indexOf(lesson.n) < 0) st.done.push(lesson.n);
+    st.done.sort();
+    tutSave(st);
+    // Всё пройдено — база откроет иконку. Без входа отметим при входе
+    if (st.done.length >= 3 && runAuth()) friendRpc('tutorial_finished', {}).then(() => {
+      if (profileInfo) profileInfo.tutorialDone = true;
+    }).catch(() => {});
+  }
+
+  // Подсказка урока — по тому, что сейчас на доске
+  function coachStep() {
+    const n = lesson.n;
+    const mine = history.filter(h => h.p === 0 || h.p === null).length;
+    if (n === 1) return Math.min(history.length, 2);
+    if (n === 2) {
+      if (!mine) return 0;
+      return mine >= 2 && D.tokens[0] > 0 ? 2 : 1;
+    }
+    if (D.bonuses.some(b => b.taken)) return 2;
+    return D.nearBonus ? 1 : 0;
+  }
+
+  function renderCoach() {
+    const box = document.getElementById('coach');
+    const show = !!lesson && !lesson.done;
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    box.textContent = t().tut.coach[lesson.n][coachStep()];
+  }
+
+  // Конец урока: вместо «Новая игра» — следующий урок
+  function renderLessonResult() {
+    if (!lesson || !lessonFinished()) return;
+    if (!lesson.done) finishLesson();
+    const box = document.getElementById('resultBox');
+    const actions = box.querySelector('.r-actions');
+    if (!actions || box.querySelector('.r-lesson')) return;
+    const T = t().tut;
+    const line = document.createElement('div');
+    line.className = 'r-lesson';
+    const parts = [T.lessonDone.replace('{n}', lesson.n)];
+    if (lesson.n === 2 && onlineOpen()) parts.push(T.lessonOpen);
+    if (tutorialComplete() && lesson.n === 3) parts.push(T.tutAllDone);
+    line.textContent = parts.join(' · ');
+    box.insertBefore(line, actions);
+    const next = lesson.n < 3 ? lesson.n + 1 : null;
+    actions.innerHTML = (next
+      ? '<button class="btn" onclick="startLesson(' + next + ')">' + T.lessonNext.replace('{n}', next) + '</button>'
+      : '<button class="btn" onclick="quitToMenu()">' + T.lessonFinish + '</button>') +
+      (next ? '<button class="btn-ghost" onclick="quitToMenu()">' + t().toMenu + '</button>' : '');
+  }
+
+  // ---------- Карточки бонусов ----------
+  const BONUS_ICON = { extra: '⚡', fog: '🙈', blind: '🌫️', lava: '🌋', skip: '⏭', gift: '🎁', memory: '🧠', near: '❓' };
+  let bonusCardFor = null;
+  function seenBonuses() {
+    try { return JSON.parse(localStorage.getItem(SEEN_BONUS_KEY)) || []; } catch (e) { return []; }
+  }
+  function checkBonusCard() {
+    if (mode !== 'duel' || screen !== 'game' || bonusCardFor) return;
+    const kind = D.lastBonus && BONUS_ICON[D.lastBonus] ? D.lastBonus : (D.nearBonus ? 'near' : null);
+    if (!kind) return;
+    const seen = seenBonuses();
+    if (seen.indexOf(kind) >= 0) return;
+    seen.push(kind);
+    try { localStorage.setItem(SEEN_BONUS_KEY, JSON.stringify(seen)); } catch (e) {}
+    const T = t().tut;
+    bonusCardFor = kind;
+    document.getElementById('bcIcon').textContent = BONUS_ICON[kind];
+    document.getElementById('bcTitle').textContent = kind === 'near' ? T.bcNear
+      : T.bcTitle.replace('{name}', t().bonusNames[kind]);
+    document.getElementById('bcDesc').textContent = T.bcDesc[kind];
+    document.getElementById('bcOk').textContent = T.bcOk;
+    document.getElementById('bonusCard').classList.remove('hidden');
+  }
+  function closeBonusCard() {
+    bonusCardFor = null;
+    document.getElementById('bonusCard').classList.add('hidden');
+  }
+
   // ================= ЖАЛОБА И БЛОКИРОВКА =================
   let sheetFor = null;
   let reportReason = null;
@@ -7923,6 +8217,11 @@
       const month = seasonMonth(ladderInfo.season);
       document.getElementById('rkEloSub').textContent = days > 0
         ? L.lgSeason.replace('{m}', month).replace('{n}', days) : L.lgSeasonLast.replace('{m}', month);
+      // Ученик: первые партии без потери звёзд — сказать, сколько ещё
+      const left = ladderInfo.apprentice || 0;
+      const ap = document.getElementById('rkApprentice');
+      ap.textContent = t().tut.rkApprentice.replace('{n}', left);
+      ap.classList.toggle('hidden', !(left > 0));
     } else {
       elo.textContent = mine ? formatNum(mine.elo) : '—';
       document.getElementById('rkEloSub').textContent = mine
@@ -8701,6 +9000,7 @@
   // или смена размера окна требуют пересчёта
   window.addEventListener('resize', () => { if (screen === 'game') renderNumberLine(); });
 
+  tutInit();
   initScaleBox();
   document.getElementById('langSwitcher').value = currentLang;
   document.getElementById('winsNeeded').value = '3';

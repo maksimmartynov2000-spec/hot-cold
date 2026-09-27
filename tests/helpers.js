@@ -58,6 +58,11 @@ function stubSupabase(opts) {
           // конкретного вызова тест подкладывает через window.__rpcError.
           // unsupported — сервер без миграции профиля: функций нет вовсе
           // noColor — сервер с профилем, но ещё без цвета (своя миграция не применена)
+          if (name === 'tutorial_finished') {
+            window.__tutorialFinished = (window.__tutorialFinished || 0) + 1;
+            if (window.__profile) window.__profile.tutorialDone = true;
+            return { data: true, error: null };
+          }
           if (['my_profile', 'set_avatar', 'set_avatar_color', 'avatars_for', 'rename_student', 'change_pin'].indexOf(name) >= 0) {
             const P = window.__profile;
             P.calls.push({ name, args });
@@ -70,6 +75,8 @@ function stubSupabase(opts) {
             if (name === 'my_profile') {
               const d = { username: args.p_username, avatar: P.avatar, since: P.since, renameWaitHours: P.wait };
               if (!P.noColor) d.color = P.color;
+              // Про обучение знает только база с миграцией 037
+              if ('tutorialDone' in P) d.tutorialDone = !!P.tutorialDone;
               return { data: d, error: null };
             }
             if (name === 'set_avatar_color') {
@@ -418,6 +425,12 @@ function stubSupabase(opts) {
         updatedAt: '2026-01-01T00:00:00Z' };
     };
 
+    // Обучение и карточки бонусов (обучение новичка) проверяются отдельно;
+    // остальные проверки идут как у игрока, который всё это уже видел
+    if (!opts.newbie && localStorage.getItem('hc_tutorial') === null) {
+      localStorage.setItem('hc_tutorial', JSON.stringify({ done: [], skipped: true }));
+      localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'lava', 'skip', 'gift', 'memory', 'near']));
+    }
     if (opts.user) {
       localStorage.setItem('hc_run_user', opts.user);
       localStorage.setItem('hc_run_pin', '1234');

@@ -69,7 +69,7 @@ function serve() {
 
   check('без сети страница открывается', await page.locator('#screenMode').isVisible());
   check('без сети видны все пять режимов',
-    (await page.locator('#screenMode .mode-btn').count()) === 5);
+    (await page.locator('#screenMode .mode-btn:not(.hidden)').count()) === 5);
 
   // Онлайн — первый режим, которому сеть нужна по существу. И рейтинг, и друзья
   // должны сказать об этом словами, а не молча зависнуть на пустом списке

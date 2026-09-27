@@ -95,7 +95,14 @@ async function openPlayer(browser, db, lang) {
   await attach(context, db, log);
   const page = await context.newPage();
   page.on('pageerror', e => check('без ошибок JS', false, e.message));
-  await page.addInitScript(l => localStorage.setItem('hc_lang', l), lang || 'ru');
+  await page.addInitScript(l => {
+    localStorage.setItem('hc_lang', l);
+    // Обучение проверяет run.js; здесь игроки его уже прошли
+    if (localStorage.getItem('hc_tutorial') === null) {
+      localStorage.setItem('hc_tutorial', JSON.stringify({ done: [1, 2, 3], skipped: false }));
+      localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'lava', 'skip', 'gift', 'memory', 'near']));
+    }
+  }, lang || 'ru');
   await page.goto(GAME);
   await page.waitForTimeout(400);
   return { context, page, log };
