@@ -13,6 +13,10 @@ do $$ begin
   update matches set status = 'finished' where status in ('invited', 'active');
   update students set failed_logins = 0, locked_until = null, avatar = null, avatar_color = null;
 end $$;
+-- Сценарии ниже — про игрока, который уже не «Ученик» (миграция 037): у
+-- ученика поражение звезду не отнимает. «Ученика» проверяет test_onboarding.sql.
+-- Внутри транзакции — откатится вместе со всем
+create or replace function apprentice_games() returns int language sql immutable as $$ select 0; $$;
 \echo ok
 
 \echo === 1. звёзды: +1, третья победа подряд +2, поражение −1 и обрыв серии

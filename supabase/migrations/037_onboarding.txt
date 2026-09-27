@@ -1,0 +1,175 @@
+-- Обучение новичка: иконка за обучение и лига «Ученик». Применять в Supabase:
+-- SQL Editor → вставить целиком → Run. Применить ДО мёржа.
+--
+-- Сами уроки идут в игре без интернета: база о них узнаёт, только когда
+-- игрок вошёл, — игра отмечает «обучение пройдено». Это открывает иконку 🎓.
+--
+-- Лига «Ученик»: первые 10 партий на звёзды поражение звезду не отнимает —
+-- как у новичков в Hearthstone. Считаются все партии на звёзды за всё время,
+-- а не за сезон. Кто уже играл до этой миграции, учеником не считается.
+
+-- 1. Обучение пройдено
+alter table students add column if not exists tutorial_done boolean not null default false;
+
+create or replace function tutorial_icon()
+returns text
+language sql
+immutable
+as $$ select '🎓'::text; $$;
+
+alter table students drop constraint if exists student_avatar_allowed;
+alter table students add constraint student_avatar_allowed
+  check (avatar is null or avatar = any (avatar_choices() || reward_icons() || tutorial_icon()));
+
+create or replace function tutorial_finished(p_username text, p_pin text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  update students set tutorial_done = true where username = me;
+  return true;
+end;
+$$;
+
+-- 2. Партии на звёзды за всё время. Тем, кто уже играл, ставим 10: учеником
+--    их не делаем. Повторный прогон ничего не меняет — трогаем только пустые
+alter table ladder add column if not exists career int;
+update ladder l
+set career = case when l.games >= 10 or exists (select 1 from season_badges b where b.username = l.username)
+                  then 10 else l.games end
+where l.career is null;
+alter table ladder alter column career set default 0;
+alter table ladder alter column career set not null;
+
+create or replace function apprentice_games()
+returns int
+language sql
+immutable
+as $$ select 10; $$;
+
+-- 3. Профиль знает, пройдено ли обучение; иконка 🎓 — только прошедшему
+create or replace function my_profile(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; s students;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into s from students where username = me;
+  return jsonb_build_object(
+    'username', s.username,
+    'avatar', s.avatar,
+    'color', s.avatar_color,
+    'since', s.created_at,
+    'tutorialDone', s.tutorial_done,
+    'renameWaitHours', case
+      when s.renamed_at is null or s.renamed_at <= now() - interval '24 hours' then 0
+      else greatest(1, ceil(extract(epoch from (s.renamed_at + interval '24 hours' - now())) / 3600))::int
+    end);
+end;
+$$;
+
+create or replace function set_avatar(p_username text, p_pin text, p_avatar text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; need int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  -- Иконка за обучение — тому, кто его прошёл
+  if p_avatar = tutorial_icon() then
+    if not coalesce((select tutorial_done from students where username = me), false) then
+      raise exception 'avatar_locked';
+    end if;
+  elsif p_avatar is not null and not (p_avatar = any (avatar_choices())) then
+    select league into need from league_rewards() where kind = 'icon' and value = p_avatar;
+    if need is null then raise exception 'invalid_avatar'; end if;
+    if coalesce((select peak from ladder where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  end if;
+  update students set avatar = p_avatar where username = me;
+  return p_avatar;
+end;
+$$;
+
+-- 4. Ученик: поражение звезду не отнимает, игра видит, сколько партий осталось
+create or replace function ladder_after(p_username text, p_won boolean)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare r ladder; st int; s int;
+begin
+  r := ladder_touch(p_username);
+  if p_won then
+    st := r.streak + 1;
+    s := least(150, r.stars + case when st >= 3 and r.stars < 150 then 2 else 1 end);
+  else
+    st := 0;
+    -- Начало лиги и ранг 5 — ступени, ниже которых не упасть. Легенда — до
+    -- конца сезона
+    s := case when r.stars >= 150 or r.stars % 15 = 0 then r.stars else r.stars - 1 end;
+    -- Ученик: первые 10 партий на звёзды поражение звезду не отнимает
+    if r.career < apprentice_games() then s := r.stars; end if;
+  end if;
+  update ladder
+  set stars = s,
+      legend_at = case when s >= 150 and r.legend_at is null then now() else r.legend_at end,
+      streak = st,
+      best = greatest(r.best, s),
+      games = r.games + 1,
+      career = r.career + 1,
+      peak = greatest(r.peak, ladder_league(s)),
+      updated_at = now()
+  where username = p_username;
+  return s - r.stars;
+end;
+$$;
+
+create or replace function ladder_status(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; r ladder; badges jsonb; ends timestamptz;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  r := ladder_touch(me);
+  select coalesce(jsonb_agg(jsonb_build_object('season', b.season, 'league', b.league) order by b.season), '[]'::jsonb)
+    into badges
+  from season_badges b where b.username = me;
+  ends := (date_trunc('month', now() at time zone 'UTC') + interval '1 month') at time zone 'UTC';
+  return jsonb_build_object(
+    'season', r.season,
+    'endsIn', greatest(0, floor(extract(epoch from (ends - now())))::int),
+    'stars', r.stars,
+    'streak', r.streak,
+    'best', r.best,
+    'games', r.games,
+    'apprentice', greatest(0, apprentice_games() - r.career),
+    'peak', r.peak,
+    'badges', badges);
+end;
+$$;
+
+revoke execute on function ladder_after(text, boolean) from public, anon;
+grant execute on function tutorial_icon() to anon;
+grant execute on function tutorial_finished(text, text) to anon;
+grant execute on function my_profile(text, text) to anon;
+grant execute on function set_avatar(text, text, text) to anon;
+grant execute on function ladder_status(text, text) to anon;
