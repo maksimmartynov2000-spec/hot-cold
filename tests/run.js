@@ -5228,6 +5228,93 @@ async function testFogWholeRound(browser) {
   await page.context().close();
 }
 
+// Партия с человеком: ждём обоих, отсчёт 3-2-1, «Готов» между раундами
+async function testMatchFlow(browser) {
+  console.log('\nОнлайн: начало партии и перерыв');
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    Object.assign(window.__match, { lobby: true, lobbyLeft: 270, present: [true, false] });
+    openMatch(1);
+  });
+  await page.waitForTimeout(500);
+  const view = () => page.evaluate(() => ({
+    banner: document.getElementById('turnBanner').textContent,
+    bannerShown: !document.getElementById('turnBanner').classList.contains('hidden'),
+    input: !document.getElementById('guessSection').classList.contains('hidden'),
+    clock: !document.getElementById('turnClock').classList.contains('hidden'),
+    next: (document.getElementById('rNext') || {}).textContent || '',
+    btns: [...document.querySelectorAll('#resultBox .r-actions .btn')].map(b => ({ t: b.textContent, off: b.disabled }))
+  }));
+  let v = await view();
+  check('соперника нет — «Ждём Кира» и сколько до отмены',
+    v.bannerShown && v.banner.includes('Ждём Кира') && /отмена через 4:(2\d|30)/.test(v.banner), v.banner);
+  check('пока ждём — ни поля ввода, ни часов хода', !v.input && !v.clock, JSON.stringify(v));
+
+  // Соперник пришёл — отсчёт
+  await page.evaluate(() => { Object.assign(window.__match, { lobby: false, lobbyLeft: null, startsIn: 2, present: [true, true] }); refreshMatch(true); });
+  await page.waitForTimeout(400);
+  v = await view();
+  check('оба на месте — «Начинаем через 2…»', /Начинаем через [12]…/.test(v.banner) && !v.input && !v.clock, JSON.stringify(v));
+  // Опрос сервера выключен: поле должно появиться от самого отсчёта, а не
+  // от очередного ответа сервера двумя секундами позже
+  await page.evaluate(() => { window.__match.startsIn = null; stopMatchPoll(); });
+  await page.waitForTimeout(2200);
+  v = await view();
+  check('отсчёт кончился — поле ввода и часы хода', v.input && v.clock && v.banner.includes('Ходит'), JSON.stringify(v));
+  await page.evaluate(() => startMatchPoll());
+
+  // Раунд окончен: «Готов», 10 секунд, соперник ещё не готов
+  await page.evaluate(() => {
+    Object.assign(window.__match, { roundOver: true, roundWinner: 0, wins: [1, 0], nextIn: 8, waitReady: true,
+                                    moves: [{ seat: 0, guess: 42, tier: 8 }] });
+    window.__nextCalls = 0;
+    refreshMatch(true);
+  });
+  await page.waitForTimeout(400);
+  v = await view();
+  check('между раундами — «Готов» и сколько до следующего', v.btns.length === 1 && v.btns[0].t === 'Готов' &&
+    /Следующий раунд через [78] с/.test(v.next), JSON.stringify(v));
+  await page.click('#resultBox .r-actions .btn');
+  await page.waitForTimeout(400);
+  v = await view();
+  const calls = await page.evaluate(() => ({ n: window.__nextCalls, round: D.round, over: D.roundOver }));
+  check('нажал «Готов» — ждём соперника, раунд не начался',
+    v.btns[0] && v.btns[0].off && v.btns[0].t.includes('ждём Кира') && calls.n === 1 && calls.over && calls.round === 1,
+    JSON.stringify({ v, calls }));
+  await page.evaluate(() => { window.__match.ready = [true, true]; refreshMatch(true); });
+  await page.waitForTimeout(400);
+  v = await view();
+  check('соперник тоже готов — это видно', v.next.includes('✓ Кира ждёт'), v.next);
+  // Вышло время — сервер начал раунд сам
+  await page.evaluate(() => {
+    Object.assign(window.__match, { roundOver: false, roundWinner: null, round: 2, cur: 1, nextIn: null, ready: [false, false], moves: [] });
+    refreshMatch(true);
+  });
+  await page.waitForTimeout(400);
+  v = await view();
+  const r2 = await page.evaluate(() => ({ round: D.round, over: D.roundOver, line: !!document.querySelector('#rNext') }));
+  check('новый раунд начался сам', r2.round === 2 && !r2.over && !r2.line, JSON.stringify(r2));
+
+  // Не пришёл — отменено
+  await page.evaluate(() => { Object.assign(window.__match, { status: 'expired' }); refreshMatch(true); });
+  await page.waitForTimeout(400);
+  v = await view();
+  check('соперник не пришёл — «Партия отменена», ходить нельзя', v.banner.includes('Партия отменена — Кира') && !v.input && !v.clock,
+    JSON.stringify(v));
+
+  // С ботом «Готов» не нужен: кнопка как раньше
+  await page.evaluate(() => {
+    Object.assign(window.__match, { status: 'active', botSeat: 1, names: ['Лев', '@bot:panda'], roundOver: true, roundWinner: 0,
+                                    nextIn: 9, waitReady: false, ready: [false, true] });
+    refreshMatch(true);
+  });
+  await page.waitForTimeout(400);
+  v = await view();
+  check('с ботом — «Следующий раунд» без ожидания', v.btns[0] && v.btns[0].t === 'Следующий раунд' && !v.next.includes('ждёт'),
+    JSON.stringify(v));
+  await page.context().close();
+}
+
 async function testPolish(browser) {
   console.log('\nПолировка');
   let page = await newGame(browser);
@@ -5769,6 +5856,7 @@ async function testKeyPage(browser) {
     await testPolish(browser);
     await testQuitConfirm(browser);
     await testFogWholeRound(browser);
+    await testMatchFlow(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

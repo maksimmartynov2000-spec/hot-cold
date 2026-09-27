@@ -118,6 +118,9 @@ async function registerPlayer(p, name, pin) {
   await db.connect();
   // Сценарии миграций оставляют после себя игроков — для чистоты берём своих
   await db.query("delete from students where username in ('Тимур','Лада','Артур')");
+  // run.sh выключает правило «начинаем, когда оба пришли» для своих сценариев.
+  // Здесь игра идёт как в жизни — правило включено
+  await db.query('alter table matches enable trigger matches_flow');
 
   const browser = await chromium.launch(launchOptions());
   const A = await openPlayer(browser, db, 'ru');
@@ -196,6 +199,15 @@ async function registerPlayer(p, name, pin) {
   const seen = await B.page.evaluate(() => ({ secret: secret, seat: online.seat }));
   check('загаданное число клиенту неизвестно', seen.secret === 0, String(seen.secret));
   check('место за доской получено с сервера', seen.seat === 1, String(seen.seat));
+  // Вызвавшего ещё нет: часы стоят, у принявшего — «Ждём …»
+  const waiting = await B.page.evaluate(() => ({
+    banner: document.getElementById('turnBanner').textContent,
+    input: !document.getElementById('guessSection').classList.contains('hidden')
+  }));
+  const lobbyRow = (await db.query('select lobby, turn_deadline from matches where id = $1', [match.id])).rows[0];
+  check('пока вызвавшего нет — «Ждём», часы не идут',
+    waiting.banner.includes('Ждём') && !waiting.input && lobbyRow.lobby && lobbyRow.turn_deadline === null,
+    JSON.stringify({ waiting, lobbyRow }));
 
   // Вызвавший тоже должен открыть матч: у него в списке он стал активным
   await A.page.waitForTimeout(11000);
@@ -205,6 +217,8 @@ async function registerPlayer(p, name, pin) {
   await A.page.click('#screenFriends .friend-row[data-id] .fr-btn');
   await A.page.waitForTimeout(1500);
   check('доска открылась и у вызвавшего', await A.page.locator('#screenGame').isVisible());
+  // Оба на месте — отсчёт 3-2-1, потом игра
+  await A.page.waitForTimeout(4500);
 
   // Ходит вызвавший
   check('первым ходит вызвавший', await A.page.locator('#guessSection').isVisible());

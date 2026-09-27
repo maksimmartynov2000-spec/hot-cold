@@ -184,6 +184,15 @@ function stubSupabase(opts) {
           }
           if (name === 'next_match_round') {
             const M = window.__match;
+            window.__nextCalls = (window.__nextCalls || 0) + 1;
+            // Партия с человеком: раунд начнётся, когда готовы оба. Тест сам
+            // решает, готов ли соперник, через M.ready
+            if (M.waitReady && M.botSeat == null) {
+              M.ready = (M.ready || [false, false]).slice();
+              M.ready[M.seat] = true;
+              if (!M.ready[1 - M.seat]) return { data: false, error: null };
+            }
+            M.ready = [false, false];
             M.round++; M.roundOver = false; M.roundWinner = null;
             M.moves = []; M.tokens = [1, 1]; M.cur = 1 - M.starter; M.starter = M.cur;
             return { data: true, error: null };
@@ -382,6 +391,12 @@ function stubSupabase(opts) {
         elo: M.elo === undefined ? 1000 : M.elo,
         turnSeconds: M.turnSeconds || 30,
         secondsLeft: M.secondsLeft === undefined ? 30 : M.secondsLeft,
+        // Начало партии и перерыв (миграция 035). Без них — как партия, что уже идёт
+        lobby: !!M.lobby, present: M.present || [true, true],
+        lobbyLeft: M.lobbyLeft === undefined ? null : M.lobbyLeft,
+        startsIn: M.startsIn === undefined ? null : M.startsIn,
+        nextIn: M.nextIn === undefined ? (M.roundOver && !M.matchOver ? 10 : null) : M.nextIn,
+        ready: M.ready || [false, false],
         updatedAt: '2026-01-01T00:00:00Z' };
     };
 

@@ -62,6 +62,7 @@ begin
   v := pg_temp.seen('Кира', '4321', mid);
   if v <> '90,60,95,40' then raise exception 'ОШИБКА: после раунда закрыто: %', v; end if;
   perform next_match_round('Лев', '1234', mid);
+  perform next_match_round('Кира', '4321', mid);   -- оба нажали «Готов»
   delete from match_bonuses where match_id = mid;
   update matches set secret = 40 where id = mid;
   if (select fog[2] from matches where id = mid) then raise exception 'ОШИБКА: туман перешёл в новый раунд'; end if;

@@ -1,0 +1,393 @@
+-- Начало партии и перерыв между раундами. Применять в Supabase: SQL Editor →
+-- вставить целиком → Run. Применить ДО мёржа.
+--
+-- 1. Партия с человеком начинается, только когда оба открыли её: до этого
+--    часы не идут и ходить нельзя. Когда оба на месте — отсчёт 3 секунды и
+--    старт. Если за 5 минут после принятия вызова кто-то так и не пришёл,
+--    партия отменяется без результата: ни рейтинга, ни звёзд.
+--    Раньше вызов принимали — и часы у вызвавшего шли, даже если его не было
+--    в игре: он проигрывал по времени, не узнав, что партия началась.
+-- 2. Между раундами — 10 секунд на итог. «Готов» у обоих начинает раньше.
+--    Раньше любой мог сразу нажать «Следующий раунд», и второй не успевал
+--    увидеть загаданное число.
+-- С ботом ждать некого: бот всегда на месте и всегда готов.
+
+-- Состояние партии
+alter table matches add column if not exists lobby boolean not null default false;
+alter table matches add column if not exists accepted_at timestamptz;
+alter table matches add column if not exists start_at timestamptz;
+alter table matches add column if not exists seen_at timestamptz[] not null default array[null, null]::timestamptz[];
+alter table matches add column if not exists ready boolean[] not null default array[false, false];
+alter table matches add column if not exists round_ended_at timestamptz;
+
+-- 1. Правила ставит сама база, какая бы функция ни создала или ни начала
+--    партию: вызов, реванш, очередь
+create or replace function matches_flow()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if tg_op = 'INSERT' then
+    -- Партия из очереди с человеком создаётся сразу идущей
+    if new.status = 'active' and new.bot_seat is null then
+      new.lobby := true;
+      new.accepted_at := now();
+    end if;
+  else
+    -- Вызов или реванш приняли
+    if old.status = 'invited' and new.status = 'active' and new.bot_seat is null then
+      new.lobby := true;
+      new.accepted_at := now();
+    end if;
+    if new.round_over and not coalesce(old.round_over, false) then
+      new.round_ended_at := now();
+    end if;
+    if not new.round_over and coalesce(old.round_over, false) then
+      new.ready := array[false, false];
+    end if;
+  end if;
+  -- Пока ждём обоих, часы стоят
+  if new.lobby then new.turn_deadline := null; end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists matches_flow on matches;
+create trigger matches_flow before insert or update on matches
+for each row execute function matches_flow();
+
+-- 2. Игрок открыл партию: отметка «на месте». Оба на месте — отсчёт и старт.
+--    Итог раунда висит 10 секунд — потом следующий раунд начинается сам
+create or replace function match_flow_tick(p_match_id bigint, p_seat int)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches;
+begin
+  update matches set seen_at[p_seat + 1] = now() where id = p_match_id;
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null or m.status <> 'active' then return; end if;
+
+  if m.lobby then
+    if m.seen_at[1] > now() - interval '15 seconds' and m.seen_at[2] > now() - interval '15 seconds' then
+      update matches
+      set lobby = false,
+          start_at = now() + interval '3 seconds',
+          turn_deadline = now() + interval '3 seconds' + make_interval(secs => turn_seconds(m))
+      where id = p_match_id;
+    end if;
+    return;
+  end if;
+
+  if m.round_over and not m.match_over and m.round_ended_at <= now() - interval '10 seconds' then
+    perform match_start_next(p_match_id);
+  end if;
+end;
+$$;
+
+-- Следующий раунд: то, что раньше делала кнопка сразу
+create or replace function match_start_next(p_match_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches;
+begin
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null or not m.round_over or m.match_over or m.status <> 'active' then return; end if;
+  update matches set round = m.round + 1, starter = 1 - m.starter, ready = array[false, false],
+                     updated_at = now()
+  where id = p_match_id;
+  perform start_match_round(p_match_id);
+end;
+$$;
+
+-- 3. «Готов»: раунд начнётся, когда готовы оба (бот готов всегда) или когда
+--    выйдут 10 секунд
+create or replace function next_match_round(p_username text, p_pin text, p_match_id bigint)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; my_seat int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  my_seat := match_seat(m, me);
+  if my_seat is null then raise exception 'not_your_match'; end if;
+  if m.match_over then raise exception 'match_over'; end if;
+  if not m.round_over then raise exception 'round_not_over'; end if;
+
+  update matches set ready[my_seat + 1] = true where id = p_match_id;
+  select * into m from matches where id = p_match_id;
+  if (m.ready[1] or m.bot_seat = 0) and (m.ready[2] or m.bot_seat = 1)
+     or m.round_ended_at <= now() - interval '10 seconds' then
+    perform match_start_next(p_match_id);
+    return true;
+  end if;
+  return false;
+end;
+$$;
+
+-- 4. Не пришёл за 5 минут — партия отменяется
+create or replace function expire_stale_matches()
+returns void
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  update matches
+  set status = 'expired', turn_deadline = null
+  where (status = 'invited' and updated_at < now() - interval '30 minutes')
+     or (status = 'active' and lobby and accepted_at < now() - interval '5 minutes')
+     or (status = 'active' and updated_at < now() - interval '60 minutes');
+$$;
+
+-- 5. Ходить можно только после старта
+create or replace function match_guess_core(p_match_id bigint, p_seat int, p_guess int)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; seat int; dist int; band int; used_double boolean;
+        hit record; btype text; radius int; done boolean;
+begin
+  seat := p_seat;
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  if m.status <> 'active' then raise exception 'not_playing'; end if;
+  if m.round_over or m.match_over then raise exception 'round_over'; end if;
+  if m.cur <> seat then raise exception 'not_your_turn'; end if;
+  -- Пока оба не пришли и не отсчитано 3-2-1, ходить нельзя
+  if m.lobby or (m.start_at is not null and m.start_at > now()) then
+    raise exception 'not_started';
+  end if;
+  if m.skip_turn[seat + 1] or m.auto_lava[seat + 1] then raise exception 'forced_turn'; end if;
+  if p_guess is null or p_guess < m.range_min or p_guess > m.range_max then
+    raise exception 'out_of_range';
+  end if;
+
+  dist := abs(p_guess - m.secret);
+  band := feedback_tier(match_span(m), dist);
+  -- Для разбора: ход сделан под помехой — игрок видел не все ходы
+  insert into match_moves(match_id, round, seat, guess, tier, limited)
+  values (p_match_id, m.round, seat, p_guess, band,
+          m.fog[seat + 1] or m.blind[seat + 1] or m.short_memory[seat + 1]);
+
+  radius := bonus_near_radius(match_span(m));
+  select * into hit from match_bonuses b
+  where b.match_id = p_match_id and b.round = m.round and not b.taken and b.value = p_guess;
+
+  btype := null;
+  if hit.type is not null then
+    btype := hit.type;
+    if match_bonus_blocked(m, btype, 1 - seat) then btype := 'extra'; end if;
+    update match_bonuses set taken = true
+    where match_id = p_match_id and round = m.round and value = p_guess;
+  end if;
+
+  -- Сходил — значит на месте: счётчик молчания обнуляется
+  update matches
+  set last_bonus = btype,
+      last_bonus_by = seat,
+      last_timeout = false,
+      timeouts[seat + 1] = 0,
+      near_bonus = (btype is null and exists (
+        select 1 from match_bonuses b
+        where b.match_id = p_match_id and b.round = m.round and not b.taken
+          and abs(b.value - p_guess) <= radius))
+  where id = p_match_id;
+
+  if btype is not null then perform apply_match_bonus(p_match_id, btype, seat); end if;
+
+  select * into m from matches where id = p_match_id;
+  used_double := m.armed;
+
+  if dist = 0 then
+    done := (m.wins[seat + 1] + 1) >= m.wins_needed;
+    update matches
+    set round_over = true, round_winner = seat,
+        wins[seat + 1] = m.wins[seat + 1] + 1,
+        match_over = done,
+        status = case when done then 'finished' else status end,
+        armed = false, turn_deadline = null, updated_at = now()
+    where id = p_match_id;
+    if done then perform apply_elo(p_match_id, seat); end if;
+  elsif used_double then
+    update matches set armed = false, updated_at = now() where id = p_match_id;
+    select * into m from matches where id = p_match_id;
+    update matches set turn_deadline = now() + make_interval(secs => turn_seconds(m))
+    where id = p_match_id;
+  else
+    perform pass_turn(p_match_id, false);
+  end if;
+
+  return band;
+end;
+$$;
+
+-- 6. Уйти из партии, которая ещё не началась, — отменить её без результата
+create or replace function leave_match(p_username text, p_pin text, p_match_id bigint)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; my_seat int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  my_seat := match_seat(m, me);
+  if my_seat is null then raise exception 'not_your_match'; end if;
+  if m.status not in ('invited', 'active') then return false; end if;
+
+  -- Партия ещё не началась — оба не пришли. Уход её отменяет, без результата
+  if m.status = 'active' and m.lobby then
+    update matches set status = 'expired', turn_deadline = null, updated_at = now()
+    where id = p_match_id;
+    return true;
+  end if;
+
+  -- Из рейтинговой игры нельзя выйти без последствий: иначе проигрывающий
+  -- всегда будет закрывать вкладку, и рейтинг перестанет что-то значить
+  if m.ranked and m.status = 'active' then
+    update matches
+    set status = 'finished', match_over = true, round_over = true,
+        round_winner = 1 - my_seat, forfeit_by = my_seat,
+        turn_deadline = null, updated_at = now()
+    where id = p_match_id;
+    perform apply_elo(p_match_id, 1 - my_seat);
+    return true;
+  end if;
+
+  update matches set status = 'finished', match_over = true, updated_at = now()
+  where id = p_match_id;
+  return true;
+end;
+$$;
+
+-- 7. Что видит игрок: то же, что раньше, плюс начало партии и перерыв
+create or replace function match_state(p_username text, p_pin text, p_match_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; my_seat int; moves jsonb; reveal boolean;
+        visible int; hide_mine boolean; hide_theirs boolean; chat jsonb; my_elo int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  my_seat := match_seat(m, me);
+  if my_seat is null then raise exception 'not_your_match'; end if;
+
+  -- Игрок на месте: отметка присутствия, старт партии и следующего раунда
+  perform match_flow_tick(p_match_id, my_seat);
+
+  -- Партии людей бот не трогает: лишняя блокировка строки на каждом опросе
+  if m.bot_seat is not null then perform bot_act(p_match_id); end if;
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id;
+
+  reveal := m.round_over or m.match_over or m.status <> 'active';
+  -- Помехи действуют весь раунд, чей бы ни был ход. Прячутся только ходы,
+  -- сделанные после того, как помеха легла: прежние игрок уже видел
+  hide_mine := (not reveal) and m.blind[my_seat + 1];
+  hide_theirs := (not reveal) and m.fog[my_seat + 1];
+  visible := case when (not reveal) and m.short_memory[my_seat + 1] then 2 else 4 end;
+
+  select coalesce(jsonb_agg(x order by x_id), '[]'::jsonb) into moves from (
+    select mv.id as x_id,
+           case
+             when mv.kind = 'timeout'
+               then jsonb_build_object('seat', mv.seat, 'timeout', true)
+             when (mv.seat = my_seat and hide_mine and mv.id > m.blind_from[my_seat + 1])
+               or (mv.seat <> my_seat and hide_theirs and mv.id > m.fog_from[my_seat + 1])
+               then jsonb_build_object('seat', mv.seat, 'hidden', true)
+             else jsonb_build_object('seat', mv.seat, 'guess', mv.guess, 'tier', mv.tier)
+           end as x
+    from (select * from match_moves mv2
+          where mv2.match_id = p_match_id and mv2.round = m.round
+          order by mv2.id desc limit visible) mv
+  ) q;
+
+  -- Фразы отдаём вместе с возрастом: клиент сам решит, показывать ли ещё
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', c.id, 'seat', c.seat, 'code', c.code,
+           'ago', floor(extract(epoch from (now() - c.created_at)))::int) order by c.id), '[]'::jsonb)
+    into chat
+  from (select * from match_chat c2 where c2.match_id = p_match_id
+        order by c2.id desc limit 6) c;
+
+  select e.elo into my_elo from elo_ratings e
+  where e.username = me and e.mode = coalesce(m.ranked_mode, 0);
+
+  return jsonb_build_object(
+    'id', m.id, 'seat', my_seat,
+    'names', jsonb_build_array(m.p0, m.p1),
+    'status', m.status, 'winsNeeded', m.wins_needed,
+    'rangeMin', m.range_min, 'rangeMax', m.range_max, 'frost', m.frost,
+    'round', m.round, 'wins', m.wins, 'cur', m.cur, 'tokens', m.tokens, 'armed', m.armed,
+    'roundOver', m.round_over, 'roundWinner', m.round_winner, 'matchOver', m.match_over,
+    'moves', moves,
+    'secret', case when reveal then to_jsonb(m.secret) else 'null'::jsonb end,
+    'bonusesOn', m.bonuses_on,
+    'fog', m.fog, 'blind', m.blind, 'autoLava', m.auto_lava,
+    'skip', m.skip_turn, 'shortMemory', m.short_memory, 'rush', m.rush,
+    'nearBonus', m.near_bonus, 'lastBonus', m.last_bonus, 'lastBonusBy', m.last_bonus_by,
+    'lastTimeout', m.last_timeout,
+    'forced', forced_turn_kind(m),
+    'turnSeconds', turn_seconds(m),
+    'secondsLeft', case when m.turn_deadline is null then null
+                        else greatest(0, ceil(extract(epoch from (m.turn_deadline - now()))))::int end,
+    'chat', chat,
+    'ranked', m.ranked,
+    'rankedMode', m.ranked_mode,
+    'botSeat', m.bot_seat,
+    'forfeitBy', m.forfeit_by,
+    'eloDelta', case when m.elo_applied then to_jsonb(m.elo_delta) else 'null'::jsonb end,
+    'elo', coalesce(my_elo, 1000),
+    'updatedAt', m.updated_at,
+    -- Начало партии: ждём обоих, потом 3-2-1
+    'lobby', m.lobby,
+    'present', jsonb_build_array(
+      coalesce(m.seen_at[1] > now() - interval '15 seconds', false) or m.bot_seat = 0,
+      coalesce(m.seen_at[2] > now() - interval '15 seconds', false) or m.bot_seat = 1),
+    'lobbyLeft', case when m.lobby and m.accepted_at is not null
+                      then greatest(0, ceil(extract(epoch from (m.accepted_at + interval '5 minutes' - now()))))::int end,
+    'startsIn', case when m.start_at is not null and m.start_at > now()
+                     then ceil(extract(epoch from (m.start_at - now())))::int end,
+    -- Между раундами: сколько до следующего и кто уже готов
+    'nextIn', case when m.status = 'active' and m.round_over and not m.match_over and m.round_ended_at is not null
+                   then greatest(0, ceil(extract(epoch from (m.round_ended_at + interval '10 seconds' - now()))))::int end,
+    'ready', jsonb_build_array(m.ready[1] or m.bot_seat = 0, m.ready[2] or m.bot_seat = 1)
+  );
+end;
+$$;
+
+revoke execute on function matches_flow() from public, anon;
+revoke execute on function match_flow_tick(bigint, int) from public, anon;
+revoke execute on function match_start_next(bigint) from public, anon;
+revoke execute on function match_guess_core(bigint, int, int) from public, anon;
+revoke execute on function expire_stale_matches() from public, anon;
+grant execute on function next_match_round(text, text, bigint) to anon;
+grant execute on function leave_match(text, text, bigint) to anon;
+grant execute on function match_state(text, text, bigint) to anon;

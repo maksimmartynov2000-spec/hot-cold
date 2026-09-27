@@ -235,6 +235,7 @@ begin
                      short_memory = array[true, true] where id = mid;
   select array_agg(value order by value) into before from match_bonuses where match_id = mid;
   perform next_match_round('Лев','1234',mid);
+  perform next_match_round('Кира','4321',mid);   -- оба нажали «Готов»
   select * into m from matches where id = mid;
   if m.fog[1] or m.fog[2] or m.short_memory[1] or m.rush[1] is distinct from 0 then
     raise exception 'ОШИБКА: помехи пережили раунд';

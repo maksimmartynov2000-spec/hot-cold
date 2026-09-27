@@ -215,6 +215,7 @@ do $$
 declare mid bigint := current_setting('t.m')::bigint; st jsonb;
 begin
   perform next_match_round('Лев','1234',mid);
+  perform next_match_round('Кира','4321',mid);   -- оба нажали «Готов»
   st := match_state('Лев','1234',mid);
   if (st ->> 'round')::int is distinct from 2 then raise exception 'ОШИБКА: раунд не сменился'; end if;
   if (st ->> 'cur')::int is distinct from 1 then raise exception 'ОШИБКА: начинает не второй игрок'; end if;
@@ -238,6 +239,7 @@ begin
     if guard > 20 then raise exception 'ОШИБКА: матч не кончается'; end if;
     if (st ->> 'roundOver')::boolean then
       perform next_match_round('Лев','1234',mid);
+      perform next_match_round('Кира','4321',mid);
     else
       select secret into sec from matches where id = mid;
       if (st ->> 'cur')::int = 0

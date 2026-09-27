@@ -1172,6 +1172,8 @@
     .p-effects { margin-top: 6px; font-size: 15px; letter-spacing: 3px; }
     .p-effects:empty { display: none; }
     .history-item .h-masked { opacity: 0.45; }
+    .r-next { margin-top: 10px; font-size: 13px; color: rgba(255, 255, 255, 0.55); text-align: center; }
+    .turn-banner.count { font-size: 1.4em; letter-spacing: 0.02em; }
 
     /* Панель отнятого хода живёт на месте поля ввода и выглядит так же
        заметно: этот ход — событие, а не пауза */
@@ -2206,6 +2208,7 @@
         errInviteGone: "That challenge is gone",
         errNoMatch: "No such game",
         timedOut: "out of time", clockMine: "Your turn: {n}s", clockTheirs: "Their turn: {n}s",
+        waitFor: "⏳ Waiting for {name} — we start when you are both here", lobbyCancel: "cancels in {t}", lobbyGone: "Game cancelled — {name} didn't come", startsIn: "Starting in {n}…", readyBtn: "Ready", readyWait: "✓ Ready — waiting for {name}", nextIn: "Next round in {n}s", oppReady: "✓ {name} is ready", errNotStarted: "The game hasn't started yet",
         chBonuses: "Bonuses", chBonusCount: "Bonuses on the board",
         whoPlays: "Recently playing \u2014 add anyone you like",
         nobodyYet: "Nobody else has played yet",
@@ -2431,6 +2434,7 @@
         errInviteGone: "Вызова больше нет",
         errNoMatch: "Такой игры нет",
         timedOut: "время вышло", clockMine: "Ваш ход: {n} с", clockTheirs: "Ход соперника: {n} с",
+        waitFor: "⏳ Ждём {name} — начнём, когда вы оба в игре", lobbyCancel: "отмена через {t}", lobbyGone: "Партия отменена — {name} не пришёл(ла)", startsIn: "Начинаем через {n}…", readyBtn: "Готов", readyWait: "✓ Готов — ждём {name}", nextIn: "Следующий раунд через {n} с", oppReady: "✓ {name} ждёт", errNotStarted: "Партия ещё не началась",
         chBonuses: "Бонусы", chBonusCount: "Бонусов на поле",
         whoPlays: "Недавно играли — можно добавить любого",
         nobodyYet: "Пока больше никто не играл",
@@ -2656,6 +2660,7 @@
         errInviteGone: "Ce d\u00e9fi n\u2019existe plus",
         errNoMatch: "Cette partie n\u2019existe pas",
         timedOut: "temps \u00e9coul\u00e9", clockMine: "\u00c0 vous : {n} s", clockTheirs: "Adversaire : {n} s",
+        waitFor: "⏳ On attend {name} — on commence quand vous êtes là tous les deux", lobbyCancel: "annulation dans {t}", lobbyGone: "Partie annulée — {name} n'est pas venu·e", startsIn: "Début dans {n}…", readyBtn: "Prêt", readyWait: "✓ Prêt — on attend {name}", nextIn: "Manche suivante dans {n} s", oppReady: "✓ {name} attend", errNotStarted: "La partie n'a pas encore commencé",
         chBonuses: "Bonus", chBonusCount: "Bonus sur le plateau",
         whoPlays: "Ont jou\u00e9 r\u00e9cemment \u2014 ajoutez qui vous voulez",
         nobodyYet: "Personne d\u2019autre n\u2019a encore jou\u00e9",
@@ -2881,6 +2886,7 @@
         errInviteGone: "Diese Herausforderung gibt es nicht mehr",
         errNoMatch: "Diese Partie gibt es nicht",
         timedOut: "Zeit um", clockMine: "Du: {n} s", clockTheirs: "Gegner: {n} s",
+        waitFor: "⏳ Warten auf {name} — es geht los, wenn ihr beide da seid", lobbyCancel: "Abbruch in {t}", lobbyGone: "Spiel abgebrochen — {name} ist nicht gekommen", startsIn: "Start in {n} …", readyBtn: "Bereit", readyWait: "✓ Bereit — warten auf {name}", nextIn: "Nächste Runde in {n} s", oppReady: "✓ {name} wartet", errNotStarted: "Das Spiel hat noch nicht begonnen",
         chBonuses: "Boni", chBonusCount: "Boni auf dem Feld",
         whoPlays: "K\u00fcrzlich gespielt \u2014 f\u00fcg hinzu, wen du willst",
         nobodyYet: "Sonst hat noch niemand gespielt",
@@ -4213,7 +4219,7 @@
   function renderClock() {
     const box = document.getElementById('turnClock');
     if (!box) return;
-    const show = online && !D.roundOver && !D.matchOver && online.deadlineAt;
+    const show = online && !D.roundOver && !D.matchOver && online.deadlineAt && !onlineHold();
     box.classList.toggle('hidden', !show);
     if (!show) return;
     const left = Math.max(0, Math.ceil((online.deadlineAt - Date.now()) / 1000));
@@ -4224,10 +4230,33 @@
     box.classList.toggle('out', left === 0);
   }
 
+  // Раз в четверть секунды: текст ожидания и отсчёты. Отсчёт 3-2-1 кончился —
+  // перерисовываем всё: появляется поле ввода и часы хода
+  let lastHold = null;
+  function renderFlowTick() {
+    const hold = onlineHold();
+    if (hold !== lastHold) { lastHold = hold; renderAll(); return; }
+    if (hold) document.getElementById('turnBanner').innerHTML = holdText();
+    const line = document.getElementById('rNext');
+    if (line) line.innerHTML = nextLineText();
+  }
+
+  // Строка под итогом раунда: сколько до следующего и готов ли соперник
+  function nextLineText() {
+    if (!online || !online.nextAt) return '';
+    const L = t().online;
+    const other = 1 - online.seat;
+    let text = L.nextIn.replace('{n}', secsTo(online.nextAt));
+    if (online.botSeat === null && online.ready[other]) {
+      text += ' · ' + L.oppReady.replace('{name}', escapeHtml(D.names[other]));
+    }
+    return text;
+  }
+
   function startClock() {
     stopClock();
     clockTimer = setInterval(() => {
-      if (online && screen === 'game') { renderClock(); renderSayBubble(); } else stopClock();
+      if (online && screen === 'game') { renderClock(); renderSayBubble(); renderFlowTick(); } else stopClock();
     }, 250);
   }
 
@@ -4504,6 +4533,32 @@
     nlPlay(svg);
   }
 
+  // Партия с человеком ещё не началась: ждём соперника или идёт отсчёт 3-2-1.
+  // Отменённая — тоже не игра: соперник так и не пришёл
+  function onlineHold() {
+    if (!online) return null;
+    if (online.status === 'expired') return 'gone';
+    if (online.lobby) return 'lobby';
+    if (online.startsAt && online.startsAt > Date.now()) return 'count';
+    return null;
+  }
+
+  function secsTo(at) { return Math.max(0, Math.ceil((at - Date.now()) / 1000)); }
+
+  function holdText() {
+    const L = t().online;
+    const other = escapeHtml(D.names[1 - online.seat]);
+    const hold = onlineHold();
+    if (hold === 'gone') return L.lobbyGone.replace('{name}', other);
+    if (hold === 'count') return L.startsIn.replace('{n}', secsTo(online.startsAt));
+    let text = L.waitFor.replace('{name}', other);
+    if (online.lobbyEndsAt) {
+      const left = secsTo(online.lobbyEndsAt);
+      text += ' · ' + L.lobbyCancel.replace('{t}', Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'));
+    }
+    return text;
+  }
+
   function renderStatus() {
     const L = t();
     const duel = mode === 'duel';
@@ -4517,8 +4572,17 @@
       confirmed.textContent = '';
       attempts.textContent = L.roundLabel + D.round;
       attempts.className = 'attempts';
-      if (D.roundOver) { banner.classList.add('hidden'); }
+      const hold = onlineHold();
+      if (hold) {
+        banner.classList.remove('hidden');
+        banner.innerHTML = holdText();
+        banner.classList.toggle('count', hold === 'count');
+        banner.style.borderColor = 'rgba(255,255,255,0.25)';
+        banner.style.background = 'rgba(255,255,255,0.06)';
+        banner.style.color = '';
+      } else if (D.roundOver) { banner.classList.add('hidden'); }
       else {
+        banner.classList.remove('count');
         banner.classList.remove('hidden');
         banner.textContent = L.turnOf + D.names[D.cur] + (D.armed ? '  ' + L.tokenArmed : '');
         banner.style.borderColor = P_COLORS[D.cur];
@@ -4527,7 +4591,7 @@
       }
       document.getElementById('finalBox').classList.add('hidden');
       document.getElementById('guessSection').classList.toggle('hidden',
-        D.roundOver || !!forcedTurn() || (online && D.cur !== online.seat));
+        D.roundOver || !!forcedTurn() || (online && (D.cur !== online.seat || !!onlineHold())));
     } else {
       banner.classList.add('hidden');
       // Партия кончилась — «осталось попыток» уже ничего не значит и читается
@@ -4659,8 +4723,21 @@
              '<button class="btn-ghost" onclick="backToOnline()">' + L.toMenu + '</button>')
           : '<button class="btn" onclick="newMatch()">' + L.newMatch + '</button>' +
             '<button class="btn-ghost" onclick="quitToMenu()">' + L.toMenu + '</button>';
+      } else if (online && online.botSeat === null) {
+        // С человеком: «Готов». Раунд начнётся, когда готовы оба или выйдет время
+        const mine = online.ready[online.seat];
+        actions.innerHTML = mine
+          ? '<button class="btn" disabled>' + L.online.readyWait.replace('{name}', escapeHtml(D.names[1 - online.seat])) + '</button>'
+          : '<button class="btn" onclick="nextRound()">' + L.online.readyBtn + '</button>';
       } else {
         actions.innerHTML = '<button class="btn" onclick="nextRound()">' + L.nextRound + '</button>';
+      }
+      let nextLine = null;
+      if (online && !D.matchOver && online.nextAt) {
+        nextLine = document.createElement('div');
+        nextLine.className = 'r-next';
+        nextLine.id = 'rNext';
+        nextLine.innerHTML = nextLineText();
       }
       // Причина стоит сразу под заголовком: иначе «выигрывает игру» рядом со
       // счётом 0:0 читается как ошибка, а не как сдача соперника
@@ -4680,6 +4757,7 @@
       if (eloLine) box.appendChild(eloLine);
       if (sentLine) box.appendChild(sentLine);
       box.appendChild(actions);
+      if (nextLine) box.appendChild(nextLine);
       box.classList.remove('hidden');
       duelCelebrate(starBox);
       return;
@@ -7807,6 +7885,7 @@
     if (m.indexOf('no_such_match') >= 0) return L.online.errNoMatch;
     if (m.indexOf('not_playing') >= 0) return L.online.errNotPlaying;
     if (m.indexOf('too_fast') >= 0) return L.online.errTooFast;
+    if (m.indexOf('not_started') >= 0) return L.online.errNotStarted;
     if (m.indexOf('bad_phrase') >= 0) return L.online.errNoMatch;
     return friendErrorText(m);
   }
@@ -7822,6 +7901,14 @@
     online.eloDelta = st.eloDelta || null;
     online.elo = st.elo;
     online.botSeat = (st.botSeat === null || st.botSeat === undefined) ? null : st.botSeat;
+    // Начало партии и перерыв: сервер присылает остаток секунд, дальше
+    // отсчитывает браузер — как часы хода
+    const at = n => (n === null || n === undefined) ? null : Date.now() + n * 1000;
+    online.lobby = !!st.lobby;
+    online.lobbyEndsAt = at(st.lobbyLeft);
+    online.startsAt = at(st.startsIn);
+    online.nextAt = at(st.nextIn);
+    online.ready = (st.ready || [false, false]).slice();
     mode = 'duel';
     RANGE_MIN = st.rangeMin;
     RANGE_MAX = st.rangeMax;
@@ -7957,6 +8044,7 @@
   }
 
   async function onlineNextRound() {
+    if (online.ready) { online.ready[online.seat] = true; renderAll(); }
     try {
       await friendRpc('next_match_round', { p_match_id: online.id });
       await refreshMatch();
