@@ -310,13 +310,7 @@ begin
                      cur = 0, round_over = false, match_over = false, armed = false,
                      tokens = array[1, 1],
                      turn_deadline = now() + interval '30 seconds' where id = mid;
-  -- Жетон нельзя взвести первым ходом раунда: сделаем, чтобы ход уже был
-  select count(*) into before from match_moves where match_id = mid;
-  if before = 0 then
-    insert into match_moves(match_id, round, seat, guess, tier)
-    select mid, m2.round, 1, m2.range_min, 0 from matches m2 where id = mid;
-  end if;
-
+  -- Жетон взводится в любой момент, и первым ходом раунда тоже
   if use_match_token('Лев','1234',mid,true) is distinct from true then
     raise exception 'ОШИБКА: жетон не взвёлся на отнятом ходе';
   end if;
