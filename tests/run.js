@@ -4756,6 +4756,105 @@ async function testBots(browser) {
   await done(page);
 }
 
+// ------------------------------------------ разбор онлайн-партии
+async function testOnlineReview(browser) {
+  console.log('\nРазбор онлайн-партии');
+  const setup = () => {
+    FEEDBACK_META = buildFeedbackMeta(100);
+    const t = (g, sec) => bandOf(Math.abs(g - sec), reviewBands(FEEDBACK_META));
+    const mk = (r, seat, g, sec, extra) => Object.assign({ round: r, seat, guess: g, tier: t(g, sec),
+      timeout: false, forced: false, limited: false }, extra || {});
+    window.__matchReview = [
+      mk(1, 0, 50, 37), mk(1, 1, 30, 37), mk(1, 0, 40, 37), mk(1, 1, 37, 37),
+      mk(2, 1, 50, 71), { round: 2, seat: 0, guess: null, tier: null, timeout: true, forced: false, limited: false },
+      mk(2, 1, 75, 71, { limited: true }), mk(2, 0, 70, 71, { forced: true }), mk(2, 1, 71, 71),
+      mk(3, 0, 50, 12), mk(3, 1, 25, 12), mk(3, 0, 12, 12)];
+    Object.assign(window.__match, { names: ['Лев', 'Кира'], ranked: false, round: 3, wins: [1, 2],
+      winsNeeded: 2, roundOver: true, matchOver: false, status: 'active', roundWinner: 0,
+      moves: [{ seat: 0, guess: 50, tier: t(50, 12) }], secret: 12 });
+  };
+  let page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(setup);
+  await page.evaluate(() => openMatch(1));
+  await page.waitForTimeout(400);
+  check('пока партия идёт, всех ходов у сервера не просят и кнопки нет', await page.evaluate(() =>
+    !window.__reviewCalls && !document.getElementById('reviewBtn')));
+
+  // Партия кончилась
+  await page.evaluate(() => {
+    Object.assign(window.__match, { matchOver: true, status: 'finished', wins: [1, 2], roundWinner: 1 });
+    return refreshMatch(true);
+  });
+  await page.waitForTimeout(300);
+  const res = await page.evaluate(() => {
+    const rv = currentReview();
+    // Ожидание: каждый раунд — дуэльным движком отдельно, точность по всем ходам
+    const list = window.__matchReview;
+    const all = [];
+    [1, 2, 3].forEach(r => {
+      const played = list.filter(m => m.round === r && !m.timeout);
+      analyseDuel(played.map(m => ({ guess: m.guess, labelIndex: m.tier, p: m.seat, forced: m.forced, limited: m.limited })),
+                  1, 100, FEEDBACK_META).moves.forEach(x => all.push(x));
+    });
+    const acc = p => { const own = all.filter(x => x.p === p && x.score !== null);
+                       return Math.round(own.reduce((a, x) => a + x.score, 0) / own.length); };
+    return { btn: (document.getElementById('reviewBtn') || {}).textContent || '', calls: window.__reviewCalls,
+             acc: rv && rv.accuracy, want: [acc(0), acc(1)], n: rv && rv.moves.length,
+             grades: rv && rv.moves.map(m => m.grade),
+             badges: document.querySelectorAll('#historyList .gr-badge, #historyList .h-grade').length };
+  });
+  check('после партии — кнопка с точностью обоих', /📊 Лев \d+% · Кира \d+% · Разбор/.test(res.btn), res.btn);
+  check('все ходы спрошены один раз', res.calls === 1, String(res.calls));
+  check('разобраны все ходы всех раундов, пропуск по времени — нет', res.n === 11, String(res.n));
+  check('бросок в лаву и ход под помехой без оценки',
+    res.grades[5] === 'limited' && res.grades[6] === 'forced', JSON.stringify(res.grades));
+  check('точность — по всем ходам партии, без неоценённых',
+    JSON.stringify(res.acc) === JSON.stringify(res.want), JSON.stringify(res));
+  check('в истории последнего раунда значков нет — разбор по всей партии', res.badges === 0);
+
+  await page.click('#reviewBtn');
+  await page.waitForTimeout(200);
+  const modal = await page.evaluate(() => ({
+    title: document.getElementById('tReviewTitle').textContent,
+    heads: [...document.querySelectorAll('#rvList .rv-round')].map(e => e.textContent),
+    nums: [...document.querySelectorAll('#rvList .rv-row .rv-num')].map(e => e.textContent).join(),
+    players: [...document.querySelectorAll('#rvAcc .rv-acc-player')].length }));
+  check('разбор партии: заголовок и оба игрока', modal.title === 'Разбор партии' && modal.players === 2, JSON.stringify(modal));
+  check('раунды подписаны и назван победитель каждого',
+    modal.heads.join('|') === 'Раунд 1 · 🎯 Кира|Раунд 2 · 🎯 Кира|Раунд 3 · 🎯 Лев', modal.heads.join('|'));
+  check('ходы нумеруются внутри раунда', modal.nums === '#1,#2,#3,#4,#1,#2,#3,#4,#1,#2,#3', modal.nums);
+  await page.click('#tReviewClose');
+
+  // Повторные опросы разбор заново не спрашивают
+  await page.evaluate(() => refreshMatch(true));
+  await page.evaluate(() => refreshMatch(true));
+  check('опрос не спрашивает ходы повторно', await page.evaluate(() => window.__reviewCalls === 1));
+  await done(page);
+
+  // Старая база без разбора: кнопки нет, ошибок нет
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(setup);
+  await page.evaluate(() => {
+    window.__reviewError = 'function match_review does not exist';
+    Object.assign(window.__match, { matchOver: true, status: 'finished' });
+    return openMatch(1);
+  });
+  await page.waitForTimeout(400);
+  check('без разбора на сервере кнопки нет', await page.evaluate(() =>
+    window.__reviewCalls === 1 && !document.getElementById('reviewBtn')));
+  // Сбой прошёл — та же партия, открытая заново, спрашивает разбор снова
+  await page.evaluate(() => { window.__reviewError = null; return openMatch(1); });
+  await page.waitForTimeout(400);
+  check('после сбоя разбор той же партии спрашивается заново', await page.evaluate(() =>
+    window.__reviewCalls === 2 && !!document.getElementById('reviewBtn')));
+  // Новая партия — свой разбор
+  await page.evaluate(() => { window.__match.id = 2; return openMatch(2); });
+  await page.waitForTimeout(400);
+  check('у новой партии свой разбор', await page.evaluate(() =>
+    window.__reviewCalls === 3 && !!document.getElementById('reviewBtn')));
+  await done(page);
+}
+
 // ------------------------------------------ профиль: иконка, имя, PIN
 async function testProfile(browser) {
   console.log('\nПрофиль: иконка, имя, PIN');
@@ -5160,6 +5259,7 @@ async function testKeyPage(browser) {
     await testReview(browser);
     await testDuelReview(browser);
     await testBots(browser);
+    await testOnlineReview(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

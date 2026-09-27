@@ -1257,6 +1257,9 @@
     .rv-grade .g-pct, .h-grade .g-pct { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums;
                                         color: rgba(255, 255, 255, 0.75); }
     .rv-grade .g-pct { font-size: 13px; }
+    .rv-round { font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+                color: rgba(255, 255, 255, 0.5); margin: 8px 0 2px; }
+    .rv-round:first-child { margin-top: 0; }
     .rv-final { flex-basis: 100%; font-size: 11px; color: rgba(255, 255, 255, 0.4); padding-left: 32px; }
     .result-box .r-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: center; flex-wrap: wrap; }
 
@@ -2242,7 +2245,7 @@
       roundWin: " wins the round!", matchWin: " wins the game!",
       secretWas: "Number: ", nextRound: "Next round", newMatch: "New Game", toMenu: "Menu",
       recordLabel: "Best for this range: ", newRecord: "🏆 New record!",
-      review: { open: "Review", title: "Game review", titleRound: "Round review", accuracy: "Accuracy", finalGuess: "last guess",
+      review: { open: "Review", title: "Game review", titleRound: "Round review", round: "Round {n}", accuracy: "Accuracy", finalGuess: "last guess",
         grades: { brilliant: "Brilliant", best: "Best", excellent: "Excellent", good: "Good", inaccuracy: "Inaccuracy", mistake: "Mistake", blunder: "Blunder", hit: "Bullseye!", forced: "Lava toss \u2014 not graded", limited: "Didn\u2019t see every move \u2014 not graded" } },
       run: {
         mode: "Trial",
@@ -2464,7 +2467,7 @@
       roundWin: " выигрывает раунд!", matchWin: " выигрывает игру!",
       secretWas: "Число: ", nextRound: "Следующий раунд", newMatch: "Новая игра", toMenu: "В меню",
       recordLabel: "Рекорд для этого диапазона: ", newRecord: "🏆 Новый рекорд!",
-      review: { open: "Разбор", title: "Разбор партии", titleRound: "Разбор раунда", accuracy: "Точность", finalGuess: "последняя догадка",
+      review: { open: "Разбор", title: "Разбор партии", titleRound: "Разбор раунда", round: "Раунд {n}", accuracy: "Точность", finalGuess: "последняя догадка",
         grades: { brilliant: "Блестяще", best: "Лучший", excellent: "Отлично", good: "Хорошо", inaccuracy: "Неточность", mistake: "Ошибка", blunder: "Зевок", hit: "В точку!", forced: "Бросок в лаву — без оценки", limited: "Видел не все ходы — без оценки" } },
       run: {
         mode: "Испытание",
@@ -2686,7 +2689,7 @@
       roundWin: " remporte la manche !", matchWin: " remporte la partie !",
       secretWas: "Nombre : ", nextRound: "Manche suivante", newMatch: "Nouvelle partie", toMenu: "Menu",
       recordLabel: "Meilleur score pour cette plage : ", newRecord: "🏆 Nouveau record !",
-      review: { open: "Analyse", title: "Analyse de la partie", titleRound: "Analyse de la manche", accuracy: "Pr\u00e9cision", finalGuess: "derni\u00e8re r\u00e9ponse",
+      review: { open: "Analyse", title: "Analyse de la partie", titleRound: "Analyse de la manche", round: "Manche {n}", accuracy: "Pr\u00e9cision", finalGuess: "derni\u00e8re r\u00e9ponse",
         grades: { brilliant: "Brillant", best: "Meilleur coup", excellent: "Excellent", good: "Bon", inaccuracy: "Impr\u00e9cision", mistake: "Erreur", blunder: "Gaffe", hit: "Dans le mille !", forced: "Jet de lave \u2014 non not\u00e9", limited: "N\u2019a pas vu tous les coups \u2014 non not\u00e9" } },
       run: {
         mode: "\u00c9preuve",
@@ -2908,7 +2911,7 @@
       roundWin: " gewinnt die Runde!", matchWin: " gewinnt das Spiel!",
       secretWas: "Zahl: ", nextRound: "Nächste Runde", newMatch: "Neues Spiel", toMenu: "Menü",
       recordLabel: "Bestwert für diesen Bereich: ", newRecord: "🏆 Neuer Rekord!",
-      review: { open: "Analyse", title: "Partieanalyse", titleRound: "Rundenanalyse", accuracy: "Genauigkeit", finalGuess: "letzter Tipp",
+      review: { open: "Analyse", title: "Partieanalyse", titleRound: "Rundenanalyse", round: "Runde {n}", accuracy: "Genauigkeit", finalGuess: "letzter Tipp",
         grades: { brilliant: "Brillant", best: "Bester Zug", excellent: "Exzellent", good: "Gut", inaccuracy: "Ungenauigkeit", mistake: "Fehler", blunder: "Patzer", hit: "Volltreffer!", forced: "Lavawurf \u2014 ohne Wertung", limited: "Nicht alle Z\u00fcge gesehen \u2014 ohne Wertung" } },
       run: {
         mode: "Kraftprobe",
@@ -4482,7 +4485,10 @@
       secretLine.textContent = L.secretWas + secret;
 
       // Точность обоих — и нажатие открывает разбор раунда
-      const drv = online ? null : currentReview();
+      // Онлайн разбор — после всей партии: ходы всех раундов база отдаёт
+      // только когда партия закончена
+      if (online && D.matchOver) loadOnlineReview();
+      const drv = currentReview();
       let reviewBtn = null;
       if (drv) {
         reviewBtn = document.createElement('button');
@@ -4643,7 +4649,10 @@
 
     // Оценка хода, как на chess.com: в тренировке — сразу после хода,
     // в игре с другом — после раунда
-    const rv = currentReview(true);
+    const rv0 = currentReview(true);
+    // Разбор онлайн-партии идёт по всем раундам, а в истории — последние ходы
+    // последнего: значки к ним не привязать
+    const rv = rv0 && rv0.match ? null : rv0;
 
     // Видны только последние ходы: остальное игрок держит в голове. Номера
     // остаются настоящими, поэтому пропуск виден и без пояснений
@@ -4955,9 +4964,55 @@
   // Разбор текущей партии тренировки или раунда игры с другом — только когда
   // он закончился. Онлайн — позже
   let reviewCache = null;
+  // ---------- Разбор онлайн-партии ----------
+  // Ходы всех раундов приходят с сервера после конца партии. Каждый раунд
+  // разбирается дуэльным движком отдельно, точность — по всем ходам партии
+  let onlineReview = null;   // { id, data } — data: null, пока не пришло или не вышло
+
+  async function loadOnlineReview() {
+    if (!online || (onlineReview && onlineReview.id === online.id)) return;
+    const id = online.id;
+    onlineReview = { id, data: null };
+    let res;
+    try {
+      res = await friendRpc('match_review', { p_match_id: id });
+    } catch (e) {
+      return;   // старая база без разбора — кнопки просто нет
+    }
+    if (!online || online.id !== id || !res || !Array.isArray(res.moves)) return;
+    onlineReview = { id, data: analyseOnlineMatch(res.moves) };
+    renderAll();
+  }
+
+  function analyseOnlineMatch(list) {
+    const rounds = [...new Set(list.map(m => m.round))].sort((a, b) => a - b);
+    const moves = [];
+    const info = [];
+    rounds.forEach(r => {
+      // Пропуск по времени — не ход: оценивать нечего, но очередь он передал,
+      // и это движок видит по тому, кто ходит следующим
+      const played = list.filter(m => m.round === r && !m.timeout && m.guess !== null && m.guess !== undefined);
+      const hit = played.find(m => m.tier === 8);
+      info.push({ round: r, winner: hit ? hit.seat : null });
+      if (!played.length) return;
+      const rv = analyseDuel(played.map(m => ({ guess: m.guess, labelIndex: m.tier, p: m.seat,
+                                                forced: !!m.forced, limited: !!m.limited })),
+                             RANGE_MIN, RANGE_MAX, FEEDBACK_META);
+      rv.moves.forEach(x => moves.push(Object.assign(x, { round: r })));
+    });
+    const acc = p => {
+      const own = moves.filter(x => x.p === p && x.score !== null);
+      return own.length ? Math.round(own.reduce((a, x) => a + x.score, 0) / own.length) : null;
+    };
+    return { duel: true, match: true, moves, rounds: info, accuracy: [acc(0), acc(1)] };
+  }
+
   // live — оценки уже во время тренировки: каждая считается только по ходам
   // до неё, поэтому после партии они те же. Лучший ход при этом не показываем
   function currentReview(live) {
+    if (online) {
+      return (D.matchOver && onlineReview && onlineReview.id === online.id) ? onlineReview.data : null;
+    }
     if (mode === 'duel' && !online && D.roundOver) {
       const key = 'duel:' + D.round + ':' + history.length + ':' + secret;
       if (reviewCache && reviewCache.key === key) return reviewCache.data;
@@ -5012,7 +5067,7 @@
     const rv = currentReview();
     if (!rv) return;
     const L = t();
-    document.getElementById('tReviewTitle').textContent = rv.duel ? L.review.titleRound : L.review.title;
+    document.getElementById('tReviewTitle').textContent = (rv.duel && !rv.match) ? L.review.titleRound : L.review.title;
     const accBox = document.getElementById('rvAcc');
     accBox.innerHTML = '';
     if (rv.duel) {
@@ -5047,13 +5102,28 @@
     });
     const list = document.getElementById('rvList');
     list.innerHTML = '';
+    let lastRound = null;
+    let inRound = 0;
     rv.moves.forEach((m, i) => {
+      // Партия онлайн — несколько раундов: перед каждым подпись и кто выиграл
+      if (rv.match && m.round !== lastRound) {
+        lastRound = m.round;
+        inRound = 0;
+        const head = document.createElement('div');
+        head.className = 'rv-round';
+        head.dataset.round = m.round;
+        const r = rv.rounds.find(x => x.round === m.round);
+        head.textContent = L.review.round.replace('{n}', m.round) +
+          (r && r.winner !== null ? ' · 🎯 ' + D.names[r.winner] : '');
+        list.appendChild(head);
+      }
+      inRound++;
       const row = document.createElement('div');
       row.className = 'rv-row';
       row.dataset.grade = m.grade;
       const num = document.createElement('span');
       num.className = 'rv-num';
-      num.textContent = '#' + (i + 1);
+      num.textContent = '#' + (rv.match ? inRound : i + 1);
       if (rv.duel) {
         row.style.borderLeft = '3px solid ' + P_COLORS[m.p];
         row.dataset.p = m.p;
@@ -7500,6 +7570,7 @@
   async function openMatch(id) {
     stopBot();
     vsBot = null;
+    onlineReview = null;
     online = { id: id, seat: 0, status: 'active' };
     sayLastId = 0;
     sayShownUntil = 0;
