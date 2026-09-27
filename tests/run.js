@@ -4855,6 +4855,147 @@ async function testOnlineReview(browser) {
   await done(page);
 }
 
+// ------------------------------------------ лиги и сезоны
+async function testLeagues(browser) {
+  console.log('\nЛиги и сезоны');
+  const LADDER = { season: '2026-09', endsIn: 4 * 86400 + 3000, stars: 64, streak: 2, best: 70, games: 12, peak: 2,
+                   badges: [{ season: '2026-07', league: 1 }, { season: '2026-08', league: 2 }] };
+  let page = await newGame(browser, { user: 'Максим' });
+  const pos = await page.evaluate(() => [0, 1, 29, 30, 45, 64, 149, 150].map(v => leagueLabel(v) + '|' + starsLine(v)));
+  check('звёзды → лига, ранг и звёзды в ранге',
+    pos.join(',') === '🥉 Бронза 10|☆☆☆,🥉 Бронза 10|★☆☆,🥉 Бронза 1|★★☆,🥈 Серебро 10|☆☆☆,' +
+                      '🥈 Серебро 5|☆☆☆,🥇 Золото 9|★☆☆,💎 Алмаз 1|★★☆,👑 Легенда|', pos.join(','));
+
+  // Без лиг на сервере — всё по-старому: число рейтинга и топ по рейтингу
+  await page.evaluate(() => openOnlineEntry());
+  await page.waitForTimeout(500);
+  const old = await page.evaluate(() => ({ elo: document.getElementById('rkElo').textContent.replace(/\s/g, ' '),
+    stars: document.getElementById('rkStars').classList.contains('hidden'),
+    top: document.getElementById('tRkTop').textContent }));
+  check('сервер без лиг: как раньше — число рейтинга', old.elo === '1 000' && old.stars && old.top === 'Топ по рейтингу',
+    JSON.stringify(old));
+  await done(page);
+
+  page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(L => {
+    window.__ladder = L;
+    window.__ladderTop = [{ username: 'Кира', stars: 150 }, { username: 'Максим', stars: 64 }];
+  }, LADDER);
+  await page.evaluate(() => openOnlineEntry());
+  await page.waitForTimeout(500);
+  const hero = await page.evaluate(() => ({
+    elo: document.getElementById('rkElo').textContent, stars: document.getElementById('rkStars').textContent,
+    sub: document.getElementById('rkEloSub').textContent, top: document.getElementById('tRkTop').textContent,
+    rows: [...document.querySelectorAll('#rkTopList .rk-top-row')].map(r => r.querySelector('.rk-who').textContent + ':' +
+                                                                         r.querySelector('.rk-pts').textContent) }));
+  check('на экране онлайна — лига и звёзды вместо числа', hero.elo === '🥇 Золото 9' && hero.stars === '★☆☆', JSON.stringify(hero));
+  check('сказано, какой сезон и сколько осталось', hero.sub === 'Сезон: сентябрь · осталось 4 дн.', hero.sub);
+  check('топ сезона — по лигам', hero.top === 'Топ сезона' && hero.rows.join() === 'Кира:👑 Легенда,Максим:🥇 Золото 9',
+    JSON.stringify(hero.rows));
+  const legend = await page.evaluate(() => {
+    ladderInfo = Object.assign({}, ladderInfo, { stars: 150, endsIn: 3600 });
+    renderRanked(null);
+    return { elo: document.getElementById('rkElo').textContent,
+             stars: document.getElementById('rkStars').textContent.replace(/\s/g, ' '),
+             sub: document.getElementById('rkEloSub').textContent };
+  });
+  check('Легенде видно число рейтинга; в последний день — «последний день»',
+    legend.elo === '👑 Легенда' && legend.stars === 'рейтинг 1 000' && /последний день/.test(legend.sub), JSON.stringify(legend));
+  const calls = await page.evaluate(() => window.__ladderCalls);
+  await page.evaluate(() => loadRanked(true));
+  check('лестница не спрашивается на каждом опросе', await page.evaluate(n => window.__ladderCalls === n, calls));
+
+  // Итог партии: звёзды вместо числа рейтинга
+  const result = async stars => {
+    await page.evaluate(st => {
+      window.__matchReview = [{ round: 1, seat: 0, guess: 50, tier: 8, timeout: false, forced: false, limited: false }];
+      window.__matchStars = st;
+      window.__match.id = (window.__match.id || 1) + 1;
+      Object.assign(window.__match, { names: ['Максим', '@bot:fox'], botSeat: 1, ranked: true, rankedMode: 0,
+        roundOver: true, matchOver: true, status: 'finished', wins: st.delta[0] < 0 ? [1, 3] : [3, 1],
+        roundWinner: st.delta[0] < 0 || (st.delta[0] === 0 && st.after[0] % 15 === 0) ? 1 : 0,
+        eloDelta: [10, 0], elo: 1010, moves: [{ seat: 0, guess: 50, tier: 8 }] });
+      return openMatch(window.__match.id);
+    }, stars);
+    await page.waitForTimeout(400);
+    return page.evaluate(() => ({
+      main: (document.querySelector('#resultBox .r-stars-main') || {}).textContent || '',
+      note: (document.querySelector('#resultBox .r-stars-note') || {}).textContent || '',
+      elo: !!document.querySelector('#resultBox .r-elo') }));
+  };
+  let r = await result({ delta: [2, 0], after: [60, null], unlock: [2, null] });
+  check('победа: +2 за серию, новая лига и открытые иконки',
+    r.main === '+2 ★ · 🥇 Золото 10 ☆☆☆' && r.note === 'серия побед · Новая лига: 🥇 Золото! · В профиле открыто: 🦚 🐉', JSON.stringify(r));
+  check('число рейтинга в итоге не показывается, когда есть звёзды', !r.elo);
+  r = await result({ delta: [-1, 0], after: [40, null], unlock: [null, null] });
+  check('поражение: минус звезда', r.main === '−1 ★ · 🥈 Серебро 7 ★☆☆' && r.note === '', JSON.stringify(r));
+  r = await result({ delta: [0, 0], after: [45, null], unlock: [null, null] });
+  check('поражение на ступени: звезда не ушла, и сказано почему',
+    r.main === '±0 ★ · 🥈 Серебро 5 ☆☆☆' && /ниже этого ранга не упасть/.test(r.note), JSON.stringify(r));
+  r = await result({ delta: [0, 0], after: [150, null], unlock: [null, null] });
+  check('Легенда: без звёзд, только лига', r.main === '👑 Легенда', JSON.stringify(r));
+  // Сдача соперника: причина и звёзды видны вместе
+  await page.evaluate(() => { window.__match.forfeitBy = 1; });
+  r = await result({ delta: [1, 0], after: [41, null], unlock: [null, null] });
+  check('при сдаче соперника — и причина, и звезда', r.main === '+1 ★ · 🥈 Серебро 7 ★★☆' &&
+    await page.evaluate(() => /вышел из игры/.test((document.querySelector('#resultBox .r-forfeit') || {}).textContent || '')),
+    JSON.stringify(r));
+  await page.evaluate(() => { window.__match.forfeitBy = null; window.__matchStars = null; });
+  const noStars = await page.evaluate(() => {
+    window.__match.id += 1;
+    return openMatch(window.__match.id);
+  }).then(() => page.waitForTimeout(400)).then(() => page.evaluate(() => ({
+    stars: !!document.querySelector('#resultBox .r-stars'), elo: !!document.querySelector('#resultBox .r-elo') })));
+  check('партия без звёзд (друг на рейтинг) — прежняя строка рейтинга', !noStars.stars && noStars.elo, JSON.stringify(noStars));
+  await done(page);
+
+  // Профиль: лига, значки сезонов, награды под замком
+  page = await newGame(browser, { user: 'Максим', profile: { color: null } });
+  await page.evaluate(L => { window.__ladder = L; }, LADDER);
+  await page.click('#accountChip');
+  await page.waitForTimeout(500);
+  const pf = await page.evaluate(() => document.getElementById('pfLeague').textContent);
+  check('в профиле — лига и значки прошлых сезонов', pf === '🥇 Золото 9 ★☆☆Сезоны: 🥈 07.2026  🥇 08.2026', pf);
+  await page.click('#tAvatarStart');
+  await page.waitForTimeout(150);
+  const grid = await page.evaluate(() => ({
+    icons: [...document.querySelectorAll('#avGrid .av-tile')].length,
+    locked: [...document.querySelectorAll('#avGrid .av-tile.locked')].map(e => e.dataset.icon).join(''),
+    colorsLocked: [...document.querySelectorAll('#avGrid .av-color.locked')].map(e => e.dataset.color).join(',') }));
+  check('награды видны все, закрыты — лиги выше достигнутой',
+    grid.icons === 25 + 10 && grid.locked === '🦩🐳🦖🦜👑🌟' && grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
+    JSON.stringify(grid));
+  const before = await page.evaluate(() => window.__profile.calls.length);
+  await page.click('.av-tile[data-icon="🦖"]');
+  await page.waitForTimeout(150);
+  const lock = await page.evaluate(n => ({ note: document.getElementById('avNote').textContent,
+    sent: window.__profile.calls.slice(n).filter(c => c.name === 'set_avatar').length,
+    open: !document.getElementById('avGrid').classList.contains('hidden') }), before);
+  check('закрытая иконка не ставится, и сказано, где откроется',
+    lock.note === 'Откроется в лиге «Алмаз»' && lock.sent === 0 && lock.open, JSON.stringify(lock));
+  await page.click('.av-tile[data-icon="🐉"]');
+  await page.waitForTimeout(200);
+  check('открытая награда ставится', await page.evaluate(() => window.__profile.avatar === '🐉'));
+  await page.click('#tAvatarStart');   // выбор иконки сворачивает сетку
+  await page.waitForTimeout(100);
+  await page.click('.av-color[data-color="#0ea5e9"]');
+  await page.waitForTimeout(150);
+  check('закрытый цвет не ставится', await page.evaluate(() => window.__profile.color !== '#0ea5e9' &&
+    /Алмаз/.test(document.getElementById('avNote').textContent)));
+  await done(page);
+
+  // Сервер без лиг — наград в сетке нет
+  page = await newGame(browser, { user: 'Максим', profile: { color: null } });
+  await page.click('#accountChip');
+  await page.waitForTimeout(400);
+  await page.click('#tAvatarStart');
+  await page.waitForTimeout(150);
+  check('сервер без лиг: сетка как раньше, лиги в профиле нет', await page.evaluate(() =>
+    document.querySelectorAll('#avGrid .av-tile').length === 25 &&
+    document.getElementById('pfLeague').classList.contains('hidden')));
+  await done(page);
+}
+
 // ------------------------------------------ профиль: иконка, имя, PIN
 async function testProfile(browser) {
   console.log('\nПрофиль: иконка, имя, PIN');
@@ -5260,6 +5401,7 @@ async function testKeyPage(browser) {
     await testDuelReview(browser);
     await testBots(browser);
     await testOnlineReview(browser);
+    await testLeagues(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

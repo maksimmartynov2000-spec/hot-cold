@@ -127,10 +127,21 @@ function stubSupabase(opts) {
           }
           if (name === 'list_matches') return { data: window.__matches || [], error: null };
           if (name === 'match_state') return { data: window.__matchState(), error: null };
+          // Лиги: без window.__ladder заглушка ведёт себя как сервер без миграции
+          if (name === 'ladder_status') {
+            window.__ladderCalls = (window.__ladderCalls || 0) + 1;
+            if (!window.__ladder) return { data: null, error: { message: 'function ladder_status does not exist' } };
+            return { data: window.__ladder, error: null };
+          }
+          if (name === 'ladder_top') {
+            if (!window.__ladder) return { data: null, error: { message: 'function ladder_top does not exist' } };
+            return { data: window.__ladderTop || [], error: null };
+          }
           if (name === 'match_review') {
             window.__reviewCalls = (window.__reviewCalls || 0) + 1;
             if (window.__reviewError) return { data: null, error: { message: window.__reviewError } };
-            return { data: { id: window.__match.id, moves: window.__matchReview || [] }, error: null };
+            return { data: { id: window.__match.id, moves: window.__matchReview || [],
+                             stars: window.__matchStars || null }, error: null };
           }
           if (name === 'challenge_friend') return { data: 1, error: null };
           if (name === 'respond_challenge') return { data: args.p_accept ? 'active' : 'declined', error: null };

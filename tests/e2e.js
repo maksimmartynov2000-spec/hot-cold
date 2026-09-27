@@ -348,8 +348,9 @@ async function registerPlayer(p, name, pin) {
   // В карточке число разделено пробелами по-русски: сравниваем без них
   const card = (await A.page.locator('#resultBox').textContent()).replace(/[\s\u00a0\u202f]/g, '');
   check('оставшемуся объяснили, что соперник ушёл', card.indexOf('Ладавышелизигры') >= 0, card);
-  check('и показали новый рейтинг с прибавкой',
-    card.indexOf('(+') >= 0 && card.indexOf(String(timur.elo)) >= 0, card);
+  // Партия из очереди — на звёзды: вместо числа рейтинга звезда и лига
+  check('и показали звезду за победу и лигу',
+    card.indexOf('+1★·🥉Бронза10★☆☆') >= 0 && card.indexOf('Рейтинг:') < 0, card);
   check('причина стоит раньше счёта', card.indexOf('вышелизигры') < card.indexOf('0:0'), card);
 
   // ---------- Профиль: иконка, смена имени и PIN — через настоящий SQL ----------
@@ -496,6 +497,18 @@ async function registerPlayer(p, name, pin) {
     bEnd.status === 'finished' && bEnd.elo_delta[0] === -10 && bEnd.elo_delta[1] === 0, JSON.stringify(bEnd));
   check('после поражения следующий бот слабее',
     skill && Math.abs(skill.level - 0.23) < 0.001 && skill.streak === -1, JSON.stringify(skill));
+  // Лиги: партия из очереди с ботом идёт в лестницу; из Бронзы 10 ниже не упасть
+  const lad = (await db.query("select stars, games, streak from ladder where username = 'Лада'")).rows[0];
+  const bStars = (await db.query('select ladder, star_delta, star_after from matches where id = $1', [bm.id])).rows[0];
+  // Вторая партия Лады на звёзды: первой была сдача по молчанию в рейтинге
+  check('партия с ботом — на звёзды, поражение в начале Бронзы звезды не отняло',
+    bStars.ladder === true && lad && lad.games === 2 && lad.stars === 0 &&
+    bStars.star_delta[0] === 0 && bStars.star_after[0] === 0, JSON.stringify({ lad, bStars }));
+  await B.page.evaluate(() => backToOnline());
+  await B.page.waitForTimeout(1200);
+  const heroB = await B.page.evaluate(() => document.getElementById('rkElo').textContent);
+  check('на экране онлайна — лига из настоящей базы', heroB === '🥉 Бронза 10', heroB);
+
   check('у бота рейтинга нет',
     (await db.query("select count(*) from elo_ratings where username like '@bot:%'")).rows[0].count === '0');
 
@@ -508,7 +521,7 @@ async function registerPlayer(p, name, pin) {
     calls.includes('match_guess') && calls.includes('match_state') &&
     calls.includes('send_phrase') && calls.includes('challenge_friend') &&
     calls.includes('join_ranked_queue') && calls.includes('ranked_status') &&
-    calls.includes('elo_leaderboard') && calls.includes('match_review'),
+    calls.includes('match_review') && calls.includes('ladder_status') && calls.includes('ladder_top'),
     [...new Set(calls)].join(', '));
 
   await browser.close();

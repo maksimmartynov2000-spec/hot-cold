@@ -1,0 +1,341 @@
+-- Лиги, звёзды и сезоны, как в Hearthstone. Применять в Supabase: SQL Editor →
+-- вставить целиком → Run. Применить ДО мёржа: новая игра спрашивает у базы лигу.
+--
+-- Пять лиг — 🥉 Бронза, 🥈 Серебро, 🥇 Золото, 💠 Платина, 💎 Алмаз, — в каждой
+-- десять рангов (10 → 1) по три звезды. Выше Алмаза 1 — 👑 Легенда. Победа в
+-- партии из очереди (с человеком или с ботом) даёт звезду, третья победа
+-- подряд и дальше — две. Поражение отнимает звезду, но ниже начала лиги и
+-- ниже ранга 5 не упасть. Легенда держится до конца сезона.
+--
+-- Звёзды общие на все четыре рейтинговых режима: лестница одна. Рейтинг Эло
+-- остаётся — по нему подбираются соперники и сила бота.
+--
+-- Сезон — календарный месяц (UTC). В новом сезоне игрок опускается на одну
+-- лигу (из Бронзы — в начало Бронзы, из Легенды — в Алмаз 5), а лучшая лига
+-- прошлого сезона остаётся значком в профиле. Переход делается сам при первом
+-- обращении игрока в новом месяце: отдельного расписания не нужно.
+--
+-- Награды: лига, достигнутая хоть раз, навсегда открывает две иконки и цвет.
+-- Проверяет база: в обход игры закрытую иконку не поставить.
+--
+-- Звёзды идут только за партии из очереди. Вызов друга «на рейтинг» и
+-- реванш с человеком звёзд не дают: иначе вдвоём их можно было бы накрутить.
+
+-- 1. Награды за лиги. Копия — в index.html (LEAGUE_REWARDS), сверяется тестом
+create or replace function league_rewards()
+returns table(league int, kind text, value text)
+language sql
+immutable
+as $$
+  values (1, 'icon', '🦅'), (1, 'icon', '🐺'), (1, 'color', '#94a3b8'),
+         (2, 'icon', '🦚'), (2, 'icon', '🐉'), (2, 'color', '#eab308'),
+         (3, 'icon', '🦩'), (3, 'icon', '🐳'), (3, 'color', '#14b8a6'),
+         (4, 'icon', '🦖'), (4, 'icon', '🦜'), (4, 'color', '#0ea5e9'),
+         (5, 'icon', '👑'), (5, 'icon', '🌟'), (5, 'color', '#d946ef');
+$$;
+
+create or replace function reward_icons()
+returns text[]
+language sql
+immutable
+as $$ select array_agg(value order by league, value) from league_rewards() where kind = 'icon'; $$;
+
+create or replace function reward_colors()
+returns text[]
+language sql
+immutable
+as $$ select array_agg(value order by league) from league_rewards() where kind = 'color'; $$;
+
+alter table students drop constraint if exists student_avatar_allowed;
+alter table students add constraint student_avatar_allowed
+  check (avatar is null or avatar = any (avatar_choices() || reward_icons()));
+alter table students drop constraint if exists student_avatar_color_allowed;
+alter table students add constraint student_avatar_color_allowed
+  check (avatar_color is null or avatar_color = any (avatar_colors() || reward_colors()));
+
+-- 2. Лестница. stars — позиция: 0 — Бронза 10 без звёзд, 149 — Алмаз 1 с двумя
+-- звёздами, 150 — Легенда. Лига = stars / 30, ранг = 10 − (stars % 30) / 3,
+-- звёзд в ранге = stars % 3
+create table if not exists ladder (
+  username text primary key references students(username) on update cascade on delete cascade,
+  season text not null,
+  stars int not null default 0,
+  legend_at timestamptz,
+  streak int not null default 0,
+  best int not null default 0,
+  games int not null default 0,
+  peak int not null default 0,
+  updated_at timestamptz not null default now(),
+  constraint ladder_stars_range check (stars between 0 and 150),
+  constraint ladder_peak_range check (peak between 0 and 5)
+);
+alter table ladder enable row level security;
+
+create table if not exists season_badges (
+  username text not null references students(username) on update cascade on delete cascade,
+  season text not null,
+  league int not null,
+  primary key (username, season)
+);
+alter table season_badges enable row level security;
+
+-- Какие партии дают звёзды — решается при создании: партия из очереди
+-- (с человеком или ботом) создаётся сразу идущей, а вызов друга и реванш
+-- с человеком — приглашением
+alter table matches add column if not exists ladder boolean not null default false;
+alter table matches add column if not exists star_delta int[] not null default array[0, 0];
+alter table matches add column if not exists star_after int[];
+alter table matches add column if not exists star_unlock int[];
+
+create or replace function matches_ladder_flag()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.ladder := new.ranked and new.status = 'active';
+  return new;
+end;
+$$;
+drop trigger if exists matches_ladder_flag on matches;
+create trigger matches_ladder_flag before insert on matches
+  for each row execute function matches_ladder_flag();
+
+create or replace function ladder_season()
+returns text
+language sql
+stable
+as $$ select to_char(now() at time zone 'UTC', 'YYYY-MM'); $$;
+
+create or replace function ladder_league(p_stars int)
+returns int
+language sql
+immutable
+as $$ select case when p_stars >= 150 then 5 else p_stars / 30 end; $$;
+
+-- Строка игрока в текущем сезоне. Сезон сменился — значок за прошлый и
+-- спуск на лигу
+create or replace function ladder_touch(p_username text)
+returns ladder
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare r ladder; cur text; s int;
+begin
+  cur := ladder_season();
+  insert into ladder(username, season) values (p_username, cur)
+  on conflict (username) do nothing;
+  select * into r from ladder where username = p_username for update;
+  if r.season <> cur then
+    if r.games > 0 then
+      insert into season_badges(username, season, league)
+      values (p_username, r.season, ladder_league(r.best))
+      on conflict (username, season) do nothing;
+    end if;
+    s := case when r.stars >= 150 then 135 else greatest(0, r.stars - 30) end;
+    s := s - s % 3;
+    update ladder
+    set season = cur, stars = s, legend_at = null, streak = 0, best = s, games = 0, updated_at = now()
+    where username = p_username
+    returning * into r;
+  end if;
+  return r;
+end;
+$$;
+
+-- Итог партии для одного игрока: сколько звёзд прибавилось (или ушло)
+create or replace function ladder_after(p_username text, p_won boolean)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare r ladder; st int; s int;
+begin
+  r := ladder_touch(p_username);
+  if p_won then
+    st := r.streak + 1;
+    s := least(150, r.stars + case when st >= 3 and r.stars < 150 then 2 else 1 end);
+  else
+    st := 0;
+    -- Начало лиги и ранг 5 — ступени, ниже которых не упасть. Легенда — до
+    -- конца сезона
+    s := case when r.stars >= 150 or r.stars % 15 = 0 then r.stars else r.stars - 1 end;
+  end if;
+  update ladder
+  set stars = s,
+      legend_at = case when s >= 150 and r.legend_at is null then now() else r.legend_at end,
+      streak = st,
+      best = greatest(r.best, s),
+      games = r.games + 1,
+      peak = greatest(r.peak, ladder_league(s)),
+      updated_at = now()
+  where username = p_username;
+  return s - r.stars;
+end;
+$$;
+
+-- Партия из очереди закончилась: звёзды обоим людям (у бота лестницы нет).
+-- Срабатывает там же, где рейтинг: при первом elo_applied
+create or replace function matches_ladder_result()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare seat int; who text; d int; before_peak int; r ladder;
+        deltas int[] := array[0, 0]; afters int[] := array[null, null]::int[];
+        unlocks int[] := array[null, null]::int[];
+begin
+  for seat in 0..1 loop
+    if new.bot_seat is not null and new.bot_seat = seat then continue; end if;
+    who := case when seat = 0 then new.p0 else new.p1 end;
+    if who like '#%' then continue; end if;
+    select peak into before_peak from ladder where username = who;
+    d := ladder_after(who, new.round_winner = seat);
+    select * into r from ladder where username = who;
+    deltas[seat + 1] := d;
+    afters[seat + 1] := r.stars;
+    if r.peak > coalesce(before_peak, 0) then unlocks[seat + 1] := r.peak; end if;
+  end loop;
+  update matches set star_delta = deltas, star_after = afters, star_unlock = unlocks
+  where id = new.id;
+  return null;
+end;
+$$;
+drop trigger if exists matches_ladder_result on matches;
+create trigger matches_ladder_result after update of elo_applied on matches
+  for each row when (new.elo_applied and not old.elo_applied and new.ladder)
+  execute function matches_ladder_result();
+
+-- 3. Что видит игрок: своя лестница, значки, открытые награды, срок сезона
+create or replace function ladder_status(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; r ladder; badges jsonb; ends timestamptz;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  r := ladder_touch(me);
+  select coalesce(jsonb_agg(jsonb_build_object('season', b.season, 'league', b.league) order by b.season), '[]'::jsonb)
+    into badges
+  from season_badges b where b.username = me;
+  ends := (date_trunc('month', now() at time zone 'UTC') + interval '1 month') at time zone 'UTC';
+  return jsonb_build_object(
+    'season', r.season,
+    'endsIn', greatest(0, floor(extract(epoch from (ends - now())))::int),
+    'stars', r.stars,
+    'streak', r.streak,
+    'best', r.best,
+    'games', r.games,
+    'peak', r.peak,
+    'badges', badges);
+end;
+$$;
+
+-- Топ сезона: легенды — по тому, кто дошёл раньше; остальные — по звёздам
+create or replace function ladder_top()
+returns table(username text, stars int)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select l.username, l.stars
+  from ladder l
+  where l.season = ladder_season() and l.games > 0 and l.username not like '#%'
+  order by l.stars desc, l.legend_at asc nulls last, l.updated_at asc
+  limit 10;
+$$;
+
+-- 4. Награды: закрытую иконку или цвет база не поставит
+create or replace function set_avatar(p_username text, p_pin text, p_avatar text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; need int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_avatar is not null and not (p_avatar = any (avatar_choices())) then
+    select league into need from league_rewards() where kind = 'icon' and value = p_avatar;
+    if need is null then raise exception 'invalid_avatar'; end if;
+    if coalesce((select peak from ladder where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  end if;
+  update students set avatar = p_avatar where username = me;
+  return p_avatar;
+end;
+$$;
+
+create or replace function set_avatar_color(p_username text, p_pin text, p_color text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; need int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_color is not null and not (p_color = any (avatar_colors())) then
+    select league into need from league_rewards() where kind = 'color' and value = p_color;
+    if need is null then raise exception 'invalid_color'; end if;
+    if coalesce((select peak from ladder where username = me), 0) < need then
+      raise exception 'color_locked';
+    end if;
+  end if;
+  update students set avatar_color = p_color where username = me;
+  return p_color;
+end;
+$$;
+
+-- 5. Итог партии: разбор отдаёт и звёзды — сколько, где теперь, что открылось
+create or replace function match_review(p_username text, p_pin text, p_match_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; moves jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  if match_seat(m, me) is null then raise exception 'not_your_match'; end if;
+  -- Пока партия идёт, ходы прошлых раундов — подсказка о том, как играет
+  -- соперник, а текущего — прямая подсказка. Только после конца
+  if not m.match_over then raise exception 'match_not_over'; end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'round', mv.round, 'seat', mv.seat, 'guess', mv.guess, 'tier', mv.tier,
+           'timeout', mv.kind = 'timeout', 'forced', mv.forced, 'limited', mv.limited)
+         order by mv.id), '[]'::jsonb)
+    into moves
+  from match_moves mv where mv.match_id = p_match_id;
+
+  return jsonb_build_object('id', m.id, 'moves', moves,
+    'stars', case when m.ladder and m.star_after is not null then jsonb_build_object(
+      'delta', to_jsonb(m.star_delta), 'after', to_jsonb(m.star_after),
+      'unlock', to_jsonb(m.star_unlock)) else null end);
+end;
+$$;
+
+revoke execute on function matches_ladder_flag() from public, anon;
+revoke execute on function matches_ladder_result() from public, anon;
+revoke execute on function ladder_touch(text) from public, anon;
+revoke execute on function ladder_after(text, boolean) from public, anon;
+grant execute on function ladder_status(text, text) to anon;
+grant execute on function ladder_top() to anon;
+grant execute on function league_rewards() to anon;
+grant execute on function set_avatar(text, text, text) to anon;
+grant execute on function set_avatar_color(text, text, text) to anon;
+grant execute on function match_review(text, text, bigint) to anon;
