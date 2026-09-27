@@ -2038,6 +2038,16 @@
   </div>
 </div>
 
+<!-- Выход из начатой партии без интернета: она нигде не хранится, и случайное
+     нажатие на ☰ не должно стирать её молча -->
+<div class="modal-backdrop hidden" id="quitModal">
+  <div class="modal-card">
+    <div class="modal-text" id="tQuitAsk"></div>
+    <button class="btn btn-block" id="tQuitStay" onclick="closeQuit()"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="tQuitGo" onclick="closeQuit(); quitToMenu()"></button>
+  </div>
+</div>
+
 <!-- Аккаунт: имя, свой PIN и выход -->
 <!-- Профиль. Раньше это было окно выхода: вопрос «Выйти из аккаунта?» висел,
      хотя человек ничего не нажимал, — открыл посмотреть PIN, а его спрашивают,
@@ -2287,6 +2297,7 @@
       turnOf: "Turn: ", roundLabel: "Round ",
       roundWin: " wins the round!", matchWin: " wins the game!",
       secretWas: "Number: ", nextRound: "Next round", newMatch: "New Game", toMenu: "Menu",
+      quitAsk: "Leave the game? This game won't be saved.", quitStay: "Keep playing", quitGo: "Leave",
       recordLabel: "Best: ", recordShort: "🏆 {n}", newRecord: "🏆 New record!",
       review: { open: "Review", title: "Game review", titleRound: "Round review", round: "Round {n}", accuracy: "Accuracy", finalGuess: "last guess",
         grades: { brilliant: "Brilliant", best: "Best", excellent: "Excellent", good: "Good", inaccuracy: "Inaccuracy", mistake: "Mistake", blunder: "Blunder", hit: "Bullseye!", forced: "Lava toss \u2014 not graded", limited: "Didn\u2019t see every move \u2014 not graded" } },
@@ -2511,6 +2522,7 @@
       turnOf: "Ходит: ", roundLabel: "Раунд ",
       roundWin: " выигрывает раунд!", matchWin: " выигрывает игру!",
       secretWas: "Число: ", nextRound: "Следующий раунд", newMatch: "Новая игра", toMenu: "В меню",
+      quitAsk: "Выйти из игры? Эта партия не сохранится.", quitStay: "Продолжить", quitGo: "Выйти",
       recordLabel: "Рекорд: ", recordShort: "🏆 {n}", newRecord: "🏆 Новый рекорд!",
       review: { open: "Разбор", title: "Разбор партии", titleRound: "Разбор раунда", round: "Раунд {n}", accuracy: "Точность", finalGuess: "последняя догадка",
         grades: { brilliant: "Блестяще", best: "Лучший", excellent: "Отлично", good: "Хорошо", inaccuracy: "Неточность", mistake: "Ошибка", blunder: "Зевок", hit: "В точку!", forced: "Бросок в лаву — без оценки", limited: "Видел не все ходы — без оценки" } },
@@ -2735,6 +2747,7 @@
       turnOf: "Au tour de : ", roundLabel: "Manche ",
       roundWin: " remporte la manche !", matchWin: " remporte la partie !",
       secretWas: "Nombre : ", nextRound: "Manche suivante", newMatch: "Nouvelle partie", toMenu: "Menu",
+      quitAsk: "Quitter la partie ? Elle ne sera pas enregistr\u00e9e.", quitStay: "Continuer", quitGo: "Quitter",
       recordLabel: "Record : ", recordShort: "🏆 {n}", newRecord: "🏆 Nouveau record !",
       review: { open: "Analyse", title: "Analyse de la partie", titleRound: "Analyse de la manche", round: "Manche {n}", accuracy: "Pr\u00e9cision", finalGuess: "derni\u00e8re r\u00e9ponse",
         grades: { brilliant: "Brillant", best: "Meilleur coup", excellent: "Excellent", good: "Bon", inaccuracy: "Impr\u00e9cision", mistake: "Erreur", blunder: "Gaffe", hit: "Dans le mille !", forced: "Jet de lave \u2014 non not\u00e9", limited: "N\u2019a pas vu tous les coups \u2014 non not\u00e9" } },
@@ -2959,6 +2972,7 @@
       turnOf: "Am Zug: ", roundLabel: "Runde ",
       roundWin: " gewinnt die Runde!", matchWin: " gewinnt das Spiel!",
       secretWas: "Zahl: ", nextRound: "Nächste Runde", newMatch: "Neues Spiel", toMenu: "Menü",
+      quitAsk: "Spiel verlassen? Diese Partie wird nicht gespeichert.", quitStay: "Weiterspielen", quitGo: "Verlassen",
       recordLabel: "Rekord: ", recordShort: "🏆 {n}", newRecord: "🏆 Neuer Rekord!",
       review: { open: "Analyse", title: "Partieanalyse", titleRound: "Rundenanalyse", round: "Runde {n}", accuracy: "Genauigkeit", finalGuess: "letzter Tipp",
         grades: { brilliant: "Brillant", best: "Bester Zug", excellent: "Exzellent", good: "Gut", inaccuracy: "Ungenauigkeit", mistake: "Fehler", blunder: "Patzer", hit: "Volltreffer!", forced: "Lavawurf \u2014 ohne Wertung", limited: "Nicht alle Z\u00fcge gesehen \u2014 ohne Wertung" } },
@@ -3632,7 +3646,32 @@
     if (online && online.ranked && !D.matchOver) return openResign();
     if (online) return backToOnline();
     if (mode === 'run') { openPause(); return; }
+    if (hasProgress()) return openQuit();
     quitToMenu();
+  }
+
+  // Есть ли что терять: начатая и не законченная партия. Пустую или уже
+  // сыгранную закрываем без вопроса — спрашивать там не о чем
+  function hasProgress() {
+    if (mode === 'solo') {
+      return history.length > 0 && (!gameOver || gameOverType === 'lose_waiting');
+    }
+    if (mode === 'duel') {
+      return !D.matchOver && (history.length > 0 || D.round > 1 || D.wins[0] + D.wins[1] > 0);
+    }
+    return false;
+  }
+
+  function openQuit() {
+    const L = t();
+    document.getElementById('tQuitAsk').textContent = L.quitAsk;
+    document.getElementById('tQuitStay').textContent = L.quitStay;
+    document.getElementById('tQuitGo').textContent = L.quitGo;
+    document.getElementById('quitModal').classList.remove('hidden');
+  }
+
+  function closeQuit() {
+    document.getElementById('quitModal').classList.add('hidden');
   }
 
   // ================= ОБЩАЯ НАСТРОЙКА (диапазон/попытки/дуэль) =================
