@@ -445,6 +445,21 @@
     .mode-btn.online { border-left: 3px solid #38bdf8; }
     .mode-btn.bot { border-left: 3px solid #a78bfa; }
     .r-stars { margin-top: 8px; text-align: center; }
+    /* Салют при победе */
+    .confetti { position: fixed; left: 50%; top: 40%; width: 0; height: 0; pointer-events: none; z-index: 60; }
+    .confetti span {
+      position: absolute; left: -12px; top: -12px; font-size: 22px; opacity: 0;
+      animation: confetti-fly 1.35s ease-out forwards;
+    }
+    @keyframes confetti-fly {
+      0% { transform: translate(0, 0) scale(0.4); opacity: 1; }
+      70% { opacity: 1; }
+      100% { transform: translate(var(--dx), var(--dy)) scale(1.1) rotate(25deg); opacity: 0; }
+    }
+    /* Новый рекорд и новая лига — строка подпрыгивает */
+    .r-pop { animation: r-pop 0.7s ease-out; }
+    @keyframes r-pop { 0% { transform: scale(0.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+    @media (prefers-reduced-motion: reduce) { .r-pop { animation: none; } }
     .r-stars-main { font-size: 17px; font-weight: 800; color: #fbbf24; }
     .r-stars-note { font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); margin-top: 2px; }
     .r-elo .r-elo-note { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
@@ -542,6 +557,9 @@
     }
     .fold[open] > .fold-head::after { transform: rotate(90deg); }
     .fold-body { padding-top: 10px; }
+    .pf-fold { margin-top: 8px; }
+    .pf-fold .fold-body > .btn-ghost + .fr-note + .btn-ghost,
+    .pf-fold .fold-body > .fr-note + .btn-ghost { margin-top: 8px; }
     .fr-btn.more { padding: 5px 9px; font-size: 15px; line-height: 1; letter-spacing: 1px; }
     .friend-row .avatar { margin-right: 2px; }
     .fr-note {
@@ -1016,7 +1034,7 @@
 
       /* Ходов теперь всегда четыре, и окно под них не растёт — но строки
          поплотнее, чтобы в те же пиксели их помещалось больше */
-      .card.solo-game .history-list { max-height: 96px; gap: 4px; }
+      .card.solo-game .history-list { gap: 4px; }
       .card.solo-game .history-item { padding: 6px 12px; }
       .card.solo-game .history-item .h-guess { font-size: 15px; }
     }
@@ -1291,11 +1309,7 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      max-height: 190px;
-      overflow-y: auto;
-      padding-right: 4px;
     }
-    .history-list.tall { max-height: 340px; }
     .history-list::-webkit-scrollbar { width: 4px; }
     .history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 
@@ -1439,7 +1453,7 @@
     /* Под названием экрана «Играет …» — подзаголовок, а не отдельная строка
        посередине */
     .screen-title + .run-greeting { text-align: left; margin: -8px 0 16px; }
-    #screenRunHub #tRunStart + .frost-row { margin-top: 14px; }
+    #screenRunHub .frost-row { margin: 4px 0 14px; }
     #screenRunHub .lb-wrap { margin-top: 28px; }
     #screenRunHub .lb-list { margin-top: 10px; }
 
@@ -1453,6 +1467,10 @@
     .run-hub-actions .btn-ghost { flex: 1; }
     /* Переключатель «мороз и жара». Вся строка — часть label, чтобы по подписи
        можно было попасть пальцем, а не только по самой галочке */
+    .frost-row .fr-text { display: flex; flex-direction: column; gap: 1px; }
+    .frost-row:has(.row-hint) { align-items: flex-start; }
+    .frost-row:has(.row-hint) input { margin-top: 1px; }
+    .frost-row .row-hint { font-size: 12px; color: rgba(255, 255, 255, 0.5); line-height: 1.3; }
     .frost-row {
       display: flex;
       align-items: center;
@@ -1599,7 +1617,7 @@
 
     <label class="frost-row">
       <input type="checkbox" id="frostSetup" onchange="setFrostMode(this.checked)" />
-      <span id="tFrostSetup"></span>
+      <span class="fr-text"><span id="tFrostSetup"></span><small class="row-hint" id="tFrostHint"></small></span>
     </label>
 
     <div class="setup-field" id="attemptsField">
@@ -1615,7 +1633,7 @@
 
       <label class="frost-row">
         <input type="checkbox" id="bonusSetup" onchange="setBonusMode(this.checked)" />
-        <span id="tBonusSetup"></span>
+        <span class="fr-text"><span id="tBonusSetup"></span><small class="row-hint" id="tBonusHint"></small></span>
       </label>
 
       <div class="setup-field hidden" id="bonusCountField">
@@ -1634,6 +1652,7 @@
           <input type="text" id="nameP2" maxlength="14" oninput="buildHandicapOptions()" />
         </div>
       </div>
+      <div class="setup-pair">
       <div class="setup-field">
         <label id="tLblWins">Play until how many wins</label>
         <select class="field" id="winsNeeded">
@@ -1647,6 +1666,7 @@
       <div class="setup-field" id="handicapField">
         <label id="tLblHandicap">Handicap</label>
         <select class="field" id="handicap"></select>
+      </div>
       </div>
     </div>
 
@@ -1747,7 +1767,6 @@
         </div>
 
         <div class="guess-section" id="guessSection">
-          <p id="tEnterGuess">Enter a number</p>
           <div class="row">
             <button class="sign-btn hidden" id="guessSign" onclick="flipSign('guessInput')" aria-label="−">−</button>
             <input type="text" id="guessInput" placeholder="" inputmode="numeric" autocomplete="off" />
@@ -1967,11 +1986,11 @@
       <button class="btn btn-block" style="margin-top:14px" id="tUnfinishedResume" onclick="resumeSavedRun()"></button>
       <button class="btn-ghost btn-block" style="margin-top:8px" id="tUnfinishedFinish" onclick="finishSavedRun()"></button>
     </div>
-    <button class="btn btn-block" id="tRunStart" onclick="startRun()"></button>
     <label class="frost-row">
       <input type="checkbox" id="frostRun" onchange="setFrostMode(this.checked)" />
-      <span id="tFrostRun"></span>
+      <span class="fr-text"><span id="tFrostRun"></span><small class="row-hint" id="tFrostRunHint"></small></span>
     </label>
+    <button class="btn btn-block" id="tRunStart" onclick="startRun()"></button>
     <div class="lb-wrap">
       <div class="lb-head">
         <div class="lb-title" id="tRunTop"></div>
@@ -2048,7 +2067,12 @@
       <div class="fr-note hidden" id="pushNote"></div>
 
       <div class="hidden" id="pfEdit">
-        <button class="btn-ghost btn-block" id="tRenameStart" style="margin-top:8px"
+        <!-- Имя и PIN меняют редко: под одной строкой. «Показать PIN» — выше,
+             на виду: его дети забывают чаще всего -->
+        <details class="fold pf-fold" id="pfEditFold">
+        <summary class="fold-head" id="tNamePinHead">Name and PIN</summary>
+        <div class="fold-body">
+        <button class="btn-ghost btn-block" id="tRenameStart"
                 onclick="openRename(true)"></button>
         <div class="pf-form hidden" id="renameBox">
           <input type="text" id="renameInput" maxlength="20" autocomplete="off" />
@@ -2071,6 +2095,8 @@
           </div>
         </div>
         <div class="fr-note hidden" id="pinNote"></div>
+        </div>
+        </details>
       </div>
     </div>
 
@@ -2123,7 +2149,7 @@
     en: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
-      frostLabel: "Frost and Heat",
+      frostLabel: "Frost and Heat", frostHint: "Negative numbers too \u2014 e.g. \u221250 to 50", bonusHint: "Some numbers hide surprises \u2014 a help or a trap",
       say: {
         hi: "\ud83d\udc4b Hello!",
         hot: "\ud83d\udd25 Getting warm\u2026",
@@ -2253,7 +2279,7 @@
       botsSub: { turtle: "Beginner", panda: "Learning", dolphin: "Steady", fox: "Sly", owl: "Master" },
       groupOffline: "No internet needed", groupOnline: "Needs internet",
       lblP1: "Player 1", lblP2: "Player 2", defP1: "Player 1", defP2: "Player 2",
-      lblWins: "Play until how many wins", lblHandicap: "Head start",
+      lblWins: "Play to", lblHandicap: "Head start",
       lblRange: "Range", lblAttempts: "Attempts",
       hcNone: "None", hcTokens: "2 tokens",
       back: "Back", startMatch: "Start game", startGame: "Start game",
@@ -2261,7 +2287,7 @@
       turnOf: "Turn: ", roundLabel: "Round ",
       roundWin: " wins the round!", matchWin: " wins the game!",
       secretWas: "Number: ", nextRound: "Next round", newMatch: "New Game", toMenu: "Menu",
-      recordLabel: "Best for this range: ", newRecord: "🏆 New record!",
+      recordLabel: "Best: ", recordShort: "🏆 {n}", newRecord: "🏆 New record!",
       review: { open: "Review", title: "Game review", titleRound: "Round review", round: "Round {n}", accuracy: "Accuracy", finalGuess: "last guess",
         grades: { brilliant: "Brilliant", best: "Best", excellent: "Excellent", good: "Good", inaccuracy: "Inaccuracy", mistake: "Mistake", blunder: "Blunder", hit: "Bullseye!", forced: "Lava toss \u2014 not graded", limited: "Didn\u2019t see every move \u2014 not graded" } },
       run: {
@@ -2326,7 +2352,7 @@
         forgot: "Forgot your PIN?",
         hintIs: "Your reminder: ",
         noHint: "No reminder was saved for this name",
-        account: "Your account",
+        account: "Your account", namePin: "Name and PIN",
         settings: "Settings", language: "Language", done: "Done",
         avatarChange: "Change icon", avatarColorChange: "Icon and colour", lgLocked: "Unlocks in {l}", lgSeasons: "Seasons", save: "Save",
         renameStart: "Change name", renameNew: "New name",
@@ -2347,7 +2373,7 @@
     ru: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
-      frostLabel: "Мороз и Жара",
+      frostLabel: "Мороз и Жара", frostHint: "Есть и отрицательные числа \u2014 например, от \u221250 до 50", bonusHint: "На некоторых числах спрятаны сюрпризы \u2014 помощь или ловушка",
       say: {
         hi: "\ud83d\udc4b Привет!",
         hot: "\ud83d\udd25 Уже теплее\u2026",
@@ -2477,7 +2503,7 @@
       botsSub: { turtle: "Новичок", panda: "Учится", dolphin: "Уверенный", fox: "Хитрый", owl: "Мастер" },
       groupOffline: "Без интернета", groupOnline: "Нужен интернет",
       lblP1: "Игрок 1", lblP2: "Игрок 2", defP1: "Игрок 1", defP2: "Игрок 2",
-      lblWins: "Играем до скольких побед", lblHandicap: "Фора",
+      lblWins: "Играем до", lblHandicap: "Фора",
       lblRange: "Диапазон", lblAttempts: "Попыток",
       hcNone: "Нет", hcTokens: "2 жетона",
       back: "Назад", startMatch: "Начать игру", startGame: "Начать игру",
@@ -2485,7 +2511,7 @@
       turnOf: "Ходит: ", roundLabel: "Раунд ",
       roundWin: " выигрывает раунд!", matchWin: " выигрывает игру!",
       secretWas: "Число: ", nextRound: "Следующий раунд", newMatch: "Новая игра", toMenu: "В меню",
-      recordLabel: "Рекорд для этого диапазона: ", newRecord: "🏆 Новый рекорд!",
+      recordLabel: "Рекорд: ", recordShort: "🏆 {n}", newRecord: "🏆 Новый рекорд!",
       review: { open: "Разбор", title: "Разбор партии", titleRound: "Разбор раунда", round: "Раунд {n}", accuracy: "Точность", finalGuess: "последняя догадка",
         grades: { brilliant: "Блестяще", best: "Лучший", excellent: "Отлично", good: "Хорошо", inaccuracy: "Неточность", mistake: "Ошибка", blunder: "Зевок", hit: "В точку!", forced: "Бросок в лаву — без оценки", limited: "Видел не все ходы — без оценки" } },
       run: {
@@ -2550,7 +2576,7 @@
         forgot: "Забыли PIN?",
         hintIs: "Ваша подсказка: ",
         noHint: "Для этого имени подсказки нет",
-        account: "Ваш аккаунт",
+        account: "Ваш аккаунт", namePin: "Имя и PIN",
         settings: "Настройки", language: "Язык", done: "Готово",
         avatarChange: "Сменить иконку", avatarColorChange: "Иконка и цвет", lgLocked: "Откроется в лиге «{l}»", lgSeasons: "Сезоны", save: "Сохранить",
         renameStart: "Сменить имя", renameNew: "Новое имя",
@@ -2571,7 +2597,7 @@
     fr: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
-      frostLabel: "Gel et Chaleur",
+      frostLabel: "Gel et Chaleur", frostHint: "Aussi des nombres n\u00e9gatifs \u2014 par ex. de \u221250 \u00e0 50", bonusHint: "Certains nombres cachent des surprises \u2014 un coup de pouce ou un pi\u00e8ge",
       say: {
         hi: "\ud83d\udc4b Salut !",
         hot: "\ud83d\udd25 \u00c7a chauffe\u2026",
@@ -2701,7 +2727,7 @@
       botsSub: { turtle: "D\u00e9butant", panda: "Apprenti", dolphin: "Solide", fox: "Rus\u00e9", owl: "Ma\u00eetre" },
       groupOffline: "Sans internet", groupOnline: "Avec internet",
       lblP1: "Joueur 1", lblP2: "Joueur 2", defP1: "Joueur 1", defP2: "Joueur 2",
-      lblWins: "Jusqu'à combien de victoires", lblHandicap: "Avantage",
+      lblWins: "Jusqu'à", lblHandicap: "Avantage",
       lblRange: "Plage", lblAttempts: "Essais",
       hcNone: "Aucun", hcTokens: "2 jetons",
       back: "Retour", startMatch: "Commencer la partie", startGame: "Commencer la partie",
@@ -2709,7 +2735,7 @@
       turnOf: "Au tour de : ", roundLabel: "Manche ",
       roundWin: " remporte la manche !", matchWin: " remporte la partie !",
       secretWas: "Nombre : ", nextRound: "Manche suivante", newMatch: "Nouvelle partie", toMenu: "Menu",
-      recordLabel: "Meilleur score pour cette plage : ", newRecord: "🏆 Nouveau record !",
+      recordLabel: "Record : ", recordShort: "🏆 {n}", newRecord: "🏆 Nouveau record !",
       review: { open: "Analyse", title: "Analyse de la partie", titleRound: "Analyse de la manche", round: "Manche {n}", accuracy: "Pr\u00e9cision", finalGuess: "derni\u00e8re r\u00e9ponse",
         grades: { brilliant: "Brillant", best: "Meilleur coup", excellent: "Excellent", good: "Bon", inaccuracy: "Impr\u00e9cision", mistake: "Erreur", blunder: "Gaffe", hit: "Dans le mille !", forced: "Jet de lave \u2014 non not\u00e9", limited: "N\u2019a pas vu tous les coups \u2014 non not\u00e9" } },
       run: {
@@ -2774,7 +2800,7 @@
         forgot: "PIN oublié ?",
         hintIs: "Votre aide : ",
         noHint: "Aucune aide enregistrée pour ce nom",
-        account: "Votre compte",
+        account: "Votre compte", namePin: "Nom et PIN",
         settings: "R\u00e9glages", language: "Langue", done: "OK",
         avatarChange: "Changer d\u2019ic\u00f4ne", avatarColorChange: "Ic\u00f4ne et couleur", lgLocked: "Se d\u00e9bloque en ligue {l}", lgSeasons: "Saisons", save: "Enregistrer",
         renameStart: "Changer de nom", renameNew: "Nouveau nom",
@@ -2795,7 +2821,7 @@
     de: {
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
-      frostLabel: "Frost und Hitze",
+      frostLabel: "Frost und Hitze", frostHint: "Auch negative Zahlen \u2014 z. B. \u221250 bis 50", bonusHint: "Manche Zahlen verstecken \u00dcberraschungen \u2014 Hilfe oder Falle",
       say: {
         hi: "\ud83d\udc4b Hallo!",
         hot: "\ud83d\udd25 Es wird w\u00e4rmer\u2026",
@@ -2925,7 +2951,7 @@
       botsSub: { turtle: "Anf\u00e4nger", panda: "Lernt", dolphin: "Sicher", fox: "Schlau", owl: "Meister" },
       groupOffline: "Ohne Internet", groupOnline: "Mit Internet",
       lblP1: "Spieler 1", lblP2: "Spieler 2", defP1: "Spieler 1", defP2: "Spieler 2",
-      lblWins: "Bis wie viele Siege", lblHandicap: "Vorsprung",
+      lblWins: "Spielen bis", lblHandicap: "Vorsprung",
       lblRange: "Bereich", lblAttempts: "Versuche",
       hcNone: "Ohne", hcTokens: "2 Jetons",
       back: "Zurück", startMatch: "Spiel starten", startGame: "Spiel starten",
@@ -2933,7 +2959,7 @@
       turnOf: "Am Zug: ", roundLabel: "Runde ",
       roundWin: " gewinnt die Runde!", matchWin: " gewinnt das Spiel!",
       secretWas: "Zahl: ", nextRound: "Nächste Runde", newMatch: "Neues Spiel", toMenu: "Menü",
-      recordLabel: "Bestwert für diesen Bereich: ", newRecord: "🏆 Neuer Rekord!",
+      recordLabel: "Rekord: ", recordShort: "🏆 {n}", newRecord: "🏆 Neuer Rekord!",
       review: { open: "Analyse", title: "Partieanalyse", titleRound: "Rundenanalyse", round: "Runde {n}", accuracy: "Genauigkeit", finalGuess: "letzter Tipp",
         grades: { brilliant: "Brillant", best: "Bester Zug", excellent: "Exzellent", good: "Gut", inaccuracy: "Ungenauigkeit", mistake: "Fehler", blunder: "Patzer", hit: "Volltreffer!", forced: "Lavawurf \u2014 ohne Wertung", limited: "Nicht alle Z\u00fcge gesehen \u2014 ohne Wertung" } },
       run: {
@@ -2998,7 +3024,7 @@
         forgot: "PIN vergessen?",
         hintIs: "Deine Hilfe: ",
         noHint: "Für diesen Namen ist keine Hilfe gespeichert",
-        account: "Dein Konto",
+        account: "Dein Konto", namePin: "Name und PIN",
         settings: "Einstellungen", language: "Sprache", done: "Fertig",
         avatarChange: "Symbol \u00e4ndern", avatarColorChange: "Symbol und Farbe", lgLocked: "Wird in der Liga {l} frei", lgSeasons: "Saisons", save: "Speichern",
         renameStart: "Namen \u00e4ndern", renameNew: "Neuer Name",
@@ -3443,7 +3469,6 @@
     menuBtn.classList.toggle('icon', mode !== 'run');
     document.getElementById('tFinalWarning').textContent = L.finalWarning;
     document.getElementById('tFinalSubmit').textContent = L.finalSubmit;
-    document.getElementById('tEnterGuess').textContent = L.enterGuess;
     document.getElementById('tSubmitGuess').textContent = L.submitGuess;
     document.getElementById('tHistoryTitle').textContent = L.historyTitle;
     document.getElementById('tLegendTitle').textContent = L.legendTitle;
@@ -3476,6 +3501,9 @@
     renderVizToggles();
     document.getElementById('tFrostSetup').textContent = L.frostLabel;
     document.getElementById('tBonusSetup').textContent = L.bonusLabel;
+    document.getElementById('tFrostHint').textContent = L.frostHint;
+    document.getElementById('tFrostRunHint').textContent = L.frostHint;
+    document.getElementById('tBonusHint').textContent = L.bonusHint;
     document.getElementById('bonusSetup').checked = bonusMode;
     document.getElementById('tLblBonusCount').textContent = L.lblBonusCount;
     buildBonusCountOptions();
@@ -3890,7 +3918,7 @@
       return;
     }
     if (D.tokens[p] <= 0) return;
-    if (history.length === 0) return;   // нельзя первым ходом раунда
+    // Жетон — в любой момент, и первым ходом раунда тоже
     D.tokens[p]--;
     D.armed = true;
     renderAll();
@@ -4160,7 +4188,7 @@
     document.getElementById('forcedText').textContent =
       L.forced[kind].replace('{a}', D.names[D.cur]);
     document.getElementById('forcedBtn').textContent = L.forcedBtn[kind];
-    const canArm = !D.armed && D.tokens[D.cur] > 0 && history.length > 0 &&
+    const canArm = !D.armed && D.tokens[D.cur] > 0 &&
                    (!online || D.cur === online.seat);
     const hint = document.getElementById('forcedHint');
     hint.textContent = canArm ? L.forcedHint[kind] : '';
@@ -4464,7 +4492,13 @@
                                       formatNum(best) + '</span>' : '');
       } else {
         const rec = getRecord(RANGE_MAX);
-        confirmed.innerHTML = (rec === null) ? '' : (L.recordLabel + '<strong>' + rec + '</strong>');
+        // Партия кончилась — рекорд рядом с числом ходов, отдельная строка не нужна
+        if (over) {
+          confirmed.innerHTML = '';
+          if (rec !== null) attempts.textContent += ' · ' + L.recordShort.replace('{n}', rec);
+        } else {
+          confirmed.innerHTML = (rec === null) ? '' : (L.recordLabel + '<strong>' + rec + '</strong>');
+        }
       }
     }
   }
@@ -4590,6 +4624,7 @@
       if (sentLine) box.appendChild(sentLine);
       box.appendChild(actions);
       box.classList.remove('hidden');
+      duelCelebrate(starBox);
       return;
     }
 
@@ -4602,9 +4637,13 @@
 
       if (gameOverType === 'win' && lastWinIsRecord) {
         const rec = document.createElement('div');
-        rec.className = 'r-secret';
+        rec.className = 'r-secret r-newrec r-pop';
         rec.textContent = L.newRecord;
         box.appendChild(rec);
+      }
+      // Салют один раз на партию: ключ — сама история ходов этой партии
+      if (gameOverType === 'win') {
+        celebrate(history, lastWinIsRecord ? ['🏆', '⭐', '✨', '🎉'] : ['🎉', '✨', '⭐'], lastWinIsRecord);
       }
 
       // Точность партии сразу в итогах; нажатие открывает разбор ходов
@@ -4648,7 +4687,7 @@
 
       const btn = document.getElementById('ptoken' + p);
       const isArmedByMe = D.armed && D.cur === p;
-      const canArm = !D.armed && D.tokens[p] > 0 && history.length > 0;
+      const canArm = !D.armed && D.tokens[p] > 0;
       const canUse = !D.roundOver && !D.matchOver && D.cur === p && (isArmedByMe || canArm);
       btn.disabled = !canUse;
       btn.classList.toggle('armed', isArmedByMe);
@@ -5012,6 +5051,21 @@
     renderAll();
   }
 
+  // Салют в дуэли: с другом на одном телефоне — любому выигранному раунду,
+  // с ботом и онлайн — только своему. Партия и новая лига — побольше, с фанфарами
+  function duelCelebrate(starBox) {
+    if (!D.roundOver) return;
+    const mine = online ? online.seat : (vsBot ? 0 : D.roundWinner);
+    if (D.roundWinner !== mine) return;
+    const key = online ? 'o:' + online.id + ':' + D.round + (D.matchOver ? ':m' : '') : history;
+    const newLeague = !!(starBox && starBox.querySelector('.r-pop'));
+    const icons = newLeague ? [LEAGUE_ICONS[ladderPos(onlineReview.stars.after[online.seat]).league], '⭐', '✨']
+                            : ['🎉', '✨', '⭐'];
+    // Итог онлайн-партии приходит двумя шагами: сначала раунд, потом звёзды.
+    // Новая лига — отдельный повод, даже если за раунд салют уже был
+    celebrate(newLeague ? key + ':lg' : key, icons, D.matchOver || newLeague);
+  }
+
   function starsResult(stars, seat) {
     const L = t().online;
     const d = (stars.delta || [])[seat];
@@ -5031,7 +5085,8 @@
     const lines = [];
     if (d === 2) lines.push(L.lgStreak);
     if (d === 0 && after < 150 && after % 15 === 0 && D.roundWinner !== seat) lines.push(L.lgFloor);
-    if (ladderPos(after).league > ladderPos(was).league) lines.push(L.lgNew.replace('{l}', leagueLabel(after).replace(/ \d+$/, '')));
+    const promoted = ladderPos(after).league > ladderPos(was).league;
+    if (promoted) lines.push(L.lgNew.replace('{l}', leagueLabel(after).replace(/ \d+$/, '')));
     const unlock = (stars.unlock || [])[seat];
     if (typeof unlock === 'number') {
       const got = LEAGUE_REWARDS.filter(r => r.league === unlock && r.kind === 'icon').map(r => r.value).join(' ');
@@ -5039,6 +5094,7 @@
     }
     note.textContent = lines.join(' · ');
     if (lines.length) box.appendChild(note);
+    if (promoted) main.classList.add('r-pop');
     return box;
   }
 
@@ -5554,6 +5610,41 @@
     }
   }
 
+  // Фанфары: рекорд, выигранная партия, новая лига
+  function soundFanfare() {
+    [523, 659, 784, 1047].forEach((f, i) => playTone(f, i === 3 ? 0.3 : 0.12, i * 0.11));
+    buzz([30, 40, 30, 40, 80]);
+  }
+
+  // Салют: эмодзи разлетаются из центра и гаснут за секунду с небольшим.
+  // Один раз на событие: итог перерисовывается при каждом опросе, а салют —
+  // нет. Кто попросил в системе меньше движения, тому салюта нет
+  let celebratedFor = null;
+  function celebrate(key, icons, big) {
+    if (key === celebratedFor) return false;
+    celebratedFor = key;
+    if (big) soundFanfare();
+    try {
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+    } catch (e) {}
+    const layer = document.createElement('div');
+    layer.className = 'confetti';
+    const n = big ? 26 : 14;
+    for (let i = 0; i < n; i++) {
+      const bit = document.createElement('span');
+      bit.textContent = icons[i % icons.length];
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 80 + Math.random() * (big ? 160 : 100);
+      bit.style.setProperty('--dx', Math.round(Math.cos(angle) * dist) + 'px');
+      bit.style.setProperty('--dy', Math.round(Math.sin(angle) * dist - 30) + 'px');
+      bit.style.animationDelay = (Math.random() * 0.15).toFixed(2) + 's';
+      layer.appendChild(bit);
+    }
+    document.body.appendChild(layer);
+    setTimeout(() => layer.remove(), 1700);
+    return true;
+  }
+
   function soundGameOver() {
     playTone(330, 0.18);
     playTone(196, 0.32, 0.16);
@@ -5806,7 +5897,7 @@
       face.style.background = '';
     }
     document.getElementById('accountName').textContent = auth ? auth.username : L.run.settings;
-    document.getElementById('tAccountTitle').textContent = auth ? L.run.account : '';
+    document.getElementById('tAccountTitle').textContent = '';
     const lg = document.getElementById('pfLeague');
     lg.classList.toggle('hidden', !(auth && ladderInfo));
     if (auth && ladderInfo) {
@@ -5835,6 +5926,7 @@
     document.getElementById('tAvatarStart').textContent =
       colorsSupported() ? L.run.avatarColorChange : L.run.avatarChange;
     document.getElementById('tRenameStart').textContent = L.run.renameStart;
+    document.getElementById('tNamePinHead').textContent = L.run.namePin;
     document.getElementById('tRenameSave').textContent = L.run.save;
     document.getElementById('tRenameCancel').textContent = L.run.cancel;
     document.getElementById('renameInput').placeholder = L.run.renameNew;
@@ -5864,6 +5956,7 @@
     showAvatarPicker(false);
     openRename(false);
     openPinChange(false);
+    document.getElementById('pfEditFold').open = false;
     ['avNote', 'renameNote', 'pinNote'].forEach(id => setNote(id, ''));
     fillProfile();
     if (auth) {
@@ -6749,7 +6842,8 @@
         findDecided = true;
         if (!rows.some(r => r.relation === 'friend')) document.getElementById('findBox').open = true;
       }
-      setNote('friendsNote', rows.length ? '' : t().online.noFriends);
+      // Друзей нет — поиск раскрыт, и он сам всё объясняет: без лишней строки
+      setNote('friendsNote', '');
     } catch (e) {
       if (!quiet) setNote('friendsNote', friendErrorText(e.message), true);
     } finally {
@@ -6929,7 +7023,7 @@
       box.innerHTML = '';
       rows.forEach(r => box.appendChild(friendRow(r.username, null)));
       fetchAvatars(rows.map(r => r.username));
-      setNote('searchNote', rows.length ? t().online.whoPlays : t().online.nobodyYet);
+      setNote('searchNote', rows.length ? t().online.whoPlays : '');
     } catch (e) {
       setNote('searchNote', friendErrorText(e.message), true);
     }

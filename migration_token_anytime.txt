@@ -1,0 +1,46 @@
+-- Жетон дополнительного хода — в любой момент, и первым ходом раунда тоже.
+-- Применять в Supabase: SQL Editor → вставить целиком → Run. Применить ДО
+-- мёржа: новая игра разрешает жетон на первом ходу, а старая база его отклоняет.
+--
+-- Раньше первым ходом раунда жетон взвести было нельзя. Теперь начинающий
+-- раунд может сделать два хода подряд до ответа соперника. Раунды начинают
+-- по очереди, поэтому за партию это выравнивается.
+
+create or replace function use_match_token(p_username text, p_pin text,
+                                           p_match_id bigint, p_arm boolean)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; seat int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  seat := match_seat(m, me);
+  if seat is null then raise exception 'not_your_match'; end if;
+  if m.status <> 'active' or m.round_over then raise exception 'not_playing'; end if;
+  if m.cur <> seat then raise exception 'not_your_turn'; end if;
+
+  if not p_arm then
+    if not m.armed then return false; end if;
+    update matches set armed = false, tokens[seat + 1] = m.tokens[seat + 1] + 1,
+                       updated_at = now()
+    where id = p_match_id;
+    return false;
+  end if;
+
+  if m.armed then return true; end if;
+  if m.tokens[seat + 1] <= 0 then raise exception 'no_tokens'; end if;
+
+  update matches set armed = true, tokens[seat + 1] = m.tokens[seat + 1] - 1,
+                     updated_at = now()
+  where id = p_match_id;
+  return true;
+end;
+$$;
+
+grant execute on function use_match_token(text, text, bigint, boolean) to anon;

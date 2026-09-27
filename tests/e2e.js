@@ -399,6 +399,7 @@ async function registerPlayer(p, name, pin) {
   });
   check('и его цвет фона', faceBg === 'rgb(45, 212, 191)', String(faceBg));
 
+  await A.page.evaluate(() => { document.getElementById('pfEditFold').open = true; });
   await A.page.click('#tRenameStart');
   await A.page.fill('#renameInput', 'Артур');
   await A.page.click('#tRenameSave');
@@ -438,6 +439,7 @@ async function registerPlayer(p, name, pin) {
     thread.length === 2 && thread.every(m => m.cls.indexOf('theirs') >= 0) &&
     thread[1].text.indexOf('привет, ***! сыграем?') === 0, JSON.stringify(thread));
 
+  await A.page.evaluate(() => { document.getElementById('pfEditFold').open = true; });
   await A.page.click('#tPinStart');
   await A.page.fill('#pinOld', '1111');
   await A.page.fill('#pinNew', '3333');
