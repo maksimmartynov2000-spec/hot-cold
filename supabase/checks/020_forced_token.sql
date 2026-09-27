@@ -1,4 +1,4 @@
--- Проверка: всё ли из миграций доехало до базы.
+-- Проверка миграций 018_ranked.txt, 019_ranked_modes.txt и 020_forced_token.txt.
 -- Вставить целиком в Supabase → SQL Editor → Run. Ничего не меняет, только читает.
 -- В колонке «итог» должно быть ✔ у каждой строки.
 
@@ -40,7 +40,8 @@ checks(nn, part, what, ok) as (values
   (13, 'рейтинг по режимам', 'список игр различает рейтинг и вызов',
        exists (select 1 from fn where name = 'list_matches' and argnames like '%ranked%')),
   (14, 'жетон на пропуске', 'пропуск с жетоном оставляет ход игроку',
-       exists (select 1 from fn where name = 'do_forced_turn'
+       -- с миграции ботов этот код живёт в forced_turn_core, раньше — в do_forced_turn
+       exists (select 1 from fn where name in ('do_forced_turn', 'forced_turn_core')
                and src like '%Пропуск засчитан первым ходом%')),
   (15, 'рейтинг (первая миграция)', 'у матча есть изменение рейтинга',
        exists (select 1 from col where t = 'matches' and c = 'elo_delta')),

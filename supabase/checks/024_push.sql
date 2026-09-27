@@ -1,4 +1,4 @@
--- Проверка двух последних миграций: migration_bonus_balance.txt и migration_push.txt.
+-- Проверка миграций 023_bonus_balance.txt и 024_push.txt.
 -- Вставить целиком в Supabase → SQL Editor → Run. Ничего не меняет, только читает.
 -- В колонке «итог» должно быть ✔ у каждой строки.
 

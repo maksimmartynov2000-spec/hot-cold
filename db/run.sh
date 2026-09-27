@@ -2,14 +2,26 @@
 # Проверка миграций на настоящем PostgreSQL. База собирается заново каждый раз,
 # иначе прогон видит состояние предыдущего и проверки начинают врать.
 #   sh db/run.sh
+#
+# Миграции берутся из supabase/migrations по порядку номеров — новую сюда
+# вписывать не нужно. Тестовая база стартует с 00_base.sql (состояние после
+# миграции 007) и получает миграции с 008.
 set -e
 DIR=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(dirname "$DIR")
+MIG="$ROOT/supabase/migrations"
+CHECKS="$ROOT/supabase/checks"
+FIRST=008
 
 service postgresql status >/dev/null 2>&1 || service postgresql start >/dev/null
 
-su postgres -c "dropdb --if-exists hotcold_test" >/dev/null 2>&1
-su postgres -c "createdb hotcold_test"
+# Два файла с одним номером — порядок между ними не определён
+DUP=$(ls "$MIG" | cut -c1-3 | uniq -d)
+if [ -n "$DUP" ]; then
+  echo "ЕСТЬ ПАДЕНИЯ: два файла миграций с номером $DUP"
+  exit 1
+fi
+
 # Пояса считаются и в браузере, и в базе. Таблицу для сверки достаём из
 # index.html каждый раз заново: копия рядом разошлась бы с игрой незаметно
 node "$DIR/tiers_from_js.js"
@@ -22,40 +34,57 @@ node "$DIR/bots_from_js.js"
 node "$DIR/rewards_from_js.js"
 chmod a+r "$DIR"/*.csv
 
+# Список «-f файл» для psql: все миграции с номером не меньше $1.
+# С $2 = twice каждая идёт дважды подряд
+mig_args() {
+  for M in "$MIG"/*.txt; do
+    N=$(basename "$M" | cut -c1-3)
+    if [ "$N" -ge "$1" ]; then
+      printf ' -f %s' "$M"
+      if [ "$2" = "twice" ]; then printf ' -f %s' "$M"; fi
+    fi
+  done
+}
+
+FAILED=0
+
+# 1. База с нуля по всем миграциям подряд: номера стоят в том порядке,
+#    в котором миграции можно применить. Каждую — дважды: если человек не
+#    уверен, что миграция прошла, и запустит её снова, это не должно ломаться
+echo "--- все миграции с нуля"
+su postgres -c "dropdb --if-exists hotcold_scratch" >/dev/null 2>&1
+su postgres -c "createdb hotcold_scratch"
+if ! su postgres -c "psql -q -d hotcold_scratch -v ON_ERROR_STOP=1 \
+     -f $DIR/00_supabase.sql $(mig_args 001 twice)" >/dev/null 2>"$DIR/.scratch.log"; then
+  grep -v NOTICE "$DIR/.scratch.log"
+  FAILED=1
+fi
+rm -f "$DIR/.scratch.log"
+su postgres -c "dropdb --if-exists hotcold_scratch" >/dev/null 2>&1
+
+# 2. Тестовая база
+su postgres -c "dropdb --if-exists hotcold_test" >/dev/null 2>&1
+su postgres -c "createdb hotcold_test"
 su postgres -c "psql -q -d hotcold_test -v ON_ERROR_STOP=1 \
-  -f $DIR/00_base.sql \
-  -f $ROOT/migration_friends.txt \
-  -f $ROOT/migration_tiers.txt \
-  -f $ROOT/migration_matches.txt \
-  -f $ROOT/migration_online_bonuses.txt \
-  -f $ROOT/migration_timeout_row.txt \
-  -f $ROOT/migration_run_server.txt \
-  -f $ROOT/migration_run_moves.txt \
-  -f $ROOT/migration_more_ranges.txt \
-  -f $ROOT/migration_chat.txt \
-  -f $ROOT/migration_suggest.txt \
-  -f $ROOT/migration_ranked.txt \
-  -f $ROOT/migration_ranked_modes.txt \
-  -f $ROOT/migration_forced_token.txt \
-  -f $ROOT/migration_rivalry.txt \
-  -f $ROOT/migration_friend_chat.txt \
-  -f $ROOT/migration_bonus_balance.txt \
-  -f $ROOT/migration_push.txt \
-  -f $ROOT/migration_friend_cancel.txt \
-  -f $ROOT/migration_bonus_radius.txt \
-  -f $ROOT/migration_profile.txt \
-  -f $ROOT/migration_chat_text.txt \
-  -f $ROOT/migration_avatar_color.txt \
-  -f $ROOT/migration_bots.txt \
-  -f $ROOT/migration_match_review.txt \
-  -f $ROOT/migration_leagues.txt \
-  -f $ROOT/migration_token_anytime.txt \
+  -f $DIR/00_base.sql $(mig_args $FIRST) \
   -c \"select register_student('Лев','1234',null), register_student('Кира','4321',null), register_student('Максим','1111',null);\"" >/dev/null
 
-# Тесты подгружают таблицы-сверки по имени файла, без пути: работают из папки
-# db, где бы ни лежал сам репозиторий
+# 3. Файлы проверки из supabase/checks: на базе со всеми миграциями в каждом
+#    должны быть только ✔ — иначе пользователь увидит ложную тревогу
+for C in "$CHECKS"/*.sql; do
+  echo "--- $(basename "$C")"
+  if ! OUT=$(su postgres -c "psql -q -A -t -d hotcold_test -v ON_ERROR_STOP=1 -f $C" 2>&1); then
+    echo "$OUT"
+    FAILED=1
+  elif echo "$OUT" | grep -q "✘"; then
+    echo "$OUT" | grep "✘"
+    FAILED=1
+  fi
+done
+
+# 4. Сценарии. Они подгружают таблицы-сверки по имени файла, без пути:
+#    работают из папки db, где бы ни лежал сам репозиторий
 cd "$DIR"
-FAILED=0
 for T in "$DIR"/test_*.sql; do
   echo "--- $(basename "$T")"
   if ! su postgres -c "psql -q -d hotcold_test -v ON_ERROR_STOP=1 -f $T" 2>&1; then

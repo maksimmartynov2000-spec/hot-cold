@@ -10,7 +10,7 @@ SQL Editor, кроме шагов, прямо помеченных «SQL Editor�
 
 ## Шаг 1. Миграция
 
-**Где:** Supabase → SQL Editor → вставить `migration_push.txt` целиком → Run.
+**Где:** Supabase → SQL Editor → вставить `supabase/migrations/024_push.txt` целиком → Run.
 
 ---
 
