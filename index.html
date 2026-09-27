@@ -191,6 +191,13 @@
     .pf-avatar.guest { background: rgba(255, 255, 255, 0.1); color: #fff; border-width: 1px; }
     .pf-name { font-size: 20px; font-weight: 800; }
     .pf-sub { font-size: 12px; color: rgba(255, 255, 255, 0.5); margin: 2px 0 16px; }
+    .pf-league { font-size: 14px; font-weight: 700; color: #fbbf24; margin: -10px 0 14px; }
+    .pf-league .pf-badges { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.55); margin-top: 2px; }
+    /* Награда за лигу, до которой ещё не дошёл: видна, но под замком */
+    .av-tile.locked, .av-color.locked { opacity: 0.35; position: relative; }
+    .av-tile.locked::after, .av-color.locked::after {
+      content: '🔒'; position: absolute; right: -2px; bottom: -2px; font-size: 11px; opacity: 1;
+    }
     .pf-row {
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
       margin-top: 14px; padding: 10px 14px;
@@ -437,6 +444,9 @@
     .mode-btn.run { border-left: 3px solid #4ade80; }
     .mode-btn.online { border-left: 3px solid #38bdf8; }
     .mode-btn.bot { border-left: 3px solid #a78bfa; }
+    .r-stars { margin-top: 8px; text-align: center; }
+    .r-stars-main { font-size: 17px; font-weight: 800; color: #fbbf24; }
+    .r-stars-note { font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); margin-top: 2px; }
     .r-elo .r-elo-note { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
     /* Выбор бота: пять персонажей столбиком, от слабого к сильному. В ряд
        на телефоне не влезали имена: «Чере…», «Дель…» */
@@ -660,6 +670,8 @@
     .rk-elo { font-size: 44px; font-weight: 800; line-height: 1.05; color: #fbbf24;
               font-variant-numeric: tabular-nums; }
     .rk-elo-sub { font-size: 13px; color: rgba(255, 255, 255, 0.5); margin-top: 4px; }
+    .rk-elo.league { font-size: 32px; }
+    .rk-stars { font-size: 26px; letter-spacing: 4px; color: #fbbf24; line-height: 1.2; }
     .rk-top { margin-top: 26px; }
     .lb-row.rk-top-row {
       display: flex; align-items: center; gap: 10px;
@@ -1812,6 +1824,7 @@
       <div class="rk-modes" id="rkModes"></div>
       <div class="rk-hero">
         <div class="rk-elo" id="rkElo"></div>
+        <div class="rk-stars hidden" id="rkStars"></div>
         <div class="rk-elo-sub" id="rkEloSub"></div>
       </div>
       <div class="fr-note hidden" id="rkNote"></div>
@@ -2016,6 +2029,8 @@
     <div class="pf-avatar" id="pfAvatar" onclick="if (this.classList.contains('editable')) toggleAvatarPicker()"></div>
     <div class="pf-name" id="accountName"></div>
     <div class="pf-sub" id="tAccountTitle"></div>
+    <!-- Лига и значки прошлых сезонов: одна строка под именем -->
+    <div class="pf-league hidden" id="pfLeague"></div>
 
     <div id="pfAccount">
       <!-- Своя иконка вместо буквы. Прячется, пока сервер не умеет профиль
@@ -2201,6 +2216,7 @@
         rkAgoDay: "{n} d ago",
         rkAgoNow: "just now",
         rkTop: "Ranked top",
+        lgTop: "Season top", lgSeason: "{m} season \u00b7 {n} days left", lgSeasonLast: "{m} season \u00b7 last day", lgStreak: "win streak", lgFloor: "a floor: you can\u2019t drop below this rank", lgNew: "New league: {l}!", lgUnlock: "Unlocked in your profile: {x}", lgElo: "rating {n}",
         rkTopEmpty: "Nobody has played three ranked games yet",
         rkBadge: "ranked",
         rkResume: "A ranked game is already on",
@@ -2231,6 +2247,7 @@
 
       modeSolo: "Practice",
       modeDuel: "Play with a friend",
+      leagues: ["Bronze", "Silver", "Gold", "Platinum", "Diamond", "Legend"],
       modeBot: "Play the bot", lblBot: "Opponent", you: "You",
       bots: { turtle: "Turtle", panda: "Panda", dolphin: "Dolphin", fox: "Fox", owl: "Owl" },
       botsSub: { turtle: "Beginner", panda: "Learning", dolphin: "Steady", fox: "Sly", owl: "Master" },
@@ -2311,7 +2328,7 @@
         noHint: "No reminder was saved for this name",
         account: "Your account",
         settings: "Settings", language: "Language", done: "Done",
-        avatarChange: "Change icon", avatarColorChange: "Icon and colour", save: "Save",
+        avatarChange: "Change icon", avatarColorChange: "Icon and colour", lgLocked: "Unlocks in {l}", lgSeasons: "Seasons", save: "Save",
         renameStart: "Change name", renameNew: "New name",
         renameDone: "Name changed",
         renameWait: "You can change your name once a day \u2014 wait {n} h more",
@@ -2423,6 +2440,7 @@
         rkAgoDay: "{n} дн назад",
         rkAgoNow: "только что",
         rkTop: "Топ по рейтингу",
+        lgTop: "Топ сезона", lgSeason: "Сезон: {m} \u00b7 осталось {n} дн.", lgSeasonLast: "Сезон: {m} \u00b7 последний день", lgStreak: "серия побед", lgFloor: "ступень: ниже этого ранга не упасть", lgNew: "Новая лига: {l}!", lgUnlock: "В профиле открыто: {x}", lgElo: "рейтинг {n}",
         rkTopEmpty: "Пока никто не сыграл трёх рейтинговых игр",
         rkBadge: "рейтинг",
         rkResume: "Рейтинговая игра уже идёт",
@@ -2453,6 +2471,7 @@
 
       modeSolo: "Тренировка",
       modeDuel: "Игра с другом",
+      leagues: ["Бронза", "Серебро", "Золото", "Платина", "Алмаз", "Легенда"],
       modeBot: "Игра с ботом", lblBot: "Соперник", you: "Вы",
       bots: { turtle: "Черепаха", panda: "Панда", dolphin: "Дельфин", fox: "Лис", owl: "Сова" },
       botsSub: { turtle: "Новичок", panda: "Учится", dolphin: "Уверенный", fox: "Хитрый", owl: "Мастер" },
@@ -2533,7 +2552,7 @@
         noHint: "Для этого имени подсказки нет",
         account: "Ваш аккаунт",
         settings: "Настройки", language: "Язык", done: "Готово",
-        avatarChange: "Сменить иконку", avatarColorChange: "Иконка и цвет", save: "Сохранить",
+        avatarChange: "Сменить иконку", avatarColorChange: "Иконка и цвет", lgLocked: "Откроется в лиге «{l}»", lgSeasons: "Сезоны", save: "Сохранить",
         renameStart: "Сменить имя", renameNew: "Новое имя",
         renameDone: "Имя изменено",
         renameWait: "Имя можно менять раз в сутки — подождите ещё {n} ч",
@@ -2645,6 +2664,7 @@
         rkAgoDay: "il y a {n} j",
         rkAgoNow: "\u00e0 l'instant",
         rkTop: "Classement",
+        lgTop: "Top de la saison", lgSeason: "Saison {m} \u00b7 encore {n} j", lgSeasonLast: "Saison {m} \u00b7 dernier jour", lgStreak: "s\u00e9rie de victoires", lgFloor: "palier : impossible de descendre plus bas", lgNew: "Nouvelle ligue : {l} !", lgUnlock: "D\u00e9bloqu\u00e9 dans le profil : {x}", lgElo: "classement {n}",
         rkTopEmpty: "Personne n'a encore jou\u00e9 trois parties class\u00e9es",
         rkBadge: "class\u00e9",
         rkResume: "Une partie class\u00e9e est d\u00e9j\u00e0 en cours",
@@ -2675,6 +2695,7 @@
 
       modeSolo: "Entraînement",
       modeDuel: "Jouer à deux",
+      leagues: ["Bronze", "Argent", "Or", "Platine", "Diamant", "L\u00e9gende"],
       modeBot: "Jouer contre le bot", lblBot: "Adversaire", you: "Vous",
       bots: { turtle: "Tortue", panda: "Panda", dolphin: "Dauphin", fox: "Renard", owl: "Chouette" },
       botsSub: { turtle: "D\u00e9butant", panda: "Apprenti", dolphin: "Solide", fox: "Rus\u00e9", owl: "Ma\u00eetre" },
@@ -2755,7 +2776,7 @@
         noHint: "Aucune aide enregistrée pour ce nom",
         account: "Votre compte",
         settings: "R\u00e9glages", language: "Langue", done: "OK",
-        avatarChange: "Changer d\u2019ic\u00f4ne", avatarColorChange: "Ic\u00f4ne et couleur", save: "Enregistrer",
+        avatarChange: "Changer d\u2019ic\u00f4ne", avatarColorChange: "Ic\u00f4ne et couleur", lgLocked: "Se d\u00e9bloque en ligue {l}", lgSeasons: "Saisons", save: "Enregistrer",
         renameStart: "Changer de nom", renameNew: "Nouveau nom",
         renameDone: "Nom modifi\u00e9",
         renameWait: "Le nom se change une fois par jour \u2014 encore {n} h",
@@ -2867,6 +2888,7 @@
         rkAgoDay: "vor {n} T",
         rkAgoNow: "gerade eben",
         rkTop: "Ranglisten-Top",
+        lgTop: "Saison-Top", lgSeason: "Saison {m} \u00b7 noch {n} Tage", lgSeasonLast: "Saison {m} \u00b7 letzter Tag", lgStreak: "Siegesserie", lgFloor: "Stufe: tiefer f\u00e4llst du nicht", lgNew: "Neue Liga: {l}!", lgUnlock: "Im Profil freigeschaltet: {x}", lgElo: "Wertung {n}",
         rkTopEmpty: "Noch niemand hat drei Ranglistenpartien gespielt",
         rkBadge: "Rangliste",
         rkResume: "Eine Ranglistenpartie l\u00e4uft schon",
@@ -2897,6 +2919,7 @@
 
       modeSolo: "Training",
       modeDuel: "Zu zweit spielen",
+      leagues: ["Bronze", "Silber", "Gold", "Platin", "Diamant", "Legende"],
       modeBot: "Gegen den Bot", lblBot: "Gegner", you: "Du",
       bots: { turtle: "Schildkr\u00f6te", panda: "Panda", dolphin: "Delfin", fox: "Fuchs", owl: "Eule" },
       botsSub: { turtle: "Anf\u00e4nger", panda: "Lernt", dolphin: "Sicher", fox: "Schlau", owl: "Meister" },
@@ -2977,7 +3000,7 @@
         noHint: "Für diesen Namen ist keine Hilfe gespeichert",
         account: "Dein Konto",
         settings: "Einstellungen", language: "Sprache", done: "Fertig",
-        avatarChange: "Symbol \u00e4ndern", avatarColorChange: "Symbol und Farbe", save: "Speichern",
+        avatarChange: "Symbol \u00e4ndern", avatarColorChange: "Symbol und Farbe", lgLocked: "Wird in der Liga {l} frei", lgSeasons: "Saisons", save: "Speichern",
         renameStart: "Namen \u00e4ndern", renameNew: "Neuer Name",
         renameDone: "Name ge\u00e4ndert",
         renameWait: "Der Name l\u00e4sst sich einmal am Tag \u00e4ndern \u2014 noch {n} Std.",
@@ -4504,6 +4527,10 @@
       // словами: иначе победа «из ничего» выглядит ошибкой
       let forfeitLine = null;
       let eloLine = null;
+      // Партия на звёзды: сколько прибавилось, где теперь, что открылось.
+      // Число рейтинга здесь не показываем — его заменяют звёзды
+      const starBox = online && D.matchOver && onlineReview && onlineReview.id === online.id && onlineReview.stars
+        ? starsResult(onlineReview.stars, online.seat) : null;
       if (online && online.ranked) {
         if (online.forfeitBy !== null && online.forfeitBy !== undefined) {
           forfeitLine = document.createElement('div');
@@ -4512,7 +4539,7 @@
             ? L.online.rkLeftYou
             : L.online.rkLeftThem.replace('{name}', D.names[online.forfeitBy]);
         }
-        if (D.matchOver && online.eloDelta) {
+        if (D.matchOver && online.eloDelta && !starBox) {
           const d = online.eloDelta[online.seat];
           eloLine = document.createElement('div');
           eloLine.className = 'r-elo';
@@ -4558,6 +4585,7 @@
       box.appendChild(score);
       box.appendChild(secretLine);
       if (reviewBtn) box.appendChild(reviewBtn);
+      if (starBox) box.appendChild(starBox);
       if (eloLine) box.appendChild(eloLine);
       if (sentLine) box.appendChild(sentLine);
       box.appendChild(actions);
@@ -4980,8 +5008,38 @@
       return;   // старая база без разбора — кнопки просто нет
     }
     if (!online || online.id !== id || !res || !Array.isArray(res.moves)) return;
-    onlineReview = { id, data: analyseOnlineMatch(res.moves) };
+    onlineReview = { id, data: analyseOnlineMatch(res.moves), stars: res.stars || null };
     renderAll();
+  }
+
+  function starsResult(stars, seat) {
+    const L = t().online;
+    const d = (stars.delta || [])[seat];
+    const after = (stars.after || [])[seat];
+    if (typeof d !== 'number' || typeof after !== 'number') return null;
+    const box = document.createElement('div');
+    box.className = 'r-stars';
+    const was = after - d;
+    const main = document.createElement('div');
+    main.className = 'r-stars-main';
+    // Легенда: звёзд больше нет, остаётся лига
+    const change = after >= 150 && was >= 150 ? '' : (d > 0 ? '+' + d + ' ★' : d < 0 ? '−' + (-d) + ' ★' : '±0 ★');
+    main.textContent = (change ? change + ' · ' : '') + leagueLabel(after) + (after < 150 ? ' ' + starsLine(after) : '');
+    box.appendChild(main);
+    const note = document.createElement('div');
+    note.className = 'r-stars-note';
+    const lines = [];
+    if (d === 2) lines.push(L.lgStreak);
+    if (d === 0 && after < 150 && after % 15 === 0 && D.roundWinner !== seat) lines.push(L.lgFloor);
+    if (ladderPos(after).league > ladderPos(was).league) lines.push(L.lgNew.replace('{l}', leagueLabel(after).replace(/ \d+$/, '')));
+    const unlock = (stars.unlock || [])[seat];
+    if (typeof unlock === 'number') {
+      const got = LEAGUE_REWARDS.filter(r => r.league === unlock && r.kind === 'icon').map(r => r.value).join(' ');
+      lines.push(L.lgUnlock.replace('{x}', got));
+    }
+    note.textContent = lines.join(' · ');
+    if (lines.length) box.appendChild(note);
+    return box;
   }
 
   function analyseOnlineMatch(list) {
@@ -5176,6 +5234,67 @@
 
   function botName(bot) {
     return bot.icon + ' ' + t().bots[bot.key] + ' 🤖';
+  }
+
+  // ================= ЛИГИ =================
+  // Та же лестница — в базе (ladder). Звёзды 0…149 — пять лиг по десять
+  // рангов (10 → 1) по три звезды; 150 — Легенда
+  const LEAGUE_ICONS = ['🥉', '🥈', '🥇', '💠', '💎', '👑'];
+  // Награды за лигу, достигнутую хоть раз. Копия — в базе (league_rewards),
+  // сверяется тестом
+  const LEAGUE_REWARDS = [
+    { league: 1, kind: 'icon', value: '🦅' }, { league: 1, kind: 'icon', value: '🐺' }, { league: 1, kind: 'color', value: '#94a3b8' },
+    { league: 2, kind: 'icon', value: '🦚' }, { league: 2, kind: 'icon', value: '🐉' }, { league: 2, kind: 'color', value: '#eab308' },
+    { league: 3, kind: 'icon', value: '🦩' }, { league: 3, kind: 'icon', value: '🐳' }, { league: 3, kind: 'color', value: '#14b8a6' },
+    { league: 4, kind: 'icon', value: '🦖' }, { league: 4, kind: 'icon', value: '🦜' }, { league: 4, kind: 'color', value: '#0ea5e9' },
+    { league: 5, kind: 'icon', value: '👑' }, { league: 5, kind: 'icon', value: '🌟' }, { league: 5, kind: 'color', value: '#d946ef' }
+  ];
+  // Своя лестница с сервера. null — сервер лиг не знает (или ещё не ответил):
+  // тогда всё выглядит по-старому, с числом рейтинга
+  let ladderInfo = null;
+
+  function ladderPos(stars) {
+    if (stars >= 150) return { league: 5, rank: null, inRank: 0, legend: true };
+    return { league: Math.floor(stars / 30), rank: 10 - Math.floor((stars % 30) / 3),
+             inRank: stars % 3, legend: false };
+  }
+
+  function leagueLabel(stars) {
+    const p = ladderPos(stars);
+    return LEAGUE_ICONS[p.league] + ' ' + t().leagues[p.league] + (p.legend ? '' : ' ' + p.rank);
+  }
+
+  function starsLine(stars) {
+    const p = ladderPos(stars);
+    return p.legend ? '' : '★'.repeat(p.inRank) + '☆'.repeat(3 - p.inRank);
+  }
+
+  function seasonMonth(season) {
+    try {
+      return new Intl.DateTimeFormat(currentLang, { month: 'long', timeZone: 'UTC' })
+        .format(new Date(season + '-15T00:00:00Z'));
+    } catch (e) { return season; }
+  }
+
+  function rewardLeague(kind, value) {
+    const r = LEAGUE_REWARDS.find(x => x.kind === kind && x.value === value);
+    return r ? r.league : 0;
+  }
+
+  // Открыта ли награда: лига, до которой игрок хоть раз дошёл
+  function rewardOpen(kind, value) {
+    return !!ladderInfo && (ladderInfo.peak || 0) >= rewardLeague(kind, value);
+  }
+
+  async function loadLadder() {
+    if (!runAuth()) return null;
+    try {
+      const st = await friendRpc('ladder_status');
+      ladderInfo = (st && typeof st === 'object' && 'stars' in st) ? st : null;
+    } catch (e) {
+      ladderInfo = null;
+    }
+    return ladderInfo;
   }
 
   // Какого бота выбрали в прошлый раз. Сначала — 🐼: слабый, но не беспомощный
@@ -5688,6 +5807,21 @@
     }
     document.getElementById('accountName').textContent = auth ? auth.username : L.run.settings;
     document.getElementById('tAccountTitle').textContent = auth ? L.run.account : '';
+    const lg = document.getElementById('pfLeague');
+    lg.classList.toggle('hidden', !(auth && ladderInfo));
+    if (auth && ladderInfo) {
+      lg.textContent = leagueLabel(ladderInfo.stars) +
+        (ladderInfo.stars < 150 ? ' ' + starsLine(ladderInfo.stars) : '');
+      // Значки прошлых сезонов: лучшая лига и месяц
+      const badges = (ladderInfo.badges || []).map(b =>
+        LEAGUE_ICONS[b.league] + ' ' + String(b.season).slice(5) + '.' + String(b.season).slice(0, 4));
+      if (badges.length) {
+        const row = document.createElement('span');
+        row.className = 'pf-badges';
+        row.textContent = L.run.lgSeasons + ': ' + badges.join('  ');
+        lg.appendChild(row);
+      }
+    }
     document.getElementById('pfAccount').classList.toggle('hidden', !auth);
     document.getElementById('pfLogout').classList.toggle('hidden', !auth);
     document.getElementById('tDeleteAccount').classList.toggle('hidden', !auth);
@@ -5740,6 +5874,9 @@
       syncProfile().then(() => {
         if (!document.getElementById('logoutModal').classList.contains('hidden')) fillProfile();
       });
+      loadLadder().then(() => {
+        if (!document.getElementById('logoutModal').classList.contains('hidden')) fillProfile();
+      });
     }
     document.getElementById('logoutModal').classList.remove('hidden');
   }
@@ -5765,10 +5902,13 @@
     grid.innerHTML = '';
     // Сверху — цвета фона, два ряда по пять; ниже — буква и животные уже на
     // выбранном цвете: сразу видно, как это будет выглядеть
+    // Награды за лиги — только когда сервер знает лиги
+    const rewardsOf = kind => ladderInfo ? LEAGUE_REWARDS.filter(r => r.kind === kind).map(r => r.value) : [];
     if (colorsSupported()) {
-      AVATAR_BG.forEach(color => {
+      AVATAR_BG.concat(rewardsOf('color')).forEach(color => {
         const c = document.createElement('button');
-        c.className = 'av-color' + (color === bg ? ' sel' : '');
+        const locked = rewardLeague('color', color) > 0 && !rewardOpen('color', color);
+        c.className = 'av-color' + (color === bg ? ' sel' : '') + (locked ? ' locked' : '');
         c.dataset.color = color;
         c.style.background = color;
         c.setAttribute('aria-label', color);
@@ -5780,9 +5920,10 @@
       grid.appendChild(sep);
     }
     // Первая клетка — буква: вернуться к ней можно так же, как выбрать иконку
-    ['', ...AVATAR_CHOICES].forEach(icon => {
+    ['', ...AVATAR_CHOICES, ...rewardsOf('icon')].forEach(icon => {
       const b = document.createElement('button');
-      b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '');
+      const locked = rewardLeague('icon', icon) > 0 && !rewardOpen('icon', icon);
+      b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '') + (locked ? ' locked' : '');
       b.dataset.icon = icon;
       b.textContent = icon || avatarLetter(me);
       b.style.background = bg;
@@ -5793,7 +5934,15 @@
 
   // Цвет виден сразу; сетка не сворачивается — после цвета часто выбирают и
   // животное. Сервер не принял — возвращаем прежний
+  // Закрытая награда: говорим, в какой лиге она откроется
+  function lockedNote(kind, value) {
+    if (!rewardLeague(kind, value) || rewardOpen(kind, value)) return false;
+    setNote('avNote', t().run.lgLocked.replace('{l}', t().leagues[rewardLeague(kind, value)]), true);
+    return true;
+  }
+
   async function chooseColor(color) {
+    if (lockedNote('color', color)) return;
     const before = myColor();
     if (color === colorOf(myName())) return;
     setMyColor(color);
@@ -5816,6 +5965,7 @@
 
   // Выбор видно сразу; если сервер не принял — возвращаем прежнюю
   async function chooseAvatar(icon) {
+    if (lockedNote('icon', icon)) return;
     const before = myAvatar();
     // Выбрал — сетка сворачивается: новая иконка видна в большом кружке
     showAvatarPicker(false);
@@ -6251,7 +6401,7 @@
     who.textContent = name;
     const pts = document.createElement('span');
     pts.className = 'rk-pts';
-    pts.textContent = formatNum(points);
+    pts.textContent = typeof points === 'number' ? formatNum(points) : points;
     row.append(place, face, who, pts);
     return row;
   }
@@ -6310,7 +6460,8 @@
     loadFriends(true);
     loadMatches();
     loadRanked();
-    loadEloTop();
+    // Лестница меняется только после партии — спрашиваем при входе, не в опросе
+    loadLadder().then(() => { if (screen === 'online') { renderRanked(null); loadEloTop(); } });
   }
 
   let friendMenuOpen = null;
@@ -7314,9 +7465,25 @@
   function renderRanked(st) {
     const L = t().online;
     const mine = rankedRatings && rankedRatings[rankedMode];
-    document.getElementById('rkElo').textContent = mine ? formatNum(mine.elo) : '—';
-    document.getElementById('rkEloSub').textContent = mine
-      ? L.rkEloSub.replace('{g}', mine.games) : L.rkEloSub.replace('{g}', '0');
+    const elo = document.getElementById('rkElo');
+    const starsEl = document.getElementById('rkStars');
+    elo.classList.toggle('league', !!ladderInfo);
+    starsEl.classList.toggle('hidden', !ladderInfo);
+    if (ladderInfo) {
+      // Лига — крупно, звёзды под ней. Число рейтинга видно только Легенде:
+      // ниже его заменяют звёзды, а рейтинг работает на подбор соперника
+      const p = ladderPos(ladderInfo.stars);
+      elo.textContent = leagueLabel(ladderInfo.stars);
+      starsEl.textContent = p.legend ? (mine ? L.lgElo.replace('{n}', formatNum(mine.elo)) : '') : starsLine(ladderInfo.stars);
+      const days = Math.floor((ladderInfo.endsIn || 0) / 86400);
+      const month = seasonMonth(ladderInfo.season);
+      document.getElementById('rkEloSub').textContent = days > 0
+        ? L.lgSeason.replace('{m}', month).replace('{n}', days) : L.lgSeasonLast.replace('{m}', month);
+    } else {
+      elo.textContent = mine ? formatNum(mine.elo) : '—';
+      document.getElementById('rkEloSub').textContent = mine
+        ? L.rkEloSub.replace('{g}', mine.games) : L.rkEloSub.replace('{g}', '0');
+    }
 
     const play = document.getElementById('tRkPlay');
     play.textContent = rankedMatchId ? L.rkResume : L.rkPlay;
@@ -7409,6 +7576,23 @@
     if (!sb) return;
     const box = document.getElementById('rkTopList');
     if (!box) return;
+    // С лигами топ один на все режимы — по звёздам сезона
+    if (ladderInfo) {
+      document.getElementById('tRkTop').textContent = t().online.lgTop;
+      try {
+        const { data, error } = await sb.rpc('ladder_top');
+        if (error) throw new Error(error.message);
+        const rows = data || [];
+        const me = (runAuth() || {}).username;
+        if (!rows.length) {
+          box.innerHTML = '<div class="fr-note">' + escapeHtml(t().online.rkTopEmpty) + '</div>';
+          return;
+        }
+        box.replaceChildren(...rows.map((r, i) => topRow(i, r.username, leagueLabel(r.stars), r.username === me)));
+        fetchAvatars(rows.map(r => r.username));
+      } catch (e) {}
+      return;
+    }
     try {
       const { data, error } = await sb.rpc('elo_leaderboard', { p_mode: rankedMode });
       if (error) throw new Error(error.message);
