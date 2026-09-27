@@ -1,0 +1,335 @@
+-- Пожаловаться и заблокировать. Применять в Supabase: SQL Editor → вставить
+-- целиком → Run. Применить ДО мёржа.
+--
+-- Блокировка: заблокированный не может писать, вызывать на игру и добавлять
+-- в друзья, не находит вас в поиске и не попадает к вам в очередь на
+-- рейтинг. Дружба между вами снимается, висящие вызовы отменяются. Сам он о
+-- блокировке не узнаёт: видит только «игрок недоступен».
+--
+-- Жалоба: причина (грубость, спам, другое), комментарий по желанию и
+-- последние 30 сообщений переписки — их база прикладывает сама. Разбираете
+-- вы: готовый запрос — supabase/admin/reports.txt.
+
+-- 1. Кто кого заблокировал
+create table if not exists player_blocks (
+  blocker text not null references students(username) on update cascade on delete cascade,
+  blocked text not null references students(username) on update cascade on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker, blocked),
+  constraint player_block_not_self check (blocker <> blocked)
+);
+create index if not exists player_blocks_blocked_idx on player_blocks (blocked);
+alter table player_blocks enable row level security;
+
+-- 2. Жалобы. Имена — просто текстом, без связи с учётной записью: жалоба
+--    должна пережить удаление аккаунта, на который жаловались
+create table if not exists player_reports (
+  id bigint generated always as identity primary key,
+  reporter text not null,
+  reported text not null,
+  reason text not null,
+  note text,
+  messages jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  reviewed boolean not null default false,
+  constraint player_report_reason check (reason in ('rude', 'spam', 'other')),
+  constraint player_report_note_len check (note is null or char_length(note) <= 300)
+);
+create index if not exists player_reports_open_idx on player_reports (reviewed, created_at desc);
+alter table player_reports enable row level security;
+
+-- Блок в любую сторону: общаться нельзя, кто бы кого ни заблокировал
+create or replace function players_blocked(p_a text, p_b text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select exists (select 1 from player_blocks
+                 where (blocker = p_a and blocked = p_b) or (blocker = p_b and blocked = p_a));
+$$;
+
+-- 3. Заблокировать
+create or replace function block_player(p_username text, p_pin text, p_who text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; other text; n int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select s.username into other from students s where s.username_lower = lower(trim(p_who));
+  if other is null then raise exception 'no_such_student'; end if;
+  if other = me then raise exception 'cannot_block_self'; end if;
+  select count(*) into n from player_blocks where blocker = me;
+  if n >= 200 then raise exception 'too_many_blocks'; end if;
+
+  insert into player_blocks(blocker, blocked) values (me, other) on conflict do nothing;
+  -- Дружба и заявки между ними снимаются, висящие вызовы отменяются
+  delete from friendships
+  where (requester = me and addressee = other) or (requester = other and addressee = me);
+  update matches set status = 'declined', updated_at = now()
+  where status = 'invited' and ((p0 = me and p1 = other) or (p0 = other and p1 = me));
+  return true;
+end;
+$$;
+
+-- 4. Разблокировать
+create or replace function unblock_player(p_username text, p_pin text, p_who text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  delete from player_blocks b
+  where b.blocker = me and lower(b.blocked) = lower(trim(p_who));
+  return true;
+end;
+$$;
+
+-- 5. Кого я заблокировал — только свой список
+create or replace function blocked_players(p_username text, p_pin text)
+returns table(username text, blocked_at timestamptz)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  return query
+  select b.blocked, b.created_at from player_blocks b where b.blocker = me order by b.created_at desc;
+end;
+$$;
+
+-- 6. Пожаловаться. Не больше 10 жалоб в сутки от одного человека
+create or replace function report_player(p_username text, p_pin text, p_who text,
+                                         p_reason text, p_note text)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; other text; n int; msgs jsonb; new_id bigint; lo text; hi text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select s.username into other from students s where s.username_lower = lower(trim(p_who));
+  if other is null then raise exception 'no_such_student'; end if;
+  if other = me then raise exception 'cannot_report_self'; end if;
+  if p_reason not in ('rude', 'spam', 'other') then raise exception 'bad_reason'; end if;
+  select count(*) into n from player_reports
+  where reporter = me and created_at > now() - interval '24 hours';
+  if n >= 10 then raise exception 'too_many_reports'; end if;
+
+  lo := least(me, other); hi := greatest(me, other);
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'from', c.sender, 'code', c.code, 'text', c.body, 'at', c.created_at) order by c.id), '[]'::jsonb)
+    into msgs
+  from (select * from friend_chat c2 where c2.a = lo and c2.b = hi order by c2.id desc limit 30) c;
+
+  insert into player_reports(reporter, reported, reason, note, messages)
+  values (me, other, p_reason, nullif(left(trim(coalesce(p_note, '')), 300), ''), msgs)
+  returning id into new_id;
+  return new_id;
+end;
+$$;
+
+-- 7. Реванш и любой вызов между заблокированными не создаются
+create or replace function matches_no_blocked()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if new.status = 'invited' and players_blocked(new.p0, new.p1) then
+    raise exception 'unavailable';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists matches_no_blocked on matches;
+create trigger matches_no_blocked before insert on matches
+for each row execute function matches_no_blocked();
+
+-- 8. Заявка в друзья, поиск, подсказки и очередь обходят заблокированных
+create or replace function send_friend_request(p_username text, p_pin text, p_to text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; other text; cur text; pending_out int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select s.username into other from students s where s.username_lower = lower(trim(p_to));
+  if other is null then raise exception 'no_such_student'; end if;
+  if other = me then raise exception 'cannot_friend_self'; end if;
+  -- Заблокированному не сказано, что его заблокировали: «недоступен»
+  if players_blocked(me, other) then raise exception 'unavailable'; end if;
+
+  -- Иначе двадцать забытых заявок навсегда занимают все места
+  perform expire_friend_requests();
+
+  cur := friend_status(me, other);
+  if cur = 'friend' then return 'friend'; end if;
+  if cur = 'outgoing' then return 'outgoing'; end if;
+
+  if cur = 'incoming' then
+    update friendships set status = 'accepted', decided_at = now()
+    where requester = other and addressee = me;
+    return 'friend';
+  end if;
+
+  if exists (select 1 from friendships f
+             where f.requester = me and f.addressee = other
+               and f.status = 'declined' and f.decided_at > now() - interval '24 hours') then
+    raise exception 'recently_declined';
+  end if;
+
+  if exists (select 1 from friendships f
+             where f.requester = me and f.addressee = other
+               and f.status = 'cancelled' and f.decided_at > now() - interval '1 hour') then
+    raise exception 'recently_cancelled';
+  end if;
+
+  select count(*) into pending_out from friendships f
+  where f.requester = me and f.status = 'pending';
+  if pending_out >= 20 then raise exception 'too_many_requests'; end if;
+
+  insert into friendships(requester, addressee, status)
+  values (me, other, 'pending')
+  on conflict (requester, addressee) do update
+    set status = 'pending', created_at = now(), decided_at = null;
+  return 'outgoing';
+end;
+$$;
+
+create or replace function find_students(p_username text, p_pin text, p_query text)
+returns table(username text, best_run_score int, relation text)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; q text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  q := lower(trim(coalesce(p_query, '')));
+  if length(q) < 2 then raise exception 'query_too_short'; end if;
+
+  return query
+  select s.username, s.best_run_score, friend_status(me, s.username)
+  from students s
+  where s.username_lower like q || '%'
+    and s.username <> me
+    and s.username not like '#%'
+    and not s.is_bot
+    and not players_blocked(me, s.username)
+  order by s.username
+  limit 10;
+end;
+$$;
+
+create or replace function suggest_students(p_username text, p_pin text)
+returns table(username text, best_run_score int, last_seen timestamptz)
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  return query
+  select s.username, s.best_run_score, act.seen
+  from students s
+  cross join lateral (
+    select greatest(
+      s.created_at,
+      coalesce((select max(r.created_at) from runs r where r.username = s.username), s.created_at),
+      coalesce((select max(m.updated_at) from matches m
+                where m.p0 = s.username or m.p1 = s.username), s.created_at)
+    ) as seen
+  ) act
+  where s.username <> me
+    and s.username not like '#%'
+    and not s.is_bot
+    and friend_status(me, s.username) is null
+    and not players_blocked(me, s.username)
+  order by act.seen desc, s.username
+  limit 10;
+end;
+$$;
+
+create or replace function ranked_pair(p_me text, p_mode int)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare mine ranked_queue; opp ranked_queue; r record; new_id bigint; lvl real;
+begin
+  select * into mine from ranked_queue where username = p_me for update;
+  if mine.username is null or mine.match_id is not null or mine.mode <> p_mode then return null; end if;
+
+  select * into opp from ranked_queue q
+  where q.username <> p_me and q.match_id is null and q.mode = p_mode
+    and not players_blocked(q.username, p_me)
+    and abs(q.elo - mine.elo) <= greatest(queue_window(q.joined_at), queue_window(mine.joined_at))
+  order by abs(q.elo - mine.elo), q.joined_at
+  limit 1
+  for update skip locked;
+
+  select * into r from ranked_rules(p_mode);
+
+  if opp.username is not null then
+    -- Кто ждал дольше, тот и ходит первым: маленькая компенсация за ожидание
+    insert into matches(p0, p1, wins_needed, range_min, range_max, frost,
+                        bonuses_on, ranked, ranked_mode, status, starter)
+    values (opp.username, p_me, 3, r.range_min, r.range_max, r.frost,
+            r.bonuses, true, p_mode, 'active', 0)
+    returning id into new_id;
+    perform start_match_round(new_id);
+    update ranked_queue set match_id = new_id where username = opp.username;
+    delete from ranked_queue where username = p_me;
+    return new_id;
+  end if;
+
+  if mine.joined_at > now() - make_interval(secs => bot_wait_seconds()) then return null; end if;
+
+  -- Человек ждал — он и ходит первым
+  lvl := bot_level_for(p_me, p_mode);
+  insert into matches(p0, p1, wins_needed, range_min, range_max, frost,
+                      bonuses_on, ranked, ranked_mode, status, starter, bot_seat, bot_level)
+  values (p_me, bot_for_level(lvl), 3, r.range_min, r.range_max, r.frost,
+          r.bonuses, true, p_mode, 'active', 0, 1, lvl)
+  returning id into new_id;
+  perform start_match_round(new_id);
+  delete from ranked_queue where username = p_me;
+  return new_id;
+end;
+$$;
+
+revoke execute on function players_blocked(text, text) from public, anon;
+revoke execute on function matches_no_blocked() from public, anon;
+revoke execute on function ranked_pair(text, int) from public, anon;
+grant execute on function block_player(text, text, text) to anon;
+grant execute on function unblock_player(text, text, text) to anon;
+grant execute on function blocked_players(text, text) to anon;
+grant execute on function report_player(text, text, text, text, text) to anon;
+grant execute on function send_friend_request(text, text, text) to anon;
+grant execute on function find_students(text, text, text) to anon;
+grant execute on function suggest_students(text, text) to anon;

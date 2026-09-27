@@ -1,0 +1,28 @@
+-- ЖАЛОБЫ ИГРОКОВ
+--
+-- Supabase → SQL Editor → вставить нужный запрос → Run.
+-- https://supabase.com/dashboard/project/fzakcsvyceqsnowvkxfu/sql/new
+
+-- 1. Неразобранные жалобы, новые сверху. В колонке «переписка» — последние
+--    сообщения между ними, которые база приложила к жалобе сама
+select r.id as "№",
+       to_char(r.created_at at time zone 'Asia/Makassar', 'DD.MM HH24:MI') as "когда (Бали)",
+       r.reporter as "кто",
+       r.reported as "на кого",
+       case r.reason when 'rude' then 'грубость' when 'spam' then 'спам' else 'другое' end as "причина",
+       coalesce(r.note, '') as "комментарий",
+       (select string_agg(m->>'from' || ': ' || coalesce(m->>'text', '[' || (m->>'code') || ']'), E'\n'
+                          order by ord)
+        from jsonb_array_elements(r.messages) with ordinality t(m, ord)) as "переписка",
+       (select count(*) from player_reports x where x.reported = r.reported) as "всего жалоб на него"
+from player_reports r
+where not r.reviewed
+order by r.created_at desc;
+
+-- 2. Разобрал — отметить. Подставьте номер жалобы
+-- update player_reports set reviewed = true where id = 123;
+
+-- 3. На кого жалуются чаще всего за 30 дней
+-- select reported as "на кого", count(*) as "жалоб", count(distinct reporter) as "от разных людей"
+-- from player_reports where created_at > now() - interval '30 days'
+-- group by reported order by 2 desc;

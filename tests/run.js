@@ -2295,10 +2295,17 @@ async function testFriends(browser) {
     search.rows[1].btns.join() === 'Вызвать,⋯', JSON.stringify(search.rows[1]));
   await page.click('#searchResults .friend-row:nth-child(2) .fr-btn.more');
   await page.waitForTimeout(150);
-  const more = await page.evaluate(() =>
-    [...document.querySelectorAll('#searchResults .friend-row:nth-child(2) .fr-btn')].map(b => b.textContent));
-  check('«⋯» открывает «Убрать»', more.join() === 'Вызвать,Убрать', more.join());
-  await page.click('#searchResults .friend-row:nth-child(2) .fr-btn.no');
+  // «⋯» открывает окно со всеми действиями: рядом с «Убрать» теперь
+  // «Пожаловаться» и «Заблокировать», в строке им тесно
+  const more = await page.evaluate(() => ({
+    open: !document.getElementById('friendSheet').classList.contains('hidden'),
+    name: document.getElementById('fsName').textContent,
+    btns: [...document.querySelectorAll('#friendSheet button')].filter(b => !b.classList.contains('hidden')).map(b => b.textContent)
+  }));
+  check('«⋯» открывает окно: написать, убрать, пожаловаться, заблокировать',
+    more.open && more.name.includes('Ким') &&
+    more.btns.join() === '✉️ Написать,Убрать из друзей,⚠️ Пожаловаться,🚫 Заблокировать,Отмена', JSON.stringify(more));
+  await page.click('#fsRemove');
   await page.waitForTimeout(300);
   const removed = await page.evaluate(() =>
     (window.__rpcCalls.filter(c => c.name === 'remove_friend').pop() || {}).args);
@@ -3799,14 +3806,17 @@ async function testNewLook(browser) {
   check('у удалённого игрока — знак вопроса, а не буква служебного имени',
     order.avatars['#7'] === '?', JSON.stringify(order.avatars));
 
-  // Открытое «Убрать» не должно захлопываться, пока список обновляется опросом
+  // Открытое окно «⋯» не должно захлопываться, пока список обновляется опросом
   await page.click('#friendsList .friend-row[data-name="Аня"] .fr-btn.more');
   await page.waitForTimeout(100);
   await page.evaluate(() => loadFriends(true));
   await page.waitForTimeout(300);
-  const stillOpen = await page.evaluate(() =>
-    [...document.querySelectorAll('#friendsList .friend-row[data-name="Аня"] .fr-btn')].map(b => b.textContent));
-  check('открытое «Убрать» переживает обновление списка', stillOpen.join() === 'Вызвать,Убрать', stillOpen.join());
+  const stillOpen = await page.evaluate(() => ({
+    open: !document.getElementById('friendSheet').classList.contains('hidden'),
+    name: document.getElementById('fsName').textContent }));
+  check('открытое окно «⋯» переживает обновление списка', stillOpen.open && stillOpen.name.includes('Аня'),
+    JSON.stringify(stillOpen));
+  await page.evaluate(() => closeFriendSheet());
   await done(page);
 
   // Дуэль на телефоне: ничего не вылезает за карточку, поле ввода — на экране.
@@ -5324,6 +5334,102 @@ async function testMatchFlow(browser) {
   await page.context().close();
 }
 
+// Пожаловаться и заблокировать: из «⋯» у друга и из переписки
+async function testBlockReport(browser) {
+  console.log('\nЖалоба и блокировка');
+  const page = await newGame(browser, { user: 'Максим', profile: {} });
+  await page.evaluate(() => { window.__friends = [{ username: 'Аня', relation: 'friend' }, { username: 'Кира', relation: 'friend' }]; });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(400);
+
+  // Жалоба: без причины не отправить; причина, пара слов — и на сервер
+  await page.click('#friendsList .friend-row[data-name="Аня"] .fr-btn.more');
+  await page.waitForTimeout(100);
+  await page.click('#fsReport');
+  await page.waitForTimeout(100);
+  const form = await page.evaluate(() => ({
+    open: !document.getElementById('reportModal').classList.contains('hidden'),
+    title: document.getElementById('rpTitle').textContent,
+    reasons: [...document.querySelectorAll('#rpReasons button')].map(b => b.textContent),
+    sendOff: document.getElementById('rpSend').disabled
+  }));
+  check('жалоба: три причины, без причины не отправить',
+    form.open && form.title.includes('Аня') && form.reasons.join() === 'Грубость,Спам,Другое' && form.sendOff, JSON.stringify(form));
+  await page.click('#rpReasons button[data-reason="rude"]');
+  await page.fill('#rpNote', 'обзывается');
+  await page.click('#rpSend');
+  await page.waitForTimeout(300);
+  const sent = await page.evaluate(() => ({
+    args: (window.__reports || [])[0],
+    closed: document.getElementById('reportModal').classList.contains('hidden'),
+    note: document.getElementById('friendsNote').textContent
+  }));
+  check('жалоба ушла с причиной и комментарием, игроку сказали спасибо',
+    sent.args && sent.args.p_who === 'Аня' && sent.args.p_reason === 'rude' && sent.args.p_note === 'обзывается' &&
+    sent.closed && sent.note.includes('Жалоба отправлена'), JSON.stringify(sent));
+
+  // Блокировка: сначала вопрос, «Отмена» ничего не делает
+  await page.click('#friendsList .friend-row[data-name="Аня"] .fr-btn.more');
+  await page.waitForTimeout(100);
+  await page.click('#fsBlock');
+  await page.waitForTimeout(100);
+  const ask = await page.evaluate(() => document.getElementById('blAsk').textContent);
+  check('перед блокировкой — вопрос и что будет', ask.startsWith('Заблокировать: Аня?') && ask.includes('не сможет писать вам'), ask);
+  await page.click('#blCancel');
+  await page.waitForTimeout(100);
+  check('«Отмена» ничего не блокирует', await page.evaluate(() => !(window.__blocked || []).length &&
+    document.getElementById('blockModal').classList.contains('hidden')));
+  await page.click('#friendsList .friend-row[data-name="Аня"] .fr-btn.more');
+  await page.waitForTimeout(100);
+  await page.click('#fsBlock');
+  await page.waitForTimeout(100);
+  await page.click('#blGo');
+  await page.waitForTimeout(400);
+  const blocked = await page.evaluate(() => ({
+    list: window.__blocked, rows: [...document.querySelectorAll('#friendsList .friend-row')].map(r => r.dataset.name),
+    note: document.getElementById('friendsNote').textContent
+  }));
+  check('заблокирована — ушла из списка, об этом сказано',
+    blocked.list.join() === 'Аня' && !blocked.rows.includes('Аня') && blocked.note.includes('больше не сможет вам писать'),
+    JSON.stringify(blocked));
+
+  // Из переписки: «⋯» в заголовке, «Написать» там лишнее; после блокировки — к друзьям
+  await page.evaluate(() => openChat('Кира'));
+  await page.waitForTimeout(300);
+  await page.click('#chatMore');
+  await page.waitForTimeout(100);
+  const fromChat = await page.evaluate(() =>
+    [...document.querySelectorAll('#friendSheet button')].filter(b => !b.classList.contains('hidden')).map(b => b.textContent));
+  check('в переписке «⋯» — без «Написать»', fromChat.join() === 'Убрать из друзей,⚠️ Пожаловаться,🚫 Заблокировать,Отмена',
+    fromChat.join());
+  const label = await page.evaluate(() => document.getElementById('tChatRanked').textContent);
+  check('вызов «по правилам рейтинга» подписан: без звёзд', label.includes('без звёзд'), label);
+  await page.click('#fsBlock');
+  await page.waitForTimeout(100);
+  await page.click('#blGo');
+  await page.waitForTimeout(500);
+  check('заблокировал из переписки — вернулся к друзьям', await page.locator('#screenFriends').isVisible());
+
+  // Профиль: список заблокированных, разблокировать
+  await page.click('#accountChip');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById('pfEditFold').open = true; document.getElementById('pfBlockedFold').open = true; });
+  await page.waitForTimeout(400);
+  let list = await page.evaluate(() => [...document.querySelectorAll('#pfBlockedList .bl-row')].map(r => r.textContent));
+  check('в профиле — кого заблокировал', list.join() === 'АняРазблокировать,КираРазблокировать', list.join());
+  await page.click('#pfBlockedList .bl-row:first-child .fr-btn');
+  await page.waitForTimeout(400);
+  list = await page.evaluate(() => [...document.querySelectorAll('#pfBlockedList .bl-row')].map(r => r.textContent));
+  check('«Разблокировать» убирает из списка', list.join() === 'КираРазблокировать' &&
+    await page.evaluate(() => window.__blocked.join() === 'Кира'), list.join());
+  await page.evaluate(() => closeLogoutModal());
+
+  // Заблокированному не говорят, что его заблокировали
+  const msg = await page.evaluate(() => friendErrorText('unavailable'));
+  check('ответ «unavailable» — «Игрок недоступен»', msg === 'Игрок недоступен', msg);
+  await page.context().close();
+}
+
 async function testPolish(browser) {
   console.log('\nПолировка');
   let page = await newGame(browser);
@@ -5866,6 +5972,7 @@ async function testKeyPage(browser) {
     await testQuitConfirm(browser);
     await testFogWholeRound(browser);
     await testMatchFlow(browser);
+    await testBlockReport(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

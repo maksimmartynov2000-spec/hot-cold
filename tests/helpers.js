@@ -30,6 +30,23 @@ function stubSupabase(opts) {
             return { data: null, error: { message: window.__rpcError.message } };
           }
           if (name === 'list_friends') return { data: window.__friends || [], error: null };
+          // Жалобы и блокировка (миграция 036): «сервер» — window.__reports и __blocked
+          if (name === 'report_player') {
+            (window.__reports = window.__reports || []).push(args);
+            return { data: window.__reports.length, error: null };
+          }
+          if (name === 'block_player') {
+            (window.__blocked = window.__blocked || []).push(args.p_who);
+            window.__friends = (window.__friends || []).filter(f => f.username !== args.p_who);
+            return { data: true, error: null };
+          }
+          if (name === 'unblock_player') {
+            window.__blocked = (window.__blocked || []).filter(u => u !== args.p_who);
+            return { data: true, error: null };
+          }
+          if (name === 'blocked_players') {
+            return { data: (window.__blocked || []).map(u => ({ username: u, blocked_at: '2026-09-01T00:00:00Z' })), error: null };
+          }
           if (name === 'find_students') return { data: window.__found || [], error: null };
           if (name === 'suggest_students') return { data: window.__suggested || [], error: null };
           if (name === 'send_friend_request') return { data: 'outgoing', error: null };
