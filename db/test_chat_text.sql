@@ -193,7 +193,7 @@ rollback;
 
 \echo === 11. фразы игры и быстрые ответы есть в базе
 create temp table js_codes(kind text, code text);
-\copy js_codes from '/home/user/hot-cold/db/say_codes_js.csv' with (format csv, header true)
+\copy js_codes from 'say_codes_js.csv' with (format csv, header true)
 do $$
 declare missing text;
 begin

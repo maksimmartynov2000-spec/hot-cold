@@ -525,7 +525,7 @@ reset role;
 
 \echo === 19. персонажи в базе те же, что в игре
 create temp table js_bots(username text, icon text, color text);
-\copy js_bots from '/home/user/hot-cold/db/bots_js.csv' with (format csv, header true)
+\copy js_bots from 'bots_js.csv' with (format csv, header true)
 do $$
 declare js text; db text;
 begin

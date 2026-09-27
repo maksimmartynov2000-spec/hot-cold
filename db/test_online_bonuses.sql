@@ -374,7 +374,7 @@ end $$;
 
 \echo === 20. число бонусов совпадает в браузере и в базе
 create temp table js_bonus(span int, count int);
-\copy js_bonus from '/home/user/hot-cold/db/bonus_count_js.csv' with (format csv, header true)
+\copy js_bonus from 'bonus_count_js.csv' with (format csv, header true)
 do $$
 declare bad record; n int;
 begin

@@ -252,7 +252,7 @@ reset role;
 
 \echo === 11. награды в базе те же, что в игре
 create temp table js_rewards(league int, kind text, value text);
-\copy js_rewards from '/home/user/hot-cold/db/rewards_js.csv' with (format csv, header true)
+\copy js_rewards from 'rewards_js.csv' with (format csv, header true)
 do $$
 declare js text; db text;
 begin

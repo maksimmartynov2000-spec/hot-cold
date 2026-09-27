@@ -302,7 +302,7 @@ end $$;
 
 \echo === 14. набор иконок в браузере и в базе один и тот же
 create temp table js_avatars(avatar text);
-\copy js_avatars from '/home/user/hot-cold/db/avatars_js.csv' with (format csv, header true)
+\copy js_avatars from 'avatars_js.csv' with (format csv, header true)
 do $$
 declare js text[]; db text[];
 begin

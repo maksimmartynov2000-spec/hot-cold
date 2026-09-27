@@ -1,9 +1,9 @@
 \echo === пояса: база против клиента
 create temp table js_tiers(span int, distance int, tier int);
-\copy js_tiers from '/home/user/hot-cold/db/tiers_js.csv' with (format csv)
+\copy js_tiers from 'tiers_js.csv' with (format csv)
 
 create temp table js_bounds(span int, idx int, lo int, hi int);
-\copy js_bounds from '/home/user/hot-cold/db/bounds_js.csv' with (format csv)
+\copy js_bounds from 'bounds_js.csv' with (format csv)
 
 do $$
 declare n int; total int; example text;

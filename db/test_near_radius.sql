@@ -4,7 +4,7 @@
 
 \echo === 1. радиус сигнала «рядом» совпадает в браузере и в базе
 create temp table js_radius(span int, radius int);
-\copy js_radius from '/home/user/hot-cold/db/near_radius_js.csv' with (format csv, header true)
+\copy js_radius from 'near_radius_js.csv' with (format csv, header true)
 do $$
 declare bad record; n int;
 begin

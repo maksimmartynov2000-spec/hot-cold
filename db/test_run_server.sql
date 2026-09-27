@@ -1,8 +1,8 @@
 \echo === рейтинг: кривая сложности база против клиента
 create temp table js_curve(n int, range int, allowed int, minatt int);
-\copy js_curve from '/home/user/hot-cold/db/run_curve_js.csv' with (format csv)
+\copy js_curve from 'run_curve_js.csv' with (format csv)
 create temp table js_min(range int, minatt int);
-\copy js_min from '/home/user/hot-cold/db/min_attempts_js.csv' with (format csv)
+\copy js_min from 'min_attempts_js.csv' with (format csv)
 
 do $$
 declare n int; total int; ex text;

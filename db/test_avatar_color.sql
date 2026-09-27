@@ -102,7 +102,7 @@ end $$;
 
 \echo === 7. набор цветов в базе тот же, что в игре
 create temp table js_colors(color text);
-\copy js_colors from '/home/user/hot-cold/db/avatar_colors_js.csv' with (format csv, header true)
+\copy js_colors from 'avatar_colors_js.csv' with (format csv, header true)
 do $$
 declare js text[]; db text[];
 begin
