@@ -11,6 +11,8 @@
 --    Раньше любой мог сразу нажать «Следующий раунд», и второй не успевал
 --    увидеть загаданное число.
 -- С ботом ждать некого: бот всегда на месте и всегда готов.
+-- 3. Игра узнаёт, даёт ли партия звёзды: реванш и вызов друга их не дают,
+--    и об этом теперь сказано прямо — до старта и в итоге.
 
 -- Состояние партии
 alter table matches add column if not exists lobby boolean not null default false;
@@ -378,7 +380,9 @@ begin
     -- Между раундами: сколько до следующего и кто уже готов
     'nextIn', case when m.status = 'active' and m.round_over and not m.match_over and m.round_ended_at is not null
                    then greatest(0, ceil(extract(epoch from (m.round_ended_at + interval '10 seconds' - now()))))::int end,
-    'ready', jsonb_build_array(m.ready[1] or m.bot_seat = 0, m.ready[2] or m.bot_seat = 1)
+    'ready', jsonb_build_array(m.ready[1] or m.bot_seat = 0, m.ready[2] or m.bot_seat = 1),
+    -- Даёт ли партия звёзды: игра говорит об этом до старта и в итоге
+    'ladder', m.ladder
   );
 end;
 $$;

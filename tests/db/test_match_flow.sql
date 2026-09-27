@@ -37,6 +37,8 @@ begin
     raise exception 'ОШИБКА: кто на месте: %', st->'present';
   end if;
   if (st->>'lobbyLeft')::int not between 295 and 300 then raise exception 'ОШИБКА: до отмены %', st->>'lobbyLeft'; end if;
+  -- Вызов друга звёзд не даёт — игра должна это знать, чтобы сказать заранее
+  if (st->>'ladder')::boolean then raise exception 'ОШИБКА: вызов друга помечен как партия на звёзды'; end if;
   begin
     perform match_guess('Лев','1234',mid,50);
     raise exception 'ОШИБКА: сходил до старта';
@@ -140,6 +142,7 @@ begin
     and (p0, p1) in (('Кира','Лев'), ('Лев','Кира')) order by id desc limit 1;
   select * into m from matches where id = mid;
   if mid is null or not m.lobby or not m.ladder then raise exception 'ОШИБКА: партия из очереди без ожидания'; end if;
+  if not (match_state('Кира','4321',mid)->>'ladder')::boolean then raise exception 'ОШИБКА: партия из очереди без звёзд'; end if;
   select coalesce(max(elo), 1000) into before from elo_ratings where username = 'Кира' and mode = 0;
   perform leave_match('Кира','4321',mid);
   select * into m from matches where id = mid;

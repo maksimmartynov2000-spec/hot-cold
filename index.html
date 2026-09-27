@@ -1174,6 +1174,7 @@
     .history-item .h-masked { opacity: 0.45; }
     .r-next { margin-top: 10px; font-size: 13px; color: rgba(255, 255, 255, 0.55); text-align: center; }
     .turn-banner.count { font-size: 1.4em; letter-spacing: 0.02em; }
+    .turn-banner .tb-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); letter-spacing: 0; }
 
     /* Панель отнятого хода живёт на месте поля ввода и выглядит так же
        заметно: этот ход — событие, а не пауза */
@@ -2208,7 +2209,7 @@
         errInviteGone: "That challenge is gone",
         errNoMatch: "No such game",
         timedOut: "out of time", clockMine: "Your turn: {n}s", clockTheirs: "Their turn: {n}s",
-        waitFor: "⏳ Waiting for {name} — we start when you are both here", lobbyCancel: "cancels in {t}", lobbyGone: "Game cancelled — {name} didn't come", startsIn: "Starting in {n}…", readyBtn: "Ready", readyWait: "✓ Ready — waiting for {name}", nextIn: "Next round in {n}s", oppReady: "✓ {name} is ready", errNotStarted: "The game hasn't started yet",
+        waitFor: "⏳ Waiting for {name} — we start when you are both here", lobbyCancel: "cancels in {t}", lobbyGone: "Game cancelled — {name} didn't come", startsIn: "Starting in {n}…", readyBtn: "Ready", readyWait: "✓ Ready — waiting for {name}", nextIn: "Next round in {n}s", oppReady: "✓ {name} is ready", errNotStarted: "The game hasn't started yet", noStars: "⭐ No stars in this game — stars come only from «Play ranked»",
         chBonuses: "Bonuses", chBonusCount: "Bonuses on the board",
         whoPlays: "Recently playing \u2014 add anyone you like",
         nobodyYet: "Nobody else has played yet",
@@ -2255,7 +2256,7 @@
         rkAgoDay: "{n} d ago",
         rkAgoNow: "just now",
         rkTop: "Ranked top",
-        lgTop: "Season top", lgSeason: "{m} season \u00b7 {n} days left", lgSeasonLast: "{m} season \u00b7 last day", lgStreak: "win streak", lgFloor: "a floor: you can\u2019t drop below this rank", lgNew: "New league: {l}!", lgUnlock: "Unlocked in your profile: {x}", lgElo: "rating {n}",
+        lgTop: "Season top", lgSeason: "{m} season \u00b7 {n} days left", lgSeasonLast: "{m} season \u00b7 last day", lgStreak: "win streak", lgFloor: "a floor: you can\u2019t drop below this rank", lgNew: "New league: {l}!", lgUnlock: "Unlocked in your profile: {x}",
         rkTopEmpty: "Nobody has played three ranked games yet",
         rkBadge: "ranked",
         rkResume: "A ranked game is already on",
@@ -2434,7 +2435,7 @@
         errInviteGone: "Вызова больше нет",
         errNoMatch: "Такой игры нет",
         timedOut: "время вышло", clockMine: "Ваш ход: {n} с", clockTheirs: "Ход соперника: {n} с",
-        waitFor: "⏳ Ждём {name} — начнём, когда вы оба в игре", lobbyCancel: "отмена через {t}", lobbyGone: "Партия отменена — {name} не пришёл(ла)", startsIn: "Начинаем через {n}…", readyBtn: "Готов", readyWait: "✓ Готов — ждём {name}", nextIn: "Следующий раунд через {n} с", oppReady: "✓ {name} ждёт", errNotStarted: "Партия ещё не началась",
+        waitFor: "⏳ Ждём {name} — начнём, когда вы оба в игре", lobbyCancel: "отмена через {t}", lobbyGone: "Партия отменена — {name} не пришёл(ла)", startsIn: "Начинаем через {n}…", readyBtn: "Готов", readyWait: "✓ Готов — ждём {name}", nextIn: "Следующий раунд через {n} с", oppReady: "✓ {name} ждёт", errNotStarted: "Партия ещё не началась", noStars: "⭐ Без звёзд: звёзды дают только партии через «Играть на рейтинг»",
         chBonuses: "Бонусы", chBonusCount: "Бонусов на поле",
         whoPlays: "Недавно играли — можно добавить любого",
         nobodyYet: "Пока больше никто не играл",
@@ -2481,7 +2482,7 @@
         rkAgoDay: "{n} дн назад",
         rkAgoNow: "только что",
         rkTop: "Топ по рейтингу",
-        lgTop: "Топ сезона", lgSeason: "Сезон: {m} \u00b7 осталось {n} дн.", lgSeasonLast: "Сезон: {m} \u00b7 последний день", lgStreak: "серия побед", lgFloor: "ступень: ниже этого ранга не упасть", lgNew: "Новая лига: {l}!", lgUnlock: "В профиле открыто: {x}", lgElo: "рейтинг {n}",
+        lgTop: "Топ сезона", lgSeason: "Сезон: {m} \u00b7 осталось {n} дн.", lgSeasonLast: "Сезон: {m} \u00b7 последний день", lgStreak: "серия побед", lgFloor: "ступень: ниже этого ранга не упасть", lgNew: "Новая лига: {l}!", lgUnlock: "В профиле открыто: {x}",
         rkTopEmpty: "Пока никто не сыграл трёх рейтинговых игр",
         rkBadge: "рейтинг",
         rkResume: "Рейтинговая игра уже идёт",
@@ -2660,7 +2661,7 @@
         errInviteGone: "Ce d\u00e9fi n\u2019existe plus",
         errNoMatch: "Cette partie n\u2019existe pas",
         timedOut: "temps \u00e9coul\u00e9", clockMine: "\u00c0 vous : {n} s", clockTheirs: "Adversaire : {n} s",
-        waitFor: "⏳ On attend {name} — on commence quand vous êtes là tous les deux", lobbyCancel: "annulation dans {t}", lobbyGone: "Partie annulée — {name} n'est pas venu·e", startsIn: "Début dans {n}…", readyBtn: "Prêt", readyWait: "✓ Prêt — on attend {name}", nextIn: "Manche suivante dans {n} s", oppReady: "✓ {name} attend", errNotStarted: "La partie n'a pas encore commencé",
+        waitFor: "⏳ On attend {name} — on commence quand vous êtes là tous les deux", lobbyCancel: "annulation dans {t}", lobbyGone: "Partie annulée — {name} n'est pas venu·e", startsIn: "Début dans {n}…", readyBtn: "Prêt", readyWait: "✓ Prêt — on attend {name}", nextIn: "Manche suivante dans {n} s", oppReady: "✓ {name} attend", errNotStarted: "La partie n'a pas encore commencé", noStars: "⭐ Sans étoiles : seules les parties « Jouer classé » en donnent",
         chBonuses: "Bonus", chBonusCount: "Bonus sur le plateau",
         whoPlays: "Ont jou\u00e9 r\u00e9cemment \u2014 ajoutez qui vous voulez",
         nobodyYet: "Personne d\u2019autre n\u2019a encore jou\u00e9",
@@ -2707,7 +2708,7 @@
         rkAgoDay: "il y a {n} j",
         rkAgoNow: "\u00e0 l'instant",
         rkTop: "Classement",
-        lgTop: "Top de la saison", lgSeason: "Saison {m} \u00b7 encore {n} j", lgSeasonLast: "Saison {m} \u00b7 dernier jour", lgStreak: "s\u00e9rie de victoires", lgFloor: "palier : impossible de descendre plus bas", lgNew: "Nouvelle ligue : {l} !", lgUnlock: "D\u00e9bloqu\u00e9 dans le profil : {x}", lgElo: "classement {n}",
+        lgTop: "Top de la saison", lgSeason: "Saison {m} \u00b7 encore {n} j", lgSeasonLast: "Saison {m} \u00b7 dernier jour", lgStreak: "s\u00e9rie de victoires", lgFloor: "palier : impossible de descendre plus bas", lgNew: "Nouvelle ligue : {l} !", lgUnlock: "D\u00e9bloqu\u00e9 dans le profil : {x}",
         rkTopEmpty: "Personne n'a encore jou\u00e9 trois parties class\u00e9es",
         rkBadge: "class\u00e9",
         rkResume: "Une partie class\u00e9e est d\u00e9j\u00e0 en cours",
@@ -2886,7 +2887,7 @@
         errInviteGone: "Diese Herausforderung gibt es nicht mehr",
         errNoMatch: "Diese Partie gibt es nicht",
         timedOut: "Zeit um", clockMine: "Du: {n} s", clockTheirs: "Gegner: {n} s",
-        waitFor: "⏳ Warten auf {name} — es geht los, wenn ihr beide da seid", lobbyCancel: "Abbruch in {t}", lobbyGone: "Spiel abgebrochen — {name} ist nicht gekommen", startsIn: "Start in {n} …", readyBtn: "Bereit", readyWait: "✓ Bereit — warten auf {name}", nextIn: "Nächste Runde in {n} s", oppReady: "✓ {name} wartet", errNotStarted: "Das Spiel hat noch nicht begonnen",
+        waitFor: "⏳ Warten auf {name} — es geht los, wenn ihr beide da seid", lobbyCancel: "Abbruch in {t}", lobbyGone: "Spiel abgebrochen — {name} ist nicht gekommen", startsIn: "Start in {n} …", readyBtn: "Bereit", readyWait: "✓ Bereit — warten auf {name}", nextIn: "Nächste Runde in {n} s", oppReady: "✓ {name} wartet", errNotStarted: "Das Spiel hat noch nicht begonnen", noStars: "⭐ Ohne Sterne: Sterne gibt es nur über „Gewertet spielen“",
         chBonuses: "Boni", chBonusCount: "Boni auf dem Feld",
         whoPlays: "K\u00fcrzlich gespielt \u2014 f\u00fcg hinzu, wen du willst",
         nobodyYet: "Sonst hat noch niemand gespielt",
@@ -2933,7 +2934,7 @@
         rkAgoDay: "vor {n} T",
         rkAgoNow: "gerade eben",
         rkTop: "Ranglisten-Top",
-        lgTop: "Saison-Top", lgSeason: "Saison {m} \u00b7 noch {n} Tage", lgSeasonLast: "Saison {m} \u00b7 letzter Tag", lgStreak: "Siegesserie", lgFloor: "Stufe: tiefer f\u00e4llst du nicht", lgNew: "Neue Liga: {l}!", lgUnlock: "Im Profil freigeschaltet: {x}", lgElo: "Wertung {n}",
+        lgTop: "Saison-Top", lgSeason: "Saison {m} \u00b7 noch {n} Tage", lgSeasonLast: "Saison {m} \u00b7 letzter Tag", lgStreak: "Siegesserie", lgFloor: "Stufe: tiefer f\u00e4llst du nicht", lgNew: "Neue Liga: {l}!", lgUnlock: "Im Profil freigeschaltet: {x}",
         rkTopEmpty: "Noch niemand hat drei Ranglistenpartien gespielt",
         rkBadge: "Rangliste",
         rkResume: "Eine Ranglistenpartie l\u00e4uft schon",
@@ -4550,12 +4551,15 @@
     const other = escapeHtml(D.names[1 - online.seat]);
     const hold = onlineHold();
     if (hold === 'gone') return L.lobbyGone.replace('{name}', other);
-    if (hold === 'count') return L.startsIn.replace('{n}', secsTo(online.startsAt));
+    if (hold === 'count') return L.startsIn.replace('{n}', secsTo(online.startsAt)) +
+      (online.ladder ? '' : '<small class="tb-note">' + escapeHtml(L.noStars) + '</small>');
     let text = L.waitFor.replace('{name}', other);
     if (online.lobbyEndsAt) {
       const left = secsTo(online.lobbyEndsAt);
       text += ' · ' + L.lobbyCancel.replace('{t}', Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'));
     }
+    // Реванш и вызов друга звёзд не дают — сказать до начала, а не после
+    if (!online.ladder) text += '<small class="tb-note">' + escapeHtml(L.noStars) + '</small>';
     return text;
   }
 
@@ -4694,7 +4698,9 @@
             ? L.online.rkLeftYou
             : L.online.rkLeftThem.replace('{name}', D.names[online.forfeitBy]);
         }
-        if (D.matchOver && online.eloDelta && !starBox) {
+        // Число рейтинга — только если в базе ещё нет лиг. С лигами его
+        // заменяют звёзды, а рейтинг работает на подбор соперника незаметно
+        if (D.matchOver && online.eloDelta && !starBox && !ladderInfo) {
           const d = online.eloDelta[online.seat];
           eloLine = document.createElement('div');
           eloLine.className = 'r-elo';
@@ -4709,6 +4715,15 @@
             eloLine.appendChild(half);
           }
         }
+      }
+
+      // Партия с человеком без звёзд (реванш, вызов друга): иначе кажется,
+      // что звезду не дали по ошибке
+      let noStarsLine = null;
+      if (online && D.matchOver && online.botSeat === null && !online.ladder) {
+        noStarsLine = document.createElement('div');
+        noStarsLine.className = 'r-forfeit';
+        noStarsLine.textContent = L.online.noStars;
       }
 
       const actions = document.createElement('div');
@@ -4755,6 +4770,7 @@
       if (reviewBtn) box.appendChild(reviewBtn);
       if (starBox) box.appendChild(starBox);
       if (eloLine) box.appendChild(eloLine);
+      if (noStarsLine) box.appendChild(noStarsLine);
       if (sentLine) box.appendChild(sentLine);
       box.appendChild(actions);
       if (nextLine) box.appendChild(nextLine);
@@ -7708,7 +7724,8 @@
       // ниже его заменяют звёзды, а рейтинг работает на подбор соперника
       const p = ladderPos(ladderInfo.stars);
       elo.textContent = leagueLabel(ladderInfo.stars);
-      starsEl.textContent = p.legend ? (mine ? L.lgElo.replace('{n}', formatNum(mine.elo)) : '') : starsLine(ladderInfo.stars);
+      // Число рейтинга не показываем и Легенде: лестница — лиги и звёзды
+      starsEl.textContent = p.legend ? '' : starsLine(ladderInfo.stars);
       const days = Math.floor((ladderInfo.endsIn || 0) / 86400);
       const month = seasonMonth(ladderInfo.season);
       document.getElementById('rkEloSub').textContent = days > 0
@@ -7909,6 +7926,8 @@
     online.startsAt = at(st.startsIn);
     online.nextAt = at(st.nextIn);
     online.ready = (st.ready || [false, false]).slice();
+    // Без поля (база до миграции 035) считаем, что звёзды есть: так было
+    online.ladder = st.ladder === undefined ? true : !!st.ladder;
     mode = 'duel';
     RANGE_MIN = st.rangeMin;
     RANGE_MAX = st.rangeMax;

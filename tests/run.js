@@ -4919,8 +4919,9 @@ async function testLeagues(browser) {
              stars: document.getElementById('rkStars').textContent.replace(/\s/g, ' '),
              sub: document.getElementById('rkEloSub').textContent };
   });
-  check('Легенде видно число рейтинга; в последний день — «последний день»',
-    legend.elo === '👑 Легенда' && legend.stars === 'рейтинг 1 000' && /последний день/.test(legend.sub), JSON.stringify(legend));
+  // Число рейтинга не показываем никому: лестница — лиги и звёзды
+  check('Легенде — только лига, без числа рейтинга; в последний день — «последний день»',
+    legend.elo === '👑 Легенда' && legend.stars === '' && /последний день/.test(legend.sub), JSON.stringify(legend));
   const calls = await page.evaluate(() => window.__ladderCalls);
   await page.evaluate(() => loadRanked(true));
   check('лестница не спрашивается на каждом опросе', await page.evaluate(n => window.__ladderCalls === n, calls));
@@ -4963,10 +4964,17 @@ async function testLeagues(browser) {
   await page.evaluate(() => { window.__match.forfeitBy = null; window.__matchStars = null; });
   const noStars = await page.evaluate(() => {
     window.__match.id += 1;
+    // Реванш с человеком: бота нет, звёзд нет
+    Object.assign(window.__match, { ladder: false, botSeat: null, names: ['Максим', 'Кира'] });
     return openMatch(window.__match.id);
   }).then(() => page.waitForTimeout(400)).then(() => page.evaluate(() => ({
-    stars: !!document.querySelector('#resultBox .r-stars'), elo: !!document.querySelector('#resultBox .r-elo') })));
-  check('партия без звёзд (друг на рейтинг) — прежняя строка рейтинга', !noStars.stars && noStars.elo, JSON.stringify(noStars));
+    stars: !!document.querySelector('#resultBox .r-stars'), elo: !!document.querySelector('#resultBox .r-elo'),
+    note: [...document.querySelectorAll('#resultBox .r-forfeit')].map(e => e.textContent).join('|') })));
+  // Реванш с человеком звёзд не даёт — и игра говорит об этом, а не
+  // показывает вместо звёзд число рейтинга
+  check('партия без звёзд (реванш) — «без звёзд», числа рейтинга нет',
+    !noStars.stars && !noStars.elo && noStars.note.includes('Без звёзд'), JSON.stringify(noStars));
+  await page.evaluate(() => { delete window.__match.ladder; });
   await done(page);
 
   // Профиль: лига, значки сезонов, награды под замком
@@ -5233,7 +5241,7 @@ async function testMatchFlow(browser) {
   console.log('\nОнлайн: начало партии и перерыв');
   const page = await newGame(browser, { user: 'Лев' });
   await page.evaluate(() => {
-    Object.assign(window.__match, { lobby: true, lobbyLeft: 270, present: [true, false] });
+    Object.assign(window.__match, { lobby: true, lobbyLeft: 270, present: [true, false], ladder: false });
     openMatch(1);
   });
   await page.waitForTimeout(500);
@@ -5249,6 +5257,7 @@ async function testMatchFlow(browser) {
   check('соперника нет — «Ждём Кира» и сколько до отмены',
     v.bannerShown && v.banner.includes('Ждём Кира') && /отмена через 4:(2\d|30)/.test(v.banner), v.banner);
   check('пока ждём — ни поля ввода, ни часов хода', !v.input && !v.clock, JSON.stringify(v));
+  check('ещё до начала сказано, что партия без звёзд', v.banner.includes('Без звёзд'), v.banner);
 
   // Соперник пришёл — отсчёт
   await page.evaluate(() => { Object.assign(window.__match, { lobby: false, lobbyLeft: null, startsIn: 2, present: [true, true] }); refreshMatch(true); });

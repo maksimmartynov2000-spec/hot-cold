@@ -397,6 +397,7 @@ function stubSupabase(opts) {
         startsIn: M.startsIn === undefined ? null : M.startsIn,
         nextIn: M.nextIn === undefined ? (M.roundOver && !M.matchOver ? 10 : null) : M.nextIn,
         ready: M.ready || [false, false],
+        ladder: M.ladder === undefined ? true : !!M.ladder,
         updatedAt: '2026-01-01T00:00:00Z' };
     };
 
