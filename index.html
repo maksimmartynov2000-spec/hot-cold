@@ -3263,7 +3263,7 @@
   // «короткая память» режет это вдвое — и в списке, и на прямой, иначе прямая
   // показывала бы то, что из истории убрали
   function historyVisible() {
-    return (mode === 'duel' && !D.roundOver && D.shortMemory[D.cur])
+    return (mode === 'duel' && !D.roundOver && D.shortMemory[viewerSeat()])
       ? HISTORY_SHORT : HISTORY_VISIBLE;
   }
   function maxDistance() { return RANGE_MAX - RANGE_MIN; }
@@ -3352,6 +3352,8 @@
     bonuses: [],              // { value, type, taken }
     fog: [false, false],        // не видит ЧУЖИЕ ходы до конца раунда
     blind: [false, false],      // не видит СВОИ ходы до конца раунда
+    fogFrom: [0, 0],            // с какого хода (номер в истории) они закрыты:
+    blindFrom: [0, 0],          // ход, которым помеху взяли, и прежние игрок уже видел
     autoLava: [false, false],   // следующий ход за него сделает случай
     skip: [false, false],       // пропускает свой следующий ход
     shortMemory: [false, false],// видит вдвое меньше ходов до конца раунда
@@ -3920,6 +3922,8 @@
     D.roundWinner = null;
     D.fog = [false, false];
     D.blind = [false, false];
+    D.fogFrom = [0, 0];
+    D.blindFrom = [0, 0];
     D.autoLava = [false, false];
     D.skip = [false, false];
     D.shortMemory = [false, false];
@@ -3979,8 +3983,8 @@
     // Для разбора: ход сделан сам (бросок в лаву) или игрок видел не все
     // ходы (туман, слепота, короткая память) — такие ходы не оцениваются
     const limited = !!(D.fog[D.cur] || D.blind[D.cur] || D.shortMemory[D.cur]);
-    history.push({ guess, distance, meta, p: D.cur, forced: !!forced, limited });
-    soundForGuess(meta);
+    const move = { guess, distance, meta, p: D.cur, forced: !!forced, limited };
+    history.push(move);
 
     const hit = D.bonuses.find(b => !b.taken && b.value === guess);
     const radius = bonusNearRadius();
@@ -4005,9 +4009,12 @@
       D.wins[D.cur]++;
       if (D.wins[D.cur] >= D.winsNeeded) D.matchOver = true;
       if (vsBot) botSay(D.matchOver ? 'gg' : (D.cur === 0 && Math.random() < 0.5 ? vsBot.bot.react : null));
-    } else if (!usedDouble) {
-      D.cur = 1 - D.cur;
     }
+    // У каждого пояса свой звук: закрытый от человека ход бота звучать не
+    // должен, иначе туман слышно. Проверяем после бонуса и конца раунда —
+    // от них зависит, закрыт ли ход
+    if (!(vsBot && hiddenRow(move.p, move))) soundForGuess(meta);
+    if (distance !== 0 && !usedDouble) D.cur = 1 - D.cur;
     renderAll();
   }
 
@@ -4024,8 +4031,9 @@
   function applyBonus(type, by) {
     const rival = 1 - by;
     if (type === 'extra') D.tokens[by] += 2;
-    if (type === 'fog') D.fog[rival] = true;
-    if (type === 'blind') D.blind[rival] = true;
+    // Отметка — номер следующего хода: этот ход уже в истории и остаётся виден
+    if (type === 'fog' && !D.fog[rival]) { D.fog[rival] = true; D.fogFrom[rival] = history.length; }
+    if (type === 'blind' && !D.blind[rival]) { D.blind[rival] = true; D.blindFrom[rival] = history.length; }
     if (type === 'lava') D.autoLava[rival] = true;
     if (type === 'skip') D.skip[by] = true;
     if (type === 'gift') D.tokens[rival] += 1;
@@ -4108,14 +4116,24 @@
     if (online) return !!(h && h.masked);
     if (mode !== 'duel' || D.roundOver || D.matchOver) return false;
     if (ownerP === null || ownerP === undefined) return false;
-    // С ботом экран один и смотрит в него человек. Как и в онлайне, помехи
-    // прячут ходы только пока ходит он сам
-    if (vsBot && D.cur !== 0) return false;
-    const viewer = D.cur;
+    // Прячутся ходы, сделанные после того, как помеха легла. С ботом в экран
+    // смотрит только человек — помеха на нём действует весь раунд, на любом
+    // ходу. Вдвоём за одним телефоном — пока ходит тот, на ком помеха: в
+    // чужой ход экран смотрит второй
+    const viewer = viewerSeat();
+    const at = history.indexOf(h);
     const mine = ownerP === viewer;
-    if (D.fog[viewer] && !mine) return true;
-    if (D.blind[viewer] && mine) return true;
+    if (D.fog[viewer] && !mine && at >= D.fogFrom[viewer]) return true;
+    if (D.blind[viewer] && mine && at >= D.blindFrom[viewer]) return true;
     return false;
+  }
+
+  // Кто сейчас смотрит в экран: в онлайне — хозяин телефона, с ботом —
+  // человек, вдвоём за одним телефоном — тот, чей ход
+  function viewerSeat() {
+    if (online) return online.seat;
+    if (vsBot) return 0;
+    return D.cur;
   }
 
   // Подсказка и градусник показывают положение дел прямо сейчас — то есть
@@ -5441,9 +5459,12 @@
   // последний ход; с вероятностью 0,05 + 0,9·L берёт лучший ход (сначала —
   // такой, что может сразу попасть), иначе любой не хуже 0,85·L от лучшего
   function botCandidates(moves, seat, flags, careless) {
-    let seen = moves.filter(m => !m.timeout && typeof m.guess === 'number' &&
+    // Бот под помехой не видит ходы после неё — как человек. Номер хода — по
+    // исходному списку, до отсева, иначе отметка съедет
+    let seen = moves.filter((m, i) => !m.timeout && typeof m.guess === 'number' &&
                                  m.labelIndex !== null && m.labelIndex !== undefined &&
-                                 !(flags.fog && m.p !== seat) && !(flags.blind && m.p === seat));
+                                 !(flags.fog && m.p !== seat && i >= (flags.fogFrom || 0)) &&
+                                 !(flags.blind && m.p === seat && i >= (flags.blindFrom || 0)));
     const keep = careless ? 1 : (flags.shortMemory ? 2 : seen.length);
     seen = seen.slice(Math.max(0, seen.length - keep));
     const bands = reviewBands(FEEDBACK_META);
@@ -5496,7 +5517,8 @@
     if (D.roundOver || D.matchOver || D.cur !== 1) return;
     if (localForced()) return doForcedTurn(true);
     const moves = history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex, p: h.p, timeout: !!h.timeout }));
-    const flags = { fog: D.fog[1], blind: D.blind[1], shortMemory: D.shortMemory[1] };
+    const flags = { fog: D.fog[1], blind: D.blind[1], shortMemory: D.shortMemory[1],
+                    fogFrom: D.fogFrom[1], blindFrom: D.blindFrom[1] };
     const level = vsBot.bot.level;
     // Жетон: когда осталось два числа, два хода подряд выигрывают наверняка
     if (!D.armed && D.tokens[1] > 0 && history.length > 0) {
@@ -5514,9 +5536,8 @@
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  // Шкала расстояний нужна, пока идёт партия. На итогах она занимает пол-экрана
-  // и отодвигает вниз то, ради чего партия и была — сворачиваем её, а в новом
-  // раунде возвращаем в том виде, в каком её оставил игрок.
+  // Шкала расстояний: в начале каждого раунда — в том виде, в каком её
+  // оставил игрок.
   //
   // Если игрок её не трогал: на телефоне она раскрыта только в первой партии —
   // пока шкалу не видел, она нужна; дальше полэкрана под неё жалко, а раскрыть
@@ -5561,12 +5582,14 @@
     setScaleOpen(scaleWanted());
   }
 
+  // В конце раунда шкалу не сворачиваем: страница от этого укорачивалась и
+  // прыгала вверх. Раскрыта она или нет — решается в начале раунда
   function syncScaleBox() {
     const over = roundOver();
     if (over === scaleCollapsed) return;
     scaleCollapsed = over;
     if (over) countGameDone();
-    setScaleOpen(over ? false : scaleWanted());
+    else setScaleOpen(scaleWanted());
   }
 
   function buildLegend() {

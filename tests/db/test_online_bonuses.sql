@@ -129,9 +129,9 @@ begin
   perform respond_challenge('Кира','4321',mid,true);
   perform set_config('t.b', mid::text, false);
   select * into m from matches where id = mid;
-  -- Лев ходит, потом на Киру кладём туман
-  perform match_guess('Лев','1234',mid, case when m.secret = 1 then 2 else 1 end);
+  -- На Киру кладём туман, потом Лев ходит: ход после тумана Кире закрыт
   update matches set fog = array[false, true] where id = mid;
+  perform match_guess('Лев','1234',mid, case when m.secret = 1 then 2 else 1 end);
   st := match_state('Кира','4321',mid);
   if not ((st -> 'moves' -> 0) ? 'hidden') then
     raise exception 'УТЕЧКА: под туманом чужой ход виден — %', st -> 'moves';

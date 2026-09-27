@@ -1111,9 +1111,24 @@ async function testBonusMode(browser) {
     marks: document.getElementById('peff1').textContent
   }));
   check('«Туман» ложится на соперника', fog.onRival && fog.turn === 1, JSON.stringify(fog));
-  check('чужой ход в истории скрыт', fog.masked.join() === '•••', fog.masked.join());
-  check('подсказка тоже скрыта', fog.panel === false);
+  // Ход, которым туман взяли, сделан до тумана — его соперник уже видел
+  check('ход, которым взяли туман, виден', fog.masked.join() === '40', fog.masked.join());
   check('на карточке соперника виден значок помехи', fog.marks.indexOf('🙈') >= 0, fog.marks);
+  // А следующий чужой ход на его ходу закрыт
+  await page.fill('#guessInput', '10');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(150);
+  await page.fill('#guessInput', '20');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const fog2 = await page.evaluate(() => ({
+    turn: D.cur,
+    masked: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent),
+    panel: !document.getElementById('feedbackPanel').classList.contains('hidden')
+  }));
+  check('чужой ход после тумана в истории скрыт', fog2.turn === 1 && fog2.masked.join() === '•••,10,40',
+    JSON.stringify(fog2));
+  check('подсказка к нему тоже скрыта', fog2.panel === false);
   await done(page);
 
   // Слепой ход — соперник не видит СВОИ ходы, и это до конца раунда
@@ -1715,8 +1730,9 @@ async function testEndOfRound(browser) {
   check('прошлые догадки остались полыми кружками', lost.hollow === 3, 'кружков ' + lost.hollow);
   const lostLabel = await page.locator('#attemptsLabel').textContent();
   check('вместо остатка попыток — сколько ходов ушло', lostLabel.trim() === '4 хода', lostLabel);
-  check('шкала расстояний свернулась на итогах',
-    !(await page.evaluate(() => document.getElementById('scaleBox').open)));
+  // Сворачивать на итогах нельзя: страница укорачивается и прыгает вверх
+  check('шкала расстояний на итогах не сворачивается',
+    await page.evaluate(() => document.getElementById('scaleBox').open));
 
   // Новая игра возвращает шкалу и обычный счётчик
   await page.click('#resultBox .btn');
@@ -4641,7 +4657,7 @@ async function testBots(browser) {
   check('в ход бота за него не сходить и жетон не взвести', stolen.same && !stolen.armed && stolen.cur === 1,
     JSON.stringify(stolen));
 
-  // Помехи в игре с ботом прячут ходы только пока ходит человек
+  // Помехи в игре с ботом прячут ходы весь раунд: в экран смотрит только человек
   const hide = await page.evaluate(() => {
     D.fog[0] = true;
     const botRow = history.find(h => h.p === 1);
@@ -4658,7 +4674,7 @@ async function testBots(browser) {
     D.fog[1] = false;
     return { whileBot, whileMe, botFog };
   });
-  check('туман прячет ходы бота, только пока ходит человек', !hide.whileBot && hide.whileMe, JSON.stringify(hide));
+  check('туман прячет ходы бота и пока ходит бот, и пока человек', hide.whileBot && hide.whileMe, JSON.stringify(hide));
   check('туман на боте не прячет ходы от человека', !hide.botFog, JSON.stringify(hide));
 
   // Отнятый ход бота бот делает сам, кнопку человеку не показывают
@@ -5138,6 +5154,77 @@ async function testQuitConfirm(browser) {
   // Тексты есть на всех языках
   const langs = await page.evaluate(() => Object.keys(i18n).filter(l => !i18n[l].quitAsk || !i18n[l].quitStay || !i18n[l].quitGo));
   check('вопрос переведён на все языки', langs.length === 0, langs.join(','));
+  await page.context().close();
+}
+
+// Туман и слепота с ботом — весь раунд: в экран смотрит только человек
+async function testFogWholeRound(browser) {
+  console.log('\nПомехи с ботом — весь раунд');
+  const page = await newGame(browser);
+  await page.click('.mode-btn.bot');
+  await page.waitForTimeout(150);
+  await page.selectOption('#rangeMax', '100');
+  await page.evaluate(() => { BOT_SPEED = 1000; });   // бот сам не ходит: его ходы делает тест
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => {
+    stopBot();
+    secret = 90; D.cur = 0; history = [];
+    D.bonuses = [{ value: 30, type: 'fog', taken: false }];
+    window.__snd = 0;
+    const orig = soundForGuess;
+    soundForGuess = m => { window.__snd++; orig(m); };
+    renderAll();
+  });
+  const rows = () => page.evaluate(() => ({
+    cur: D.cur, snd: window.__snd,
+    shown: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent)
+  }));
+  const me = async v => {
+    await page.fill('#guessInput', String(v));
+    await page.click('#tSubmitGuess');
+    await page.waitForTimeout(120);
+    await page.evaluate(() => stopBot());
+  };
+  const bot = v => page.evaluate(x => { stopBot(); duelPlay(x); stopBot(); }, v);
+
+  await me(10);
+  await bot(30);                                   // бот взял туман — он лёг на человека
+  let r = await rows();
+  check('бот взял туман: этот ход человеку виден', r.cur === 0 && r.shown.join() === '30,10', JSON.stringify(r));
+  await me(20);
+  await bot(50);                                   // ход после тумана
+  r = await rows();
+  check('ход бота после тумана закрыт на ходу человека', r.cur === 0 && r.shown.join() === '•••,20,30,10', JSON.stringify(r));
+  check('закрытый ход бота не звучит — по звуку не угадать пояс', r.snd === 3, 'звуков ' + r.snd);
+  await me(60);
+  r = await rows();
+  check('и на ходу бота он тоже закрыт', r.cur === 1 && r.shown.join() === '60,•••,20,30', JSON.stringify(r));
+  await bot(90);                                   // бот угадал — раунд окончен, всё открыто
+  r = await rows();
+  check('раунд окончен — ходы открыты', r.shown.includes('50') && !r.shown.includes('•••'), JSON.stringify(r));
+
+  // Туман на боте: ход, которым его взял человек, бот видит, следующие — нет
+  await page.evaluate(() => {
+    nextRound(); stopBot();
+    secret = 90; D.cur = 0; history = [];
+    D.bonuses = [{ value: 40, type: 'fog', taken: false }];
+    renderAll();
+  });
+  await me(40);
+  await bot(70);
+  await me(88);                                    // рядом с ответом: боту бы очень помог
+  const view = await page.evaluate(() => {
+    const moves = history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex, p: h.p, timeout: !!h.timeout }));
+    const flags = { fog: D.fog[1], blind: D.blind[1], shortMemory: D.shortMemory[1],
+                    fogFrom: D.fogFrom[1], blindFrom: D.blindFrom[1] };
+    const got = Array.from(botCandidates(moves, 1, flags, false)).join('');
+    const want = Array.from(botCandidates(moves.slice(0, 2), 1, {}, false)).join('');
+    const all = Array.from(botCandidates(moves, 1, {}, false)).join('');
+    return { fog: D.fog[1], from: D.fogFrom[1], same: got === want, differs: want !== all };
+  });
+  check('бот под туманом видит ход, которым туман взяли, и не видит следующий',
+    view.fog && view.from === 1 && view.same && view.differs, JSON.stringify(view));
   await page.context().close();
 }
 
@@ -5681,6 +5768,7 @@ async function testKeyPage(browser) {
     await testLeagues(browser);
     await testPolish(browser);
     await testQuitConfirm(browser);
+    await testFogWholeRound(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

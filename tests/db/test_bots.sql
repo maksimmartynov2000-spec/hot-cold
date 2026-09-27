@@ -163,7 +163,10 @@ begin
   perform match_guess_core(mid, 1, 60);
   full_c := bot_candidates(mid, 1, false);
 
+  -- Помеха прячет ходы после отметки. Ставим отметку 0 — как если бы туман
+  -- лёг до первого хода: так видно, что закрываются именно чужие ходы
   update matches set fog = array[false, true] where matches.id = mid;
+  update matches set fog_from = array[0, 0] where matches.id = mid;
   v := bot_candidates(mid, 1, false);
   if v is distinct from (select array_agg(x order by x) from generate_series(1, 100) x
                          where feedback_tier(100, abs(x - 27)) = feedback_tier(100, 26)
@@ -173,6 +176,7 @@ begin
   views := views || v::text;
 
   update matches set fog = array[false, false], blind = array[false, true] where matches.id = mid;
+  update matches set blind_from = array[0, 0] where matches.id = mid;
   v := bot_candidates(mid, 1, false);
   if v is distinct from (select array_agg(x order by x) from generate_series(1, 100) x
                          where feedback_tier(100, abs(x - 40)) = feedback_tier(100, 39)
