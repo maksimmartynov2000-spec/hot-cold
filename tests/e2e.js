@@ -43,7 +43,7 @@ window.supabase = {
 };`;
 
 function rebuildDatabase() {
-  execSync('sh ' + path.join(ROOT, 'db', 'run.sh'), { stdio: 'pipe' });
+  execSync('sh ' + path.join(__dirname, 'db', 'run.sh'), { stdio: 'pipe' });
   // Узел работает от root, а сокет пускает по имени системного пользователя:
   // без такой роли подключиться нечем. SQL кладём в файл — в строке для оболочки
   // доллары превращаются в номер процесса
