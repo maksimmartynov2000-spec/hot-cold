@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
 function extract(marker) {
   const a = html.indexOf(marker);
   if (a < 0) throw new Error('не нашёл ' + marker + ' в index.html');

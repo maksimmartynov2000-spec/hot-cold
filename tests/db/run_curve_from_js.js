@@ -2,7 +2,7 @@
 // Функции достаём из index.html, а не из копии рядом: копия разошлась бы молча.
 const fs = require('fs');
 const path = require('path');
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
 
 function grab(start, end) {
   const a = html.indexOf(start);

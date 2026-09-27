@@ -1,14 +1,14 @@
 #!/bin/sh
 # Проверка миграций на настоящем PostgreSQL. База собирается заново каждый раз,
 # иначе прогон видит состояние предыдущего и проверки начинают врать.
-#   sh db/run.sh
+#   sh tests/db/run.sh
 #
 # Миграции берутся из supabase/migrations по порядку номеров — новую сюда
 # вписывать не нужно. Тестовая база стартует с 00_base.sql (состояние после
 # миграции 007) и получает миграции с 008.
 set -e
 DIR=$(cd "$(dirname "$0")" && pwd)
-ROOT=$(dirname "$DIR")
+ROOT=$(dirname "$(dirname "$DIR")")
 MIG="$ROOT/supabase/migrations"
 CHECKS="$ROOT/supabase/checks"
 FIRST=008

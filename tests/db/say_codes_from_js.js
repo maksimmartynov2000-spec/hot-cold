@@ -3,7 +3,7 @@
 // index.html и сверяем с SQL: фразы в матче и быстрые ответы в переписке
 const fs = require('fs');
 const path = require('path');
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
 const pick = name => {
   const m = html.match(new RegExp('const ' + name + ' = (\\[[^\\]]*\\]);'));
   if (!m) throw new Error('не нашёл ' + name + ' в index.html');

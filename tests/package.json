@@ -5,7 +5,8 @@
     "test": "node run.js",
     "offline": "node offline.js",
     "layout": "node layout.js",
-    "e2e": "node e2e.js"
+    "e2e": "node e2e.js",
+    "db": "sh db/run.sh"
   },
   "devDependencies": {
     "playwright": "^1.40.0"
