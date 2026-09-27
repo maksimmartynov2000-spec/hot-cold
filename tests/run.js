@@ -5001,6 +5001,146 @@ async function testLeagues(browser) {
 }
 
 // ------------------------------------------ полировка: жетон, экраны, салют
+// ☰ во время игры без интернета: начатую партию не стирать молча
+async function testQuitConfirm(browser) {
+  console.log('\nВыход из начатой партии');
+  const page = await newGame(browser);
+  const state = () => page.evaluate(() => ({
+    modal: !document.getElementById('quitModal').classList.contains('hidden'),
+    menu: !document.getElementById('screenMode').classList.contains('hidden'),
+    game: !document.getElementById('screenGame').classList.contains('hidden'),
+    n: history.length
+  }));
+  const startSolo = async () => {
+    await page.click('.mode-btn.solo');
+    await page.waitForTimeout(150);
+    await page.selectOption('#rangeMax', '100');
+    await page.click('#tStartMatch');
+    await page.waitForTimeout(200);
+    await page.evaluate(() => { secret = 77; });
+  };
+  const guess = async v => {
+    await page.fill('#guessInput', String(v));
+    await page.click('#tSubmitGuess');
+    await page.waitForTimeout(120);
+  };
+
+  // Тренировка без ходов — терять нечего, выходим сразу
+  await startSolo();
+  await page.click('#tMenu');
+  await page.waitForTimeout(100);
+  let s = await state();
+  check('тренировка без ходов: ☰ выходит сразу', s.menu && !s.modal, JSON.stringify(s));
+
+  // После хода — вопрос; «Продолжить» оставляет партию как была
+  await startSolo();
+  await guess(10);
+  await page.click('#tMenu');
+  await page.waitForTimeout(100);
+  s = await state();
+  const txt = await page.evaluate(() => ({
+    ask: document.getElementById('tQuitAsk').textContent, stay: document.getElementById('tQuitStay').textContent,
+    go: document.getElementById('tQuitGo').textContent, want: [t().quitAsk, t().quitStay, t().quitGo]
+  }));
+  check('тренировка после хода: ☰ сначала спрашивает', s.modal && s.game && !s.menu, JSON.stringify(s));
+  check('в вопросе — текст и обе кнопки на языке игры',
+    !!txt.ask && txt.ask === txt.want[0] && txt.stay === txt.want[1] && txt.go === txt.want[2], JSON.stringify(txt));
+  await page.click('#tQuitStay');
+  await page.waitForTimeout(100);
+  s = await state();
+  check('«Продолжить» — остаёмся в той же партии', !s.modal && s.game && s.n === 1, JSON.stringify(s));
+  await page.click('#tMenu');
+  await page.waitForTimeout(100);
+  await page.click('#tQuitGo');
+  await page.waitForTimeout(150);
+  s = await state();
+  check('«Выйти» — в меню', !s.modal && s.menu, JSON.stringify(s));
+
+  // Выигранная партия — без вопроса
+  await startSolo();
+  await guess(77);
+  await page.click('#tMenu');
+  await page.waitForTimeout(100);
+  s = await state();
+  check('после победы ☰ выходит сразу', s.menu && !s.modal, JSON.stringify(s));
+
+  // Попытки кончились, осталась последняя догадка — партия ещё идёт
+  await startSolo();
+  await guess(10);
+  await page.evaluate(() => { gameOver = true; gameOverType = 'lose_waiting'; renderAll(); });
+  await page.click('#tMenu');
+  await page.waitForTimeout(100);
+  s = await state();
+  check('на последней догадке — тоже вопрос', s.modal, JSON.stringify(s));
+  await page.click('#tQuitGo');
+  await page.waitForTimeout(150);
+
+  // Дуэль: ход сделан — вопрос
+  const startDuel = async wins => {
+    await page.click('.mode-btn.duel');
+    await page.waitForTimeout(150);
+    await page.selectOption('#rangeMax', '100');
+    await page.selectOption('#winsNeeded', wins);
+    await page.click('#tStartMatch');
+    await page.waitForTimeout(200);
+    await page.evaluate(() => { secret = 77; });
+  };
+  await startDuel('3');
+  await page.click('#tMenu');
+  await page.waitForTimeout(100);
+  s = await state();
+  check('дуэль без ходов: ☰ выходит сразу', s.menu && !s.modal, JSON.stringify(s));
+  await startDuel('3');
+  await guess(10);
+  await page.click('#tMenu');
+  await page.waitForTimeout(100);
+  s = await state();
+  check('дуэль после хода: вопрос', s.modal && s.game, JSON.stringify(s));
+  await page.click('#tQuitStay');
+  // Раунд выигран, партия — нет: счёт потерялся бы
+  await guess(77);
+  await page.evaluate(() => { history = []; renderAll(); });
+  await page.click('#tMenu');
+  await page.waitForTimeout(100);
+  s = await state();
+  const sc = await page.evaluate(() => ({ round: D.round, wins: D.wins.slice(), over: D.matchOver }));
+  check('дуэль между раундами при счёте 0:1 — вопрос', s.modal && !sc.over, JSON.stringify({ s, sc }));
+  await page.click('#tQuitGo');
+  await page.waitForTimeout(150);
+  // Партия сыграна — без вопроса
+  await startDuel('1');
+  await guess(77);
+  await page.click('#tMenu');
+  await page.waitForTimeout(100);
+  s = await state();
+  check('дуэль сыграна: ☰ выходит сразу', s.menu && !s.modal, JSON.stringify(s));
+
+  // С ботом: вопрос тот же, после выхода бот не ходит
+  await page.click('.mode-btn.bot');
+  await page.waitForTimeout(150);
+  await page.selectOption('#rangeMax', '100');
+  await page.evaluate(() => { BOT_SPEED = 0; });
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { secret = 77; });
+  await guess(10);
+  await page.waitForTimeout(200);
+  await page.click('#tMenu');
+  await page.waitForTimeout(100);
+  s = await state();
+  check('игра с ботом после хода: вопрос', s.modal, JSON.stringify(s));
+  await page.click('#tQuitGo');
+  await page.waitForTimeout(300);
+  s = await state();
+  const bot = await page.evaluate(() => ({ vsBot, timer: botTimer }));
+  check('после выхода от бота — меню, бот остановлен', s.menu && !bot.vsBot && !bot.timer, JSON.stringify({ s, bot }));
+
+  // Тексты есть на всех языках
+  const langs = await page.evaluate(() => Object.keys(i18n).filter(l => !i18n[l].quitAsk || !i18n[l].quitStay || !i18n[l].quitGo));
+  check('вопрос переведён на все языки', langs.length === 0, langs.join(','));
+  await page.context().close();
+}
+
 async function testPolish(browser) {
   console.log('\nПолировка');
   let page = await newGame(browser);
@@ -5540,6 +5680,7 @@ async function testKeyPage(browser) {
     await testOnlineReview(browser);
     await testLeagues(browser);
     await testPolish(browser);
+    await testQuitConfirm(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
