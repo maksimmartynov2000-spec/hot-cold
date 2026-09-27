@@ -5444,7 +5444,7 @@ async function testTutorial(browser) {
     lockText: document.getElementById('tOnlineLock').classList.contains('hidden') ? '' : document.getElementById('tOnlineLock').textContent
   }));
   let m = await menu();
-  check('новичку — карточка «Обучение · урок 1 из 3»', m.card && m.title === '🎓 Обучение · урок 1 из 3' && m.sub === 'Как читать подсказки',
+  check('новичку — карточка «Обучение · урок 1 из 3»', m.card && m.title === 'Обучение · урок 1 из 3' && m.sub === 'Как читать подсказки',
     JSON.stringify(m));
   check('онлайн и «Испытание» закрыты до уроков 1–2', m.runLocked && m.lockText === '🔒 после уроков 1–2', JSON.stringify(m));
   await page.click('.mode-btn.online');
@@ -5593,7 +5593,7 @@ async function testTutorial(browser) {
   await page.waitForTimeout(600);
   const ap = await page.evaluate(() => document.getElementById('rkApprentice').classList.contains('hidden') ? '' :
     document.getElementById('rkApprentice').textContent);
-  check('на экране рейтинга — сколько партий Ученика осталось', ap === '🎓 Ученик: партий без потери звёзд осталось 7', ap);
+  check('на экране рейтинга — сколько партий Ученика осталось', ap === '🎓 Ученик · без потери звёзд: ещё 7', ap);
   const apRes = await page.evaluate(() => {
     D.roundWinner = 1;
     const box = starsResult({ delta: [0, 1], after: [7, 20] }, 0);
