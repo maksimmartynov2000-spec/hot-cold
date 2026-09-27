@@ -127,6 +127,11 @@ function stubSupabase(opts) {
           }
           if (name === 'list_matches') return { data: window.__matches || [], error: null };
           if (name === 'match_state') return { data: window.__matchState(), error: null };
+          if (name === 'match_review') {
+            window.__reviewCalls = (window.__reviewCalls || 0) + 1;
+            if (window.__reviewError) return { data: null, error: { message: window.__reviewError } };
+            return { data: { id: window.__match.id, moves: window.__matchReview || [] }, error: null };
+          }
           if (name === 'challenge_friend') return { data: 1, error: null };
           if (name === 'respond_challenge') return { data: args.p_accept ? 'active' : 'declined', error: null };
           if (name === 'leave_match') return { data: true, error: null };

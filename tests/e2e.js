@@ -252,6 +252,23 @@ async function registerPlayer(p, name, pin) {
   check('проигравший тоже увидел итог', loserSees.over === true && loserSees.secret === started.secret,
     JSON.stringify(loserSees));
 
+  // Разбор партии: все ходы приходят из базы только теперь, и у обоих одинаковые
+  const dbMoves = +(await db.query("select count(*) from match_moves where match_id = $1 and kind = 'guess'",
+    [match.id])).rows[0].count;
+  const revA = await A.page.evaluate(() => ({ btn: (document.getElementById('reviewBtn') || {}).textContent || '',
+    rv: currentReview() && { n: currentReview().moves.length, acc: currentReview().accuracy } }));
+  const revB = await B.page.evaluate(() => ({ btn: (document.getElementById('reviewBtn') || {}).textContent || '',
+    rv: currentReview() && { n: currentReview().moves.length, acc: currentReview().accuracy } }));
+  check('после партии у обоих кнопка разбора с точностью',
+    /Разбор/.test(revA.btn) && /Разбор/.test(revB.btn), revA.btn + ' / ' + revB.btn);
+  check('разобраны все ходы из базы, у обоих одинаково',
+    revA.rv && revA.rv.n === dbMoves && JSON.stringify(revA.rv) === JSON.stringify(revB.rv),
+    JSON.stringify({ dbMoves, a: revA.rv, b: revB.rv }));
+  await A.page.click('#reviewBtn');
+  await A.page.waitForTimeout(200);
+  check('окно разбора партии открывается', (await A.page.locator('#tReviewTitle').textContent()) === 'Разбор партии');
+  await A.page.click('#tReviewClose');
+
   // ===== Рейтинговый онлайн: очередь, автоматический подбор, сдача по молчанию
   // После дружеской игры кнопка «В меню» возвращает к друзьям
   await A.page.click('.r-actions .btn-ghost');
@@ -491,7 +508,7 @@ async function registerPlayer(p, name, pin) {
     calls.includes('match_guess') && calls.includes('match_state') &&
     calls.includes('send_phrase') && calls.includes('challenge_friend') &&
     calls.includes('join_ranked_queue') && calls.includes('ranked_status') &&
-    calls.includes('elo_leaderboard'),
+    calls.includes('elo_leaderboard') && calls.includes('match_review'),
     [...new Set(calls)].join(', '));
 
   await browser.close();
