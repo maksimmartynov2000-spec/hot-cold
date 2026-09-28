@@ -608,6 +608,15 @@
       white-space: nowrap;
     }
     .chat-head { display: flex; align-items: center; gap: 10px; }
+    .chat-head .chat-more { margin-left: auto; }
+    .rp-reasons { display: flex; gap: 6px; margin: 12px 0 10px; }
+    .rp-reasons button { flex: 1; }
+    .rp-reasons button.on { background: rgba(99, 102, 241, 0.35); border-color: #818cf8; color: #fff; }
+    .rp-note { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 15px;
+               padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.2);
+               background: rgba(255, 255, 255, 0.08); color: #fff; }
+    .rp-note::placeholder { color: rgba(255, 255, 255, 0.45); }
+    .bl-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; }
     .chat-msg { overflow-wrap: anywhere; }
     .chat-compose { display: flex; gap: 8px; margin-top: 10px; }
     .chat-compose input {
@@ -1172,6 +1181,18 @@
     .p-effects { margin-top: 6px; font-size: 15px; letter-spacing: 3px; }
     .p-effects:empty { display: none; }
     .history-item .h-masked { opacity: 0.45; }
+    .mode-btn.tut { border-color: rgba(251, 191, 36, 0.55); background: rgba(251, 191, 36, 0.1); }
+    .mode-btn .m-sub { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); margin-top: 2px; }
+    .mode-btn.locked { opacity: 0.6; }
+    .coach { margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.4;
+             background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.45); color: #fde68a; }
+    .result-box .r-lesson { margin-top: 10px; font-weight: 700; color: #fbbf24; }
+    .bonus-card { text-align: center; }
+    .bonus-card .bc-icon { font-size: 48px; line-height: 1.1; }
+    .bonus-card .bc-title { font-size: 18px; font-weight: 800; margin: 6px 0 4px; }
+    .r-next { margin-top: 10px; font-size: 13px; color: rgba(255, 255, 255, 0.55); text-align: center; }
+    .turn-banner.count { font-size: 1.4em; letter-spacing: 0.02em; }
+    .turn-banner .tb-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); letter-spacing: 0; }
 
     /* Панель отнятого хода живёт на месте поля ввода и выглядит так же
        заметно: этот ход — событие, а не пауза */
@@ -1572,6 +1593,15 @@
       <!-- Два блока по тому, нужен ли интернет: тренировка и игра вдвоём
            целиком работают без сети (их кеширует service worker), испытание
            и игра онлайн без сети не откроются — там вход и общая таблица -->
+      <!-- Обучение для новичка: три коротких урока. Пока не пройдены первые
+           два, онлайн закрыт — как в Hearthstone, где сначала учебные бои -->
+      <button class="mode-btn tut hidden" id="tutCard" onclick="startNextLesson()">
+        <span class="m-icon">🎓</span>
+        <span class="m-text">
+          <span class="m-title" id="tTutTitle"></span>
+          <span class="m-sub" id="tTutSub"></span>
+        </span>
+      </button>
       <div class="mode-group" id="tGroupOffline"></div>
       <button class="mode-btn solo" onclick="openSetup('solo')">
         <span class="m-icon">🎯</span>
@@ -1596,12 +1626,14 @@
         <span class="m-icon">🏆</span>
         <span class="m-text">
           <span class="m-title" id="tModeRun"></span>
+          <span class="m-sub hidden" id="tRunLock"></span>
         </span>
       </button>
       <button class="mode-btn online" onclick="openOnlineEntry()">
         <span class="m-icon">🌐</span>
         <span class="m-text">
           <span class="m-title" id="tModeOnline"></span>
+          <span class="m-sub hidden" id="tOnlineLock"></span>
         </span>
       </button>
     </div>
@@ -1712,6 +1744,9 @@
                каждую: без подписи 🌡️ 📏 💡 непонятны, а место под слова нет -->
           <div class="bar-tip hidden" id="barTip" role="status"></div>
         </div>
+
+        <!-- Подсказка учителя во время урока -->
+        <div class="coach hidden" id="coach" role="status"></div>
 
         <div class="turn-banner hidden" id="turnBanner"></div>
 
@@ -1845,6 +1880,7 @@
         <div class="rk-elo" id="rkElo"></div>
         <div class="rk-stars hidden" id="rkStars"></div>
         <div class="rk-elo-sub" id="rkEloSub"></div>
+        <div class="rk-elo-sub hidden" id="rkApprentice"></div>
       </div>
       <div class="fr-note hidden" id="rkNote"></div>
       <button class="btn btn-block" id="tRkPlay" onclick="startRanked()"></button>
@@ -1949,7 +1985,8 @@
   <!-- ЭКРАН: переписка с одним другом. Текст готовыми фразами — по той же
        причине, что и в матче: читают на разных языках -->
   <div id="screenChat" class="hidden">
-    <div class="screen-title chat-head"><span class="avatar" id="chatFace"></span><span id="chatWho"></span></div>
+    <div class="screen-title chat-head"><span class="avatar" id="chatFace"></span><span id="chatWho"></span>
+      <button class="fr-btn more chat-more" id="chatMore" onclick="openFriendSheet(chatWith, true)">⋯</button></div>
     <div class="fr-note hidden" id="chatNote"></div>
     <div id="chatList" class="chat-list"></div>
     <!-- Вне игры пишут текстом; четыре готовые фразы — для тех, кто печатает
@@ -2107,6 +2144,12 @@
         <div class="fr-note hidden" id="pinNote"></div>
         </div>
         </details>
+        <!-- Кого заблокировал — здесь же и разблокировать. Список грузится,
+             только когда его раскрыли: заходят сюда редко -->
+        <details class="fold pf-fold" id="pfBlockedFold" ontoggle="if (this.open) loadBlocked()">
+        <summary class="fold-head" id="tBlockedHead"></summary>
+        <div class="fold-body" id="pfBlockedList"></div>
+        </details>
       </div>
     </div>
 
@@ -2122,6 +2165,8 @@
 
     <button class="btn-ghost btn-block hidden" id="tSignIn" style="margin-top:14px"
             onclick="signInFromProfile()"></button>
+    <button class="btn-ghost btn-block" id="tTutReplay" style="margin-top:8px"
+            onclick="closeLogoutModal(); startLesson(1)"></button>
 
     <div id="pfLogout">
       <button class="btn-ghost btn-block" id="tLogoutStart" style="margin-top:14px"
@@ -2142,6 +2187,63 @@
 </div>
 
 <!-- Удаление аккаунта: отдельное окно, потому что это навсегда -->
+<!-- Онлайн закрыт, пока не пройдены два урока. Можно пропустить -->
+<div class="modal-backdrop hidden" id="gateModal" onclick="if (event.target === this) closeGate()">
+  <div class="modal-card">
+    <div class="modal-text" id="gateText"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="gateGo" onclick="closeGate(); startNextLesson()"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="gateSkip" onclick="skipTutorial()"></button>
+  </div>
+</div>
+
+<!-- Бонус встретился впервые: карточка, что он делает. Восемь видов бонусов
+     не вываливаются на новичка разом — каждый объясняется, когда появился -->
+<div class="modal-backdrop hidden" id="bonusCard">
+  <div class="modal-card bonus-card">
+    <div class="bc-icon" id="bcIcon"></div>
+    <div class="bc-title" id="bcTitle"></div>
+    <div class="modal-text" id="bcDesc"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="bcOk" onclick="closeBonusCard()"></button>
+  </div>
+</div>
+
+<!-- Друг: всё, что с ним можно сделать, кроме игры -->
+<div class="modal-backdrop hidden" id="friendSheet" onclick="if (event.target === this) closeFriendSheet()">
+  <div class="modal-card">
+    <div class="modal-text" id="fsName"></div>
+    <button class="btn-ghost btn-block" id="fsWrite" onclick="friendSheetDo('write')"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="fsRemove" onclick="friendSheetDo('remove')"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="fsReport" onclick="friendSheetDo('report')"></button>
+    <button class="btn-ghost btn-block danger" style="margin-top:8px" id="fsBlock" onclick="friendSheetDo('block')"></button>
+    <button class="btn btn-block" style="margin-top:14px" id="fsCancel" onclick="closeFriendSheet()"></button>
+  </div>
+</div>
+
+<!-- Жалоба: причина и, если хочется, пара слов. Переписку база приложит сама -->
+<div class="modal-backdrop hidden" id="reportModal">
+  <div class="modal-card">
+    <div class="modal-text" id="rpTitle"></div>
+    <div class="rp-reasons" id="rpReasons"></div>
+    <textarea class="field rp-note" id="rpNote" maxlength="300" rows="3"></textarea>
+    <div class="fr-note hidden" id="rpMsg"></div>
+    <div class="setup-row" style="margin-top:12px">
+      <button class="btn-ghost btn-block" id="rpCancel" onclick="closeReport()"></button>
+      <button class="btn btn-block" id="rpSend" onclick="sendReport()"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Блокировка: сначала вопрос — её не видно заблокированному, и по ошибке
+     человек мог бы потерять друга, не поняв, что случилось -->
+<div class="modal-backdrop hidden" id="blockModal">
+  <div class="modal-card">
+    <div class="modal-text" id="blAsk"></div>
+    <div class="fr-note hidden" id="blMsg"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="blCancel" onclick="closeBlock()"></button>
+    <button class="btn-ghost btn-block danger" style="margin-top:8px" id="blGo" onclick="confirmBlock()"></button>
+  </div>
+</div>
+
 <div class="modal-backdrop hidden" id="deleteModal">
   <div class="modal-card">
     <div class="modal-text" id="tDeleteAsk"></div>
@@ -2157,6 +2259,7 @@
 <script>
   const i18n = {
     en: {
+      tut: {"tutTitle": "Tutorial · lesson {n} of 3", "tutSub": ["How to read the hints", "A duel with a bot", "Bonuses and traps"], "tutLocked": "🔒 after lessons 1–2", "gateText": "🔒 Online opens after two short lessons (about 3 minutes): how to read the hints and how to play against an opponent.", "gateGo": "🎓 Start lesson {n}", "gateSkip": "Skip the tutorial", "coach": {"1": ["🎓 I picked a number from 1 to 20. Type any number and press «Check».", "The hint tells you how close you are: 🔥 hot — near, ❄️ cold — far. Try another number.", "The line under the thermometer keeps all your moves. Look between them — it's faster."], "2": ["🎓 Now a duel with a bot: you take turns. Whoever names the number first wins.", "The bot's moves are hints too: watch its «hot / cold» as well.", "⚡ «+1 move» is a token: two moves in a row. Press it before your move when you're close."], "3": ["🎓 Bonuses 🎁 are hidden on the line. Step on one and it fires: good ones hit the opponent, traps hit you.", "❓ «Something is near» — a bonus is close. Risk it or go around — your call.", "A bonus fired! What it does is on the card. Keep playing."]}, "lessonDone": "🎓 Lesson {n} done!", "lessonOpen": "🔓 Online is open", "tutAllDone": "Tutorial complete! Your 🎓 icon is in the profile.", "lessonNext": "🎓 Lesson {n}", "lessonFinish": "🎓 Done", "tutReplay": "🎓 Replay the tutorial", "bcTitle": "New bonus: {name}", "bcNear": "❓ Something is near", "bcOk": "Got it", "bcDesc": {"extra": "Whoever steps on it gets two «+1 move» tokens. A token gives two moves in a row.", "fog": "Fog falls on the opponent: until the end of the round they can't see the other player's moves.", "blind": "Blindness falls on the opponent: until the end of the round they can't see their own moves.", "lava": "The opponent's next move is thrown into the lava — a random number.", "skip": "A trap: whoever steps on it skips their next turn.", "gift": "A trap: whoever steps on it gives the opponent a «+1 move» token.", "memory": "A trap: whoever steps on it sees only the last two moves until the end of the round.", "near": "A bonus lies a few steps from your number — a good one or a trap. Risk it or go around — your call."}, "lgApprentice": "🎓 Apprentice: no star lost", "rkApprentice": "🎓 Apprentice: {n} more games without losing stars", "tutIconLocked": "Opens after the tutorial"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
       frostLabel: "Frost and Heat", frostHint: "Negative numbers too \u2014 e.g. \u221250 to 50", bonusHint: "Some numbers hide surprises \u2014 a help or a trap",
@@ -2188,6 +2291,7 @@
         errSelf: "You cannot add yourself",
         errDeclined: "The request was declined \u2014 try tomorrow",
         errTooMany: "Too many requests are waiting",
+        errUnavailable: "This player is unavailable", errTooManyReports: "Too many reports today", shWrite: "✉️ Message", shRemove: "Remove from friends", shReport: "⚠️ Report", shBlock: "🚫 Block", shCancel: "Cancel", rpTitle: "Report {name}", rpRude: "Rude", rpSpam: "Spam", rpOther: "Other", rpNote: "What happened? (optional)", rpSend: "Send", rpDone: "Report sent — thank you. The chat will be checked.", blAsk: "Block {name}? {name} won't be able to message you, invite you to play or add you as a friend.", blGo: "Block", blDone: "Done: {name} can't message you any more", blHead: "🚫 Blocked", blUnblock: "Unblock",
         games: "\ud83c\udfae Games", noGames: "No games yet \u2014 challenge a friend",
         stWantsFriend: "Wants to be friends", stInvite: "Invites you to play", stSent: "Challenge sent", stWrite: "Send a message",
         msgForms: ["new", "new"], stTheirTurn: "Their move", stPlay: "Play",
@@ -2206,6 +2310,7 @@
         errInviteGone: "That challenge is gone",
         errNoMatch: "No such game",
         timedOut: "out of time", clockMine: "Your turn: {n}s", clockTheirs: "Their turn: {n}s",
+        waitFor: "⏳ Waiting for {name} — we start when you are both here", lobbyCancel: "cancels in {t}", lobbyGone: "Game cancelled — {name} didn't come", startsIn: "Starting in {n}…", readyBtn: "Ready", readyWait: "✓ Ready — waiting for {name}", nextIn: "Next round in {n}s", oppReady: "✓ {name} is ready", errNotStarted: "The game hasn't started yet", noStars: "⭐ No stars in this game — stars come only from «Play ranked»",
         chBonuses: "Bonuses", chBonusCount: "Bonuses on the board",
         whoPlays: "Recently playing \u2014 add anyone you like",
         nobodyYet: "Nobody else has played yet",
@@ -2216,7 +2321,7 @@
         errTooLong: "Too long \u2014 up to 200 characters", errTextOff: "Text messages will work after the server update",
         chatInvite: "Invite to play",
         chatFriendly: "A friendly game",
-        chatRanked: "Or straight to ranked:",
+        chatRanked: "Or with ranked rules (no stars):",
         chatSent: "Invitation sent",
         errTooFast: "Too often — wait a minute",
         chatBack: "To friends",
@@ -2252,7 +2357,7 @@
         rkAgoDay: "{n} d ago",
         rkAgoNow: "just now",
         rkTop: "Ranked top",
-        lgTop: "Season top", lgSeason: "{m} season \u00b7 {n} days left", lgSeasonLast: "{m} season \u00b7 last day", lgStreak: "win streak", lgFloor: "a floor: you can\u2019t drop below this rank", lgNew: "New league: {l}!", lgUnlock: "Unlocked in your profile: {x}", lgElo: "rating {n}",
+        lgTop: "Season top", lgSeason: "{m} season \u00b7 {n} days left", lgSeasonLast: "{m} season \u00b7 last day", lgStreak: "win streak", lgFloor: "a floor: you can\u2019t drop below this rank", lgNew: "New league: {l}!", lgUnlock: "Unlocked in your profile: {x}",
         rkTopEmpty: "Nobody has played three ranked games yet",
         rkBadge: "ranked",
         rkResume: "A ranked game is already on",
@@ -2382,6 +2487,7 @@
       }
     },
     ru: {
+      tut: {"tutTitle": "Обучение · урок {n} из 3", "tutSub": ["Как читать подсказки", "Дуэль с ботом", "Бонусы и ловушки"], "tutLocked": "🔒 после уроков 1–2", "gateText": "🔒 Онлайн откроется после двух коротких уроков (минуты три): как читать подсказки и как играть против соперника.", "gateGo": "🎓 Начать урок {n}", "gateSkip": "Пропустить обучение", "coach": {"1": ["🎓 Я загадал число от 1 до 20. Введите любое и нажмите «Проверить».", "Подсказка говорит, насколько вы близко: 🔥 горячо — рядом, ❄️ холодно — далеко. Попробуйте другое число.", "Прямая под градусником помнит все ходы. Ищите между ними — так быстрее."], "2": ["🎓 Теперь дуэль с ботом: ходите по очереди. Кто первым назовёт число — выиграл.", "Ход бота — тоже подсказка: смотрите и на его «горячо / холодно».", "⚡ «+1 ход» — жетон: два хода подряд. Нажмите перед ходом, когда число почти найдено."], "3": ["🎓 На прямой спрятаны бонусы 🎁. Наступили — сработал: полезные бьют по сопернику, ловушки — по вам.", "❓ «Рядом что-то есть» — значит, рядом бонус. Рискнуть или обойти — решать вам.", "Сработал бонус! Что он делает — на карточке. Играйте дальше."]}, "lessonDone": "🎓 Урок {n} пройден!", "lessonOpen": "🔓 Онлайн открыт", "tutAllDone": "Обучение пройдено! Иконка 🎓 — в профиле.", "lessonNext": "🎓 Урок {n}", "lessonFinish": "🎓 Готово", "tutReplay": "🎓 Пройти обучение заново", "bcTitle": "Новый бонус: {name}", "bcNear": "❓ Рядом что-то есть", "bcOk": "Понятно", "bcDesc": {"extra": "Кто наступил, получает два жетона «+1 ход». Жетон — два хода подряд.", "fog": "Туман ложится на соперника: до конца раунда он не видит чужих ходов.", "blind": "Слепота ложится на соперника: до конца раунда он не видит своих ходов.", "lava": "Следующий ход соперника уходит в лаву — случайное число.", "skip": "Ловушка: кто наступил, пропускает следующий ход.", "gift": "Ловушка: кто наступил, дарит сопернику жетон «+1 ход».", "memory": "Ловушка: кто наступил, до конца раунда видит только два последних хода.", "near": "В нескольких шагах от вашего числа лежит бонус — полезный или ловушка. Рискнуть или обойти — решать вам."}, "lgApprentice": "🎓 Ученик: звезда не снята", "rkApprentice": "🎓 Ученик · без потери звёзд: ещё {n}", "tutIconLocked": "Откроется после обучения"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
       frostLabel: "Мороз и Жара", frostHint: "Есть и отрицательные числа \u2014 например, от \u221250 до 50", bonusHint: "На некоторых числах спрятаны сюрпризы \u2014 помощь или ловушка",
@@ -2413,6 +2519,7 @@
         errSelf: "Себя добавить нельзя",
         errDeclined: "Заявку отклонили — попробуйте завтра",
         errTooMany: "Слишком много заявок ждёт ответа",
+        errUnavailable: "Игрок недоступен", errTooManyReports: "Слишком много жалоб за сутки", shWrite: "✉️ Написать", shRemove: "Убрать из друзей", shReport: "⚠️ Пожаловаться", shBlock: "🚫 Заблокировать", shCancel: "Отмена", rpTitle: "Пожаловаться: {name}", rpRude: "Грубость", rpSpam: "Спам", rpOther: "Другое", rpNote: "Что случилось? (можно не писать)", rpSend: "Отправить", rpDone: "Жалоба отправлена — спасибо. Переписку посмотрят.", blAsk: "Заблокировать: {name}? {name} не сможет писать вам, звать на игру и добавлять в друзья.", blGo: "Заблокировать", blDone: "Готово: {name} больше не сможет вам писать", blHead: "🚫 Заблокированные", blUnblock: "Разблокировать",
         games: "\ud83c\udfae Игры", noGames: "Игр пока нет — вызовите друга",
         stWantsFriend: "Хочет дружить", stInvite: "Зовёт играть", stSent: "Вызов отправлен", stWrite: "Написать",
         msgForms: ["новое", "новых", "новых"], stTheirTurn: "Ход друга", stPlay: "Играть",
@@ -2431,6 +2538,7 @@
         errInviteGone: "Вызова больше нет",
         errNoMatch: "Такой игры нет",
         timedOut: "время вышло", clockMine: "Ваш ход: {n} с", clockTheirs: "Ход соперника: {n} с",
+        waitFor: "⏳ Ждём {name} — начнём, когда вы оба в игре", lobbyCancel: "отмена через {t}", lobbyGone: "Партия отменена — {name} не пришёл(ла)", startsIn: "Начинаем через {n}…", readyBtn: "Готов", readyWait: "✓ Готов — ждём {name}", nextIn: "Следующий раунд через {n} с", oppReady: "✓ {name} ждёт", errNotStarted: "Партия ещё не началась", noStars: "⭐ Без звёзд: звёзды дают только партии через «Играть на рейтинг»",
         chBonuses: "Бонусы", chBonusCount: "Бонусов на поле",
         whoPlays: "Недавно играли — можно добавить любого",
         nobodyYet: "Пока больше никто не играл",
@@ -2441,7 +2549,7 @@
         errTooLong: "Слишком длинное \u2014 до 200 символов", errTextOff: "Сообщения текстом заработают после обновления сервера",
         chatInvite: "Позвать играть",
         chatFriendly: "Дружеская игра",
-        chatRanked: "Или сразу на рейтинг:",
+        chatRanked: "Или по правилам рейтинга (без звёзд):",
         chatSent: "Вызов отправлен",
         errTooFast: "Слишком часто — подождите минуту",
         chatBack: "К друзьям",
@@ -2477,7 +2585,7 @@
         rkAgoDay: "{n} дн назад",
         rkAgoNow: "только что",
         rkTop: "Топ по рейтингу",
-        lgTop: "Топ сезона", lgSeason: "Сезон: {m} \u00b7 осталось {n} дн.", lgSeasonLast: "Сезон: {m} \u00b7 последний день", lgStreak: "серия побед", lgFloor: "ступень: ниже этого ранга не упасть", lgNew: "Новая лига: {l}!", lgUnlock: "В профиле открыто: {x}", lgElo: "рейтинг {n}",
+        lgTop: "Топ сезона", lgSeason: "Сезон: {m} \u00b7 осталось {n} дн.", lgSeasonLast: "Сезон: {m} \u00b7 последний день", lgStreak: "серия побед", lgFloor: "ступень: ниже этого ранга не упасть", lgNew: "Новая лига: {l}!", lgUnlock: "В профиле открыто: {x}",
         rkTopEmpty: "Пока никто не сыграл трёх рейтинговых игр",
         rkBadge: "рейтинг",
         rkResume: "Рейтинговая игра уже идёт",
@@ -2607,6 +2715,7 @@
       }
     },
     fr: {
+      tut: {"tutTitle": "Tutoriel · leçon {n} sur 3", "tutSub": ["Lire les indices", "Un duel contre un bot", "Bonus et pièges"], "tutLocked": "🔒 après les leçons 1–2", "gateText": "🔒 Le jeu en ligne s'ouvre après deux courtes leçons (environ 3 minutes) : lire les indices et jouer contre un adversaire.", "gateGo": "🎓 Commencer la leçon {n}", "gateSkip": "Passer le tutoriel", "coach": {"1": ["🎓 J'ai choisi un nombre de 1 à 20. Tape un nombre et appuie sur « Vérifier ».", "L'indice dit à quel point tu es proche : 🔥 chaud — tout près, ❄️ froid — loin. Essaie un autre nombre.", "La ligne sous le thermomètre garde tous tes coups. Cherche entre eux — c'est plus rapide."], "2": ["🎓 Maintenant un duel contre un bot : chacun son tour. Le premier qui trouve le nombre gagne.", "Les coups du bot sont aussi des indices : regarde aussi ses « chaud / froid ».", "⚡ « +1 coup » est un jeton : deux coups d'affilée. Appuie avant ton coup quand tu es tout près."], "3": ["🎓 Des bonus 🎁 sont cachés sur la ligne. Marche dessus et il se déclenche : les bons frappent l'adversaire, les pièges te frappent.", "❓ « Quelque chose est proche » — un bonus est tout près. Risquer ou contourner — à toi de voir.", "Un bonus s'est déclenché ! Ce qu'il fait est sur la carte. Continue."]}, "lessonDone": "🎓 Leçon {n} réussie !", "lessonOpen": "🔓 Le jeu en ligne est ouvert", "tutAllDone": "Tutoriel terminé ! Ton icône 🎓 est dans le profil.", "lessonNext": "🎓 Leçon {n}", "lessonFinish": "🎓 Terminé", "tutReplay": "🎓 Refaire le tutoriel", "bcTitle": "Nouveau bonus : {name}", "bcNear": "❓ Quelque chose est proche", "bcOk": "Compris", "bcDesc": {"extra": "Qui marche dessus reçoit deux jetons « +1 coup ». Un jeton donne deux coups d'affilée.", "fog": "Le brouillard tombe sur l'adversaire : jusqu'à la fin de la manche, il ne voit plus les coups de l'autre.", "blind": "La cécité tombe sur l'adversaire : jusqu'à la fin de la manche, il ne voit plus ses propres coups.", "lava": "Le prochain coup de l'adversaire part dans la lave — un nombre au hasard.", "skip": "Un piège : qui marche dessus passe son prochain tour.", "gift": "Un piège : qui marche dessus offre un jeton « +1 coup » à l'adversaire.", "memory": "Un piège : qui marche dessus ne voit que les deux derniers coups jusqu'à la fin de la manche.", "near": "Un bonus se trouve à quelques pas de ton nombre — bon ou piège. Risquer ou contourner — à toi de voir."}, "lgApprentice": "🎓 Apprenti : aucune étoile perdue", "rkApprentice": "🎓 Apprenti · sans perte d'étoiles : encore {n}", "tutIconLocked": "S'ouvre après le tutoriel"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
       frostLabel: "Gel et Chaleur", frostHint: "Aussi des nombres n\u00e9gatifs \u2014 par ex. de \u221250 \u00e0 50", bonusHint: "Certains nombres cachent des surprises \u2014 un coup de pouce ou un pi\u00e8ge",
@@ -2638,6 +2747,7 @@
         errSelf: "Vous ne pouvez pas vous ajouter",
         errDeclined: "La demande a \u00e9t\u00e9 refus\u00e9e \u2014 r\u00e9essayez demain",
         errTooMany: "Trop de demandes en attente",
+        errUnavailable: "Ce joueur n'est pas disponible", errTooManyReports: "Trop de signalements aujourd'hui", shWrite: "✉️ Écrire", shRemove: "Retirer des amis", shReport: "⚠️ Signaler", shBlock: "🚫 Bloquer", shCancel: "Annuler", rpTitle: "Signaler {name}", rpRude: "Grossièreté", rpSpam: "Spam", rpOther: "Autre", rpNote: "Que s'est-il passé ? (facultatif)", rpSend: "Envoyer", rpDone: "Signalement envoyé — merci. La conversation sera vérifiée.", blAsk: "Bloquer {name} ? {name} ne pourra plus vous écrire, vous inviter ni vous ajouter en ami.", blGo: "Bloquer", blDone: "C'est fait : {name} ne peut plus vous écrire", blHead: "🚫 Bloqués", blUnblock: "Débloquer",
         games: "\ud83c\udfae Parties", noGames: "Pas encore de partie \u2014 d\u00e9fiez un ami",
         stWantsFriend: "Veut \u00eatre ton ami", stInvite: "T\u2019invite \u00e0 jouer", stSent: "D\u00e9fi envoy\u00e9", stWrite: "\u00c9crire",
         msgForms: ["nouveau", "nouveaux"], stTheirTurn: "\u00c0 son tour", stPlay: "Jouer",
@@ -2656,6 +2766,7 @@
         errInviteGone: "Ce d\u00e9fi n\u2019existe plus",
         errNoMatch: "Cette partie n\u2019existe pas",
         timedOut: "temps \u00e9coul\u00e9", clockMine: "\u00c0 vous : {n} s", clockTheirs: "Adversaire : {n} s",
+        waitFor: "⏳ On attend {name} — on commence quand vous êtes là tous les deux", lobbyCancel: "annulation dans {t}", lobbyGone: "Partie annulée — {name} n'est pas venu·e", startsIn: "Début dans {n}…", readyBtn: "Prêt", readyWait: "✓ Prêt — on attend {name}", nextIn: "Manche suivante dans {n} s", oppReady: "✓ {name} attend", errNotStarted: "La partie n'a pas encore commencé", noStars: "⭐ Sans étoiles : seules les parties « Jouer classé » en donnent",
         chBonuses: "Bonus", chBonusCount: "Bonus sur le plateau",
         whoPlays: "Ont jou\u00e9 r\u00e9cemment \u2014 ajoutez qui vous voulez",
         nobodyYet: "Personne d\u2019autre n\u2019a encore jou\u00e9",
@@ -2666,7 +2777,7 @@
         errTooLong: "Trop long \u2014 200 caract\u00e8res maximum", errTextOff: "Les messages texte fonctionneront apr\u00e8s la mise \u00e0 jour du serveur",
         chatInvite: "Inviter \u00e0 jouer",
         chatFriendly: "Une partie amicale",
-        chatRanked: "Ou directement en class\u00e9 :",
+        chatRanked: "Ou avec les r\u00e8gles class\u00e9es (sans \u00e9toiles) :",
         chatSent: "Invitation envoy\u00e9e",
         errTooFast: "Trop souvent \u2014 attendez une minute",
         chatBack: "Aux amis",
@@ -2702,7 +2813,7 @@
         rkAgoDay: "il y a {n} j",
         rkAgoNow: "\u00e0 l'instant",
         rkTop: "Classement",
-        lgTop: "Top de la saison", lgSeason: "Saison {m} \u00b7 encore {n} j", lgSeasonLast: "Saison {m} \u00b7 dernier jour", lgStreak: "s\u00e9rie de victoires", lgFloor: "palier : impossible de descendre plus bas", lgNew: "Nouvelle ligue : {l} !", lgUnlock: "D\u00e9bloqu\u00e9 dans le profil : {x}", lgElo: "classement {n}",
+        lgTop: "Top de la saison", lgSeason: "Saison {m} \u00b7 encore {n} j", lgSeasonLast: "Saison {m} \u00b7 dernier jour", lgStreak: "s\u00e9rie de victoires", lgFloor: "palier : impossible de descendre plus bas", lgNew: "Nouvelle ligue : {l} !", lgUnlock: "D\u00e9bloqu\u00e9 dans le profil : {x}",
         rkTopEmpty: "Personne n'a encore jou\u00e9 trois parties class\u00e9es",
         rkBadge: "class\u00e9",
         rkResume: "Une partie class\u00e9e est d\u00e9j\u00e0 en cours",
@@ -2832,6 +2943,7 @@
       }
     },
     de: {
+      tut: {"tutTitle": "Tutorial · Lektion {n} von 3", "tutSub": ["Hinweise lesen", "Ein Duell gegen einen Bot", "Boni und Fallen"], "tutLocked": "🔒 nach den Lektionen 1–2", "gateText": "🔒 Online öffnet sich nach zwei kurzen Lektionen (etwa 3 Minuten): Hinweise lesen und gegen einen Gegner spielen.", "gateGo": "🎓 Lektion {n} starten", "gateSkip": "Tutorial überspringen", "coach": {"1": ["🎓 Ich habe eine Zahl von 1 bis 20 gewählt. Gib eine Zahl ein und drücke „Prüfen“.", "Der Hinweis sagt, wie nah du bist: 🔥 heiß — nah, ❄️ kalt — weit weg. Versuch eine andere Zahl.", "Die Linie unter dem Thermometer merkt sich alle Züge. Such zwischen ihnen — das geht schneller."], "2": ["🎓 Jetzt ein Duell gegen einen Bot: ihr zieht abwechselnd. Wer die Zahl zuerst nennt, gewinnt.", "Die Züge des Bots sind auch Hinweise: achte auch auf sein „heiß / kalt“.", "⚡ „+1 Zug“ ist eine Marke: zwei Züge hintereinander. Drück sie vor deinem Zug, wenn du nah dran bist."], "3": ["🎓 Auf der Linie sind Boni 🎁 versteckt. Tritt darauf und er wirkt: gute treffen den Gegner, Fallen treffen dich.", "❓ „Etwas ist in der Nähe“ — ein Bonus liegt nah. Riskieren oder umgehen — du entscheidest.", "Ein Bonus hat gewirkt! Was er tut, steht auf der Karte. Spiel weiter."]}, "lessonDone": "🎓 Lektion {n} geschafft!", "lessonOpen": "🔓 Online ist offen", "tutAllDone": "Tutorial geschafft! Dein 🎓-Symbol ist im Profil.", "lessonNext": "🎓 Lektion {n}", "lessonFinish": "🎓 Fertig", "tutReplay": "🎓 Tutorial wiederholen", "bcTitle": "Neuer Bonus: {name}", "bcNear": "❓ Etwas ist in der Nähe", "bcOk": "Verstanden", "bcDesc": {"extra": "Wer darauf tritt, bekommt zwei „+1 Zug“-Marken. Eine Marke gibt zwei Züge hintereinander.", "fog": "Nebel legt sich auf den Gegner: bis zum Rundenende sieht er die Züge des anderen nicht.", "blind": "Blindheit legt sich auf den Gegner: bis zum Rundenende sieht er seine eigenen Züge nicht.", "lava": "Der nächste Zug des Gegners fliegt in die Lava — eine zufällige Zahl.", "skip": "Eine Falle: wer darauf tritt, setzt den nächsten Zug aus.", "gift": "Eine Falle: wer darauf tritt, schenkt dem Gegner eine „+1 Zug“-Marke.", "memory": "Eine Falle: wer darauf tritt, sieht bis zum Rundenende nur die letzten zwei Züge.", "near": "Ein paar Schritte von deiner Zahl liegt ein Bonus — gut oder Falle. Riskieren oder umgehen — du entscheidest."}, "lgApprentice": "🎓 Lehrling: kein Stern verloren", "rkApprentice": "🎓 Lehrling · ohne Sternverlust: noch {n}", "tutIconLocked": "Öffnet sich nach dem Tutorial"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
       frostLabel: "Frost und Hitze", frostHint: "Auch negative Zahlen \u2014 z. B. \u221250 bis 50", bonusHint: "Manche Zahlen verstecken \u00dcberraschungen \u2014 Hilfe oder Falle",
@@ -2863,6 +2975,7 @@
         errSelf: "Du kannst dich nicht selbst hinzuf\u00fcgen",
         errDeclined: "Die Anfrage wurde abgelehnt \u2014 versuch es morgen",
         errTooMany: "Zu viele Anfragen warten",
+        errUnavailable: "Spieler nicht verfügbar", errTooManyReports: "Zu viele Meldungen heute", shWrite: "✉️ Schreiben", shRemove: "Aus Freunden entfernen", shReport: "⚠️ Melden", shBlock: "🚫 Blockieren", shCancel: "Abbrechen", rpTitle: "{name} melden", rpRude: "Beleidigung", rpSpam: "Spam", rpOther: "Anderes", rpNote: "Was ist passiert? (optional)", rpSend: "Senden", rpDone: "Meldung gesendet — danke. Der Chat wird geprüft.", blAsk: "{name} blockieren? {name} kann dir dann nicht mehr schreiben, dich nicht einladen und nicht als Freund hinzufügen.", blGo: "Blockieren", blDone: "Erledigt: {name} kann dir nicht mehr schreiben", blHead: "🚫 Blockiert", blUnblock: "Entsperren",
         games: "\ud83c\udfae Partien", noGames: "Noch keine Partie \u2014 fordere einen Freund heraus",
         stWantsFriend: "M\u00f6chte befreundet sein", stInvite: "L\u00e4dt dich zum Spielen ein", stSent: "Herausforderung gesendet", stWrite: "Schreiben",
         msgForms: ["neue", "neue"], stTheirTurn: "Gegen\u00fcber ist dran", stPlay: "Spielen",
@@ -2881,6 +2994,7 @@
         errInviteGone: "Diese Herausforderung gibt es nicht mehr",
         errNoMatch: "Diese Partie gibt es nicht",
         timedOut: "Zeit um", clockMine: "Du: {n} s", clockTheirs: "Gegner: {n} s",
+        waitFor: "⏳ Warten auf {name} — es geht los, wenn ihr beide da seid", lobbyCancel: "Abbruch in {t}", lobbyGone: "Spiel abgebrochen — {name} ist nicht gekommen", startsIn: "Start in {n} …", readyBtn: "Bereit", readyWait: "✓ Bereit — warten auf {name}", nextIn: "Nächste Runde in {n} s", oppReady: "✓ {name} wartet", errNotStarted: "Das Spiel hat noch nicht begonnen", noStars: "⭐ Ohne Sterne: Sterne gibt es nur über „Gewertet spielen“",
         chBonuses: "Boni", chBonusCount: "Boni auf dem Feld",
         whoPlays: "K\u00fcrzlich gespielt \u2014 f\u00fcg hinzu, wen du willst",
         nobodyYet: "Sonst hat noch niemand gespielt",
@@ -2891,7 +3005,7 @@
         errTooLong: "Zu lang \u2014 h\u00f6chstens 200 Zeichen", errTextOff: "Textnachrichten gehen nach dem Server-Update",
         chatInvite: "Zum Spielen einladen",
         chatFriendly: "Ein Freundschaftsspiel",
-        chatRanked: "Oder gleich um Punkte:",
+        chatRanked: "Oder mit Ranglisten-Regeln (ohne Sterne):",
         chatSent: "Einladung gesendet",
         errTooFast: "Zu oft \u2014 warte eine Minute",
         chatBack: "Zu den Freunden",
@@ -2927,7 +3041,7 @@
         rkAgoDay: "vor {n} T",
         rkAgoNow: "gerade eben",
         rkTop: "Ranglisten-Top",
-        lgTop: "Saison-Top", lgSeason: "Saison {m} \u00b7 noch {n} Tage", lgSeasonLast: "Saison {m} \u00b7 letzter Tag", lgStreak: "Siegesserie", lgFloor: "Stufe: tiefer f\u00e4llst du nicht", lgNew: "Neue Liga: {l}!", lgUnlock: "Im Profil freigeschaltet: {x}", lgElo: "Wertung {n}",
+        lgTop: "Saison-Top", lgSeason: "Saison {m} \u00b7 noch {n} Tage", lgSeasonLast: "Saison {m} \u00b7 letzter Tag", lgStreak: "Siegesserie", lgFloor: "Stufe: tiefer f\u00e4llst du nicht", lgNew: "Neue Liga: {l}!", lgUnlock: "Im Profil freigeschaltet: {x}",
         rkTopEmpty: "Noch niemand hat drei Ranglistenpartien gespielt",
         rkBadge: "Rangliste",
         rkResume: "Eine Ranglistenpartie l\u00e4uft schon",
@@ -3533,6 +3647,7 @@
     document.getElementById('tGroupOffline').textContent = L.groupOffline;
     document.getElementById('tGroupOnline').textContent = L.groupOnline;
     document.getElementById('tModeOnline').textContent = L.online.mode;
+    renderTutorialMenu();
     // Значок — как у «🎮 Игры»: разделы экрана подписаны одинаково
     document.getElementById('tLblFindFriend').textContent = '🔍 ' + L.online.find;
     document.getElementById('tFindBtn').textContent = L.online.findBtn;
@@ -3632,6 +3747,7 @@
   }
 
   function quitToMenu() {
+    endLessonMode();
     hideBarTip();
     stopBot();
     vsBot = null;
@@ -3680,6 +3796,7 @@
   // Игра с ботом — та же дуэль: вместо второго имени и форы выбирается бот
   let setupBot = false;
   function openSetup(m, bot) {
+    endLessonMode();
     mode = m;
     setupBot = !!bot && m === 'duel';
     const L = t();
@@ -4180,6 +4297,10 @@
     renderSayBubble();
     syncScaleBox();
     if (duel) renderPlayers();
+    // Сначала итог урока: он отмечает урок пройденным, и подсказка гаснет
+    renderLessonResult();
+    renderCoach();
+    checkBonusCard();
     botTick();
   }
 
@@ -4213,7 +4334,7 @@
   function renderClock() {
     const box = document.getElementById('turnClock');
     if (!box) return;
-    const show = online && !D.roundOver && !D.matchOver && online.deadlineAt;
+    const show = online && !D.roundOver && !D.matchOver && online.deadlineAt && !onlineHold();
     box.classList.toggle('hidden', !show);
     if (!show) return;
     const left = Math.max(0, Math.ceil((online.deadlineAt - Date.now()) / 1000));
@@ -4224,10 +4345,33 @@
     box.classList.toggle('out', left === 0);
   }
 
+  // Раз в четверть секунды: текст ожидания и отсчёты. Отсчёт 3-2-1 кончился —
+  // перерисовываем всё: появляется поле ввода и часы хода
+  let lastHold = null;
+  function renderFlowTick() {
+    const hold = onlineHold();
+    if (hold !== lastHold) { lastHold = hold; renderAll(); return; }
+    if (hold) document.getElementById('turnBanner').innerHTML = holdText();
+    const line = document.getElementById('rNext');
+    if (line) line.innerHTML = nextLineText();
+  }
+
+  // Строка под итогом раунда: сколько до следующего и готов ли соперник
+  function nextLineText() {
+    if (!online || !online.nextAt) return '';
+    const L = t().online;
+    const other = 1 - online.seat;
+    let text = L.nextIn.replace('{n}', secsTo(online.nextAt));
+    if (online.botSeat === null && online.ready[other]) {
+      text += ' · ' + L.oppReady.replace('{name}', escapeHtml(D.names[other]));
+    }
+    return text;
+  }
+
   function startClock() {
     stopClock();
     clockTimer = setInterval(() => {
-      if (online && screen === 'game') { renderClock(); renderSayBubble(); } else stopClock();
+      if (online && screen === 'game') { renderClock(); renderSayBubble(); renderFlowTick(); } else stopClock();
     }, 250);
   }
 
@@ -4504,6 +4648,35 @@
     nlPlay(svg);
   }
 
+  // Партия с человеком ещё не началась: ждём соперника или идёт отсчёт 3-2-1.
+  // Отменённая — тоже не игра: соперник так и не пришёл
+  function onlineHold() {
+    if (!online) return null;
+    if (online.status === 'expired') return 'gone';
+    if (online.lobby) return 'lobby';
+    if (online.startsAt && online.startsAt > Date.now()) return 'count';
+    return null;
+  }
+
+  function secsTo(at) { return Math.max(0, Math.ceil((at - Date.now()) / 1000)); }
+
+  function holdText() {
+    const L = t().online;
+    const other = escapeHtml(D.names[1 - online.seat]);
+    const hold = onlineHold();
+    if (hold === 'gone') return L.lobbyGone.replace('{name}', other);
+    if (hold === 'count') return L.startsIn.replace('{n}', secsTo(online.startsAt)) +
+      (online.ladder ? '' : '<small class="tb-note">' + escapeHtml(L.noStars) + '</small>');
+    let text = L.waitFor.replace('{name}', other);
+    if (online.lobbyEndsAt) {
+      const left = secsTo(online.lobbyEndsAt);
+      text += ' · ' + L.lobbyCancel.replace('{t}', Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'));
+    }
+    // Реванш и вызов друга звёзд не дают — сказать до начала, а не после
+    if (!online.ladder) text += '<small class="tb-note">' + escapeHtml(L.noStars) + '</small>';
+    return text;
+  }
+
   function renderStatus() {
     const L = t();
     const duel = mode === 'duel';
@@ -4517,8 +4690,17 @@
       confirmed.textContent = '';
       attempts.textContent = L.roundLabel + D.round;
       attempts.className = 'attempts';
-      if (D.roundOver) { banner.classList.add('hidden'); }
+      const hold = onlineHold();
+      if (hold) {
+        banner.classList.remove('hidden');
+        banner.innerHTML = holdText();
+        banner.classList.toggle('count', hold === 'count');
+        banner.style.borderColor = 'rgba(255,255,255,0.25)';
+        banner.style.background = 'rgba(255,255,255,0.06)';
+        banner.style.color = '';
+      } else if (D.roundOver) { banner.classList.add('hidden'); }
       else {
+        banner.classList.remove('count');
         banner.classList.remove('hidden');
         banner.textContent = L.turnOf + D.names[D.cur] + (D.armed ? '  ' + L.tokenArmed : '');
         banner.style.borderColor = P_COLORS[D.cur];
@@ -4527,7 +4709,7 @@
       }
       document.getElementById('finalBox').classList.add('hidden');
       document.getElementById('guessSection').classList.toggle('hidden',
-        D.roundOver || !!forcedTurn() || (online && D.cur !== online.seat));
+        D.roundOver || !!forcedTurn() || (online && (D.cur !== online.seat || !!onlineHold())));
     } else {
       banner.classList.add('hidden');
       // Партия кончилась — «осталось попыток» уже ничего не значит и читается
@@ -4630,7 +4812,9 @@
             ? L.online.rkLeftYou
             : L.online.rkLeftThem.replace('{name}', D.names[online.forfeitBy]);
         }
-        if (D.matchOver && online.eloDelta && !starBox) {
+        // Число рейтинга — только если в базе ещё нет лиг. С лигами его
+        // заменяют звёзды, а рейтинг работает на подбор соперника незаметно
+        if (D.matchOver && online.eloDelta && !starBox && !ladderInfo) {
           const d = online.eloDelta[online.seat];
           eloLine = document.createElement('div');
           eloLine.className = 'r-elo';
@@ -4647,6 +4831,15 @@
         }
       }
 
+      // Партия с человеком без звёзд (реванш, вызов друга): иначе кажется,
+      // что звезду не дали по ошибке
+      let noStarsLine = null;
+      if (online && D.matchOver && online.botSeat === null && !online.ladder) {
+        noStarsLine = document.createElement('div');
+        noStarsLine.className = 'r-forfeit';
+        noStarsLine.textContent = L.online.noStars;
+      }
+
       const actions = document.createElement('div');
       actions.className = 'r-actions';
       if (D.matchOver) {
@@ -4659,8 +4852,21 @@
              '<button class="btn-ghost" onclick="backToOnline()">' + L.toMenu + '</button>')
           : '<button class="btn" onclick="newMatch()">' + L.newMatch + '</button>' +
             '<button class="btn-ghost" onclick="quitToMenu()">' + L.toMenu + '</button>';
+      } else if (online && online.botSeat === null) {
+        // С человеком: «Готов». Раунд начнётся, когда готовы оба или выйдет время
+        const mine = online.ready[online.seat];
+        actions.innerHTML = mine
+          ? '<button class="btn" disabled>' + L.online.readyWait.replace('{name}', escapeHtml(D.names[1 - online.seat])) + '</button>'
+          : '<button class="btn" onclick="nextRound()">' + L.online.readyBtn + '</button>';
       } else {
         actions.innerHTML = '<button class="btn" onclick="nextRound()">' + L.nextRound + '</button>';
+      }
+      let nextLine = null;
+      if (online && !D.matchOver && online.nextAt) {
+        nextLine = document.createElement('div');
+        nextLine.className = 'r-next';
+        nextLine.id = 'rNext';
+        nextLine.innerHTML = nextLineText();
       }
       // Причина стоит сразу под заголовком: иначе «выигрывает игру» рядом со
       // счётом 0:0 читается как ошибка, а не как сдача соперника
@@ -4678,8 +4884,10 @@
       if (reviewBtn) box.appendChild(reviewBtn);
       if (starBox) box.appendChild(starBox);
       if (eloLine) box.appendChild(eloLine);
+      if (noStarsLine) box.appendChild(noStarsLine);
       if (sentLine) box.appendChild(sentLine);
       box.appendChild(actions);
+      if (nextLine) box.appendChild(nextLine);
       box.classList.remove('hidden');
       duelCelebrate(starBox);
       return;
@@ -5142,6 +5350,8 @@
     const lines = [];
     if (d === 2) lines.push(L.lgStreak);
     if (d === 0 && after < 150 && after % 15 === 0 && D.roundWinner !== seat) lines.push(L.lgFloor);
+    // Проиграл, а звезда на месте и это не ступень — значит, Ученик
+    else if (d === 0 && after < 150 && D.roundWinner !== seat) lines.push(t().tut.lgApprentice);
     const promoted = ladderPos(after).league > ladderPos(was).league;
     if (promoted) lines.push(L.lgNew.replace('{l}', leagueLabel(after).replace(/ \d+$/, '')));
     const unlock = (stars.unlock || [])[seat];
@@ -5793,6 +6003,10 @@
     // Старый сервер цвета не знает — тогда свой выбор не трогаем
     setMyLook(data.avatar || '', 'color' in data ? (data.color || '') : myColor());
     profileInfo = data;
+    // Обучение прошли, пока не были в аккаунте, — отметить в базе
+    if ('tutorialDone' in data && !data.tutorialDone && tutorialComplete()) {
+      friendRpc('tutorial_finished', {}).then(() => { if (profileInfo) profileInfo.tutorialDone = true; }).catch(() => {});
+    }
     updateAccountChip();
     return data;
   }
@@ -5989,6 +6203,7 @@
       colorsSupported() ? L.run.avatarColorChange : L.run.avatarChange;
     document.getElementById('tRenameStart').textContent = L.run.renameStart;
     document.getElementById('tNamePinHead').textContent = L.run.namePin;
+    document.getElementById('tBlockedHead').textContent = L.online.blHead;
     document.getElementById('tRenameSave').textContent = L.run.save;
     document.getElementById('tRenameCancel').textContent = L.run.cancel;
     document.getElementById('renameInput').placeholder = L.run.renameNew;
@@ -6075,9 +6290,12 @@
       grid.appendChild(sep);
     }
     // Первая клетка — буква: вернуться к ней можно так же, как выбрать иконку
-    ['', ...AVATAR_CHOICES, ...rewardsOf('icon')].forEach(icon => {
+    // Иконка за обучение — когда сервер о ней знает (миграция 037)
+    const tutIcon = profileInfo && 'tutorialDone' in profileInfo ? [TUTORIAL_ICON] : [];
+    ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon].forEach(icon => {
       const b = document.createElement('button');
-      const locked = rewardLeague('icon', icon) > 0 && !rewardOpen('icon', icon);
+      const locked = icon === TUTORIAL_ICON ? !tutorialIconOpen()
+        : rewardLeague('icon', icon) > 0 && !rewardOpen('icon', icon);
       b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '') + (locked ? ' locked' : '');
       b.dataset.icon = icon;
       b.textContent = icon || avatarLetter(me);
@@ -6119,8 +6337,19 @@
   }
 
   // Выбор видно сразу; если сервер не принял — возвращаем прежнюю
+  function tutorialIconOpen() {
+    return !!(profileInfo && profileInfo.tutorialDone) || tutorialComplete();
+  }
+
   async function chooseAvatar(icon) {
     if (lockedNote('icon', icon)) return;
+    if (icon === TUTORIAL_ICON) {
+      if (!tutorialIconOpen()) return setNote('avNote', t().tut.tutIconLocked, true);
+      // Обучение пройдено без входа — сначала сказать базе, иначе иконку не примет
+      if (!(profileInfo && profileInfo.tutorialDone)) {
+        try { await friendRpc('tutorial_finished', {}); if (profileInfo) profileInfo.tutorialDone = true; } catch (e) {}
+      }
+    }
     const before = myAvatar();
     // Выбрал — сетка сворачивается: новая иконка видна в большом кружке
     showAvatarPicker(false);
@@ -6326,16 +6555,19 @@
   }
 
   function openRunEntry() {
+    if (!onlineOpen()) return openLessonGate();
     authReturn = 'runHub';
     if (runAuth()) openRunHub(); else showScreen('authChoice');
   }
 
   function openOnlineEntry() {
+    if (!onlineOpen()) return openLessonGate();
     authReturn = 'online';
     if (runAuth()) openOnline(); else showScreen('authChoice');
   }
 
   function openFriendsEntry() {
+    if (!onlineOpen()) return openLessonGate();
     authReturn = 'friends';
     if (runAuth()) openFriends(); else showScreen('authChoice');
   }
@@ -6619,7 +6851,6 @@
     loadLadder().then(() => { if (screen === 'online') { renderRanked(null); loadEloTop(); } });
   }
 
-  let friendMenuOpen = null;
   // Раскрыт ли поиск, решаем один раз за заход на экран — по первому списку
   // друзей. Дальше решает игрок: опрос каждые 10 секунд его выбор не трогает
   let findDecided = false;
@@ -6627,7 +6858,6 @@
   function openFriends() {
     const auth = runAuth();
     if (!auth) { authReturn = 'friends'; return showScreen('authChoice'); }
-    friendMenuOpen = null;
     friendsData = null;
     friendMatches = [];
     document.getElementById('findBox').open = false;
@@ -6687,6 +6917,8 @@
     if (m.indexOf('recently_cancelled') >= 0) return L.online.errCancelled;
     if (m.indexOf('too_many_requests') >= 0) return L.online.errTooMany;
     if (m.indexOf('no_such_request') >= 0) return L.online.errNoRequest;
+    if (m.indexOf('unavailable') >= 0) return L.online.errUnavailable;
+    if (m.indexOf('too_many_reports') >= 0) return L.online.errTooManyReports;
     return L.run.errServer + m;
   }
 
@@ -6834,15 +7066,9 @@
       // Теперь оно за «⋯»: сначала открыть, потом нажать. Какая строка открыта,
       // помним отдельно: список перерисовывается опросом каждые несколько
       // секунд, и открытое «Убрать» иначе захлопывалось бы под пальцем
-      if (friendMenuOpen === name) {
-        button(L.remove, 'no', () => removeFriend(name));
-      } else {
-        button('⋯', 'more', function () {
-          friendMenuOpen = name;
-          this.remove();
-          button(L.remove, 'no', () => removeFriend(name));
-        });
-      }
+      // Теперь за ним и «Пожаловаться» с «Заблокировать» — трём кнопкам в
+      // строке тесно, поэтому «⋯» открывает окно со всеми действиями
+      button('⋯', 'more', () => openFriendSheet(name, false)).setAttribute('aria-label', L.shCancel);
     } else if (relation === 'outgoing') {
       // Заявку было не забрать назад: отправил не тому — и она висела вечно
       button(L.cancelReq, '', () => cancelFriendRequest(name));
@@ -7136,6 +7362,364 @@
       await loadFriends();
     } catch (e) {
       setNote('friendsNote', friendErrorText(e.message), true);
+    }
+  }
+
+  // ================= ОБУЧЕНИЕ =================
+  // Три урока: подсказки, дуэль с ботом, бонусы. Пока не пройдены первые два,
+  // онлайн закрыт. Кто уже играл до появления обучения, ничего не проходит —
+  // его узнаём по следам прошлых игр в браузере
+  const TUTORIAL_ICON = '🎓';
+  const TUT_KEY = 'hc_tutorial';
+  const SEEN_BONUS_KEY = 'hc_seen_bonus';
+  let lesson = null;   // { n, prev, done } — идёт урок n
+
+  function tutState() {
+    try { return JSON.parse(localStorage.getItem(TUT_KEY)) || { done: [], skipped: false }; }
+    catch (e) { return { done: [], skipped: false }; }
+  }
+  function tutSave(st) {
+    try { localStorage.setItem(TUT_KEY, JSON.stringify(st)); } catch (e) {}
+  }
+  function tutInit() {
+    try {
+      if (localStorage.getItem(TUT_KEY) !== null) return;
+      const quiet = ['hc_lang', 'hc_mute', 'hc_sound', TUT_KEY, SEEN_BONUS_KEY];
+      let veteran = false;
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf('hc_') === 0 && quiet.indexOf(k) < 0) veteran = true;
+      }
+      tutSave({ done: [], skipped: veteran, veteran: veteran });
+      // Старые игроки бонусы уже видели: карточки им ни к чему
+      if (veteran) localStorage.setItem(SEEN_BONUS_KEY, JSON.stringify(BONUS_TYPES.concat(['near'])));
+    } catch (e) {}
+  }
+  function onlineOpen() {
+    const st = tutState();
+    return st.skipped || (st.done.indexOf(1) >= 0 && st.done.indexOf(2) >= 0);
+  }
+  function tutorialComplete() { return tutState().done.length >= 3; }
+  function nextLessonNo() {
+    const done = tutState().done;
+    return [1, 2, 3].find(n => done.indexOf(n) < 0) || 1;
+  }
+
+  function renderTutorialMenu() {
+    const T = t().tut;
+    const st = tutState();
+    const show = !st.skipped && st.done.length < 3;
+    const card = document.getElementById('tutCard');
+    card.classList.toggle('hidden', !show);
+    if (show) {
+      const n = nextLessonNo();
+      document.getElementById('tTutTitle').textContent = T.tutTitle.replace('{n}', n);
+      document.getElementById('tTutSub').textContent = T.tutSub[n - 1];
+    }
+    const locked = !onlineOpen();
+    ['run', 'online'].forEach(k => {
+      document.querySelector('.mode-btn.' + k).classList.toggle('locked', locked);
+      const sub = document.getElementById(k === 'run' ? 'tRunLock' : 'tOnlineLock');
+      sub.textContent = T.tutLocked;
+      sub.classList.toggle('hidden', !locked);
+    });
+    document.getElementById('tTutReplay').textContent = T.tutReplay;
+  }
+
+  function openLessonGate() {
+    const T = t().tut;
+    document.getElementById('gateText').textContent = T.gateText;
+    document.getElementById('gateGo').textContent = T.gateGo.replace('{n}', nextLessonNo());
+    document.getElementById('gateSkip').textContent = T.gateSkip;
+    document.getElementById('gateModal').classList.remove('hidden');
+  }
+  function closeGate() { document.getElementById('gateModal').classList.add('hidden'); }
+  function skipTutorial() {
+    const st = tutState();
+    st.skipped = true;
+    tutSave(st);
+    closeGate();
+    renderTutorialMenu();
+  }
+
+  // Урок идёт обычной игрой с заданными условиями. Настройки игрока (бонусы,
+  // мороз, число бонусов) урок не трогает: берёт на время и возвращает
+  function startLesson(n) {
+    if (lesson) endLessonMode();
+    lesson = { n: n, done: false, prev: { bonusMode, bonusCountChoice, frostMode } };
+    frostMode = false;
+    stopBot();
+    vsBot = null;
+    if (n === 1) {
+      mode = 'solo';
+      applyBounds(20);
+      MAX_GUESSES = minAttempts(rangeCount()) + 3;
+      applyRangeToInputs();
+      startSolo();
+      return;
+    }
+    const L = t();
+    mode = 'duel';
+    setupBot = true;
+    bonusMode = n === 3;
+    bonusCountChoice = n === 3 ? 5 : 0;
+    applyBounds(50);
+    applyRangeToInputs();
+    // Черепаха — самый мягкий соперник: урок про правила, а не про победу
+    vsBot = { bot: BOTS[0] };
+    D.names[0] = myName() || L.you;
+    D.names[1] = botName(vsBot.bot);
+    D.winsNeeded = 1;
+    D.handicap = 0;
+    D.wins = [0, 0];
+    D.round = 1;
+    D.matchOver = false;
+    D.starter = 0;
+    startRound();
+    applyTranslations();
+    showScreen('game');
+  }
+
+  function startNextLesson() { startLesson(nextLessonNo()); }
+
+  function endLessonMode() {
+    if (!lesson) return;
+    bonusMode = lesson.prev.bonusMode;
+    bonusCountChoice = lesson.prev.bonusCountChoice;
+    frostMode = lesson.prev.frostMode;
+    lesson = null;
+  }
+
+  function lessonFinished() {
+    if (!lesson) return false;
+    if (lesson.n === 1) return gameOverType === 'win' || gameOverType === 'lose';
+    return D.matchOver;
+  }
+
+  function finishLesson() {
+    lesson.done = true;
+    const st = tutState();
+    if (st.done.indexOf(lesson.n) < 0) st.done.push(lesson.n);
+    st.done.sort();
+    tutSave(st);
+    // Всё пройдено — база откроет иконку. Без входа отметим при входе
+    if (st.done.length >= 3 && runAuth()) friendRpc('tutorial_finished', {}).then(() => {
+      if (profileInfo) profileInfo.tutorialDone = true;
+    }).catch(() => {});
+  }
+
+  // Подсказка урока — по тому, что сейчас на доске
+  function coachStep() {
+    const n = lesson.n;
+    const mine = history.filter(h => h.p === 0 || h.p === null).length;
+    if (n === 1) return Math.min(history.length, 2);
+    if (n === 2) {
+      if (!mine) return 0;
+      return mine >= 2 && D.tokens[0] > 0 ? 2 : 1;
+    }
+    if (D.bonuses.some(b => b.taken)) return 2;
+    return D.nearBonus ? 1 : 0;
+  }
+
+  function renderCoach() {
+    const box = document.getElementById('coach');
+    const show = !!lesson && !lesson.done;
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    box.textContent = t().tut.coach[lesson.n][coachStep()];
+  }
+
+  // Конец урока: вместо «Новая игра» — следующий урок
+  function renderLessonResult() {
+    if (!lesson || !lessonFinished()) return;
+    if (!lesson.done) finishLesson();
+    const box = document.getElementById('resultBox');
+    const actions = box.querySelector('.r-actions');
+    if (!actions || box.querySelector('.r-lesson')) return;
+    const T = t().tut;
+    const line = document.createElement('div');
+    line.className = 'r-lesson';
+    const parts = [T.lessonDone.replace('{n}', lesson.n)];
+    if (lesson.n === 2 && onlineOpen()) parts.push(T.lessonOpen);
+    if (tutorialComplete() && lesson.n === 3) parts.push(T.tutAllDone);
+    line.textContent = parts.join(' · ');
+    box.insertBefore(line, actions);
+    const next = lesson.n < 3 ? lesson.n + 1 : null;
+    actions.innerHTML = (next
+      ? '<button class="btn" onclick="startLesson(' + next + ')">' + T.lessonNext.replace('{n}', next) + '</button>'
+      : '<button class="btn" onclick="quitToMenu()">' + T.lessonFinish + '</button>') +
+      (next ? '<button class="btn-ghost" onclick="quitToMenu()">' + t().toMenu + '</button>' : '');
+  }
+
+  // ---------- Карточки бонусов ----------
+  const BONUS_ICON = { extra: '⚡', fog: '🙈', blind: '🌫️', lava: '🌋', skip: '⏭', gift: '🎁', memory: '🧠', near: '❓' };
+  let bonusCardFor = null;
+  function seenBonuses() {
+    try { return JSON.parse(localStorage.getItem(SEEN_BONUS_KEY)) || []; } catch (e) { return []; }
+  }
+  function checkBonusCard() {
+    if (mode !== 'duel' || screen !== 'game' || bonusCardFor) return;
+    const kind = D.lastBonus && BONUS_ICON[D.lastBonus] ? D.lastBonus : (D.nearBonus ? 'near' : null);
+    if (!kind) return;
+    const seen = seenBonuses();
+    if (seen.indexOf(kind) >= 0) return;
+    seen.push(kind);
+    try { localStorage.setItem(SEEN_BONUS_KEY, JSON.stringify(seen)); } catch (e) {}
+    const T = t().tut;
+    bonusCardFor = kind;
+    document.getElementById('bcIcon').textContent = BONUS_ICON[kind];
+    document.getElementById('bcTitle').textContent = kind === 'near' ? T.bcNear
+      : T.bcTitle.replace('{name}', t().bonusNames[kind]);
+    document.getElementById('bcDesc').textContent = T.bcDesc[kind];
+    document.getElementById('bcOk').textContent = T.bcOk;
+    document.getElementById('bonusCard').classList.remove('hidden');
+  }
+  function closeBonusCard() {
+    bonusCardFor = null;
+    document.getElementById('bonusCard').classList.add('hidden');
+  }
+
+  // ================= ЖАЛОБА И БЛОКИРОВКА =================
+  let sheetFor = null;
+  let reportReason = null;
+
+  function openFriendSheet(name, fromChat) {
+    if (!name) return;
+    sheetFor = name;
+    const L = t().online;
+    const row = (friendsData || []).find(r => r.username === name);
+    document.getElementById('fsName').textContent = playerName(name);
+    document.getElementById('fsWrite').textContent = L.shWrite;
+    document.getElementById('fsRemove').textContent = L.shRemove;
+    document.getElementById('fsReport').textContent = L.shReport;
+    document.getElementById('fsBlock').textContent = L.shBlock;
+    document.getElementById('fsCancel').textContent = L.shCancel;
+    // Из переписки «Написать» некуда: она уже открыта
+    document.getElementById('fsWrite').classList.toggle('hidden', !!fromChat);
+    document.getElementById('fsRemove').classList.toggle('hidden', !!(row && row.relation !== 'friend'));
+    document.getElementById('friendSheet').classList.remove('hidden');
+  }
+
+  function closeFriendSheet() {
+    document.getElementById('friendSheet').classList.add('hidden');
+  }
+
+  function friendSheetDo(what) {
+    const name = sheetFor;
+    closeFriendSheet();
+    if (what === 'write') return openChat(name);
+    if (what === 'remove') return removeFriend(name);
+    if (what === 'report') return openReport(name);
+    if (what === 'block') return openBlock(name);
+  }
+
+  function openReport(name) {
+    sheetFor = name;
+    reportReason = null;
+    const L = t().online;
+    document.getElementById('rpTitle').textContent = L.rpTitle.replace('{name}', playerName(name));
+    const box = document.getElementById('rpReasons');
+    box.innerHTML = '';
+    [['rude', L.rpRude], ['spam', L.rpSpam], ['other', L.rpOther]].forEach(([code, label]) => {
+      const b = document.createElement('button');
+      b.className = 'btn-ghost';
+      b.dataset.reason = code;
+      b.textContent = label;
+      b.onclick = () => {
+        reportReason = code;
+        box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+        document.getElementById('rpSend').disabled = false;
+      };
+      box.appendChild(b);
+    });
+    const note = document.getElementById('rpNote');
+    note.value = '';
+    note.placeholder = L.rpNote;
+    document.getElementById('rpCancel').textContent = L.shCancel;
+    document.getElementById('rpSend').textContent = L.rpSend;
+    // Без причины отправить нельзя: жалоба «ни о чём» ничего не скажет
+    document.getElementById('rpSend').disabled = true;
+    setNote('rpMsg', '');
+    document.getElementById('reportModal').classList.remove('hidden');
+  }
+
+  function closeReport() {
+    document.getElementById('reportModal').classList.add('hidden');
+  }
+
+  async function sendReport() {
+    if (!reportReason) return;
+    const name = sheetFor;
+    try {
+      await friendRpc('report_player', { p_who: name, p_reason: reportReason,
+                                         p_note: document.getElementById('rpNote').value });
+      closeReport();
+      const L = t().online;
+      setNote(screen === 'chat' ? 'chatNote' : 'friendsNote', L.rpDone);
+    } catch (e) {
+      setNote('rpMsg', friendErrorText(e.message), true);
+    }
+  }
+
+  function openBlock(name) {
+    sheetFor = name;
+    const L = t().online;
+    document.getElementById('blAsk').textContent = L.blAsk.split('{name}').join(playerName(name));
+    document.getElementById('blCancel').textContent = L.shCancel;
+    document.getElementById('blGo').textContent = L.blGo;
+    setNote('blMsg', '');
+    document.getElementById('blockModal').classList.remove('hidden');
+  }
+
+  function closeBlock() {
+    document.getElementById('blockModal').classList.add('hidden');
+  }
+
+  async function confirmBlock() {
+    const name = sheetFor;
+    try {
+      await friendRpc('block_player', { p_who: name });
+      closeBlock();
+      // Из переписки с заблокированным уходим: писать туда больше нельзя
+      if (screen === 'chat') openFriends(); else await loadFriends();
+      setNote('friendsNote', t().online.blDone.replace('{name}', playerName(name)));
+    } catch (e) {
+      setNote('blMsg', friendErrorText(e.message), true);
+    }
+  }
+
+  async function loadBlocked() {
+    const box = document.getElementById('pfBlockedList');
+    const L = t().online;
+    try {
+      const rows = await friendRpc('blocked_players', {}) || [];
+      box.innerHTML = '';
+      if (!rows.length) {
+        box.innerHTML = '<div class="fr-note">—</div>';
+        return;
+      }
+      rows.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'bl-row';
+        const who = document.createElement('span');
+        who.textContent = playerName(r.username);
+        const b = document.createElement('button');
+        b.className = 'fr-btn';
+        b.textContent = L.blUnblock;
+        b.onclick = async () => {
+          try { await friendRpc('unblock_player', { p_who: r.username }); } catch (e) {}
+          loadBlocked();
+        };
+        row.appendChild(who);
+        row.appendChild(b);
+        box.appendChild(row);
+      });
+    } catch (e) {
+      box.innerHTML = '';
+      const n = document.createElement('div');
+      n.className = 'fr-note bad';
+      n.textContent = friendErrorText(e.message);
+      box.appendChild(n);
     }
   }
 
@@ -7630,11 +8214,17 @@
       // ниже его заменяют звёзды, а рейтинг работает на подбор соперника
       const p = ladderPos(ladderInfo.stars);
       elo.textContent = leagueLabel(ladderInfo.stars);
-      starsEl.textContent = p.legend ? (mine ? L.lgElo.replace('{n}', formatNum(mine.elo)) : '') : starsLine(ladderInfo.stars);
+      // Число рейтинга не показываем и Легенде: лестница — лиги и звёзды
+      starsEl.textContent = p.legend ? '' : starsLine(ladderInfo.stars);
       const days = Math.floor((ladderInfo.endsIn || 0) / 86400);
       const month = seasonMonth(ladderInfo.season);
       document.getElementById('rkEloSub').textContent = days > 0
         ? L.lgSeason.replace('{m}', month).replace('{n}', days) : L.lgSeasonLast.replace('{m}', month);
+      // Ученик: первые партии без потери звёзд — сказать, сколько ещё
+      const left = ladderInfo.apprentice || 0;
+      const ap = document.getElementById('rkApprentice');
+      ap.textContent = t().tut.rkApprentice.replace('{n}', left);
+      ap.classList.toggle('hidden', !(left > 0));
     } else {
       elo.textContent = mine ? formatNum(mine.elo) : '—';
       document.getElementById('rkEloSub').textContent = mine
@@ -7807,6 +8397,7 @@
     if (m.indexOf('no_such_match') >= 0) return L.online.errNoMatch;
     if (m.indexOf('not_playing') >= 0) return L.online.errNotPlaying;
     if (m.indexOf('too_fast') >= 0) return L.online.errTooFast;
+    if (m.indexOf('not_started') >= 0) return L.online.errNotStarted;
     if (m.indexOf('bad_phrase') >= 0) return L.online.errNoMatch;
     return friendErrorText(m);
   }
@@ -7822,6 +8413,16 @@
     online.eloDelta = st.eloDelta || null;
     online.elo = st.elo;
     online.botSeat = (st.botSeat === null || st.botSeat === undefined) ? null : st.botSeat;
+    // Начало партии и перерыв: сервер присылает остаток секунд, дальше
+    // отсчитывает браузер — как часы хода
+    const at = n => (n === null || n === undefined) ? null : Date.now() + n * 1000;
+    online.lobby = !!st.lobby;
+    online.lobbyEndsAt = at(st.lobbyLeft);
+    online.startsAt = at(st.startsIn);
+    online.nextAt = at(st.nextIn);
+    online.ready = (st.ready || [false, false]).slice();
+    // Без поля (база до миграции 035) считаем, что звёзды есть: так было
+    online.ladder = st.ladder === undefined ? true : !!st.ladder;
     mode = 'duel';
     RANGE_MIN = st.rangeMin;
     RANGE_MAX = st.rangeMax;
@@ -7957,6 +8558,7 @@
   }
 
   async function onlineNextRound() {
+    if (online.ready) { online.ready[online.seat] = true; renderAll(); }
     try {
       await friendRpc('next_match_round', { p_match_id: online.id });
       await refreshMatch();
@@ -8401,6 +9003,7 @@
   // или смена размера окна требуют пересчёта
   window.addEventListener('resize', () => { if (screen === 'game') renderNumberLine(); });
 
+  tutInit();
   initScaleBox();
   document.getElementById('langSwitcher').value = currentLang;
   document.getElementById('winsNeeded').value = '3';

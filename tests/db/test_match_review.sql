@@ -51,7 +51,8 @@ begin
   update matches set secret = 30 where matches.id = mid;
   perform match_guess('Лев', '1234', mid, 50);   -- раунд 1
   perform match_guess('Кира', '4321', mid, 30);
-  perform next_match_round('Лев', '1234', mid);    -- раунд 2, начинает Кира
+  perform next_match_round('Лев', '1234', mid);    -- оба «Готов» — раунд 2, начинает Кира
+  perform next_match_round('Кира', '4321', mid);
   update matches set secret = 70 where matches.id = mid;
   perform match_guess('Кира', '4321', mid, 10);
   perform match_guess('Лев', '1234', mid, 60);

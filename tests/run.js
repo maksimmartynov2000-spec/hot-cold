@@ -58,7 +58,8 @@ async function testModes(browser) {
   ]);
   check('в меню пять режимов с названиями', names.every(n => n && n.trim()), names.join(' / '));
   check('карточек в меню тоже пять',
-    await page.evaluate(() => document.querySelectorAll('#screenMode .mode-btn').length) === 5);
+    // Карточка обучения видна только новичку — здесь её нет
+    await page.evaluate(() => document.querySelectorAll('#screenMode .mode-btn:not(.hidden)').length) === 5);
 
   // Тренировка
   await page.click('#tModeSolo');
@@ -2295,10 +2296,17 @@ async function testFriends(browser) {
     search.rows[1].btns.join() === 'Вызвать,⋯', JSON.stringify(search.rows[1]));
   await page.click('#searchResults .friend-row:nth-child(2) .fr-btn.more');
   await page.waitForTimeout(150);
-  const more = await page.evaluate(() =>
-    [...document.querySelectorAll('#searchResults .friend-row:nth-child(2) .fr-btn')].map(b => b.textContent));
-  check('«⋯» открывает «Убрать»', more.join() === 'Вызвать,Убрать', more.join());
-  await page.click('#searchResults .friend-row:nth-child(2) .fr-btn.no');
+  // «⋯» открывает окно со всеми действиями: рядом с «Убрать» теперь
+  // «Пожаловаться» и «Заблокировать», в строке им тесно
+  const more = await page.evaluate(() => ({
+    open: !document.getElementById('friendSheet').classList.contains('hidden'),
+    name: document.getElementById('fsName').textContent,
+    btns: [...document.querySelectorAll('#friendSheet button')].filter(b => !b.classList.contains('hidden')).map(b => b.textContent)
+  }));
+  check('«⋯» открывает окно: написать, убрать, пожаловаться, заблокировать',
+    more.open && more.name.includes('Ким') &&
+    more.btns.join() === '✉️ Написать,Убрать из друзей,⚠️ Пожаловаться,🚫 Заблокировать,Отмена', JSON.stringify(more));
+  await page.click('#fsRemove');
   await page.waitForTimeout(300);
   const removed = await page.evaluate(() =>
     (window.__rpcCalls.filter(c => c.name === 'remove_friend').pop() || {}).args);
@@ -2854,7 +2862,7 @@ async function testRanked(browser) {
     ranked: !document.getElementById('screenOnline').classList.contains('hidden'),
     friends: !document.getElementById('screenFriends').classList.contains('hidden'),
     tabs: document.querySelectorAll('.ol-tab').length,
-    menu: [...document.querySelectorAll('#screenMode .m-title')].map(e => e.textContent),
+    menu: [...document.querySelectorAll('#screenMode .mode-btn:not(.hidden) .m-title')].map(e => e.textContent),
     hdr: !document.getElementById('friendsBtn').classList.contains('hidden')
   }));
   check('«Игра онлайн» ведёт сразу на рейтинг', split.ranked && !split.friends);
@@ -3690,9 +3698,10 @@ async function testNewLook(browser) {
   // Главное меню: у каждого режима значок. Строки-пояснения под названиями
   // убраны по просьбе — названий и блоков «без интернета / нужен интернет» хватает
   const menu = await page.evaluate(() =>
-    [...document.querySelectorAll('#screenMode .mode-btn')].map(b => ({
+    [...document.querySelectorAll('#screenMode .mode-btn:not(.hidden)')].map(b => ({
       icon: (b.querySelector('.m-icon') || {}).textContent || '',
-      subs: b.querySelectorAll('.m-sub').length
+      // «🔒 после уроков» бывает только у новичка — у остальных она скрыта
+      subs: b.querySelectorAll('.m-sub:not(.hidden)').length
     })));
   check('у каждого режима есть значок', menu.every(m => m.icon.trim().length > 0),
     menu.map(m => m.icon).join(' '));
@@ -3707,7 +3716,7 @@ async function testNewLook(browser) {
 
   // Два блока по тому, нужен ли интернет: подпись стоит перед своими режимами
   const groups = await page.evaluate(() => {
-    const kids = [...document.querySelector('#screenMode .mode-list').children];
+    const kids = [...document.querySelector('#screenMode .mode-list').children].filter(k => !k.classList.contains('hidden'));
     return kids.map(k => k.classList.contains('mode-group') ? 'G:' + k.textContent
                                                             : k.className.replace('mode-btn ', ''));
   });
@@ -3799,14 +3808,17 @@ async function testNewLook(browser) {
   check('у удалённого игрока — знак вопроса, а не буква служебного имени',
     order.avatars['#7'] === '?', JSON.stringify(order.avatars));
 
-  // Открытое «Убрать» не должно захлопываться, пока список обновляется опросом
+  // Открытое окно «⋯» не должно захлопываться, пока список обновляется опросом
   await page.click('#friendsList .friend-row[data-name="Аня"] .fr-btn.more');
   await page.waitForTimeout(100);
   await page.evaluate(() => loadFriends(true));
   await page.waitForTimeout(300);
-  const stillOpen = await page.evaluate(() =>
-    [...document.querySelectorAll('#friendsList .friend-row[data-name="Аня"] .fr-btn')].map(b => b.textContent));
-  check('открытое «Убрать» переживает обновление списка', stillOpen.join() === 'Вызвать,Убрать', stillOpen.join());
+  const stillOpen = await page.evaluate(() => ({
+    open: !document.getElementById('friendSheet').classList.contains('hidden'),
+    name: document.getElementById('fsName').textContent }));
+  check('открытое окно «⋯» переживает обновление списка', stillOpen.open && stillOpen.name.includes('Аня'),
+    JSON.stringify(stillOpen));
+  await page.evaluate(() => closeFriendSheet());
   await done(page);
 
   // Дуэль на телефоне: ничего не вылезает за карточку, поле ввода — на экране.
@@ -4919,8 +4931,9 @@ async function testLeagues(browser) {
              stars: document.getElementById('rkStars').textContent.replace(/\s/g, ' '),
              sub: document.getElementById('rkEloSub').textContent };
   });
-  check('Легенде видно число рейтинга; в последний день — «последний день»',
-    legend.elo === '👑 Легенда' && legend.stars === 'рейтинг 1 000' && /последний день/.test(legend.sub), JSON.stringify(legend));
+  // Число рейтинга не показываем никому: лестница — лиги и звёзды
+  check('Легенде — только лига, без числа рейтинга; в последний день — «последний день»',
+    legend.elo === '👑 Легенда' && legend.stars === '' && /последний день/.test(legend.sub), JSON.stringify(legend));
   const calls = await page.evaluate(() => window.__ladderCalls);
   await page.evaluate(() => loadRanked(true));
   check('лестница не спрашивается на каждом опросе', await page.evaluate(n => window.__ladderCalls === n, calls));
@@ -4963,10 +4976,17 @@ async function testLeagues(browser) {
   await page.evaluate(() => { window.__match.forfeitBy = null; window.__matchStars = null; });
   const noStars = await page.evaluate(() => {
     window.__match.id += 1;
+    // Реванш с человеком: бота нет, звёзд нет
+    Object.assign(window.__match, { ladder: false, botSeat: null, names: ['Максим', 'Кира'] });
     return openMatch(window.__match.id);
   }).then(() => page.waitForTimeout(400)).then(() => page.evaluate(() => ({
-    stars: !!document.querySelector('#resultBox .r-stars'), elo: !!document.querySelector('#resultBox .r-elo') })));
-  check('партия без звёзд (друг на рейтинг) — прежняя строка рейтинга', !noStars.stars && noStars.elo, JSON.stringify(noStars));
+    stars: !!document.querySelector('#resultBox .r-stars'), elo: !!document.querySelector('#resultBox .r-elo'),
+    note: [...document.querySelectorAll('#resultBox .r-forfeit')].map(e => e.textContent).join('|') })));
+  // Реванш с человеком звёзд не даёт — и игра говорит об этом, а не
+  // показывает вместо звёзд число рейтинга
+  check('партия без звёзд (реванш) — «без звёзд», числа рейтинга нет',
+    !noStars.stars && !noStars.elo && noStars.note.includes('Без звёзд'), JSON.stringify(noStars));
+  await page.evaluate(() => { delete window.__match.ladder; });
   await done(page);
 
   // Профиль: лига, значки сезонов, награды под замком
@@ -5225,6 +5245,361 @@ async function testFogWholeRound(browser) {
   });
   check('бот под туманом видит ход, которым туман взяли, и не видит следующий',
     view.fog && view.from === 1 && view.same && view.differs, JSON.stringify(view));
+  await page.context().close();
+}
+
+// Партия с человеком: ждём обоих, отсчёт 3-2-1, «Готов» между раундами
+async function testMatchFlow(browser) {
+  console.log('\nОнлайн: начало партии и перерыв');
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    Object.assign(window.__match, { lobby: true, lobbyLeft: 270, present: [true, false], ladder: false });
+    openMatch(1);
+  });
+  await page.waitForTimeout(500);
+  const view = () => page.evaluate(() => ({
+    banner: document.getElementById('turnBanner').textContent,
+    bannerShown: !document.getElementById('turnBanner').classList.contains('hidden'),
+    input: !document.getElementById('guessSection').classList.contains('hidden'),
+    clock: !document.getElementById('turnClock').classList.contains('hidden'),
+    next: (document.getElementById('rNext') || {}).textContent || '',
+    btns: [...document.querySelectorAll('#resultBox .r-actions .btn')].map(b => ({ t: b.textContent, off: b.disabled }))
+  }));
+  let v = await view();
+  check('соперника нет — «Ждём Кира» и сколько до отмены',
+    v.bannerShown && v.banner.includes('Ждём Кира') && /отмена через 4:(2\d|30)/.test(v.banner), v.banner);
+  check('пока ждём — ни поля ввода, ни часов хода', !v.input && !v.clock, JSON.stringify(v));
+  check('ещё до начала сказано, что партия без звёзд', v.banner.includes('Без звёзд'), v.banner);
+
+  // Соперник пришёл — отсчёт
+  await page.evaluate(() => { Object.assign(window.__match, { lobby: false, lobbyLeft: null, startsIn: 2, present: [true, true] }); refreshMatch(true); });
+  await page.waitForTimeout(400);
+  v = await view();
+  check('оба на месте — «Начинаем через 2…»', /Начинаем через [12]…/.test(v.banner) && !v.input && !v.clock, JSON.stringify(v));
+  // Опрос сервера выключен: поле должно появиться от самого отсчёта, а не
+  // от очередного ответа сервера двумя секундами позже
+  await page.evaluate(() => { window.__match.startsIn = null; stopMatchPoll(); });
+  await page.waitForTimeout(2200);
+  v = await view();
+  check('отсчёт кончился — поле ввода и часы хода', v.input && v.clock && v.banner.includes('Ходит'), JSON.stringify(v));
+  await page.evaluate(() => startMatchPoll());
+
+  // Раунд окончен: «Готов», 10 секунд, соперник ещё не готов
+  await page.evaluate(() => {
+    Object.assign(window.__match, { roundOver: true, roundWinner: 0, wins: [1, 0], nextIn: 8, waitReady: true,
+                                    moves: [{ seat: 0, guess: 42, tier: 8 }] });
+    window.__nextCalls = 0;
+    refreshMatch(true);
+  });
+  await page.waitForTimeout(400);
+  v = await view();
+  check('между раундами — «Готов» и сколько до следующего', v.btns.length === 1 && v.btns[0].t === 'Готов' &&
+    /Следующий раунд через [78] с/.test(v.next), JSON.stringify(v));
+  await page.click('#resultBox .r-actions .btn');
+  await page.waitForTimeout(400);
+  v = await view();
+  const calls = await page.evaluate(() => ({ n: window.__nextCalls, round: D.round, over: D.roundOver }));
+  check('нажал «Готов» — ждём соперника, раунд не начался',
+    v.btns[0] && v.btns[0].off && v.btns[0].t.includes('ждём Кира') && calls.n === 1 && calls.over && calls.round === 1,
+    JSON.stringify({ v, calls }));
+  await page.evaluate(() => { window.__match.ready = [true, true]; refreshMatch(true); });
+  await page.waitForTimeout(400);
+  v = await view();
+  check('соперник тоже готов — это видно', v.next.includes('✓ Кира ждёт'), v.next);
+  // Вышло время — сервер начал раунд сам
+  await page.evaluate(() => {
+    Object.assign(window.__match, { roundOver: false, roundWinner: null, round: 2, cur: 1, nextIn: null, ready: [false, false], moves: [] });
+    refreshMatch(true);
+  });
+  await page.waitForTimeout(400);
+  v = await view();
+  const r2 = await page.evaluate(() => ({ round: D.round, over: D.roundOver, line: !!document.querySelector('#rNext') }));
+  check('новый раунд начался сам', r2.round === 2 && !r2.over && !r2.line, JSON.stringify(r2));
+
+  // Не пришёл — отменено
+  await page.evaluate(() => { Object.assign(window.__match, { status: 'expired' }); refreshMatch(true); });
+  await page.waitForTimeout(400);
+  v = await view();
+  check('соперник не пришёл — «Партия отменена», ходить нельзя', v.banner.includes('Партия отменена — Кира') && !v.input && !v.clock,
+    JSON.stringify(v));
+
+  // С ботом «Готов» не нужен: кнопка как раньше
+  await page.evaluate(() => {
+    Object.assign(window.__match, { status: 'active', botSeat: 1, names: ['Лев', '@bot:panda'], roundOver: true, roundWinner: 0,
+                                    nextIn: 9, waitReady: false, ready: [false, true] });
+    refreshMatch(true);
+  });
+  await page.waitForTimeout(400);
+  v = await view();
+  check('с ботом — «Следующий раунд» без ожидания', v.btns[0] && v.btns[0].t === 'Следующий раунд' && !v.next.includes('ждёт'),
+    JSON.stringify(v));
+  await page.context().close();
+}
+
+// Пожаловаться и заблокировать: из «⋯» у друга и из переписки
+async function testBlockReport(browser) {
+  console.log('\nЖалоба и блокировка');
+  const page = await newGame(browser, { user: 'Максим', profile: {} });
+  await page.evaluate(() => { window.__friends = [{ username: 'Аня', relation: 'friend' }, { username: 'Кира', relation: 'friend' }]; });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(400);
+
+  // Жалоба: без причины не отправить; причина, пара слов — и на сервер
+  await page.click('#friendsList .friend-row[data-name="Аня"] .fr-btn.more');
+  await page.waitForTimeout(100);
+  await page.click('#fsReport');
+  await page.waitForTimeout(100);
+  const form = await page.evaluate(() => ({
+    open: !document.getElementById('reportModal').classList.contains('hidden'),
+    title: document.getElementById('rpTitle').textContent,
+    reasons: [...document.querySelectorAll('#rpReasons button')].map(b => b.textContent),
+    sendOff: document.getElementById('rpSend').disabled
+  }));
+  check('жалоба: три причины, без причины не отправить',
+    form.open && form.title.includes('Аня') && form.reasons.join() === 'Грубость,Спам,Другое' && form.sendOff, JSON.stringify(form));
+  await page.click('#rpReasons button[data-reason="rude"]');
+  await page.fill('#rpNote', 'обзывается');
+  await page.click('#rpSend');
+  await page.waitForTimeout(300);
+  const sent = await page.evaluate(() => ({
+    args: (window.__reports || [])[0],
+    closed: document.getElementById('reportModal').classList.contains('hidden'),
+    note: document.getElementById('friendsNote').textContent
+  }));
+  check('жалоба ушла с причиной и комментарием, игроку сказали спасибо',
+    sent.args && sent.args.p_who === 'Аня' && sent.args.p_reason === 'rude' && sent.args.p_note === 'обзывается' &&
+    sent.closed && sent.note.includes('Жалоба отправлена'), JSON.stringify(sent));
+
+  // Блокировка: сначала вопрос, «Отмена» ничего не делает
+  await page.click('#friendsList .friend-row[data-name="Аня"] .fr-btn.more');
+  await page.waitForTimeout(100);
+  await page.click('#fsBlock');
+  await page.waitForTimeout(100);
+  const ask = await page.evaluate(() => document.getElementById('blAsk').textContent);
+  check('перед блокировкой — вопрос и что будет', ask.startsWith('Заблокировать: Аня?') && ask.includes('не сможет писать вам'), ask);
+  await page.click('#blCancel');
+  await page.waitForTimeout(100);
+  check('«Отмена» ничего не блокирует', await page.evaluate(() => !(window.__blocked || []).length &&
+    document.getElementById('blockModal').classList.contains('hidden')));
+  await page.click('#friendsList .friend-row[data-name="Аня"] .fr-btn.more');
+  await page.waitForTimeout(100);
+  await page.click('#fsBlock');
+  await page.waitForTimeout(100);
+  await page.click('#blGo');
+  await page.waitForTimeout(400);
+  const blocked = await page.evaluate(() => ({
+    list: window.__blocked, rows: [...document.querySelectorAll('#friendsList .friend-row')].map(r => r.dataset.name),
+    note: document.getElementById('friendsNote').textContent
+  }));
+  check('заблокирована — ушла из списка, об этом сказано',
+    blocked.list.join() === 'Аня' && !blocked.rows.includes('Аня') && blocked.note.includes('больше не сможет вам писать'),
+    JSON.stringify(blocked));
+
+  // Из переписки: «⋯» в заголовке, «Написать» там лишнее; после блокировки — к друзьям
+  await page.evaluate(() => openChat('Кира'));
+  await page.waitForTimeout(300);
+  await page.click('#chatMore');
+  await page.waitForTimeout(100);
+  const fromChat = await page.evaluate(() =>
+    [...document.querySelectorAll('#friendSheet button')].filter(b => !b.classList.contains('hidden')).map(b => b.textContent));
+  check('в переписке «⋯» — без «Написать»', fromChat.join() === 'Убрать из друзей,⚠️ Пожаловаться,🚫 Заблокировать,Отмена',
+    fromChat.join());
+  const label = await page.evaluate(() => document.getElementById('tChatRanked').textContent);
+  check('вызов «по правилам рейтинга» подписан: без звёзд', label.includes('без звёзд'), label);
+  await page.click('#fsBlock');
+  await page.waitForTimeout(100);
+  await page.click('#blGo');
+  await page.waitForTimeout(500);
+  check('заблокировал из переписки — вернулся к друзьям', await page.locator('#screenFriends').isVisible());
+
+  // Профиль: список заблокированных, разблокировать
+  await page.click('#accountChip');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById('pfEditFold').open = true; document.getElementById('pfBlockedFold').open = true; });
+  await page.waitForTimeout(400);
+  let list = await page.evaluate(() => [...document.querySelectorAll('#pfBlockedList .bl-row')].map(r => r.textContent));
+  check('в профиле — кого заблокировал', list.join() === 'АняРазблокировать,КираРазблокировать', list.join());
+  await page.click('#pfBlockedList .bl-row:first-child .fr-btn');
+  await page.waitForTimeout(400);
+  list = await page.evaluate(() => [...document.querySelectorAll('#pfBlockedList .bl-row')].map(r => r.textContent));
+  check('«Разблокировать» убирает из списка', list.join() === 'КираРазблокировать' &&
+    await page.evaluate(() => window.__blocked.join() === 'Кира'), list.join());
+  await page.evaluate(() => closeLogoutModal());
+
+  // Заблокированному не говорят, что его заблокировали
+  const msg = await page.evaluate(() => friendErrorText('unavailable'));
+  check('ответ «unavailable» — «Игрок недоступен»', msg === 'Игрок недоступен', msg);
+  await page.context().close();
+}
+
+// Обучение новичка: три урока, замок на онлайне, карточки бонусов, иконка, Ученик
+async function testTutorial(browser) {
+  console.log('\nОбучение новичка');
+  let page = await newGame(browser, { newbie: true });
+  await page.evaluate(() => { currentLang = 'ru'; applyTranslations(); });
+  const menu = () => page.evaluate(() => ({
+    card: !document.getElementById('tutCard').classList.contains('hidden'),
+    title: document.getElementById('tTutTitle').textContent, sub: document.getElementById('tTutSub').textContent,
+    runLocked: document.querySelector('.mode-btn.run').classList.contains('locked'),
+    lockText: document.getElementById('tOnlineLock').classList.contains('hidden') ? '' : document.getElementById('tOnlineLock').textContent
+  }));
+  let m = await menu();
+  check('новичку — карточка «Обучение · урок 1 из 3»', m.card && m.title === 'Обучение · урок 1 из 3' && m.sub === 'Как читать подсказки',
+    JSON.stringify(m));
+  check('онлайн и «Испытание» закрыты до уроков 1–2', m.runLocked && m.lockText === '🔒 после уроков 1–2', JSON.stringify(m));
+  await page.click('.mode-btn.online');
+  await page.waitForTimeout(150);
+  const gate = await page.evaluate(() => ({
+    open: !document.getElementById('gateModal').classList.contains('hidden'),
+    go: document.getElementById('gateGo').textContent, skip: document.getElementById('gateSkip').textContent,
+    online: !document.getElementById('screenOnline').classList.contains('hidden') }));
+  check('закрытый режим предлагает урок или пропустить', gate.open && !gate.online && gate.go === '🎓 Начать урок 1' &&
+    gate.skip === 'Пропустить обучение', JSON.stringify(gate));
+  await page.evaluate(() => closeGate());
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(150);
+  check('и «Друзья» в шапке тоже закрыты', await page.evaluate(() => document.getElementById('screenFriends').classList.contains('hidden') &&
+    !document.getElementById('gateModal').classList.contains('hidden')));
+
+  // Урок 1: тренировка 1–20, подсказки по шагам
+  await page.click('#gateGo');
+  await page.waitForTimeout(250);
+  const coach = () => page.evaluate(() => document.getElementById('coach').classList.contains('hidden') ? '' :
+    document.getElementById('coach').textContent);
+  const l1 = await page.evaluate(() => ({ mode, min: RANGE_MIN, max: RANGE_MAX, ph: document.getElementById('guessInput').placeholder }));
+  check('урок 1 — тренировка от 1 до 20', l1.mode === 'solo' && l1.min === 1 && l1.max === 20, JSON.stringify(l1));
+  check('подсказка учителя: что делать', (await coach()).startsWith('🎓 Я загадал число от 1 до 20'), await coach());
+  await page.evaluate(() => { secret = 15; });
+  const guess = async v => { await page.fill('#guessInput', String(v)); await page.click('#tSubmitGuess'); await page.waitForTimeout(150); };
+  await guess(3);
+  check('после хода — как читать «горячо / холодно»', (await coach()).includes('🔥 горячо'), await coach());
+  await guess(19);
+  check('потом — про прямую', (await coach()).includes('Прямая'), await coach());
+  await guess(15);
+  let res = await page.evaluate(() => ({
+    line: (document.querySelector('#resultBox .r-lesson') || {}).textContent,
+    btns: [...document.querySelectorAll('#resultBox .r-actions button')].map(b => b.textContent),
+    coach: document.getElementById('coach').classList.contains('hidden'), st: tutState() }));
+  check('урок 1 пройден — кнопка «Урок 2»', res.line === '🎓 Урок 1 пройден!' && res.btns.join() === '🎓 Урок 2,В меню' &&
+    res.coach && res.st.done.join() === '1', JSON.stringify(res));
+
+  // Урок 2: дуэль с черепахой, до одной победы. Ходы бота делает тест:
+  // быстрый бот мог бы случайно угадать и закончить урок раньше проверок
+  await page.evaluate(() => { BOT_SPEED = 1000; });
+  await page.click('#resultBox .r-actions .btn');
+  await page.waitForTimeout(250);
+  const l2 = await page.evaluate(() => ({ mode, bot: vsBot && vsBot.bot.key, wins: D.winsNeeded, max: RANGE_MAX, bonus: bonusMode }));
+  check('урок 2 — дуэль с самым мягким ботом, 1–50, до одной победы, без бонусов',
+    l2.mode === 'duel' && l2.bot === 'turtle' && l2.wins === 1 && l2.max === 50 && !l2.bonus, JSON.stringify(l2));
+  check('подсказка: ходите по очереди', (await coach()).includes('ходите по очереди'), await coach());
+  const bot = v => page.evaluate(x => { stopBot(); duelPlay(x); stopBot(); }, v);
+  await page.evaluate(() => { secret = 33; });
+  await guess(10);
+  await bot(40);
+  check('после хода — ход бота тоже подсказка', (await coach()).includes('Ход бота'), await coach());
+  await guess(20);
+  await bot(41);
+  check('дальше — про жетон «+1 ход»', (await coach()).includes('+1 ход'), await coach());
+  await guess(33);
+  res = await page.evaluate(() => ({ line: (document.querySelector('#resultBox .r-lesson') || {}).textContent, st: tutState() }));
+  check('урок 2 пройден — онлайн открыт', res.line === '🎓 Урок 2 пройден! · 🔓 Онлайн открыт' && res.st.done.join() === '1,2',
+    JSON.stringify(res));
+
+  // Урок 3: бонусы; первый бонус объясняется карточкой
+  await page.click('#resultBox .r-actions .btn');
+  await page.waitForTimeout(250);
+  const l3 = await page.evaluate(() => ({ bonus: bonusMode, n: D.bonuses.length }));
+  check('урок 3 — с бонусами', l3.bonus && l3.n === 5, JSON.stringify(l3));
+  check('подсказка про бонусы', (await coach()).includes('бонусы 🎁'), await coach());
+  await page.evaluate(() => { stopBot(); secret = 44; D.cur = 0; D.bonuses = [{ value: 10, type: 'fog', taken: false }]; renderAll(); });
+  await guess(10);
+  const card = await page.evaluate(() => ({
+    open: !document.getElementById('bonusCard').classList.contains('hidden'),
+    icon: document.getElementById('bcIcon').textContent, title: document.getElementById('bcTitle').textContent,
+    desc: document.getElementById('bcDesc').textContent }));
+  check('первый туман — карточка «Новый бонус: Туман» с объяснением',
+    card.open && card.icon === '🙈' && card.title === 'Новый бонус: Туман' && card.desc.startsWith('Туман ложится на соперника'),
+    JSON.stringify(card));
+  await page.click('#bcOk');
+  await page.waitForTimeout(100);
+  check('после бонуса — подсказка про карточку', (await coach()).includes('Сработал бонус'), await coach());
+  await page.evaluate(() => { stopBot(); D.cur = 0; D.lastBonus = 'fog'; renderAll(); });
+  check('второй раз тот же бонус карточку не показывает',
+    await page.evaluate(() => document.getElementById('bonusCard').classList.contains('hidden')));
+  await page.evaluate(() => { stopBot(); D.cur = 0; D.lastBonus = null; renderAll(); });
+  await guess(44);
+  res = await page.evaluate(() => ({ line: (document.querySelector('#resultBox .r-lesson') || {}).textContent,
+    btns: [...document.querySelectorAll('#resultBox .r-actions button')].map(b => b.textContent), st: tutState() }));
+  check('урок 3 пройден — иконка 🎓 в профиле, кнопка «Готово»',
+    res.line === '🎓 Урок 3 пройден! · Обучение пройдено! Иконка 🎓 — в профиле.' && res.btns.join() === '🎓 Готово' &&
+    res.st.done.join() === '1,2,3', JSON.stringify(res));
+  await page.click('#resultBox .r-actions .btn');
+  await page.waitForTimeout(250);
+  m = await menu();
+  const prefs = await page.evaluate(() => ({ bonus: bonusMode, n: bonusCountChoice, lesson }));
+  check('после обучения — карточки нет, онлайн открыт', !m.card && !m.runLocked, JSON.stringify(m));
+  check('свои настройки игрока урок вернул как было', !prefs.bonus && prefs.n === 0 && prefs.lesson === null, JSON.stringify(prefs));
+  await page.context().close();
+
+  // Пропустить
+  page = await newGame(browser, { newbie: true });
+  await page.evaluate(() => { currentLang = 'ru'; applyTranslations(); });
+  await page.click('.mode-btn.run');
+  await page.waitForTimeout(150);
+  await page.click('#gateSkip');
+  await page.waitForTimeout(150);
+  m = await menu();
+  check('«Пропустить обучение» — всё открыто, карточки нет', !m.card && !m.runLocked, JSON.stringify(m));
+  await page.context().close();
+
+  // Кто уже играл, тот не новичок
+  page = await newGame(browser, { newbie: true, user: 'Лев' });
+  m = await menu();
+  check('у игравшего раньше нет ни уроков, ни замков', !m.card && !m.runLocked, JSON.stringify(m));
+  await page.context().close();
+
+  // Иконка 🎓: закрыта до обучения; прошёл без входа — база узнает при выборе
+  page = await newGame(browser, { user: 'Лев', profile: { tutorialDone: false } });
+  await page.click('#accountChip');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => showAvatarPicker(true));
+  await page.waitForTimeout(100);
+  const tile = () => page.evaluate(() => {
+    const b = document.querySelector('#avGrid .av-tile[data-icon="🎓"]');
+    return b ? { locked: b.classList.contains('locked') } : null;
+  });
+  let tl = await tile();
+  check('в сетке иконок есть 🎓 — закрыта до обучения', tl && tl.locked, JSON.stringify(tl));
+  await page.click('#avGrid .av-tile[data-icon="🎓"]');
+  await page.waitForTimeout(200);
+  check('нажал закрытую — «Откроется после обучения»',
+    (await page.evaluate(() => document.getElementById('avNote').textContent)) === 'Откроется после обучения');
+  await page.evaluate(() => { tutSave({ done: [1, 2, 3], skipped: false }); renderAvatarGrid(); showAvatarPicker(true); });
+  await page.waitForTimeout(100);
+  tl = await tile();
+  check('обучение пройдено — 🎓 открыта', tl && !tl.locked, JSON.stringify(tl));
+  await page.click('#avGrid .av-tile[data-icon="🎓"]');
+  await page.waitForTimeout(400);
+  const av = await page.evaluate(() => ({ fin: window.__tutorialFinished || 0, avatar: window.__profile.avatar }));
+  check('выбор 🎓 сначала отмечает обучение в базе, потом ставит иконку', av.fin >= 1 && av.avatar === '🎓', JSON.stringify(av));
+  await page.context().close();
+
+  // Ученик
+  page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => {
+    window.__ladder = { season: '2026-09', endsIn: 4 * 86400, stars: 7, streak: 0, best: 7, games: 3, peak: 0, badges: [], apprentice: 7 };
+    openOnlineEntry();
+  });
+  await page.waitForTimeout(600);
+  const ap = await page.evaluate(() => document.getElementById('rkApprentice').classList.contains('hidden') ? '' :
+    document.getElementById('rkApprentice').textContent);
+  check('на экране рейтинга — сколько партий Ученика осталось', ap === '🎓 Ученик · без потери звёзд: ещё 7', ap);
+  const apRes = await page.evaluate(() => {
+    D.roundWinner = 1;
+    const box = starsResult({ delta: [0, 1], after: [7, 20] }, 0);
+    return box ? box.textContent : '';
+  });
+  check('проиграл Учеником — «звезда не снята»', apRes.includes('Ученик: звезда не снята'), apRes);
   await page.context().close();
 }
 
@@ -5769,6 +6144,9 @@ async function testKeyPage(browser) {
     await testPolish(browser);
     await testQuitConfirm(browser);
     await testFogWholeRound(browser);
+    await testMatchFlow(browser);
+    await testBlockReport(browser);
+    await testTutorial(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

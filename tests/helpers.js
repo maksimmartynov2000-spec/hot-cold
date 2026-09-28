@@ -30,6 +30,23 @@ function stubSupabase(opts) {
             return { data: null, error: { message: window.__rpcError.message } };
           }
           if (name === 'list_friends') return { data: window.__friends || [], error: null };
+          // Жалобы и блокировка (миграция 036): «сервер» — window.__reports и __blocked
+          if (name === 'report_player') {
+            (window.__reports = window.__reports || []).push(args);
+            return { data: window.__reports.length, error: null };
+          }
+          if (name === 'block_player') {
+            (window.__blocked = window.__blocked || []).push(args.p_who);
+            window.__friends = (window.__friends || []).filter(f => f.username !== args.p_who);
+            return { data: true, error: null };
+          }
+          if (name === 'unblock_player') {
+            window.__blocked = (window.__blocked || []).filter(u => u !== args.p_who);
+            return { data: true, error: null };
+          }
+          if (name === 'blocked_players') {
+            return { data: (window.__blocked || []).map(u => ({ username: u, blocked_at: '2026-09-01T00:00:00Z' })), error: null };
+          }
           if (name === 'find_students') return { data: window.__found || [], error: null };
           if (name === 'suggest_students') return { data: window.__suggested || [], error: null };
           if (name === 'send_friend_request') return { data: 'outgoing', error: null };
@@ -41,6 +58,11 @@ function stubSupabase(opts) {
           // конкретного вызова тест подкладывает через window.__rpcError.
           // unsupported — сервер без миграции профиля: функций нет вовсе
           // noColor — сервер с профилем, но ещё без цвета (своя миграция не применена)
+          if (name === 'tutorial_finished') {
+            window.__tutorialFinished = (window.__tutorialFinished || 0) + 1;
+            if (window.__profile) window.__profile.tutorialDone = true;
+            return { data: true, error: null };
+          }
           if (['my_profile', 'set_avatar', 'set_avatar_color', 'avatars_for', 'rename_student', 'change_pin'].indexOf(name) >= 0) {
             const P = window.__profile;
             P.calls.push({ name, args });
@@ -53,6 +75,8 @@ function stubSupabase(opts) {
             if (name === 'my_profile') {
               const d = { username: args.p_username, avatar: P.avatar, since: P.since, renameWaitHours: P.wait };
               if (!P.noColor) d.color = P.color;
+              // Про обучение знает только база с миграцией 037
+              if ('tutorialDone' in P) d.tutorialDone = !!P.tutorialDone;
               return { data: d, error: null };
             }
             if (name === 'set_avatar_color') {
@@ -184,6 +208,15 @@ function stubSupabase(opts) {
           }
           if (name === 'next_match_round') {
             const M = window.__match;
+            window.__nextCalls = (window.__nextCalls || 0) + 1;
+            // Партия с человеком: раунд начнётся, когда готовы оба. Тест сам
+            // решает, готов ли соперник, через M.ready
+            if (M.waitReady && M.botSeat == null) {
+              M.ready = (M.ready || [false, false]).slice();
+              M.ready[M.seat] = true;
+              if (!M.ready[1 - M.seat]) return { data: false, error: null };
+            }
+            M.ready = [false, false];
             M.round++; M.roundOver = false; M.roundWinner = null;
             M.moves = []; M.tokens = [1, 1]; M.cur = 1 - M.starter; M.starter = M.cur;
             return { data: true, error: null };
@@ -382,9 +415,22 @@ function stubSupabase(opts) {
         elo: M.elo === undefined ? 1000 : M.elo,
         turnSeconds: M.turnSeconds || 30,
         secondsLeft: M.secondsLeft === undefined ? 30 : M.secondsLeft,
+        // Начало партии и перерыв (миграция 035). Без них — как партия, что уже идёт
+        lobby: !!M.lobby, present: M.present || [true, true],
+        lobbyLeft: M.lobbyLeft === undefined ? null : M.lobbyLeft,
+        startsIn: M.startsIn === undefined ? null : M.startsIn,
+        nextIn: M.nextIn === undefined ? (M.roundOver && !M.matchOver ? 10 : null) : M.nextIn,
+        ready: M.ready || [false, false],
+        ladder: M.ladder === undefined ? true : !!M.ladder,
         updatedAt: '2026-01-01T00:00:00Z' };
     };
 
+    // Обучение и карточки бонусов (обучение новичка) проверяются отдельно;
+    // остальные проверки идут как у игрока, который всё это уже видел
+    if (!opts.newbie && localStorage.getItem('hc_tutorial') === null) {
+      localStorage.setItem('hc_tutorial', JSON.stringify({ done: [], skipped: true }));
+      localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'lava', 'skip', 'gift', 'memory', 'near']));
+    }
     if (opts.user) {
       localStorage.setItem('hc_run_user', opts.user);
       localStorage.setItem('hc_run_pin', '1234');
