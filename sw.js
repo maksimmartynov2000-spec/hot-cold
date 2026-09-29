@@ -4,12 +4,13 @@
 
 // Версию поднимаем, когда меняется что-то из CORE: старый кеш отдаётся сразу,
 // и без смены имени телефон продолжил бы брать прежний manifest
-const CACHE = 'hot-cold-v3';
+const CACHE = 'hot-cold-v4';
 
 // Своё, что нужно для запуска
 const CORE = [
   './',
   './index.html',
+  './vendor/qrcode.js',
   './manifest.webmanifest',
   './icon-180.png',
   './icon-192.png',

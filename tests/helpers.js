@@ -30,6 +30,15 @@ function stubSupabase(opts) {
             return { data: null, error: { message: window.__rpcError.message } };
           }
           if (name === 'list_friends') return { data: window.__friends || [], error: null };
+          // Приглашения (миграция 039): чей код — window.__invites {код: имя}
+          if (name === 'my_invite_code') return { data: 'ABCD2345', error: null };
+          if (name === 'invite_owner') return { data: (window.__invites || {})[String(args.p_code).toUpperCase()] || null, error: null };
+          if (name === 'accept_invite') {
+            const host = (window.__invites || {})[String(args.p_code).toUpperCase()];
+            (window.__accepted = window.__accepted || []).push(args.p_code);
+            if (!host) return { data: null, error: { message: 'no_such_invite' } };
+            return { data: host, error: null };
+          }
           // Жалобы и блокировка (миграция 036): «сервер» — window.__reports и __blocked
           if (name === 'report_player') {
             (window.__reports = window.__reports || []).push(args);

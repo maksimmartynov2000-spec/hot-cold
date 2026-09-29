@@ -5689,6 +5689,84 @@ async function testCurtain(browser) {
   await p3.context().close();
 }
 
+// Приглашение по ссылке и QR-коду
+async function testInviteLink(browser) {
+  console.log('\nПриглашение по ссылке');
+  const { GAME_URL } = require('./helpers');
+  // Пригласить: QR и ссылка
+  let page = await newGame(browser, { user: 'Лев' });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(400);
+  check('у друзей есть «Пригласить друга»', (await page.locator('#tInviteBtn').textContent()) === '🔗 Пригласить друга');
+  await page.click('#tInviteBtn');
+  await page.waitForTimeout(300);
+  const inv = await page.evaluate(() => ({
+    open: !document.getElementById('inviteModal').classList.contains('hidden'),
+    svg: !!document.querySelector('#invQr svg rect, #invQr svg path'),
+    link: document.getElementById('invLink').textContent }));
+  check('окно приглашения: QR-код и ссылка с кодом', inv.open && inv.svg && /index\.html\?invite=ABCD2345$/.test(inv.link), JSON.stringify(inv));
+  await page.click('#invCopy');
+  await page.waitForTimeout(200);
+  const note = await page.evaluate(() => document.getElementById('invNote').textContent);
+  check('«Скопировать» — ссылка в буфере или на экране', note === 'Ссылка скопирована' || note === inv.link, note);
+  await page.context().close();
+
+  // Открыл ссылку, уже в аккаунте: «Лев зовёт вас в друзья» → сразу друзья
+  const open = async (opts, code) => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const p = await ctx.newPage();
+    p.on('pageerror', e => check('без ошибок JS', false, e.message));
+    await applyStub(p, opts);
+    await p.addInitScript(() => { window.__invites = { ABCD2345: 'Лев' }; });
+    await p.goto(GAME_URL + '?invite=' + code);
+    await p.waitForTimeout(600);
+    return p;
+  };
+  page = await open({ user: 'Кира' }, 'abcd2345');
+  let st = await page.evaluate(() => ({
+    open: !document.getElementById('inviteInModal').classList.contains('hidden'),
+    title: document.getElementById('inTitle').textContent, add: document.getElementById('inAdd').textContent,
+    url: location.search }));
+  check('ссылка открыта — «👋 Лев зовёт вас в друзья»',
+    // Из адреса код убирается на настоящем сайте; у file:// менять адрес
+    // браузер не даёт — это проверяет offline.js на локальном сервере
+    st.open && st.title === '👋 Лев зовёт вас в друзья' && st.add === 'Добавить в друзья', JSON.stringify(st));
+  await page.click('#inAdd');
+  await page.waitForTimeout(500);
+  st = await page.evaluate(() => ({ acc: window.__accepted, friends: !document.getElementById('screenFriends').classList.contains('hidden'),
+    note: document.getElementById('friendsNote').textContent, left: localStorage.getItem('hc_pending_invite') }));
+  check('«Добавить» — сразу друзья, код больше не ждёт', st.acc && st.acc[0] === 'ABCD2345' && st.friends &&
+    st.note === 'Теперь вы друзья: Лев' && st.left === null, JSON.stringify(st));
+  await page.context().close();
+
+  // Новичок без аккаунта: сначала вход, потом добавить; онлайн открыт сразу
+  page = await open({ newbie: true }, 'ABCD2345');
+  st = await page.evaluate(() => ({
+    add: document.getElementById('inAdd').textContent, locked: document.querySelector('.mode-btn.online').classList.contains('locked'),
+    card: !document.getElementById('tutCard').classList.contains('hidden') }));
+  check('новичок по приглашению: «Войти или зарегистрироваться», онлайн не закрыт, уроки предложены',
+    st.add === 'Войти или зарегистрироваться' && !st.locked && st.card, JSON.stringify(st));
+  await page.click('#inAdd');
+  await page.waitForTimeout(300);
+  check('ведёт на вход', await page.locator('#screenAuthChoice').isVisible());
+  await page.evaluate(() => { localStorage.setItem('hc_run_user', 'Кира'); localStorage.setItem('hc_run_pin', '4321'); afterAuth(); });
+  await page.waitForTimeout(800);
+  st = await page.evaluate(() => ({ open: !document.getElementById('inviteInModal').classList.contains('hidden'),
+    add: document.getElementById('inAdd').textContent }));
+  check('после входа — снова предложение, уже «Добавить в друзья»', st.open && st.add === 'Добавить в друзья', JSON.stringify(st));
+  await page.context().close();
+
+  // Свой код и несуществующий — ничего не показываем
+  page = await open({ user: 'Лев' }, 'ABCD2345');
+  st = await page.evaluate(() => ({ open: !document.getElementById('inviteInModal').classList.contains('hidden'), left: localStorage.getItem('hc_pending_invite') }));
+  check('свою ссылку открыл сам — ничего не спрашиваем', !st.open && st.left === null, JSON.stringify(st));
+  await page.context().close();
+  page = await open({ user: 'Кира' }, 'ZZZZ9999');
+  st = await page.evaluate(() => ({ open: !document.getElementById('inviteInModal').classList.contains('hidden'), left: localStorage.getItem('hc_pending_invite') }));
+  check('несуществующий код — тихо забыт', !st.open && st.left === null, JSON.stringify(st));
+  await page.context().close();
+}
+
 async function testPolish(browser) {
   console.log('\nПолировка');
   let page = await newGame(browser);
@@ -6235,6 +6313,7 @@ async function testKeyPage(browser) {
     await testTutorial(browser);
     await testPushTexts();
     await testCurtain(browser);
+    await testInviteLink(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

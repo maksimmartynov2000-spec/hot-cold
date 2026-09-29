@@ -1,0 +1,89 @@
+-- Приглашение в друзья по ссылке и QR-коду. Применять в Supabase: SQL Editor →
+-- вставить целиком → Run. Применить ДО мёржа.
+--
+-- У каждого игрока — свой код приглашения. Ссылка с кодом открывает игру и
+-- предлагает «Добавить Льва в друзья»; нажал — сразу друзья: ссылку дал сам
+-- Лев, значит, он согласен. Лев получает уведомление. Код не меняется при
+-- смене имени, поэтому старые ссылки продолжают работать.
+
+-- 1. Код приглашения: 8 знаков без похожих друг на друга (0/O, 1/I/L)
+alter table students add column if not exists invite_code text;
+create unique index if not exists students_invite_code_idx on students (invite_code);
+
+create or replace function new_invite_code()
+returns text
+language sql
+volatile
+as $$
+  select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 1 + floor(random() * 31)::int, 1), '')
+  from generate_series(1, 8);
+$$;
+
+-- 2. Свой код — только себе, по PIN. Нет кода — выдаём
+create or replace function my_invite_code(p_username text, p_pin text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; code text; tries int := 0;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select invite_code into code from students where username = me;
+  while code is null loop
+    tries := tries + 1;
+    if tries > 20 then raise exception 'no_code'; end if;
+    begin
+      update students set invite_code = new_invite_code() where username = me
+      returning invite_code into code;
+    exception when unique_violation then code := null;
+    end;
+  end loop;
+  return code;
+end;
+$$;
+
+-- 3. Чей это код — показать до входа: «Лев зовёт вас в друзья». Отдаёт только
+--    имя; перебирать коды бессмысленно — их почти триллион
+create or replace function invite_owner(p_code text)
+returns text
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select s.username from students s
+  where s.invite_code = upper(trim(coalesce(p_code, ''))) and not s.is_bot;
+$$;
+
+-- 4. Принять приглашение: сразу друзья, пригласившему — уведомление
+create or replace function accept_invite(p_username text, p_pin text, p_code text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; host text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  host := invite_owner(p_code);
+  if host is null then raise exception 'no_such_invite'; end if;
+  if host = me then raise exception 'cannot_friend_self'; end if;
+  if players_blocked(me, host) then raise exception 'unavailable'; end if;
+  if friend_status(me, host) = 'friend' then return host; end if;
+
+  delete from friendships
+  where (requester = me and addressee = host) or (requester = host and addressee = me);
+  insert into friendships(requester, addressee, status, decided_at)
+  values (host, me, 'accepted', now());
+  insert into push_outbox(username, kind, who) values (host, 'invite_joined', me);
+  return host;
+end;
+$$;
+
+revoke execute on function new_invite_code() from public, anon;
+grant execute on function my_invite_code(text, text) to anon;
+grant execute on function invite_owner(text) to anon;
+grant execute on function accept_invite(text, text, text) to anon;

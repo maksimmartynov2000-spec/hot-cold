@@ -1182,6 +1182,12 @@
     .p-effects:empty { display: none; }
     .history-item .h-masked { opacity: 0.45; }
     .modal-backdrop.curtain { background: #0b1020; }
+    .inv-qr { background: #fff; border-radius: 14px; padding: 10px; width: 200px; height: 200px;
+              margin: 12px auto 8px; box-sizing: border-box; }
+    .inv-qr svg { width: 100%; height: 100%; display: block; }
+    .inv-link { font-size: 12px; text-align: center; word-break: break-all; color: rgba(255, 255, 255, 0.6);
+                user-select: all; }
+    .inv-hint { font-size: 13px; opacity: 0.8; margin-top: 8px; }
     .curtain .ct-text { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 8px; }
     .curtain .ct-why { font-size: 13px; opacity: 0.75; }
     .mode-btn.tut { border-color: rgba(251, 191, 36, 0.55); background: rgba(251, 191, 36, 0.1); }
@@ -1964,6 +1970,8 @@
       <div id="gamesList" class="friend-list"></div>
     </div>
 
+    <button class="btn-ghost btn-block" id="tInviteBtn" style="margin-bottom:10px" onclick="openInvite()"></button>
+
     <!-- Поиск свёрнут: он нужен изредка, а список «недавно играли» занимал
          пол-экрана каждый раз. Новичку без друзей раскрыт — больше ему тут
          делать нечего -->
@@ -2190,6 +2198,30 @@
 </div>
 
 <!-- Удаление аккаунта: отдельное окно, потому что это навсегда -->
+<!-- Пригласить друга: QR-код и ссылка. Кто откроет — сразу друг -->
+<div class="modal-backdrop hidden" id="inviteModal" onclick="if (event.target === this) closeInvite()">
+  <div class="modal-card">
+    <div class="modal-text" id="invTitle" style="font-weight:800"></div>
+    <div class="inv-qr" id="invQr"></div>
+    <div class="inv-link" id="invLink"></div>
+    <div class="modal-text inv-hint" id="invHint"></div>
+    <div class="fr-note hidden" id="invNote"></div>
+    <button class="btn btn-block" style="margin-top:10px" id="invShare" onclick="shareInvite()"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="invCopy" onclick="copyInvite()"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="invDone" onclick="closeInvite()"></button>
+  </div>
+</div>
+
+<!-- Открыли ссылку-приглашение -->
+<div class="modal-backdrop hidden" id="inviteInModal">
+  <div class="modal-card">
+    <div class="modal-text" id="inTitle" style="font-weight:800"></div>
+    <div class="fr-note hidden" id="inNote"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="inAdd" onclick="acceptPendingInvite()"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="inLater" onclick="dropPendingInvite()"></button>
+  </div>
+</div>
+
 <!-- Игра вдвоём на одном телефоне при помехах: между ходами экран закрыт,
      чтобы второй игрок не увидел то, что от него спрятано -->
 <div class="modal-backdrop curtain hidden" id="curtain">
@@ -2269,9 +2301,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="vendor/qrcode.js"></script>
 <script>
   const i18n = {
     en: {
+      inv: {"invBtn": "🔗 Invite a friend", "invTitle": "Invite a friend", "invHint": "Show the code or send the link. Whoever opens it becomes your friend right away.", "invShare": "📤 Share", "invCopy": "📋 Copy link", "invCopied": "Link copied", "invShareText": "Let's play Hot or Cold! My name in the game: {name}", "inTitle": "👋 {name} invites you to be friends", "inAdd": "Add to friends", "inLogin": "Log in or sign up", "inLater": "Not now", "inDone": "You are friends now: {name}", "errNoInvite": "Invitation not found", "invDone": "Done"},
       curtain: {"text": "🔄 Pass the phone to {name}", "go": "I'm {name} — show", "why": "A fog, blindness or short memory is on — the other player mustn't see the screen"},
       tut: {"tutTitle": "Tutorial · lesson {n} of 3", "tutSub": ["How to read the hints", "A duel with a bot", "Bonuses and traps"], "tutLocked": "🔒 after lessons 1–2", "gateText": "🔒 Online opens after two short lessons (about 3 minutes): how to read the hints and how to play against an opponent.", "gateGo": "🎓 Start lesson {n}", "gateSkip": "Skip the tutorial", "coach": {"1": ["🎓 I picked a number from 1 to 20. Type any number and press «Check».", "The hint tells you how close you are: 🔥 hot — near, ❄️ cold — far. Try another number.", "The line under the thermometer keeps all your moves. Look between them — it's faster."], "2": ["🎓 Now a duel with a bot: you take turns. Whoever names the number first wins.", "The bot's moves are hints too: watch its «hot / cold» as well.", "⚡ «+1 move» is a token: two moves in a row. Press it before your move when you're close."], "3": ["🎓 Bonuses 🎁 are hidden on the line. Step on one and it fires: good ones hit the opponent, traps hit you.", "❓ «Something is near» — a bonus is close. Risk it or go around — your call.", "A bonus fired! What it does is on the card. Keep playing."]}, "lessonDone": "🎓 Lesson {n} done!", "lessonOpen": "🔓 Online is open", "tutAllDone": "Tutorial complete! Your 🎓 icon is in the profile.", "lessonNext": "🎓 Lesson {n}", "lessonFinish": "🎓 Done", "tutReplay": "🎓 Replay the tutorial", "bcTitle": "New bonus: {name}", "bcNear": "❓ Something is near", "bcOk": "Got it", "bcDesc": {"extra": "Whoever steps on it gets two «+1 move» tokens. A token gives two moves in a row.", "fog": "Fog falls on the opponent: until the end of the round they can't see the other player's moves.", "blind": "Blindness falls on the opponent: until the end of the round they can't see their own moves.", "lava": "The opponent's next move is thrown into the lava — a random number.", "skip": "A trap: whoever steps on it skips their next turn.", "gift": "A trap: whoever steps on it gives the opponent a «+1 move» token.", "memory": "A trap: whoever steps on it sees only the last two moves until the end of the round.", "near": "A bonus lies a few steps from your number — a good one or a trap. Risk it or go around — your call."}, "lgApprentice": "🎓 Apprentice: no star lost", "rkApprentice": "🎓 Apprentice: {n} more games without losing stars", "tutIconLocked": "Opens after the tutorial"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
@@ -2501,6 +2535,7 @@
       }
     },
     ru: {
+      inv: {"invBtn": "🔗 Пригласить друга", "invTitle": "Пригласить друга", "invHint": "Покажите код или отправьте ссылку. Кто откроет — сразу станет вашим другом.", "invShare": "📤 Поделиться", "invCopy": "📋 Скопировать ссылку", "invCopied": "Ссылка скопирована", "invShareText": "Давай играть в Hot or Cold! Моё имя в игре: {name}", "inTitle": "👋 {name} зовёт вас в друзья", "inAdd": "Добавить в друзья", "inLogin": "Войти или зарегистрироваться", "inLater": "Не сейчас", "inDone": "Теперь вы друзья: {name}", "errNoInvite": "Приглашение не найдено", "invDone": "Готово"},
       curtain: {"text": "🔄 Передайте телефон: {name}", "go": "Я {name} — показать", "why": "Действует туман, слепота или короткая память — второму игроку смотреть нельзя"},
       tut: {"tutTitle": "Обучение · урок {n} из 3", "tutSub": ["Как читать подсказки", "Дуэль с ботом", "Бонусы и ловушки"], "tutLocked": "🔒 после уроков 1–2", "gateText": "🔒 Онлайн откроется после двух коротких уроков (минуты три): как читать подсказки и как играть против соперника.", "gateGo": "🎓 Начать урок {n}", "gateSkip": "Пропустить обучение", "coach": {"1": ["🎓 Я загадал число от 1 до 20. Введите любое и нажмите «Проверить».", "Подсказка говорит, насколько вы близко: 🔥 горячо — рядом, ❄️ холодно — далеко. Попробуйте другое число.", "Прямая под градусником помнит все ходы. Ищите между ними — так быстрее."], "2": ["🎓 Теперь дуэль с ботом: ходите по очереди. Кто первым назовёт число — выиграл.", "Ход бота — тоже подсказка: смотрите и на его «горячо / холодно».", "⚡ «+1 ход» — жетон: два хода подряд. Нажмите перед ходом, когда число почти найдено."], "3": ["🎓 На прямой спрятаны бонусы 🎁. Наступили — сработал: полезные бьют по сопернику, ловушки — по вам.", "❓ «Рядом что-то есть» — значит, рядом бонус. Рискнуть или обойти — решать вам.", "Сработал бонус! Что он делает — на карточке. Играйте дальше."]}, "lessonDone": "🎓 Урок {n} пройден!", "lessonOpen": "🔓 Онлайн открыт", "tutAllDone": "Обучение пройдено! Иконка 🎓 — в профиле.", "lessonNext": "🎓 Урок {n}", "lessonFinish": "🎓 Готово", "tutReplay": "🎓 Пройти обучение заново", "bcTitle": "Новый бонус: {name}", "bcNear": "❓ Рядом что-то есть", "bcOk": "Понятно", "bcDesc": {"extra": "Кто наступил, получает два жетона «+1 ход». Жетон — два хода подряд.", "fog": "Туман ложится на соперника: до конца раунда он не видит чужих ходов.", "blind": "Слепота ложится на соперника: до конца раунда он не видит своих ходов.", "lava": "Следующий ход соперника уходит в лаву — случайное число.", "skip": "Ловушка: кто наступил, пропускает следующий ход.", "gift": "Ловушка: кто наступил, дарит сопернику жетон «+1 ход».", "memory": "Ловушка: кто наступил, до конца раунда видит только два последних хода.", "near": "В нескольких шагах от вашего числа лежит бонус — полезный или ловушка. Рискнуть или обойти — решать вам."}, "lgApprentice": "🎓 Ученик: звезда не снята", "rkApprentice": "🎓 Ученик · без потери звёзд: ещё {n}", "tutIconLocked": "Откроется после обучения"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
@@ -2730,6 +2765,7 @@
       }
     },
     fr: {
+      inv: {"invBtn": "🔗 Inviter un ami", "invTitle": "Inviter un ami", "invHint": "Montrez le code ou envoyez le lien. Qui l'ouvre devient tout de suite votre ami.", "invShare": "📤 Partager", "invCopy": "📋 Copier le lien", "invCopied": "Lien copié", "invShareText": "Jouons à Hot or Cold ! Mon nom dans le jeu : {name}", "inTitle": "👋 {name} vous invite à devenir amis", "inAdd": "Ajouter aux amis", "inLogin": "Se connecter ou s'inscrire", "inLater": "Pas maintenant", "inDone": "Vous êtes amis : {name}", "errNoInvite": "Invitation introuvable", "invDone": "Terminé"},
       curtain: {"text": "🔄 Passez le téléphone à {name}", "go": "C'est moi, {name} — afficher", "why": "Brouillard, cécité ou mémoire courte en cours — l'autre joueur ne doit pas regarder"},
       tut: {"tutTitle": "Tutoriel · leçon {n} sur 3", "tutSub": ["Lire les indices", "Un duel contre un bot", "Bonus et pièges"], "tutLocked": "🔒 après les leçons 1–2", "gateText": "🔒 Le jeu en ligne s'ouvre après deux courtes leçons (environ 3 minutes) : lire les indices et jouer contre un adversaire.", "gateGo": "🎓 Commencer la leçon {n}", "gateSkip": "Passer le tutoriel", "coach": {"1": ["🎓 J'ai choisi un nombre de 1 à 20. Tape un nombre et appuie sur « Vérifier ».", "L'indice dit à quel point tu es proche : 🔥 chaud — tout près, ❄️ froid — loin. Essaie un autre nombre.", "La ligne sous le thermomètre garde tous tes coups. Cherche entre eux — c'est plus rapide."], "2": ["🎓 Maintenant un duel contre un bot : chacun son tour. Le premier qui trouve le nombre gagne.", "Les coups du bot sont aussi des indices : regarde aussi ses « chaud / froid ».", "⚡ « +1 coup » est un jeton : deux coups d'affilée. Appuie avant ton coup quand tu es tout près."], "3": ["🎓 Des bonus 🎁 sont cachés sur la ligne. Marche dessus et il se déclenche : les bons frappent l'adversaire, les pièges te frappent.", "❓ « Quelque chose est proche » — un bonus est tout près. Risquer ou contourner — à toi de voir.", "Un bonus s'est déclenché ! Ce qu'il fait est sur la carte. Continue."]}, "lessonDone": "🎓 Leçon {n} réussie !", "lessonOpen": "🔓 Le jeu en ligne est ouvert", "tutAllDone": "Tutoriel terminé ! Ton icône 🎓 est dans le profil.", "lessonNext": "🎓 Leçon {n}", "lessonFinish": "🎓 Terminé", "tutReplay": "🎓 Refaire le tutoriel", "bcTitle": "Nouveau bonus : {name}", "bcNear": "❓ Quelque chose est proche", "bcOk": "Compris", "bcDesc": {"extra": "Qui marche dessus reçoit deux jetons « +1 coup ». Un jeton donne deux coups d'affilée.", "fog": "Le brouillard tombe sur l'adversaire : jusqu'à la fin de la manche, il ne voit plus les coups de l'autre.", "blind": "La cécité tombe sur l'adversaire : jusqu'à la fin de la manche, il ne voit plus ses propres coups.", "lava": "Le prochain coup de l'adversaire part dans la lave — un nombre au hasard.", "skip": "Un piège : qui marche dessus passe son prochain tour.", "gift": "Un piège : qui marche dessus offre un jeton « +1 coup » à l'adversaire.", "memory": "Un piège : qui marche dessus ne voit que les deux derniers coups jusqu'à la fin de la manche.", "near": "Un bonus se trouve à quelques pas de ton nombre — bon ou piège. Risquer ou contourner — à toi de voir."}, "lgApprentice": "🎓 Apprenti : aucune étoile perdue", "rkApprentice": "🎓 Apprenti · sans perte d'étoiles : encore {n}", "tutIconLocked": "S'ouvre après le tutoriel"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
@@ -2959,6 +2995,7 @@
       }
     },
     de: {
+      inv: {"invBtn": "🔗 Freund einladen", "invTitle": "Freund einladen", "invHint": "Zeig den Code oder schick den Link. Wer ihn öffnet, ist sofort dein Freund.", "invShare": "📤 Teilen", "invCopy": "📋 Link kopieren", "invCopied": "Link kopiert", "invShareText": "Lass uns Hot or Cold spielen! Mein Name im Spiel: {name}", "inTitle": "👋 {name} lädt dich als Freund ein", "inAdd": "Als Freund hinzufügen", "inLogin": "Anmelden oder registrieren", "inLater": "Nicht jetzt", "inDone": "Ihr seid jetzt Freunde: {name}", "errNoInvite": "Einladung nicht gefunden", "invDone": "Fertig"},
       curtain: {"text": "🔄 Gib das Handy an {name} weiter", "go": "Ich bin {name} — zeigen", "why": "Nebel, Blindheit oder kurzes Gedächtnis wirkt — der andere darf nicht hinsehen"},
       tut: {"tutTitle": "Tutorial · Lektion {n} von 3", "tutSub": ["Hinweise lesen", "Ein Duell gegen einen Bot", "Boni und Fallen"], "tutLocked": "🔒 nach den Lektionen 1–2", "gateText": "🔒 Online öffnet sich nach zwei kurzen Lektionen (etwa 3 Minuten): Hinweise lesen und gegen einen Gegner spielen.", "gateGo": "🎓 Lektion {n} starten", "gateSkip": "Tutorial überspringen", "coach": {"1": ["🎓 Ich habe eine Zahl von 1 bis 20 gewählt. Gib eine Zahl ein und drücke „Prüfen“.", "Der Hinweis sagt, wie nah du bist: 🔥 heiß — nah, ❄️ kalt — weit weg. Versuch eine andere Zahl.", "Die Linie unter dem Thermometer merkt sich alle Züge. Such zwischen ihnen — das geht schneller."], "2": ["🎓 Jetzt ein Duell gegen einen Bot: ihr zieht abwechselnd. Wer die Zahl zuerst nennt, gewinnt.", "Die Züge des Bots sind auch Hinweise: achte auch auf sein „heiß / kalt“.", "⚡ „+1 Zug“ ist eine Marke: zwei Züge hintereinander. Drück sie vor deinem Zug, wenn du nah dran bist."], "3": ["🎓 Auf der Linie sind Boni 🎁 versteckt. Tritt darauf und er wirkt: gute treffen den Gegner, Fallen treffen dich.", "❓ „Etwas ist in der Nähe“ — ein Bonus liegt nah. Riskieren oder umgehen — du entscheidest.", "Ein Bonus hat gewirkt! Was er tut, steht auf der Karte. Spiel weiter."]}, "lessonDone": "🎓 Lektion {n} geschafft!", "lessonOpen": "🔓 Online ist offen", "tutAllDone": "Tutorial geschafft! Dein 🎓-Symbol ist im Profil.", "lessonNext": "🎓 Lektion {n}", "lessonFinish": "🎓 Fertig", "tutReplay": "🎓 Tutorial wiederholen", "bcTitle": "Neuer Bonus: {name}", "bcNear": "❓ Etwas ist in der Nähe", "bcOk": "Verstanden", "bcDesc": {"extra": "Wer darauf tritt, bekommt zwei „+1 Zug“-Marken. Eine Marke gibt zwei Züge hintereinander.", "fog": "Nebel legt sich auf den Gegner: bis zum Rundenende sieht er die Züge des anderen nicht.", "blind": "Blindheit legt sich auf den Gegner: bis zum Rundenende sieht er seine eigenen Züge nicht.", "lava": "Der nächste Zug des Gegners fliegt in die Lava — eine zufällige Zahl.", "skip": "Eine Falle: wer darauf tritt, setzt den nächsten Zug aus.", "gift": "Eine Falle: wer darauf tritt, schenkt dem Gegner eine „+1 Zug“-Marke.", "memory": "Eine Falle: wer darauf tritt, sieht bis zum Rundenende nur die letzten zwei Züge.", "near": "Ein paar Schritte von deiner Zahl liegt ein Bonus — gut oder Falle. Riskieren oder umgehen — du entscheidest."}, "lgApprentice": "🎓 Lehrling: kein Stern verloren", "rkApprentice": "🎓 Lehrling · ohne Sternverlust: noch {n}", "tutIconLocked": "Öffnet sich nach dem Tutorial"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
@@ -3673,6 +3710,7 @@
     document.getElementById('tGamesTitle').textContent = L.online.games;
     document.getElementById('tFriendsBack').textContent = L.online.back;
     document.getElementById('tFriendsScreen').textContent = L.online.menuFriends;
+    document.getElementById('tInviteBtn').textContent = L.inv.invBtn;
     document.getElementById('tDeleteAccount').textContent = L.online.deleteAccount;
     document.getElementById('tChatInvite').textContent = L.online.chatInvite;
     document.getElementById('chatText').placeholder = L.online.chatPh;
@@ -6569,6 +6607,8 @@
   function afterAuth() {
     // Запомнить, чей это аккаунт, и подтянуть свою иконку
     syncProfile();
+    // Пришёл по ссылке-приглашению и только что вошёл — теперь можно добавить
+    if (pendingInvite()) setTimeout(checkPendingInvite, 300);
     if (authReturn === 'mode') return showScreen('mode');
     if (authReturn === 'online') return openOnline();
     if (authReturn === 'friends') return openFriends();
@@ -7140,6 +7180,12 @@
 
   // quiet — это опрос по таймеру: молча, иначе на экране будет мигать ошибка
   // связи каждые десять секунд
+  let friendsFlash = null;
+  function flashFriends(text) {
+    friendsFlash = text;
+    setNote('friendsNote', text);
+  }
+
   async function loadFriends(quiet) {
     if (friendsBusy) return;
     friendsBusy = true;
@@ -7151,8 +7197,11 @@
         findDecided = true;
         if (!rows.some(r => r.relation === 'friend')) document.getElementById('findBox').open = true;
       }
-      // Друзей нет — поиск раскрыт, и он сам всё объясняет: без лишней строки
-      setNote('friendsNote', '');
+      // Друзей нет — поиск раскрыт, и он сам всё объясняет: без лишней строки.
+      // Сообщение о только что сделанном (подружились, заблокировал) живёт до
+      // первого обновления списка — иначе оно стиралось, не успев показаться
+      setNote('friendsNote', friendsFlash || '');
+      friendsFlash = null;
     } catch (e) {
       if (!quiet) setNote('friendsNote', friendErrorText(e.message), true);
     } finally {
@@ -7386,6 +7435,118 @@
     }
   }
 
+  // ================= ПРИГЛАШЕНИЕ ПО ССЫЛКЕ =================
+  // Ссылка с кодом игрока: открыл — «Лев зовёт вас в друзья», нажал — сразу
+  // друзья. Код запоминаем до входа: новичку сначала нужно зарегистрироваться
+  const INVITE_KEY = 'hc_pending_invite';
+  let inviteLink = '';
+
+  function captureInvite() {
+    try {
+      const u = new URL(location.href);
+      const code = u.searchParams.get('invite');
+      if (!code) return;
+      localStorage.setItem(INVITE_KEY, code.trim().toUpperCase().slice(0, 12));
+      // Из адреса код убираем: иначе обновление страницы звало бы снова
+      u.searchParams.delete('invite');
+      // window. — обязательно: в игре своя переменная history (ходы партии)
+      window.history.replaceState(null, '', u.pathname + u.search + u.hash);
+    } catch (e) {}
+  }
+  function pendingInvite() {
+    try { return localStorage.getItem(INVITE_KEY); } catch (e) { return null; }
+  }
+  function dropPendingInvite() {
+    try { localStorage.removeItem(INVITE_KEY); } catch (e) {}
+    document.getElementById('inviteInModal').classList.add('hidden');
+  }
+
+  let inviteHost = null;
+  async function checkPendingInvite() {
+    const code = pendingInvite();
+    if (!code || !sb) return;
+    let host = null;
+    try {
+      const { data, error } = await sb.rpc('invite_owner', { p_code: code });
+      if (error) throw new Error(error.message);
+      host = data;
+    } catch (e) { return; }   // нет сети — спросим в следующий раз
+    if (!host || host === myName()) return dropPendingInvite();
+    inviteHost = host;
+    const I = t().inv;
+    document.getElementById('inTitle').textContent = I.inTitle.replace('{name}', playerName(host));
+    document.getElementById('inAdd').textContent = runAuth() ? I.inAdd : I.inLogin;
+    document.getElementById('inLater').textContent = I.inLater;
+    setNote('inNote', '');
+    document.getElementById('inviteInModal').classList.remove('hidden');
+  }
+
+  async function acceptPendingInvite() {
+    const code = pendingInvite();
+    if (!runAuth()) {
+      // Сначала вход или регистрация; код ждёт в браузере
+      document.getElementById('inviteInModal').classList.add('hidden');
+      authReturn = 'friends';
+      return showScreen('authChoice');
+    }
+    try {
+      const host = await friendRpc('accept_invite', { p_code: code });
+      dropPendingInvite();
+      openFriends();
+      flashFriends(t().inv.inDone.replace('{name}', playerName(host || inviteHost)));
+    } catch (e) {
+      const m = String(e.message || '');
+      setNote('inNote', m.indexOf('no_such_invite') >= 0 ? t().inv.errNoInvite : friendErrorText(m), true);
+    }
+  }
+
+  async function openInvite() {
+    const I = t().inv;
+    document.getElementById('invTitle').textContent = I.invTitle;
+    document.getElementById('invHint').textContent = I.invHint;
+    document.getElementById('invShare').textContent = I.invShare;
+    document.getElementById('invCopy').textContent = I.invCopy;
+    document.getElementById('invDone').textContent = I.invDone;
+    document.getElementById('invShare').classList.toggle('hidden', !navigator.share);
+    setNote('invNote', '');
+    let code;
+    try {
+      code = await friendRpc('my_invite_code', {});
+    } catch (e) {
+      return setNote('friendsNote', friendErrorText(e.message), true);
+    }
+    inviteLink = location.href.split(/[?#]/)[0] + '?invite=' + encodeURIComponent(code);
+    document.getElementById('invLink').textContent = inviteLink;
+    const box = document.getElementById('invQr');
+    box.innerHTML = '';
+    if (typeof qrcode === 'function') {
+      const qr = qrcode(0, 'M');
+      qr.addData(inviteLink);
+      qr.make();
+      box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+    }
+    document.getElementById('inviteModal').classList.remove('hidden');
+  }
+
+  function closeInvite() { document.getElementById('inviteModal').classList.add('hidden'); }
+
+  async function shareInvite() {
+    const I = t().inv;
+    try {
+      await navigator.share({ title: 'Hot or Cold', text: I.invShareText.replace('{name}', myName()), url: inviteLink });
+    } catch (e) {}
+  }
+
+  async function copyInvite() {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setNote('invNote', t().inv.invCopied);
+    } catch (e) {
+      // Буфер обмена недоступен — ссылка на экране выделяется целиком одним нажатием
+      setNote('invNote', inviteLink);
+    }
+  }
+
   // ================= ШТОРКА «ПЕРЕДАЙТЕ ТЕЛЕФОН» =================
   // Вдвоём за одним телефоном туман и слепота ничего не прятали: экран общий,
   // и второй видел всё. Пока на ком-то помеха, после смены хода экран закрыт,
@@ -7440,20 +7601,21 @@
   function tutInit() {
     try {
       if (localStorage.getItem(TUT_KEY) !== null) return;
-      const quiet = ['hc_lang', 'hc_mute', 'hc_sound', TUT_KEY, SEEN_BONUS_KEY];
+      const quiet = ['hc_lang', 'hc_mute', 'hc_sound', TUT_KEY, SEEN_BONUS_KEY, INVITE_KEY];
       let veteran = false;
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (k && k.indexOf('hc_') === 0 && quiet.indexOf(k) < 0) veteran = true;
       }
-      tutSave({ done: [], skipped: veteran, veteran: veteran });
+      // Пришёл по приглашению — друг ждёт: онлайн открыт сразу, уроки только предлагаются
+      tutSave({ done: [], skipped: veteran, veteran: veteran, invited: !!pendingInvite() });
       // Старые игроки бонусы уже видели: карточки им ни к чему
       if (veteran) localStorage.setItem(SEEN_BONUS_KEY, JSON.stringify(BONUS_TYPES.concat(['near'])));
     } catch (e) {}
   }
   function onlineOpen() {
     const st = tutState();
-    return st.skipped || (st.done.indexOf(1) >= 0 && st.done.indexOf(2) >= 0);
+    return st.skipped || !!st.invited || (st.done.indexOf(1) >= 0 && st.done.indexOf(2) >= 0);
   }
   function tutorialComplete() { return tutState().done.length >= 3; }
   function nextLessonNo() {
@@ -7738,7 +7900,7 @@
       closeBlock();
       // Из переписки с заблокированным уходим: писать туда больше нельзя
       if (screen === 'chat') openFriends(); else await loadFriends();
-      setNote('friendsNote', t().online.blDone.replace('{name}', playerName(name)));
+      flashFriends(t().online.blDone.replace('{name}', playerName(name)));
     } catch (e) {
       setNote('blMsg', friendErrorText(e.message), true);
     }
@@ -9059,6 +9221,7 @@
   // или смена размера окна требуют пересчёта
   window.addEventListener('resize', () => { if (screen === 'game') renderNumberLine(); });
 
+  captureInvite();
   tutInit();
   initScaleBox();
   document.getElementById('langSwitcher').value = currentLang;
@@ -9067,6 +9230,7 @@
   showScreen('mode');
   // Подтянуть свою иконку и проверить, что сохранённый вход ещё наш
   if (runAuth()) syncProfile();
+  checkPendingInvite();
 
   checkRemoteConfig();
   setInterval(checkRemoteConfig, 60000);
