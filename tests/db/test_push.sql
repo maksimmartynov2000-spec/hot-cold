@@ -87,8 +87,13 @@ begin
     raise exception 'ОШИБКА: вызов уведомил неправильно: % % %', r.username, r.kind, r.who;
   end if;
   perform respond_challenge('Кира','4321', mid, true);
-  if (select count(*) from push_outbox) is distinct from 1 then
-    raise exception 'ОШИБКА: принятый вызов уведомил ещё раз';
+  -- Принятый вызов: приглашённому второй раз не пишем, а вызвавшему — «принял»
+  -- (миграция 038): партия ждёт обоих, и он должен об этом узнать
+  if (select count(*) from push_outbox where username = 'Кира') is distinct from 1 then
+    raise exception 'ОШИБКА: принятый вызов уведомил приглашённого ещё раз';
+  end if;
+  if (select count(*) from push_outbox where username = 'Лев' and kind = 'accepted') is distinct from 1 then
+    raise exception 'ОШИБКА: вызвавшему не сказали, что вызов принят';
   end if;
 
   -- Рейтинговая игра из подбора никого не дёргает: оба и так у экрана

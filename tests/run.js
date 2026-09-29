@@ -5603,6 +5603,92 @@ async function testTutorial(browser) {
   await page.context().close();
 }
 
+// Тексты уведомлений: каждый вид, который знает база, есть на всех языках,
+// а заголовок — «Hot or Cold» везде
+async function testPushTexts() {
+  console.log('\nТексты уведомлений');
+  const fs = require('fs'), path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'push', 'index.ts'), 'utf8');
+  let code = src.slice(src.indexOf('const TEXT'), src.indexOf('Deno.serve'));
+  code = 'return ' + code.slice(code.indexOf('>> = {') + 5).trim().replace(/;\s*$/, '');
+  const TEXT = new Function(code)();
+  // Виды — из последней миграции, где их список меняли
+  const dir = path.join(__dirname, '..', 'supabase', 'migrations');
+  const last = fs.readdirSync(dir).sort().reverse().map(f => fs.readFileSync(path.join(dir, f), 'utf8'))
+    .find(t => /constraint push_kind/.test(t));
+  const kinds = last.match(/check \(kind in \(([^)]*)\)\)/)[1].split(',').map(k => k.trim().replace(/'/g, ''));
+  const missing = [];
+  ['en', 'ru', 'fr', 'de'].forEach(l => kinds.forEach(k => {
+    const f = TEXT[l] && TEXT[l][k];
+    const r = f ? f('Кира') : null;
+    if (!r || r[0] !== 'Hot or Cold' || !r[1]) missing.push(l + ':' + k);
+  }));
+  check('у каждого вида уведомления есть текст на 4 языках, заголовок «Hot or Cold»',
+    kinds.length >= 6 && missing.length === 0, 'видов ' + kinds.length + ', нет: ' + missing.join(' '));
+  check('«принял вызов» называет того, кто принял', TEXT.ru.accepted('Кира')[1].startsWith('Кира'), TEXT.ru.accepted('Кира')[1]);
+}
+
+// Вдвоём за одним телефоном при помехах — шторка между ходами
+async function testCurtain(browser) {
+  console.log('\nШторка «Передайте телефон»');
+  const page = await newGame(browser);
+  await page.click('.mode-btn.duel');
+  await page.waitForTimeout(150);
+  await page.selectOption('#rangeMax', '100');
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { secret = 90; });
+  const state = () => page.evaluate(() => ({
+    shown: !document.getElementById('curtain').classList.contains('hidden'),
+    text: document.getElementById('ctText').textContent, go: document.getElementById('ctGo').textContent, cur: D.cur }));
+  const guess = async v => { await page.fill('#guessInput', String(v)); await page.click('#tSubmitGuess'); await page.waitForTimeout(150); };
+  await guess(10);
+  await guess(15);
+  let st = await state();
+  check('без помех шторки нет — и после двух ходов', !st.shown && st.cur === 0, JSON.stringify(st));
+  // Игрок 1 наступает на туман — туман ложится на игрока 2
+  await page.evaluate(() => { D.bonuses = [{ value: 20, type: 'fog', taken: false }]; bonusMode = true; renderAll(); });
+  await guess(20);
+  st = await state();
+  check('помеха есть — после хода «Передайте телефон: Игрок 2»', st.shown && st.cur === 1 &&
+    st.text.includes('Передайте телефон: Игрок 2') && st.go === 'Я Игрок 2 — показать', JSON.stringify(st));
+  await page.click('#ctGo');
+  await page.waitForTimeout(100);
+  st = await state();
+  check('«Показать» открывает экран тому, чей ход', !st.shown && st.cur === 1, JSON.stringify(st));
+  await guess(30);
+  st = await state();
+  check('и так — после каждого хода, пока действует помеха', st.shown && st.cur === 0 && st.text.includes('Игрок 1'), JSON.stringify(st));
+  await page.click('#ctGo');
+  await guess(90);
+  st = await state();
+  check('раунд окончен — шторки нет', !st.shown, JSON.stringify(st));
+  await page.context().close();
+
+  // С ботом и онлайн шторки не бывает: экран у каждого свой
+  const p2 = await newGame(browser);
+  await p2.click('.mode-btn.bot');
+  await p2.waitForTimeout(150);
+  await p2.evaluate(() => { BOT_SPEED = 1000; });
+  await p2.click('#tStartMatch');
+  await p2.waitForTimeout(250);
+  await p2.evaluate(() => { stopBot(); secret = 90; D.fog = [true, false]; D.cur = 1; renderAll(); duelPlay(40); stopBot(); });
+  await p2.waitForTimeout(150);
+  check('с ботом шторки нет', await p2.evaluate(() => document.getElementById('curtain').classList.contains('hidden')));
+  await p2.context().close();
+
+  // Жетон, пока ждём соперника онлайн, не нажимается
+  const p3 = await newGame(browser, { user: 'Лев' });
+  await p3.evaluate(() => { Object.assign(window.__match, { lobby: true, lobbyLeft: 200 }); openMatch(1); });
+  await p3.waitForTimeout(500);
+  const tok = await p3.evaluate(() => document.getElementById('ptoken0').disabled);
+  await p3.evaluate(() => { Object.assign(window.__match, { lobby: false, lobbyLeft: null, startsIn: null }); refreshMatch(true); });
+  await p3.waitForTimeout(400);
+  const tok2 = await p3.evaluate(() => document.getElementById('ptoken0').disabled);
+  check('пока ждём соперника, жетон не нажимается; после старта — можно', tok === true && tok2 === false, tok + ' → ' + tok2);
+  await p3.context().close();
+}
+
 async function testPolish(browser) {
   console.log('\nПолировка');
   let page = await newGame(browser);
@@ -6147,6 +6233,8 @@ async function testKeyPage(browser) {
     await testMatchFlow(browser);
     await testBlockReport(browser);
     await testTutorial(browser);
+    await testPushTexts();
+    await testCurtain(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
