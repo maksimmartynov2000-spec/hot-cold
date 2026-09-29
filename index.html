@@ -1861,7 +1861,7 @@
     </div>
     <div class="setup-field">
       <label id="tRunPin"></label>
-      <input type="text" id="runPin" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="1234" />
+      <input type="text" id="runPin" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="123456" />
     </div>
     <div class="setup-field hidden" id="hintField">
       <label id="tRunHint"></label>
@@ -2127,6 +2127,7 @@
       <div class="hidden" id="pfEdit">
         <!-- Имя и PIN меняют редко: под одной строкой. «Показать PIN» — выше,
              на виду: его дети забывают чаще всего -->
+        <div class="fr-note hidden" id="pfPinShort" style="margin-bottom:8px"></div>
         <details class="fold pf-fold" id="pfEditFold">
         <summary class="fold-head" id="tNamePinHead">Name and PIN</summary>
         <div class="fold-body">
@@ -2144,8 +2145,8 @@
         <button class="btn-ghost btn-block" id="tPinStart" style="margin-top:8px"
                 onclick="openPinChange(true)"></button>
         <div class="pf-form hidden" id="pinBox">
-          <input type="password" id="pinOld" inputmode="numeric" maxlength="4" autocomplete="off" />
-          <input type="password" id="pinNew" inputmode="numeric" maxlength="4" autocomplete="off" />
+          <input type="password" id="pinOld" inputmode="numeric" maxlength="6" autocomplete="off" />
+          <input type="password" id="pinNew" inputmode="numeric" maxlength="6" autocomplete="off" />
           <input type="text" id="pinHintNew" maxlength="60" autocomplete="off" />
           <div class="setup-row">
             <button class="btn-ghost btn-block" id="tPinCancel" onclick="openPinChange(false)"></button>
@@ -2465,10 +2466,10 @@
         loginBtn: "Log in",
         registerBtn: "Sign up",
         name: "Name",
-        pin: "PIN (4 digits)",
+        pin: "PIN (6 digits)", pinLogin: "PIN", pinShort: "🔒 Your PIN has 4 digits — change it to 6, it is much safer",
         namePh: "Your name",
         errName: "Name must be 2 to 20 characters",
-        errPin: "PIN — exactly 4 digits",
+        errPin: "PIN — exactly 6 digits",
         errFill: "Fill in name and PIN",
         errNoConn: "No connection to the server",
         errTaken: "That name is taken, pick another one",
@@ -2522,7 +2523,7 @@
         renameStart: "Change name", renameNew: "New name",
         renameDone: "Name changed",
         renameWait: "You can change your name once a day \u2014 wait {n} h more",
-        pinStart: "Change PIN", pinOld: "Current PIN", pinNew: "New PIN (4 digits)",
+        pinStart: "Change PIN", pinOld: "Current PIN", pinNew: "New PIN (6 digits)",
         pinHintNew: "Hint (optional)",
         pinDone: "PIN changed. The old hint was removed",
         pinDoneHint: "PIN changed, the new hint is saved",
@@ -2695,10 +2696,10 @@
         loginBtn: "Войти",
         registerBtn: "Зарегистрироваться",
         name: "Имя",
-        pin: "PIN (4 цифры)",
+        pin: "PIN (6 цифр)", pinLogin: "PIN", pinShort: "🔒 У вас PIN из 4 цифр — смените на 6, так гораздо надёжнее",
         namePh: "Ваше имя",
         errName: "Имя должно быть от 2 до 20 символов",
-        errPin: "PIN — ровно 4 цифры",
+        errPin: "PIN — ровно 6 цифр",
         errFill: "Заполните имя и PIN",
         errNoConn: "Нет связи с сервером",
         errTaken: "Это имя уже занято, придумайте другое",
@@ -2752,7 +2753,7 @@
         renameStart: "Сменить имя", renameNew: "Новое имя",
         renameDone: "Имя изменено",
         renameWait: "Имя можно менять раз в сутки — подождите ещё {n} ч",
-        pinStart: "Сменить PIN", pinOld: "Текущий PIN", pinNew: "Новый PIN (4 цифры)",
+        pinStart: "Сменить PIN", pinOld: "Текущий PIN", pinNew: "Новый PIN (6 цифр)",
         pinHintNew: "Подсказка (необязательно)",
         pinDone: "PIN изменён. Старая подсказка удалена",
         pinDoneHint: "PIN изменён, новая подсказка сохранена",
@@ -2925,10 +2926,10 @@
         loginBtn: "Se connecter",
         registerBtn: "S'inscrire",
         name: "Nom",
-        pin: "PIN (4 chiffres)",
+        pin: "PIN (6 chiffres)", pinLogin: "PIN", pinShort: "🔒 Votre PIN a 4 chiffres — passez à 6, c'est bien plus sûr",
         namePh: "Votre nom",
         errName: "Le nom doit faire entre 2 et 20 caractères",
-        errPin: "PIN — exactement 4 chiffres",
+        errPin: "PIN — exactement 6 chiffres",
         errFill: "Remplissez le nom et le PIN",
         errNoConn: "Pas de connexion au serveur",
         errTaken: "Ce nom est déjà pris, choisissez-en un autre",
@@ -2982,7 +2983,7 @@
         renameStart: "Changer de nom", renameNew: "Nouveau nom",
         renameDone: "Nom modifi\u00e9",
         renameWait: "Le nom se change une fois par jour \u2014 encore {n} h",
-        pinStart: "Changer le PIN", pinOld: "PIN actuel", pinNew: "Nouveau PIN (4 chiffres)",
+        pinStart: "Changer le PIN", pinOld: "PIN actuel", pinNew: "Nouveau PIN (6 chiffres)",
         pinHintNew: "Indice (facultatif)",
         pinDone: "PIN modifi\u00e9. L\u2019ancien indice a \u00e9t\u00e9 supprim\u00e9",
         pinDoneHint: "PIN modifi\u00e9, le nouvel indice est enregistr\u00e9",
@@ -3155,10 +3156,10 @@
         loginBtn: "Anmelden",
         registerBtn: "Registrieren",
         name: "Name",
-        pin: "PIN (4 Ziffern)",
+        pin: "PIN (6 Ziffern)", pinLogin: "PIN", pinShort: "🔒 Deine PIN hat 4 Ziffern — wechsle auf 6, das ist viel sicherer",
         namePh: "Dein Name",
         errName: "Der Name muss 2 bis 20 Zeichen lang sein",
-        errPin: "PIN — genau 4 Ziffern",
+        errPin: "PIN — genau 6 Ziffern",
         errFill: "Name und PIN ausfüllen",
         errNoConn: "Keine Verbindung zum Server",
         errTaken: "Dieser Name ist vergeben, wähle einen anderen",
@@ -3212,7 +3213,7 @@
         renameStart: "Namen \u00e4ndern", renameNew: "Neuer Name",
         renameDone: "Name ge\u00e4ndert",
         renameWait: "Der Name l\u00e4sst sich einmal am Tag \u00e4ndern \u2014 noch {n} Std.",
-        pinStart: "PIN \u00e4ndern", pinOld: "Aktuelle PIN", pinNew: "Neue PIN (4 Ziffern)",
+        pinStart: "PIN \u00e4ndern", pinOld: "Aktuelle PIN", pinNew: "Neue PIN (6 Ziffern)",
         pinHintNew: "Hinweis (freiwillig)",
         pinDone: "PIN ge\u00e4ndert. Der alte Hinweis wurde gel\u00f6scht",
         pinDoneHint: "PIN ge\u00e4ndert, der neue Hinweis ist gespeichert",
@@ -3742,7 +3743,7 @@
     document.getElementById('tRunHint').textContent = L.run.hint;
     document.getElementById('runHint').placeholder = L.run.hintPh;
     document.getElementById('tRunForgot').textContent = L.run.forgot;
-    document.getElementById('tRunPin').textContent = L.run.pin;
+    document.getElementById('tRunPin').textContent = runAuthMode === 'register' ? L.run.pin : L.run.pinLogin;
     document.getElementById('runUsername').placeholder = L.run.namePh;
     document.getElementById('tRunStart').textContent = L.run.start;
     document.getElementById('tRunTop').textContent = L.run.top;
@@ -6233,6 +6234,11 @@
     }
     document.getElementById('accountName').textContent = auth ? auth.username : L.run.settings;
     document.getElementById('tAccountTitle').textContent = '';
+    // Старый PIN из 4 цифр — предложить сменить на 6
+    const short = !!(auth && /^[0-9]{4}$/.test(auth.pin || ''));
+    const warn = document.getElementById('pfPinShort');
+    warn.textContent = short ? L.run.pinShort : '';
+    warn.classList.toggle('hidden', !short);
     const lg = document.getElementById('pfLeague');
     lg.classList.toggle('hidden', !(auth && ladderInfo));
     if (auth && ladderInfo) {
@@ -6511,7 +6517,8 @@
     const old = document.getElementById('pinOld').value.trim();
     const next = document.getElementById('pinNew').value.trim();
     const hint = (document.getElementById('pinHintNew').value || '').trim().slice(0, 60);
-    if (!/^[0-9]{4}$/.test(old) || !/^[0-9]{4}$/.test(next)) return setNote('pinNote', L.errPin, true);
+    // Текущий — 4 или 6 цифр (старые аккаунты), новый — всегда 6
+    if (!/^([0-9]{4}|[0-9]{6})$/.test(old) || !/^[0-9]{6}$/.test(next)) return setNote('pinNote', L.errPin, true);
     const btn = document.getElementById('tPinSave');
     btn.disabled = true;
     try {
@@ -6647,6 +6654,9 @@
       authMode === 'register' ? L.run.registerTitle : L.run.loginTitle;
     document.getElementById('runAuthSubmitBtn').textContent =
       authMode === 'register' ? L.run.registerBtn : L.run.loginBtn;
+    // Вход — старым 4-значным PIN тоже; регистрация — только 6 цифр
+    document.getElementById('tRunPin').textContent = authMode === 'register' ? L.run.pin : L.run.pinLogin;
+    document.getElementById('runPin').placeholder = authMode === 'register' ? '123456' : '';
     runAuthError('');
     showScreen('auth');
   }
@@ -6684,7 +6694,8 @@
     const L = t();
     const { username, pin } = runAuthReadForm();
     if (username.length < 2 || username.length > 20) return runAuthError(L.run.errName);
-    if (!/^[0-9]{4}$/.test(pin)) return runAuthError(L.run.errPin);
+    // Новые аккаунты — 6 цифр: 4 цифры подбираются за пару недель
+    if (!/^[0-9]{6}$/.test(pin)) return runAuthError(L.run.errPin);
     if (!sb) return runAuthError(L.run.errNoConn);
     const btn = document.getElementById('runAuthSubmitBtn');
     btn.disabled = true;

@@ -100,7 +100,7 @@ function stubSupabase(opts) {
             if (name === 'rename_student') return { data: args.p_new, error: null };
             if (name === 'change_pin') {
               if (args.p_pin !== P.pin) return { data: null, error: { message: 'auth_failed' } };
-              if (!/^[0-9]{4}$/.test(args.p_new_pin || '')) return { data: null, error: { message: 'invalid_pin' } };
+              if (!/^[0-9]{6}$/.test(args.p_new_pin || '')) return { data: null, error: { message: 'invalid_pin' } };
               P.pin = args.p_new_pin; P.hint = args.p_hint;
               return { data: true, error: null };
             }

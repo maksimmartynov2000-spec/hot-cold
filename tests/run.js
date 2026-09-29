@@ -16,6 +16,16 @@ async function newGame(browser, opts) {
   return page;
 }
 
+// Вдвоём за одним телефоном при помехе после хода появляется шторка
+// «Передайте телефон» — игрок её убирает, и тесты тоже. Нет шторки — ничего
+async function liftCurtainIfShown(page) {
+  const shown = await page.evaluate(() => {
+    const c = document.getElementById('curtain');
+    return !!c && !c.classList.contains('hidden');
+  }).catch(() => false);
+  if (shown) { await page.click('#ctGo'); await page.waitForTimeout(80); }
+}
+
 // Язык живёт в окне профиля: открыть, выбрать, закрыть
 async function setLang(page, lang) {
   await page.click('#accountChip');
@@ -72,6 +82,7 @@ async function testModes(browser) {
   await page.fill('#guessInput', String(secret));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(200);
+  await liftCurtainIfShown(page);
   check('тренировка: победа показывает результат',
     (await page.locator('#resultBox').textContent()).includes('Победа'));
 
@@ -156,6 +167,7 @@ async function testScoringAndSubmit(browser) {
   await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(150);
+  await liftCurtainIfShown(page);
   const afterWin = await page.evaluate(() => ({ score: RUN.totalScore, locked: RUN.locked }));
   check('за угаданный раунд начисляются очки', afterWin.score > 0, String(afterWin.score));
 
@@ -163,6 +175,7 @@ async function testScoringAndSubmit(browser) {
   await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(100);
+  await liftCurtainIfShown(page);
   check('в паузе между раундами очки не накручиваются',
     (await page.evaluate(() => RUN.totalScore)) === afterWin.score);
 
@@ -175,6 +188,7 @@ async function testScoringAndSubmit(browser) {
     await page.fill('#guessInput', String(wrong));
     await page.click('#tSubmitGuess');
     await page.waitForTimeout(60);
+    await liftCurtainIfShown(page);
   }
   await page.waitForTimeout(500);
   check('после проигрыша возвращаемся в хаб', await page.locator('#screenRunHub').isVisible());
@@ -347,6 +361,7 @@ async function testSoundAndShare(browser) {
   await page.fill('#guessInput', String(wrong));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(200);
+  await liftCurtainIfShown(page);
   check('на ход играет звук', (await page.evaluate(() => window.__tones)) > 0);
 
   // и обратная сторона: выключенный звук читается из памяти при запуске
@@ -360,6 +375,7 @@ async function testSoundAndShare(browser) {
   await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(1200);
+  await liftCurtainIfShown(page);
   // toLocaleString ставит неразрывный пробел — сравниваем по цифрам
   const status = (await page.locator('#tConfirmed').textContent()).replace(/\s/g, ' ');
   check('личный рекорд виден во время игры', status.includes('4 200'), status.trim());
@@ -379,6 +395,7 @@ async function testSoundAndShare(browser) {
     await page.fill('#guessInput', String(w));
     await page.click('#tSubmitGuess');
     await page.waitForTimeout(60);
+    await liftCurtainIfShown(page);
   }
   await page.waitForTimeout(600);
   check('в итогах есть кнопка «поделиться»', await page.locator('#shareBtn').isVisible());
@@ -404,6 +421,7 @@ async function testDuelWording(browser) {
   await page.fill('#guessInput', String(secret));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(300);
+  await liftCurtainIfShown(page);
   const text = (await page.locator('#resultBox').textContent()).replace(/\s+/g, ' ');
   check('в итогах дуэли нет слова «матч»', !/матч/i.test(text), text.slice(0, 70));
   await done(page);
@@ -423,6 +441,7 @@ async function testPauseAndGiveUp(browser) {
   await page.fill('#guessInput', String(s));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(1200);
+  await liftCurtainIfShown(page);
   const scoreBefore = await page.evaluate(() => RUN.totalScore);
   check('забег живёт на сервере, а не в браузере',
     await page.evaluate(() => window.__run.active === true && window.__run.round === 2),
@@ -626,6 +645,7 @@ async function testFrostMode(browser) {
   await page.fill('#guessInput', '-400');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const h = await page.evaluate(() => ({ len: history.length, d: history[0].distance, s: secret }));
   check('отрицательная догадка принята', h.len === 1);
   check('расстояние от отрицательной догадки верное', h.d === Math.abs(-400 - h.s),
@@ -635,12 +655,14 @@ async function testFrostMode(browser) {
   await page.fill('#guessInput', '0');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   check('ноль принимается как догадка', await page.evaluate(() => history.length) === 2);
 
   // за границей — не принимается
   await page.fill('#guessInput', '-501');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(200);
+  await liftCurtainIfShown(page);
   check('число за нижней границей отклонено', await page.evaluate(() => history.length) === 2);
 
   // рекорды не перемешиваются с обычной игрой
@@ -714,6 +736,7 @@ async function testNumberLine(browser) {
   await page.fill('#guessInput', '-1');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const marks = await page.evaluate(() => {
     const c = [...document.querySelectorAll('#numLineSvg circle')];
     return { count: c.length, filled: c.filter(e => e.getAttribute('fill') !== 'none').length,
@@ -798,6 +821,7 @@ async function testDistanceHint(browser) {
     await page.fill('#guessInput', '1');
     await page.click('#tSubmitGuess');
     await page.waitForTimeout(300);
+    await liftCurtainIfShown(page);
 
     check(kind + ': пояс показан', await page.locator('#feedbackBand').isVisible());
     check(kind + ': кнопка подсказки подсвечена', await page.evaluate(() =>
@@ -941,6 +965,7 @@ async function testMinusButton(browser) {
   check('цифры дописываются после минуса', (await page.inputValue('#guessInput')) === '-30');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   check('отрицательная догадка засчитана',
     await page.evaluate(() => history.length === 1 && history[0].guess === -30));
 
@@ -1005,6 +1030,7 @@ async function testShortHistory(browser) {
       await page.fill('#guessInput', String(g));
       await page.click('#tSubmitGuess');
       await page.waitForTimeout(90);
+      await liftCurtainIfShown(page);
     }
 
     const seen = await page.evaluate(() => {
@@ -1072,10 +1098,12 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '43');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   check('за три клетки бонус не чувствуется', !(await page.locator('#bonusLine').isVisible()));
   await page.fill('#guessInput', '42');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const nearLine = await page.locator('#bonusLine').textContent();
   check('за две клетки виден сигнал', nearLine.indexOf('рядом') >= 0, nearLine);
   // Рядом может лежать и ловушка, поэтому значок больше не подарок
@@ -1090,6 +1118,7 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const extra = await page.evaluate(() => ({ tokens: D.tokens.slice(), cur: D.cur }));
   check('«Два про запас» даёт взявшему два жетона',
     extra.tokens[0] === tokensBefore[0] + 2, tokensBefore.join() + ' → ' + extra.tokens.join());
@@ -1105,6 +1134,7 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const fog = await page.evaluate(() => ({
     onRival: D.fog[1] === true, turn: D.cur,
     masked: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent),
@@ -1115,13 +1145,25 @@ async function testBonusMode(browser) {
   // Ход, которым туман взяли, сделан до тумана — его соперник уже видел
   check('ход, которым взяли туман, виден', fog.masked.join() === '40', fog.masked.join());
   check('на карточке соперника виден значок помехи', fog.marks.indexOf('🙈') >= 0, fog.marks);
+  // Телефон передают из рук в руки: при помехе между ходами — шторка
+  const lift = async () => {
+    if (await page.evaluate(() => !document.getElementById('curtain').classList.contains('hidden'))) {
+      await page.click('#ctGo');
+      await page.waitForTimeout(100);
+    }
+  };
+  await lift();
   // А следующий чужой ход на его ходу закрыт
   await page.fill('#guessInput', '10');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(150);
+  await liftCurtainIfShown(page);
+  await lift();
   await page.fill('#guessInput', '20');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
+  await lift();
   const fog2 = await page.evaluate(() => ({
     turn: D.cur,
     masked: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent),
@@ -1137,13 +1179,16 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   check('«Слепой ход» ложится на соперника', await page.evaluate(() => D.blind[1] === true));
   await page.fill('#guessInput', '50');       // ходит соперник
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   await page.fill('#guessInput', '60');       // ходит взявший
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const blindView = await page.evaluate(() => ({
     still: D.blind[1] === true, viewer: D.cur,
     rows: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent)
@@ -1161,6 +1206,7 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const guard = await page.evaluate(() => ({
     blind: D.blind[1], fog: D.fog[1], shown: D.lastBonus, tokens: D.tokens.slice()
   }));
@@ -1203,6 +1249,7 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(600);
+  await liftCurtainIfShown(page);
   const waiting = await page.evaluate(() => ({
     onRival: D.autoLava[1] === true, turn: D.cur, moves: history.length,
     panel: !document.getElementById('forcedTurn').classList.contains('hidden'),
@@ -1255,10 +1302,12 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   check('«Пропуск хода» ложится на взявшего', await page.evaluate(() => D.skip[0] === true));
   await page.fill('#guessInput', '50');       // соперник ходит как обычно
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const skipping = await page.evaluate(() => ({
     turn: D.cur, moves: history.length,
     panel: !document.getElementById('forcedTurn').classList.contains('hidden'),
@@ -1283,9 +1332,11 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   await page.fill('#guessInput', '50');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const before = await page.evaluate(() => ({
     tokens: D.tokens.slice(), turn: D.cur,
     token: document.getElementById('ptoken0').disabled,
@@ -1324,6 +1375,7 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '60');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(350);
+  await liftCurtainIfShown(page);
   const second = await page.evaluate(() => ({
     turn: D.cur, last: history[history.length - 1].guess, by: history[history.length - 1].p
   }));
@@ -1337,6 +1389,7 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const gift = await page.evaluate(() => D.tokens.slice());
   check('«Подарок сопернику» добавляет жетон сопернику', gift[1] === 2, gift.join());
   check('а взявшему — ничего', gift[0] === 1, gift.join());
@@ -1347,6 +1400,7 @@ async function testBonusMode(browser) {
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   check('«Короткая память» ложится на взявшего',
     await page.evaluate(() => D.shortMemory[0] === true));
   const memory = await page.evaluate(() => {
@@ -1585,7 +1639,16 @@ async function testPinHelp(browser) {
   check('при регистрации нет кнопки «Забыли PIN?»', !(await page.locator('#tRunForgot').isVisible()));
 
   await page.fill('#runUsername', 'Максим');
+  // Регистрация — только 6 цифр: 4 не уходят на сервер, а говорят почему
   await page.fill('#runPin', '1234');
+  await page.click('#runAuthSubmitBtn');
+  await page.waitForTimeout(200);
+  const short4 = await page.evaluate(() => ({ err: document.getElementById('runAuthError').textContent,
+    sent: window.__rpcCalls.filter(c => c.name === 'register_student').length,
+    label: document.getElementById('tRunPin').textContent }));
+  check('регистрация с PIN из 4 цифр — «ровно 6 цифр», на сервер не уходит',
+    short4.err === 'PIN — ровно 6 цифр' && short4.sent === 0 && short4.label === 'PIN (6 цифр)', JSON.stringify(short4));
+  await page.fill('#runPin', '123456');
   await page.fill('#runHint', 'номер дома');
   await page.click('#runAuthSubmitBtn');
   await page.waitForTimeout(300);
@@ -1704,6 +1767,7 @@ async function testEndOfRound(browser) {
   await page.fill('#guessInput', '10');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const mid = await nl();
   check('пока идёт партия, ответ на прямой не отмечен', mid.answer === 0, JSON.stringify(mid));
   check('текущая догадка отмечена залитой точкой', mid.current === 1);
@@ -1714,9 +1778,11 @@ async function testEndOfRound(browser) {
   await page.fill('#guessInput', '90');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(200);
+  await liftCurtainIfShown(page);
   await page.fill('#guessInput', '95');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   check('последняя догадка открывает поле ответа', await page.locator('#finalBox').isVisible());
   check('шкала расстояний ещё раскрыта: партия не кончилась',
     await page.evaluate(() => document.getElementById('scaleBox').open));
@@ -1749,9 +1815,11 @@ async function testEndOfRound(browser) {
   await page.fill('#guessInput', '25');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(200);
+  await liftCurtainIfShown(page);
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(300);
+  await liftCurtainIfShown(page);
   const won = await nl();
   check('после победы ответ отмечен на прямой', won.answer === 1, JSON.stringify(won));
   check('и подписан он ответом, а не догадкой', won.answerLabels.join() === '40',
@@ -1960,6 +2028,7 @@ async function testDotMotion(browser) {
   await page.fill('#guessInput', '10');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   const first = await anim();
   check('первый ход не едет — ему неоткуда', first.from === null, JSON.stringify(first));
   check('зато он проявляется', first.fade, JSON.stringify(first));
@@ -2129,6 +2198,7 @@ async function testResultPlacement(browser) {
     await page.fill('#guessInput', String(g));
     await page.click('#tSubmitGuess');
     await page.waitForTimeout(200);
+    await liftCurtainIfShown(page);
   }
   await page.waitForTimeout(300);
 
@@ -2207,7 +2277,7 @@ async function testFriends(browser) {
   await page.click('#tRunChoiceRegister');
   await page.waitForTimeout(200);
   await page.fill('#runUsername', 'Лев');
-  await page.fill('#runPin', '1234');
+  await page.fill('#runPin', '123456');
   await page.click('#runAuthSubmitBtn');
   await page.waitForTimeout(400);
   check('после входа попадаем туда, откуда пришли',
@@ -2482,6 +2552,7 @@ async function testOnlineMatch(browser) {
   await page.fill('#guessInput', '40');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(400);
+  await liftCurtainIfShown(page);
   const moved = await page.evaluate(() => ({
     rows: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent),
     cur: D.cur,
@@ -2520,6 +2591,7 @@ async function testOnlineMatch(browser) {
   await page.fill('#guessInput', '42');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(500);
+  await liftCurtainIfShown(page);
   const won = await page.evaluate(() => ({
     secret: secret, over: D.roundOver, winner: D.roundWinner,
     result: document.getElementById('resultBox').textContent
@@ -3845,6 +3917,7 @@ async function testNewLook(browser) {
   await page.fill('#guessInput', '50');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(300);
+  await liftCurtainIfShown(page);
   const duel = await page.evaluate(() => {
     const card = document.getElementById('card');
     const edge = card.getBoundingClientRect().right - parseFloat(getComputedStyle(card).paddingRight);
@@ -4170,6 +4243,7 @@ async function soloGame(browser, range, secret, guesses, opts) {
     await page.fill('#guessInput', String(g));
     await page.click('#tSubmitGuess');
     await page.waitForTimeout(80);
+    await liftCurtainIfShown(page);
   }
   await page.waitForTimeout(250);
   return page;
@@ -4325,6 +4399,7 @@ async function testReview(browser) {
   await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret > RANGE_MIN + 30 ? RANGE_MIN : RANGE_MAX)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(200);
+  await liftCurtainIfShown(page);
   check('в забеге оценок по ходу нет', await page.evaluate(() =>
     history.length === 1 && !document.querySelector('#historyList .h-grade')));
   await done(page);
@@ -4357,6 +4432,7 @@ async function testReview(browser) {
   await page.fill('#guessInput', String(await page.evaluate(() => secret === 1 ? 2 : 1)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
+  await liftCurtainIfShown(page);
   check('после тренировки ходы дуэли без значков разбора',
     await page.evaluate(() => !document.querySelector('#historyList .gr-badge')));
   await done(page);
@@ -4370,6 +4446,7 @@ async function testReview(browser) {
   await page.fill('#guessInput', String(s2));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(300);
+  await liftCurtainIfShown(page);
   // Раунд выигран первым же ходом: разбор есть, в нём один ход «в точку»
   check('в игре с другом после раунда — разбор', await page.evaluate(() =>
     !!document.getElementById('reviewBtn') && currentReview().moves.map(m => m.grade).join() === 'hit'));
@@ -4484,12 +4561,14 @@ async function testDuelReview(browser) {
   await page.fill('#guessInput', '50');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(100);
+  await liftCurtainIfShown(page);
   check('пока раунд идёт, разбора и значков нет', await page.evaluate(() =>
     !currentReview() && !document.querySelector('#historyList .gr-badge')));
   for (const g of [20, 30, 45, 36, 38, 37]) {
     await page.fill('#guessInput', String(g));
     await page.click('#tSubmitGuess');
     await page.waitForTimeout(100);
+    await liftCurtainIfShown(page);
   }
   await page.waitForTimeout(250);
   const btn = await page.evaluate(() => (document.getElementById('reviewBtn') || {}).textContent || '');
@@ -4658,6 +4737,7 @@ async function testBots(browser) {
   await page.fill('#guessInput', '2');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(100);
+  await liftCurtainIfShown(page);
   const stolen = await page.evaluate(() => {
     const before = history.length;
     document.getElementById('guessInput').value = '3';
@@ -4713,6 +4793,7 @@ async function testBots(browser) {
     await page.fill('#guessInput', String(g));
     await page.click('#tSubmitGuess');
     await page.waitForTimeout(40);
+    await liftCurtainIfShown(page);
   }
   const fin = await page.evaluate(() => ({ over: D.matchOver,
     bubble: document.getElementById('sayBubble').textContent,
@@ -5059,6 +5140,7 @@ async function testQuitConfirm(browser) {
     await page.fill('#guessInput', String(v));
     await page.click('#tSubmitGuess');
     await page.waitForTimeout(120);
+    await liftCurtainIfShown(page);
   };
 
   // Тренировка без ходов — терять нечего, выходим сразу
@@ -5204,6 +5286,7 @@ async function testFogWholeRound(browser) {
     await page.fill('#guessInput', String(v));
     await page.click('#tSubmitGuess');
     await page.waitForTimeout(120);
+    await liftCurtainIfShown(page);
     await page.evaluate(() => stopBot());
   };
   const bot = v => page.evaluate(x => { stopBot(); duelPlay(x); stopBot(); }, v);
@@ -5767,6 +5850,23 @@ async function testInviteLink(browser) {
   await page.context().close();
 }
 
+// Старый PIN из 4 цифр — профиль предлагает сменить на 6
+async function testPinShort(browser) {
+  console.log('\nPIN из 4 цифр — предложение сменить');
+  const page = await newGame(browser, { user: 'Лев', profile: {} });
+  await page.click('#accountChip');
+  await page.waitForTimeout(300);
+  const warn = () => page.evaluate(() => {
+    const el = document.getElementById('pfPinShort');
+    return el.classList.contains('hidden') ? '' : el.textContent;
+  });
+  check('в профиле: «PIN из 4 цифр — смените на 6»', (await warn()) === '🔒 У вас PIN из 4 цифр — смените на 6, так гораздо надёжнее',
+    await warn());
+  await page.evaluate(() => { localStorage.setItem('hc_run_pin', '123456'); fillProfile(); });
+  check('PIN из 6 цифр — предложения нет', (await warn()) === '');
+  await page.context().close();
+}
+
 async function testPolish(browser) {
   console.log('\nПолировка');
   let page = await newGame(browser);
@@ -5782,6 +5882,7 @@ async function testPolish(browser) {
   await page.fill('#guessInput', '1');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(150);
+  await liftCurtainIfShown(page);
   const tok = await page.evaluate(() => ({ cur: D.cur, armed: D.armed, tokens: D.tokens.slice(), n: history.length }));
   check('жетон доступен и первым ходом раунда', tok0 === false, String(tok0));
   check('первым ходом с жетоном — два хода подряд', tok.cur === 0 && !tok.armed && tok.tokens[0] === 0 && tok.n === 1,
@@ -5813,6 +5914,7 @@ async function testPolish(browser) {
     await page.fill('#guessInput', String(g));
     await page.click('#tSubmitGuess');
     await page.waitForTimeout(100);
+    await liftCurtainIfShown(page);
   }
   const hist = await page.evaluate(() => {
     const list = document.getElementById('historyList');
@@ -5830,6 +5932,7 @@ async function testPolish(browser) {
   await page.fill('#guessInput', '63');
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(150);
+  await liftCurtainIfShown(page);
   const party = await page.evaluate(() => {
     const first = document.querySelectorAll('.confetti').length;
     renderAll(); renderAll();
@@ -6037,7 +6140,7 @@ async function testProfile(browser) {
   await page.click('#tPinStart');
   await page.waitForTimeout(150);
   await page.fill('#pinOld', '0000');
-  await page.fill('#pinNew', '5678');
+  await page.fill('#pinNew', '567890');
   await page.click('#tPinSave');
   await page.waitForTimeout(300);
   const wrong = await page.evaluate(() => ({
@@ -6054,23 +6157,30 @@ async function testProfile(browser) {
   await page.waitForTimeout(150);
   check('короткий новый PIN не уходит на сервер',
     await page.evaluate(() => window.__profile.calls.filter(c => c.name === 'change_pin').length === 1));
-
+  // Новый PIN — 6 цифр; 4 цифры тоже не уходят
   await page.fill('#pinNew', '5678');
+  await page.click('#tPinSave');
+  await page.waitForTimeout(150);
+  check('новый PIN из 4 цифр тоже не уходит — нужно 6',
+    await page.evaluate(() => window.__profile.calls.filter(c => c.name === 'change_pin').length === 1 &&
+      document.getElementById('pinNote').textContent === 'PIN — ровно 6 цифр'));
+
+  await page.fill('#pinNew', '567890');
   await page.click('#tPinSave');
   await page.waitForTimeout(300);
   const pinOk = await page.evaluate(() => ({
     note: document.getElementById('pinNote').textContent,
     pin: localStorage.getItem('hc_run_pin'), hint: window.__profile.hint
   }));
-  check('новый PIN сохранён на устройстве', pinOk.pin === '5678', pinOk.pin);
+  check('новый PIN сохранён на устройстве', pinOk.pin === '567890', pinOk.pin);
   check('форма закрылась — «Готово» снова на месте', await page.locator('#tProfileDone').isVisible());
   check('и сказано, что старая подсказка удалена', pinOk.note.indexOf('Старая подсказка удалена') >= 0 &&
     pinOk.hint === null, JSON.stringify(pinOk));
 
   await page.evaluate(() => { document.getElementById('pfEditFold').open = true; });
   await page.click('#tPinStart');
-  await page.fill('#pinOld', '5678');
-  await page.fill('#pinNew', '4321');
+  await page.fill('#pinOld', '567890');
+  await page.fill('#pinNew', '432100');
   await page.fill('#pinHintNew', 'год кота');
   await page.click('#tPinSave');
   await page.waitForTimeout(300);
@@ -6314,6 +6424,7 @@ async function testKeyPage(browser) {
     await testPushTexts();
     await testCurtain(browser);
     await testInviteLink(browser);
+    await testPinShort(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

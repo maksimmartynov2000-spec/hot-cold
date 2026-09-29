@@ -133,8 +133,8 @@ async function registerPlayer(p, name, pin) {
   const A = await openPlayer(browser, db, 'ru');
   const B = await openPlayer(browser, db, 'ru');
 
-  await registerPlayer(A, 'Тимур', '1111');
-  await registerPlayer(B, 'Лада', '2222');
+  await registerPlayer(A, 'Тимур', '111111');
+  await registerPlayer(B, 'Лада', '222222');
   check('оба аккаунта зарегистрированы в настоящей базе',
     (await db.query("select count(*) from students where username in ('Тимур','Лада')")).rows[0].count === '2');
   check('после регистрации открылся рейтинг', await A.page.locator('#screenOnline').isVisible());
@@ -378,7 +378,7 @@ async function registerPlayer(p, name, pin) {
   // «Тимур» стоит по алфавиту после «Лады», «Артур» — перед ней: в парах, что
   // хранятся по алфавиту (переписка, лесенка против накрутки), строки должны
   // перевернуться, иначе база откажет в переименовании целиком
-  await db.query("select send_friend_phrase('Тимур', '1111', 'Лада', 'play')");
+  await db.query("select send_friend_phrase('Тимур', '111111', 'Лада', 'play')");
   for (const P of [A, B]) await P.page.evaluate(() => quitToMenu());
 
   // Текст вне игры: грубое слово база прячет сама
@@ -462,12 +462,12 @@ async function registerPlayer(p, name, pin) {
 
   await A.page.evaluate(() => { document.getElementById('pfEditFold').open = true; });
   await A.page.click('#tPinStart');
-  await A.page.fill('#pinOld', '1111');
-  await A.page.fill('#pinNew', '3333');
+  await A.page.fill('#pinOld', '111111');
+  await A.page.fill('#pinNew', '333333');
   await A.page.click('#tPinSave');
   await A.page.waitForTimeout(700);
   check('новый PIN подходит в базе',
-    (await db.query("select check_student_pin('Артур', '3333') as u")).rows[0].u === 'Артур');
+    (await db.query("select check_student_pin('Артур', '333333') as u")).rows[0].u === 'Артур');
   await A.page.click('#tProfileDone');
   await A.page.click('#friendsBtn');
   await A.page.waitForTimeout(800);

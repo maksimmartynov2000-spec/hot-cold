@@ -148,15 +148,15 @@ declare mid bigint; gone text; n int;
 begin
   delete from matches; delete from elo_ratings; delete from rivalry;
   delete from students where username = 'Гость';
-  perform register_student('Гость','5555');
+  perform register_student('Гость','555555');
   insert into matches(p0, p1, wins_needed, range_min, range_max, ranked, ranked_mode,
                       status, secret, match_over)
   values ('Лев','Гость', 3, 1, 100, true, 0, 'finished', 50, true) returning id into mid;
   insert into elo_ratings(username, mode, elo, games) values ('Гость', 0, 1300, 9);
   insert into runs(username, score, rounds) values ('Гость', 500, 4);
-  perform send_friend_request('Гость','5555','Лев');
+  perform send_friend_request('Гость','555555','Лев');
 
-  gone := delete_account('Гость','5555');
+  gone := delete_account('Гость','555555');
   if gone not like '#%' then raise exception 'ОШИБКА: имя удалённого не помечено: %', gone; end if;
 
   if exists (select 1 from students where username = 'Гость') then
@@ -184,20 +184,20 @@ end $$;
 do $$
 declare gone text := current_setting('t.gone');
 begin
-  if check_student_pin(gone, '5555') is not null then
+  if check_student_pin(gone, '555555') is not null then
     raise exception 'ОШИБКА: старый PIN всё ещё подходит';
   end if;
   begin
-    perform register_student(gone, '1234');
+    perform register_student(gone, '123456');
     raise exception 'ОШИБКА: зарегистрировались под именем удалённого';
   exception when others then
     if sqlerrm is distinct from 'invalid_username' then raise; end if;
   end;
   -- А освобождённое имя занять можно
-  if register_student('Гость','7777') is distinct from true then
+  if register_student('Гость','777777') is distinct from true then
     raise exception 'ОШИБКА: имя не освободилось';
   end if;
-  perform delete_account('Гость','7777');
+  perform delete_account('Гость','777777');
 end $$;
 \echo ok
 
@@ -207,11 +207,11 @@ declare mid bigint; m matches;
 begin
   delete from matches; delete from elo_ratings; delete from rivalry;
   delete from students where username like 'Беглец%';
-  perform register_student('Беглец','5555');
+  perform register_student('Беглец','555555');
   insert into matches(p0, p1, wins_needed, range_min, range_max, ranked, ranked_mode,
                       status, secret)
   values ('Лев','Беглец', 3, 1, 100, true, 0, 'active', 50) returning id into mid;
-  perform delete_account('Беглец','5555');
+  perform delete_account('Беглец','555555');
   select * into m from matches where id = mid;
   if m.status is distinct from 'finished' then raise exception 'ОШИБКА: матч завис'; end if;
   if m.forfeit_by is distinct from 1 then raise exception 'ОШИБКА: ушедший не отмечен'; end if;
@@ -297,10 +297,10 @@ declare mid bigint; gone text;
 begin
   delete from matches;
   delete from students where username like 'Ушедший%';
-  perform register_student('Ушедший','5555');
+  perform register_student('Ушедший','555555');
   insert into matches(p0, p1, ranked, status, match_over)
   values ('Лев','Ушедший', false, 'finished', true) returning id into mid;
-  gone := delete_account('Ушедший','5555');
+  gone := delete_account('Ушедший','555555');
   begin
     perform rematch('Лев','1234', mid);
     raise exception 'ОШИБКА: позвали удалённого';

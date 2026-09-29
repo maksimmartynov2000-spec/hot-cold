@@ -1,0 +1,54 @@
+-- PIN из 6 цифр. Применять в Supabase: SQL Editor → вставить целиком → Run.
+-- Применить ДО мёржа: новая игра при регистрации просит 6 цифр.
+--
+-- После пяти ошибок каждая следующая попытка запирает аккаунт на 5 минут —
+-- это примерно одна попытка в 5 минут. PIN из 4 цифр так подбирается в
+-- среднем за 2,5 недели, из 6 цифр — за 4–5 лет.
+--
+-- Новые аккаунты и смена PIN — только 6 цифр. Старые 4-значные PIN при входе
+-- работают как раньше: игра предложит сменить их в профиле.
+
+create or replace function register_student(p_username text, p_pin text, p_hint text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+begin
+  perform check_new_username(trim(p_username));
+  -- Новые аккаунты — 6 цифр: 4 цифры подбираются за пару недель
+  if p_pin !~ '^[0-9]{6}$' then raise exception 'invalid_pin'; end if;
+  if (select count(*) from students where created_at >= now() - interval '1 hour') >= 20 then
+    raise exception 'too_many_signups';
+  end if;
+  insert into students(username, pin_hash, pin_hint)
+  values (trim(p_username), crypt(p_pin, gen_salt('bf')),
+          nullif(left(trim(coalesce(p_hint, '')), 60), ''));
+  return true;
+exception when unique_violation then
+  return false;
+end;
+$$;
+
+create or replace function change_pin(p_username text, p_pin text, p_new_pin text, p_hint text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if coalesce(p_new_pin, '') !~ '^[0-9]{6}$' then raise exception 'invalid_pin'; end if;
+  update students
+  set pin_hash = crypt(p_new_pin, gen_salt('bf')),
+      pin_hint = nullif(left(trim(coalesce(p_hint, '')), 60), ''),
+      failed_logins = 0, locked_until = null
+  where username = me;
+  return true;
+end;
+$$;
+
+grant execute on function register_student(text, text, text) to anon;
+grant execute on function change_pin(text, text, text, text) to anon;

@@ -131,10 +131,10 @@ declare gone text;
 begin
   delete from push_outbox; delete from push_subscriptions; delete from matches;
   delete from students where username like 'Уходящий%';
-  perform register_student('Уходящий','5555');
-  perform save_push_subscription('Уходящий','5555','https://push.example/x','p','a','ru');
-  perform send_friend_request('Уходящий','5555','Лев');
-  gone := delete_account('Уходящий','5555');
+  perform register_student('Уходящий','555555');
+  perform save_push_subscription('Уходящий','555555','https://push.example/x','p','a','ru');
+  perform send_friend_request('Уходящий','555555','Лев');
+  gone := delete_account('Уходящий','555555');
   if (select count(*) from push_subscriptions) is distinct from 0 then
     raise exception 'ОШИБКА: подписка осталась';
   end if;

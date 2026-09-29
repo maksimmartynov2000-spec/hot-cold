@@ -49,7 +49,7 @@ do $$
 declare i int; n int;
 begin
   for i in 1..15 loop
-    perform register_student('Гость' || i, '0000', null);
+    perform register_student('Гость' || i, '000000', null);
   end loop;
   select count(*) into n from suggest_students('Лев','1234');
   if n is distinct from 10 then raise exception 'ОШИБКА: в списке % игроков вместо десяти', n; end if;
