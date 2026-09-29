@@ -30,6 +30,23 @@ function stubSupabase(opts) {
             return { data: null, error: { message: window.__rpcError.message } };
           }
           if (name === 'list_friends') return { data: window.__friends || [], error: null };
+          // Задания и достижения (миграция 041): «сервер» — window.__progress,
+          // достижения друзей — window.__friendAch {имя: [...]}
+          if (name === 'my_progress') {
+            (window.__progressCalls = window.__progressCalls || []).push(args);
+            if (!window.__progress) return { data: null, error: { message: 'Could not find the function public.my_progress' } };
+            return { data: window.__progress, error: null };
+          }
+          if (name === 'friend_achievements') {
+            const A = (window.__friendAch || {})[args.p_friend];
+            if (!A) return { data: null, error: { message: 'not_friends' } };
+            return { data: A, error: null };
+          }
+          if (name === 'season_summary_seen') {
+            (window.__seasonSeen = window.__seasonSeen || []).push(args.p_season);
+            if (window.__ladder) window.__ladder.summary = null;
+            return { data: true, error: null };
+          }
           // Приглашения (миграция 039): чей код — window.__invites {код: имя}
           if (name === 'my_invite_code') return { data: 'ABCD2345', error: null };
           if (name === 'invite_owner') return { data: (window.__invites || {})[String(args.p_code).toUpperCase()] || null, error: null };
@@ -440,6 +457,8 @@ function stubSupabase(opts) {
       localStorage.setItem('hc_tutorial', JSON.stringify({ done: [], skipped: true }));
       localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'lava', 'skip', 'gift', 'memory', 'near']));
     }
+    if (opts.progress) window.__progress = opts.progress;
+    if (opts.ladder) window.__ladder = opts.ladder;
     if (opts.user) {
       localStorage.setItem('hc_run_user', opts.user);
       localStorage.setItem('hc_run_pin', '1234');

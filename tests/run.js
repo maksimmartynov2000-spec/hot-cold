@@ -5485,7 +5485,7 @@ async function testBlockReport(browser) {
   await page.waitForTimeout(100);
   const fromChat = await page.evaluate(() =>
     [...document.querySelectorAll('#friendSheet button')].filter(b => !b.classList.contains('hidden')).map(b => b.textContent));
-  check('в переписке «⋯» — без «Написать»', fromChat.join() === 'Убрать из друзей,⚠️ Пожаловаться,🚫 Заблокировать,Отмена',
+  check('в переписке «⋯» — без «Написать»', fromChat.join() === '🏅 Достижения,Убрать из друзей,⚠️ Пожаловаться,🚫 Заблокировать,Отмена',
     fromChat.join());
   const label = await page.evaluate(() => document.getElementById('tChatRanked').textContent);
   check('вызов «по правилам рейтинга» подписан: без звёзд', label.includes('без звёзд'), label);
@@ -5848,6 +5848,157 @@ async function testInviteLink(browser) {
   st = await page.evaluate(() => ({ open: !document.getElementById('inviteInModal').classList.contains('hidden'), left: localStorage.getItem('hc_pending_invite') }));
   check('несуществующий код — тихо забыт', !st.open && st.left === null, JSON.stringify(st));
   await page.context().close();
+}
+
+// Задания дня, достижения, итоги сезона (миграция 041)
+async function testProgress(browser) {
+  console.log('\nЗадания дня, достижения, итоги сезона');
+  const fs = require('fs'), path = require('path');
+  const PROG = { day: '2026-09-29', streak: 2, bestStreak: 4, doneToday: false, secondsLeft: 5 * 3600 + 100,
+    quests: [{ code: 'play2', goal: 2, progress: 1 }, { code: 'win1', goal: 1, progress: 1 }, { code: 'run_best3', goal: 3, progress: 0 }],
+    achievements: [{ code: 'first_win', at: '2026-09-01' }, { code: 'tutorial', at: '2026-09-02' }] };
+
+  // Коды и иконки — одни в игре и в базе
+  const mig = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', '041_progress.txt'), 'utf8');
+  const page = await newGame(browser, { user: 'Лев', profile: {}, progress: PROG });
+  const js = await page.evaluate(() => ({ ach: ACHIEVEMENTS.map(a => a.code), icons: QUEST_ICONS.map(q => q.days + q.icon),
+    q: Object.keys(t().prog.q), langs: ['en', 'ru', 'fr', 'de'].map(l => {
+      const P = i18n[l].prog;
+      return ACHIEVEMENTS.every(a => P.ach[a.code] && P.ach[a.code][0] && P.ach[a.code][1]) &&
+        Object.keys(i18n.ru.prog.q).every(k => P.q[k]) && Object.keys(i18n.ru.prog).every(k => k in P);
+    }) }));
+  const dbAch = mig.match(/select array\[('first_win'[^\]]*)\]/)[1].replace(/\s/g, '').split(',').map(x => x.replace(/'/g, ''));
+  const dbIcons = [...mig.match(/values \(3, '🔥'\)[^;]*;/)[0].matchAll(/\((\d+), '([^']+)'\)/g)].map(m => m[1] + m[2]);
+  const dbQuests = [...mig.match(/create or replace function quest_pool\(\)[\s\S]*?\$\$;/)[0].matchAll(/'([a-z_0-9]+)'/g)].map(m => m[1]);
+  check('достижения: 12 кодов, те же, что в базе, в том же порядке', js.ach.length === 12 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
+  check('иконки за серию — те же, что в базе', js.icons.join() === dbIcons.join(), js.icons.join() + ' / ' + dbIcons.join());
+  check('у каждого задания из базы есть текст', dbQuests.length === 7 && dbQuests.every(c => js.q.includes(c)), dbQuests.join());
+  check('тексты заданий и достижений есть на всех 4 языках', js.langs.every(Boolean), JSON.stringify(js.langs));
+
+  // Карточка в меню
+  const card = () => page.evaluate(() => {
+    const c = document.getElementById('questCard');
+    return { shown: !c.classList.contains('hidden'), title: document.getElementById('qcTitle').textContent,
+      streak: document.getElementById('qcStreak').textContent,
+      rows: [...document.querySelectorAll('#qcList .qc-row')].map(r => (r.classList.contains('done') ? '✓' : '·') + r.textContent),
+      foot: document.getElementById('qcFoot').textContent };
+  });
+  let c = await card();
+  check('в меню — «📅 Задания дня», серия 🔥 2', c.shown && c.title === '📅 Задания дня' && c.streak === '🔥 2', JSON.stringify(c));
+  check('три задания с прогрессом; выполненное отмечено',
+    c.rows.join('|') === '·▫️Сыграть 2 партии онлайн1/2|✓✅Выиграть партию на звёзды1/1|·▫️Пройти 3 раунда Испытания за одну попытку0/3', c.rows.join('|'));
+  check('внизу — когда новые и какая иконка следующая', c.foot === 'Новые задания через 5 ч · Серия 7 дн. — иконка 🚀', c.foot);
+  check('часовой пояс отправлен', await page.evaluate(() => (window.__progressCalls || []).some(a => typeof a.p_tz === 'string' && a.p_tz.length > 0)));
+
+  // Всё выполнено
+  await page.evaluate(() => { Object.assign(window.__progress, { doneToday: true, streak: 3,
+    quests: window.__progress.quests.map(q => Object.assign({}, q, { progress: q.goal })) }); showScreen('mode'); });
+  await page.waitForTimeout(300);
+  c = await card();
+  check('всё выполнено — «Приходите завтра», серия 🔥 3', c.streak === '🔥 3' && c.foot.startsWith('Всё выполнено!') && c.rows.every(r => r[0] === '✓'), JSON.stringify(c));
+
+  // Профиль: серия, достижения, иконки за серию
+  await page.click('#accountChip');
+  await page.waitForTimeout(400);
+  let pf = await page.evaluate(() => ({ streak: document.getElementById('pfStreak').textContent,
+    streakShown: !document.getElementById('pfStreak').classList.contains('hidden'),
+    head: document.getElementById('tAchHead').textContent,
+    open: [...document.querySelectorAll('#pfAchGrid .ach-tile:not(.locked)')].map(x => x.dataset.code),
+    locked: document.querySelectorAll('#pfAchGrid .ach-tile.locked').length }));
+  check('профиль: серия заданий и лучшая', pf.streakShown && pf.streak === '📅 Серия заданий: 3 дн. · лучшая 4', pf.streak);
+  check('профиль: «🏅 Достижения: 2 из 12», открытые в цвете, остальные серые',
+    pf.head === '🏅 Достижения: 2 из 12' && pf.open.join() === 'first_win,tutorial' && pf.locked === 10, JSON.stringify(pf));
+  await page.click('#tAvatarStart');
+  await page.waitForTimeout(200);
+  const tiles = await page.evaluate(() => ['🔥', '🚀'].map(i => {
+    const b = document.querySelector('#avGrid .av-tile[data-icon="' + i + '"]');
+    return b ? (b.classList.contains('locked') ? 'locked' : 'open') : 'none';
+  }));
+  check('иконки за серию: 🔥 (3 дня) открыта при лучшей 4, 🚀 (7) — под замком', tiles.join() === 'open,locked', tiles.join());
+  await page.click('#avGrid .av-tile[data-icon="🚀"]');
+  await page.waitForTimeout(200);
+  const note = await page.evaluate(() => ({ note: document.getElementById('avNote').textContent,
+    sent: window.__profile.calls.some(x => x.name === 'set_avatar') }));
+  check('закрытая 🚀 — «Откроется за серию заданий: 7 дн.», на сервер не шлём',
+    note.note === 'Откроется за серию заданий: 7 дн. подряд' && !note.sent, JSON.stringify(note));
+  await page.click('#avGrid .av-tile[data-icon="🔥"]');
+  await page.waitForTimeout(300);
+  check('открытая 🔥 ставится', await page.evaluate(() => window.__profile.avatar === '🔥'));
+  await page.click('#tProfileDone');
+  await page.context().close();
+
+  // Без миграции — ни карточки, ни достижений, ни иконок
+  const p2 = await newGame(browser, { user: 'Лев', profile: {} });
+  await p2.waitForTimeout(200);
+  const none = await p2.evaluate(() => ({ card: document.getElementById('questCard').classList.contains('hidden'),
+    fold: (fillProfile(), document.getElementById('pfAchFold').classList.contains('hidden')), icon: (renderAvatarGrid(), !!document.querySelector('#avGrid [data-icon="🔥"]')) }));
+  check('сервер без миграции — карточки и достижений нет, иконок за серию тоже', none.card && none.fold && !none.icon, JSON.stringify(none));
+  await p2.context().close();
+
+  // Вышел из аккаунта — карточка уходит сразу, чужие задания не висят
+  const p6 = await newGame(browser, { user: 'Лев', progress: PROG });
+  const before = await p6.evaluate(() => !document.getElementById('questCard').classList.contains('hidden'));
+  await p6.click('#accountChip');
+  await p6.waitForTimeout(200);
+  await p6.click('#tLogoutStart');
+  await p6.click('#tLogoutConfirm');
+  await p6.waitForTimeout(300);
+  check('вышел из аккаунта — карточки заданий нет', before && await p6.evaluate(() =>
+    document.getElementById('questCard').classList.contains('hidden') && progressInfo === null));
+  await p6.context().close();
+
+  // Без входа — карточки нет
+  const p3 = await newGame(browser, { progress: PROG });
+  check('без входа карточки нет', await p3.evaluate(() => document.getElementById('questCard').classList.contains('hidden')));
+  await p3.context().close();
+
+  // Достижения друга: в «⋯» у друга, не у чужого
+  const p4 = await newGame(browser, { user: 'Лев', progress: PROG });
+  await p4.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' }, { username: 'Ося', relation: 'incoming' }];
+    window.__friendAch = { 'Кира': [{ code: 'league_gold', at: '2026-09-01' }, { code: 'first_win', at: '2026-08-01' }] };
+  });
+  await p4.click('#friendsBtn');
+  await p4.waitForTimeout(500);
+  await p4.evaluate(() => openFriendSheet('Ося'));
+  check('у не-друга «Достижений» нет', await p4.evaluate(() => document.getElementById('fsAch').classList.contains('hidden')));
+  await p4.evaluate(() => closeFriendSheet());
+  await p4.evaluate(() => openFriendSheet('Кира'));
+  const fsAch = await p4.evaluate(() => ({ hidden: document.getElementById('fsAch').classList.contains('hidden'), text: document.getElementById('fsAch').textContent }));
+  check('у друга в «⋯» — «🏅 Достижения»', !fsAch.hidden && fsAch.text === '🏅 Достижения', JSON.stringify(fsAch));
+  await p4.click('#fsAch');
+  await p4.waitForTimeout(400);
+  const fa = await p4.evaluate(() => ({ open: !document.getElementById('achModal').classList.contains('hidden'),
+    title: document.getElementById('achTitle').textContent,
+    tiles: [...document.querySelectorAll('#achGrid .ach-tile')].map(x => x.dataset.code + (x.classList.contains('locked') ? '🔒' : '')) }));
+  check('окно: «Достижения: Кира» — только открытые, по порядку списка',
+    fa.open && fa.title === 'Достижения: Кира' && fa.tiles.join() === 'first_win,league_gold', JSON.stringify(fa));
+  await p4.evaluate(() => { window.__friendAch['Кира'] = []; closeFriendAch(); openFriendAch('Кира'); });
+  await p4.waitForTimeout(300);
+  check('у друга пока ничего — «Пока ни одного»', await p4.evaluate(() => document.getElementById('achNote').textContent === 'Пока ни одного'));
+  await p4.context().close();
+
+  // Итоги сезона — один раз
+  const LAD = { season: '2026-09', endsIn: 20 * 86400, stars: 33, streak: 0, best: 33, games: 0, peak: 2, badges: [{ season: '2026-08', league: 2 }],
+    apprentice: 0, summary: { season: '2026-08', league: 2, best: 64, games: 12, wins: 7 } };
+  const p5 = await newGame(browser, { user: 'Лев', ladder: LAD });
+  await p5.evaluate(() => loadLadder());
+  await p5.waitForTimeout(300);
+  const ss = await p5.evaluate(() => ({ open: !document.getElementById('seasonModal').classList.contains('hidden'),
+    title: document.getElementById('ssTitle').textContent, league: document.getElementById('ssLeague').textContent,
+    best: document.getElementById('ssBest').textContent, games: document.getElementById('ssGames').textContent,
+    now: document.getElementById('ssNow').textContent, go: document.getElementById('ssGo').textContent }));
+  check('итоги сезона: месяц, лига, лучшее, партии и победы, с чего новый',
+    ss.open && /^Итоги сезона: август 2026$/i.test(ss.title) && ss.league === '🥇Золото' && ss.best === 'Лучшее: 🥇 Золото 9' &&
+    ss.games === 'Партий: 12 · Побед: 7' && ss.now === 'Новый сезон начинается с: 🥈 Серебро 9' && ss.go === 'Вперёд!', JSON.stringify(ss));
+  await p5.click('#ssGo');
+  await p5.waitForTimeout(300);
+  await p5.evaluate(() => loadLadder());
+  await p5.waitForTimeout(300);
+  const ss2 = await p5.evaluate(() => ({ seen: window.__seasonSeen, open: !document.getElementById('seasonModal').classList.contains('hidden') }));
+  check('«Вперёд!» — база помнит, что видели; второй раз не всплывает',
+    ss2.seen && ss2.seen[0] === '2026-08' && !ss2.open, JSON.stringify(ss2));
+  await p5.context().close();
 }
 
 // Старый PIN из 4 цифр — профиль предлагает сменить на 6
@@ -6425,6 +6576,7 @@ async function testKeyPage(browser) {
     await testCurtain(browser);
     await testInviteLink(browser);
     await testPinShort(browser);
+    await testProgress(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

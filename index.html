@@ -192,6 +192,7 @@
     .pf-name { font-size: 20px; font-weight: 800; }
     .pf-sub { font-size: 12px; color: rgba(255, 255, 255, 0.5); margin: 2px 0 16px; }
     .pf-league { font-size: 14px; font-weight: 700; color: #fbbf24; margin: -10px 0 14px; }
+    .pf-streak { font-size: 13px; font-weight: 700; color: #fb923c; margin: -8px 0 14px; }
     .pf-league .pf-badges { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.55); margin-top: 2px; }
     /* Награда за лигу, до которой ещё не дошёл: видна, но под замком */
     .av-tile.locked, .av-color.locked { opacity: 0.35; position: relative; }
@@ -433,6 +434,35 @@
       background: rgba(255, 255, 255, 0.08);
     }
     .mode-btn .m-text { display: flex; flex-direction: column; min-width: 0; }
+    /* Задания дня: карточка, а не кнопка — нажимать в ней нечего */
+    .quest-card {
+      padding: 14px 16px; border-radius: 16px;
+      border: 1px solid rgba(251, 146, 60, 0.35); background: rgba(251, 146, 60, 0.08);
+    }
+    .qc-head { display: flex; justify-content: space-between; align-items: center;
+               font-size: 15px; font-weight: 800; margin-bottom: 8px; }
+    .qc-streak { font-size: 14px; color: #fb923c; }
+    .qc-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center;
+              font-size: 14px; padding: 5px 0; }
+    .qc-row .qc-n { font-size: 13px; font-weight: 700; color: rgba(255, 255, 255, 0.6); }
+    .qc-row.done { color: rgba(255, 255, 255, 0.5); }
+    .qc-row.done .qc-n { color: #4ade80; }
+    .qc-bar { grid-column: 2 / 4; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; margin-top: -2px; }
+    .qc-bar > span { display: block; height: 100%; background: #fb923c; }
+    .qc-row.done + .qc-bar > span { background: #4ade80; }
+    .qc-foot { font-size: 12px; color: rgba(255, 255, 255, 0.5); margin-top: 6px; line-height: 1.4; }
+    /* Достижения: три в ряд, закрытые — серые */
+    .ach-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .ach-tile { padding: 10px 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.07); text-align: center; }
+    .ach-tile .a-icon { font-size: 26px; line-height: 1.2; }
+    .ach-tile .a-name { font-size: 12px; font-weight: 700; margin-top: 2px; }
+    .ach-tile .a-sub { font-size: 11px; color: rgba(255, 255, 255, 0.5); margin-top: 2px; line-height: 1.3; }
+    .ach-tile.locked .a-icon { filter: grayscale(1); opacity: 0.35; }
+    .ach-tile.locked .a-name { color: rgba(255, 255, 255, 0.5); }
+    .season-card .ss-league { font-size: 22px; font-weight: 800; color: #fbbf24; margin: 4px 0 10px; }
+    .season-card .ss-league .big { display: block; font-size: 48px; line-height: 1.1; }
+    .season-card .ss-line { font-size: 15px; margin: 4px 0; }
+    .season-card .ss-line.muted { font-size: 13px; color: rgba(255, 255, 255, 0.5); margin-top: 10px; }
     .mode-btn .m-title { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
     .mode-btn .m-sub { font-size: 13px; color: rgba(255, 255, 255, 0.55); line-height: 1.35; }
     /* Вход и регистрация: подпись под названием, а не сбоку — рядом с длинным
@@ -1645,6 +1675,13 @@
           <span class="m-sub hidden" id="tOnlineLock"></span>
         </span>
       </button>
+      <!-- Задания дня: засчитывает база по онлайн-партиям и Испытанию, поэтому
+           карточка — в блоке «нужен интернет» и только у вошедшего -->
+      <div class="quest-card hidden" id="questCard">
+        <div class="qc-head"><span id="qcTitle"></span><span class="qc-streak" id="qcStreak"></span></div>
+        <div id="qcList"></div>
+        <div class="qc-foot" id="qcFoot"></div>
+      </div>
     </div>
   </div>
 
@@ -2108,6 +2145,7 @@
     <div class="pf-sub" id="tAccountTitle"></div>
     <!-- Лига и значки прошлых сезонов: одна строка под именем -->
     <div class="pf-league hidden" id="pfLeague"></div>
+    <div class="pf-streak hidden" id="pfStreak"></div>
 
     <div id="pfAccount">
       <!-- Своя иконка вместо буквы. Прячется, пока сервер не умеет профиль
@@ -2118,6 +2156,12 @@
         <div class="av-grid hidden" id="avGrid"></div>
         <div class="fr-note hidden" id="avNote"></div>
       </div>
+
+      <!-- Достижения: открытые — в цвете, остальные — серые, с тем, как открыть -->
+      <details class="fold pf-fold hidden" id="pfAchFold" style="margin-bottom:8px">
+        <summary class="fold-head" id="tAchHead"></summary>
+        <div class="fold-body"><div class="ach-grid" id="pfAchGrid"></div></div>
+      </details>
 
       <button class="btn-ghost btn-block" id="tShowPin" onclick="revealOwnPin()"></button>
       <button class="btn-ghost btn-block hidden" id="tPushToggle" style="margin-top:8px"
@@ -2258,10 +2302,34 @@
   <div class="modal-card">
     <div class="modal-text" id="fsName"></div>
     <button class="btn-ghost btn-block" id="fsWrite" onclick="friendSheetDo('write')"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="fsAch" onclick="friendSheetDo('ach')"></button>
     <button class="btn-ghost btn-block" style="margin-top:8px" id="fsRemove" onclick="friendSheetDo('remove')"></button>
     <button class="btn-ghost btn-block" style="margin-top:8px" id="fsReport" onclick="friendSheetDo('report')"></button>
     <button class="btn-ghost btn-block danger" style="margin-top:8px" id="fsBlock" onclick="friendSheetDo('block')"></button>
     <button class="btn btn-block" style="margin-top:14px" id="fsCancel" onclick="closeFriendSheet()"></button>
+  </div>
+</div>
+
+<!-- Достижения друга -->
+<div class="modal-backdrop hidden" id="achModal" onclick="if (event.target === this) closeFriendAch()">
+  <div class="modal-card">
+    <div class="modal-text" id="achTitle"></div>
+    <div class="ach-grid" id="achGrid"></div>
+    <div class="fr-note hidden" id="achNote"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="achClose" onclick="closeFriendAch()"></button>
+  </div>
+</div>
+
+<!-- Итоги сезона: показываются один раз, при первом входе в новом сезоне -->
+<div class="modal-backdrop hidden" id="seasonModal">
+  <div class="modal-card season-card">
+    <div class="modal-text" id="ssTitle"></div>
+    <div class="ss-league" id="ssLeague"></div>
+    <div class="ss-line" id="ssBest"></div>
+    <div class="ss-line" id="ssGames"></div>
+    <div class="ss-line" id="ssNow"></div>
+    <div class="ss-line muted" id="ssBadge"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="ssGo" onclick="closeSeasonSummary()"></button>
   </div>
 </div>
 
@@ -2308,6 +2376,7 @@
     en: {
       inv: {"invBtn": "🔗 Invite a friend", "invTitle": "Invite a friend", "invHint": "Show the code or send the link. Whoever opens it becomes your friend right away.", "invShare": "📤 Share", "invCopy": "📋 Copy link", "invCopied": "Link copied", "invShareText": "Let's play Hot or Cold! My name in the game: {name}", "inTitle": "👋 {name} invites you to be friends", "inAdd": "Add to friends", "inLogin": "Log in or sign up", "inLater": "Not now", "inDone": "You are friends now: {name}", "errNoInvite": "Invitation not found", "invDone": "Done"},
       curtain: {"text": "🔄 Pass the phone to {name}", "go": "I'm {name} — show", "why": "A fog, blindness or short memory is on — the other player mustn't see the screen"},
+      prog: {"title": "📅 Daily quests", "streak": "🔥 {n}", "left": "New quests in {t}", "hours": "{n} h", "minutes": "{n} min", "allDone": "All done! Come back tomorrow to grow your streak", "next": "{n}-day streak unlocks {icon}", "q": {"play2": "Play 2 online games", "play3": "Play 3 online games", "ladder2": "Play 2 games for stars", "win1": "Win a game for stars", "run1": "Clear at least 1 Trial round", "run_rounds5": "Clear 5 Trial rounds today", "run_best3": "Clear 3 Trial rounds in one go"}, "achHead": "🏅 Achievements: {n} of {total}", "achTitle": "{name}: achievements", "achNone": "None yet", "fsAch": "🏅 Achievements", "ach": {"first_win": ["First win", "Win an online game"], "wins_10": ["10 wins", "Win 10 online games"], "wins_50": ["50 wins", "Win 50 online games"], "streak_3": ["Three in a row", "Win 3 games for stars in a row"], "league_gold": ["Gold", "Reach the Gold league"], "league_diamond": ["Diamond", "Reach the Diamond league"], "legend": ["Legend", "Become a Legend"], "run_5": ["Trial: 5", "Clear 5 Trial rounds in one go"], "run_10": ["Trial: 10", "Clear 10 Trial rounds in one go"], "friends_3": ["Company", "Make 3 friends"], "quests_7": ["A week", "Finish daily quests 7 days in a row"], "tutorial": ["Graduate", "Finish the tutorial"]}, "streakLocked": "Unlocks with a {n}-day quest streak", "pfStreak": "📅 Quest streak: {n} d · best {best}", "ssTitle": "Season results: {season}", "ssBest": "Best: {league}", "ssGames": "Games: {g} · Wins: {w}", "ssNow": "The new season starts at {league}", "ssBadge": "The season badge is in your profile", "ssGo": "Let's go!", "close": "Close"},
       tut: {"tutTitle": "Tutorial · lesson {n} of 3", "tutSub": ["How to read the hints", "A duel with a bot", "Bonuses and traps"], "tutLocked": "🔒 after lessons 1–2", "gateText": "🔒 Online opens after two short lessons (about 3 minutes): how to read the hints and how to play against an opponent.", "gateGo": "🎓 Start lesson {n}", "gateSkip": "Skip the tutorial", "coach": {"1": ["🎓 I picked a number from 1 to 20. Type any number and press «Check».", "The hint tells you how close you are: 🔥 hot — near, ❄️ cold — far. Try another number.", "The line under the thermometer keeps all your moves. Look between them — it's faster."], "2": ["🎓 Now a duel with a bot: you take turns. Whoever names the number first wins.", "The bot's moves are hints too: watch its «hot / cold» as well.", "⚡ «+1 move» is a token: two moves in a row. Press it before your move when you're close."], "3": ["🎓 Bonuses 🎁 are hidden on the line. Step on one and it fires: good ones hit the opponent, traps hit you.", "❓ «Something is near» — a bonus is close. Risk it or go around — your call.", "A bonus fired! What it does is on the card. Keep playing."]}, "lessonDone": "🎓 Lesson {n} done!", "lessonOpen": "🔓 Online is open", "tutAllDone": "Tutorial complete! Your 🎓 icon is in the profile.", "lessonNext": "🎓 Lesson {n}", "lessonFinish": "🎓 Done", "tutReplay": "🎓 Replay the tutorial", "bcTitle": "New bonus: {name}", "bcNear": "❓ Something is near", "bcOk": "Got it", "bcDesc": {"extra": "Whoever steps on it gets two «+1 move» tokens. A token gives two moves in a row.", "fog": "Fog falls on the opponent: until the end of the round they can't see the other player's moves.", "blind": "Blindness falls on the opponent: until the end of the round they can't see their own moves.", "lava": "The opponent's next move is thrown into the lava — a random number.", "skip": "A trap: whoever steps on it skips their next turn.", "gift": "A trap: whoever steps on it gives the opponent a «+1 move» token.", "memory": "A trap: whoever steps on it sees only the last two moves until the end of the round.", "near": "A bonus lies a few steps from your number — a good one or a trap. Risk it or go around — your call."}, "lgApprentice": "🎓 Apprentice: no star lost", "rkApprentice": "🎓 Apprentice: {n} more games without losing stars", "tutIconLocked": "Opens after the tutorial"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Attempts: ", moveForms: ["move", "moves"], newGame: "New Game", menu: "Menu",
@@ -2538,6 +2607,7 @@
     ru: {
       inv: {"invBtn": "🔗 Пригласить друга", "invTitle": "Пригласить друга", "invHint": "Покажите код или отправьте ссылку. Кто откроет — сразу станет вашим другом.", "invShare": "📤 Поделиться", "invCopy": "📋 Скопировать ссылку", "invCopied": "Ссылка скопирована", "invShareText": "Давай играть в Hot or Cold! Моё имя в игре: {name}", "inTitle": "👋 {name} зовёт вас в друзья", "inAdd": "Добавить в друзья", "inLogin": "Войти или зарегистрироваться", "inLater": "Не сейчас", "inDone": "Теперь вы друзья: {name}", "errNoInvite": "Приглашение не найдено", "invDone": "Готово"},
       curtain: {"text": "🔄 Передайте телефон: {name}", "go": "Я {name} — показать", "why": "Действует туман, слепота или короткая память — второму игроку смотреть нельзя"},
+      prog: {"title": "📅 Задания дня", "streak": "🔥 {n}", "left": "Новые задания через {t}", "hours": "{n} ч", "minutes": "{n} мин", "allDone": "Всё выполнено! Приходите завтра — серия вырастет", "next": "Серия {n} дн. — иконка {icon}", "q": {"play2": "Сыграть 2 партии онлайн", "play3": "Сыграть 3 партии онлайн", "ladder2": "Сыграть 2 партии на звёзды", "win1": "Выиграть партию на звёзды", "run1": "Пройти хотя бы 1 раунд Испытания", "run_rounds5": "Пройти 5 раундов Испытания за день", "run_best3": "Пройти 3 раунда Испытания за одну попытку"}, "achHead": "🏅 Достижения: {n} из {total}", "achTitle": "Достижения: {name}", "achNone": "Пока ни одного", "fsAch": "🏅 Достижения", "ach": {"first_win": ["Первая победа", "Выиграть партию онлайн"], "wins_10": ["10 побед", "Выиграть 10 партий онлайн"], "wins_50": ["50 побед", "Выиграть 50 партий онлайн"], "streak_3": ["Три подряд", "Выиграть 3 партии на звёзды подряд"], "league_gold": ["Золото", "Дойти до Золотой лиги"], "league_diamond": ["Алмаз", "Дойти до Алмазной лиги"], "legend": ["Легенда", "Стать Легендой"], "run_5": ["Испытание: 5", "Пройти 5 раундов Испытания за попытку"], "run_10": ["Испытание: 10", "Пройти 10 раундов Испытания за попытку"], "friends_3": ["Компания", "Завести 3 друзей"], "quests_7": ["Неделя", "Выполнять задания дня 7 дней подряд"], "tutorial": ["Выпускник", "Пройти обучение"]}, "streakLocked": "Откроется за серию заданий: {n} дн. подряд", "pfStreak": "📅 Серия заданий: {n} дн. · лучшая {best}", "ssTitle": "Итоги сезона: {season}", "ssBest": "Лучшее: {league}", "ssGames": "Партий: {g} · Побед: {w}", "ssNow": "Новый сезон начинается с: {league}", "ssBadge": "Значок сезона — в профиле", "ssGo": "Вперёд!", "close": "Закрыть"},
       tut: {"tutTitle": "Обучение · урок {n} из 3", "tutSub": ["Как читать подсказки", "Дуэль с ботом", "Бонусы и ловушки"], "tutLocked": "🔒 после уроков 1–2", "gateText": "🔒 Онлайн откроется после двух коротких уроков (минуты три): как читать подсказки и как играть против соперника.", "gateGo": "🎓 Начать урок {n}", "gateSkip": "Пропустить обучение", "coach": {"1": ["🎓 Я загадал число от 1 до 20. Введите любое и нажмите «Проверить».", "Подсказка говорит, насколько вы близко: 🔥 горячо — рядом, ❄️ холодно — далеко. Попробуйте другое число.", "Прямая под градусником помнит все ходы. Ищите между ними — так быстрее."], "2": ["🎓 Теперь дуэль с ботом: ходите по очереди. Кто первым назовёт число — выиграл.", "Ход бота — тоже подсказка: смотрите и на его «горячо / холодно».", "⚡ «+1 ход» — жетон: два хода подряд. Нажмите перед ходом, когда число почти найдено."], "3": ["🎓 На прямой спрятаны бонусы 🎁. Наступили — сработал: полезные бьют по сопернику, ловушки — по вам.", "❓ «Рядом что-то есть» — значит, рядом бонус. Рискнуть или обойти — решать вам.", "Сработал бонус! Что он делает — на карточке. Играйте дальше."]}, "lessonDone": "🎓 Урок {n} пройден!", "lessonOpen": "🔓 Онлайн открыт", "tutAllDone": "Обучение пройдено! Иконка 🎓 — в профиле.", "lessonNext": "🎓 Урок {n}", "lessonFinish": "🎓 Готово", "tutReplay": "🎓 Пройти обучение заново", "bcTitle": "Новый бонус: {name}", "bcNear": "❓ Рядом что-то есть", "bcOk": "Понятно", "bcDesc": {"extra": "Кто наступил, получает два жетона «+1 ход». Жетон — два хода подряд.", "fog": "Туман ложится на соперника: до конца раунда он не видит чужих ходов.", "blind": "Слепота ложится на соперника: до конца раунда он не видит своих ходов.", "lava": "Следующий ход соперника уходит в лаву — случайное число.", "skip": "Ловушка: кто наступил, пропускает следующий ход.", "gift": "Ловушка: кто наступил, дарит сопернику жетон «+1 ход».", "memory": "Ловушка: кто наступил, до конца раунда видит только два последних хода.", "near": "В нескольких шагах от вашего числа лежит бонус — полезный или ловушка. Рискнуть или обойти — решать вам."}, "lgApprentice": "🎓 Ученик: звезда не снята", "rkApprentice": "🎓 Ученик · без потери звёзд: ещё {n}", "tutIconLocked": "Откроется после обучения"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Попыток: ", moveForms: ["ход", "хода", "ходов"], newGame: "Новая игра", menu: "Меню",
@@ -2768,6 +2838,7 @@
     fr: {
       inv: {"invBtn": "🔗 Inviter un ami", "invTitle": "Inviter un ami", "invHint": "Montrez le code ou envoyez le lien. Qui l'ouvre devient tout de suite votre ami.", "invShare": "📤 Partager", "invCopy": "📋 Copier le lien", "invCopied": "Lien copié", "invShareText": "Jouons à Hot or Cold ! Mon nom dans le jeu : {name}", "inTitle": "👋 {name} vous invite à devenir amis", "inAdd": "Ajouter aux amis", "inLogin": "Se connecter ou s'inscrire", "inLater": "Pas maintenant", "inDone": "Vous êtes amis : {name}", "errNoInvite": "Invitation introuvable", "invDone": "Terminé"},
       curtain: {"text": "🔄 Passez le téléphone à {name}", "go": "C'est moi, {name} — afficher", "why": "Brouillard, cécité ou mémoire courte en cours — l'autre joueur ne doit pas regarder"},
+      prog: {"title": "📅 Défis du jour", "streak": "🔥 {n}", "left": "Nouveaux défis dans {t}", "hours": "{n} h", "minutes": "{n} min", "allDone": "Tout est fait ! Revenez demain pour prolonger la série", "next": "Série de {n} j — icône {icon}", "q": {"play2": "Jouer 2 parties en ligne", "play3": "Jouer 3 parties en ligne", "ladder2": "Jouer 2 parties pour des étoiles", "win1": "Gagner une partie pour des étoiles", "run1": "Réussir au moins 1 manche de l'Épreuve", "run_rounds5": "Réussir 5 manches de l'Épreuve aujourd'hui", "run_best3": "Réussir 3 manches de l'Épreuve d'affilée"}, "achHead": "🏅 Succès : {n} sur {total}", "achTitle": "Succès : {name}", "achNone": "Aucun pour l'instant", "fsAch": "🏅 Succès", "ach": {"first_win": ["Première victoire", "Gagner une partie en ligne"], "wins_10": ["10 victoires", "Gagner 10 parties en ligne"], "wins_50": ["50 victoires", "Gagner 50 parties en ligne"], "streak_3": ["Trois de suite", "Gagner 3 parties pour des étoiles de suite"], "league_gold": ["Or", "Atteindre la ligue Or"], "league_diamond": ["Diamant", "Atteindre la ligue Diamant"], "legend": ["Légende", "Devenir Légende"], "run_5": ["Épreuve : 5", "Réussir 5 manches de l'Épreuve d'affilée"], "run_10": ["Épreuve : 10", "Réussir 10 manches de l'Épreuve d'affilée"], "friends_3": ["Bande d'amis", "Avoir 3 amis"], "quests_7": ["Une semaine", "Finir les défis du jour 7 jours de suite"], "tutorial": ["Diplômé", "Terminer le tutoriel"]}, "streakLocked": "Se débloque avec une série de {n} jours", "pfStreak": "📅 Série de défis : {n} j · record {best}", "ssTitle": "Bilan de la saison : {season}", "ssBest": "Meilleur : {league}", "ssGames": "Parties : {g} · Victoires : {w}", "ssNow": "La nouvelle saison commence à : {league}", "ssBadge": "Le badge de saison est dans votre profil", "ssGo": "C'est parti !", "close": "Fermer"},
       tut: {"tutTitle": "Tutoriel · leçon {n} sur 3", "tutSub": ["Lire les indices", "Un duel contre un bot", "Bonus et pièges"], "tutLocked": "🔒 après les leçons 1–2", "gateText": "🔒 Le jeu en ligne s'ouvre après deux courtes leçons (environ 3 minutes) : lire les indices et jouer contre un adversaire.", "gateGo": "🎓 Commencer la leçon {n}", "gateSkip": "Passer le tutoriel", "coach": {"1": ["🎓 J'ai choisi un nombre de 1 à 20. Tape un nombre et appuie sur « Vérifier ».", "L'indice dit à quel point tu es proche : 🔥 chaud — tout près, ❄️ froid — loin. Essaie un autre nombre.", "La ligne sous le thermomètre garde tous tes coups. Cherche entre eux — c'est plus rapide."], "2": ["🎓 Maintenant un duel contre un bot : chacun son tour. Le premier qui trouve le nombre gagne.", "Les coups du bot sont aussi des indices : regarde aussi ses « chaud / froid ».", "⚡ « +1 coup » est un jeton : deux coups d'affilée. Appuie avant ton coup quand tu es tout près."], "3": ["🎓 Des bonus 🎁 sont cachés sur la ligne. Marche dessus et il se déclenche : les bons frappent l'adversaire, les pièges te frappent.", "❓ « Quelque chose est proche » — un bonus est tout près. Risquer ou contourner — à toi de voir.", "Un bonus s'est déclenché ! Ce qu'il fait est sur la carte. Continue."]}, "lessonDone": "🎓 Leçon {n} réussie !", "lessonOpen": "🔓 Le jeu en ligne est ouvert", "tutAllDone": "Tutoriel terminé ! Ton icône 🎓 est dans le profil.", "lessonNext": "🎓 Leçon {n}", "lessonFinish": "🎓 Terminé", "tutReplay": "🎓 Refaire le tutoriel", "bcTitle": "Nouveau bonus : {name}", "bcNear": "❓ Quelque chose est proche", "bcOk": "Compris", "bcDesc": {"extra": "Qui marche dessus reçoit deux jetons « +1 coup ». Un jeton donne deux coups d'affilée.", "fog": "Le brouillard tombe sur l'adversaire : jusqu'à la fin de la manche, il ne voit plus les coups de l'autre.", "blind": "La cécité tombe sur l'adversaire : jusqu'à la fin de la manche, il ne voit plus ses propres coups.", "lava": "Le prochain coup de l'adversaire part dans la lave — un nombre au hasard.", "skip": "Un piège : qui marche dessus passe son prochain tour.", "gift": "Un piège : qui marche dessus offre un jeton « +1 coup » à l'adversaire.", "memory": "Un piège : qui marche dessus ne voit que les deux derniers coups jusqu'à la fin de la manche.", "near": "Un bonus se trouve à quelques pas de ton nombre — bon ou piège. Risquer ou contourner — à toi de voir."}, "lgApprentice": "🎓 Apprenti : aucune étoile perdue", "rkApprentice": "🎓 Apprenti · sans perte d'étoiles : encore {n}", "tutIconLocked": "S'ouvre après le tutoriel"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Essais : ", moveForms: ["coup", "coups"], newGame: "Nouvelle partie", menu: "Menu",
@@ -2998,6 +3069,7 @@
     de: {
       inv: {"invBtn": "🔗 Freund einladen", "invTitle": "Freund einladen", "invHint": "Zeig den Code oder schick den Link. Wer ihn öffnet, ist sofort dein Freund.", "invShare": "📤 Teilen", "invCopy": "📋 Link kopieren", "invCopied": "Link kopiert", "invShareText": "Lass uns Hot or Cold spielen! Mein Name im Spiel: {name}", "inTitle": "👋 {name} lädt dich als Freund ein", "inAdd": "Als Freund hinzufügen", "inLogin": "Anmelden oder registrieren", "inLater": "Nicht jetzt", "inDone": "Ihr seid jetzt Freunde: {name}", "errNoInvite": "Einladung nicht gefunden", "invDone": "Fertig"},
       curtain: {"text": "🔄 Gib das Handy an {name} weiter", "go": "Ich bin {name} — zeigen", "why": "Nebel, Blindheit oder kurzes Gedächtnis wirkt — der andere darf nicht hinsehen"},
+      prog: {"title": "📅 Tagesaufgaben", "streak": "🔥 {n}", "left": "Neue Aufgaben in {t}", "hours": "{n} Std.", "minutes": "{n} Min.", "allDone": "Alles erledigt! Komm morgen wieder, damit deine Serie wächst", "next": "{n}-Tage-Serie — Symbol {icon}", "q": {"play2": "2 Online-Partien spielen", "play3": "3 Online-Partien spielen", "ladder2": "2 Partien um Sterne spielen", "win1": "Eine Partie um Sterne gewinnen", "run1": "Mindestens 1 Runde der Kraftprobe schaffen", "run_rounds5": "Heute 5 Runden der Kraftprobe schaffen", "run_best3": "3 Runden der Kraftprobe am Stück schaffen"}, "achHead": "🏅 Erfolge: {n} von {total}", "achTitle": "Erfolge: {name}", "achNone": "Noch keine", "fsAch": "🏅 Erfolge", "ach": {"first_win": ["Erster Sieg", "Eine Online-Partie gewinnen"], "wins_10": ["10 Siege", "10 Online-Partien gewinnen"], "wins_50": ["50 Siege", "50 Online-Partien gewinnen"], "streak_3": ["Drei in Folge", "3 Partien um Sterne in Folge gewinnen"], "league_gold": ["Gold", "Die Goldliga erreichen"], "league_diamond": ["Diamant", "Die Diamantliga erreichen"], "legend": ["Legende", "Legende werden"], "run_5": ["Kraftprobe: 5", "5 Runden am Stück schaffen"], "run_10": ["Kraftprobe: 10", "10 Runden am Stück schaffen"], "friends_3": ["Clique", "3 Freunde finden"], "quests_7": ["Eine Woche", "7 Tage in Folge alle Tagesaufgaben erledigen"], "tutorial": ["Absolvent", "Das Tutorial abschließen"]}, "streakLocked": "Wird mit einer {n}-Tage-Serie freigeschaltet", "pfStreak": "📅 Aufgaben-Serie: {n} T. · Rekord {best}", "ssTitle": "Saisonbilanz: {season}", "ssBest": "Bestes: {league}", "ssGames": "Partien: {g} · Siege: {w}", "ssNow": "Die neue Saison beginnt bei: {league}", "ssBadge": "Das Saisonabzeichen ist in deinem Profil", "ssGo": "Los geht's!", "close": "Schließen"},
       tut: {"tutTitle": "Tutorial · Lektion {n} von 3", "tutSub": ["Hinweise lesen", "Ein Duell gegen einen Bot", "Boni und Fallen"], "tutLocked": "🔒 nach den Lektionen 1–2", "gateText": "🔒 Online öffnet sich nach zwei kurzen Lektionen (etwa 3 Minuten): Hinweise lesen und gegen einen Gegner spielen.", "gateGo": "🎓 Lektion {n} starten", "gateSkip": "Tutorial überspringen", "coach": {"1": ["🎓 Ich habe eine Zahl von 1 bis 20 gewählt. Gib eine Zahl ein und drücke „Prüfen“.", "Der Hinweis sagt, wie nah du bist: 🔥 heiß — nah, ❄️ kalt — weit weg. Versuch eine andere Zahl.", "Die Linie unter dem Thermometer merkt sich alle Züge. Such zwischen ihnen — das geht schneller."], "2": ["🎓 Jetzt ein Duell gegen einen Bot: ihr zieht abwechselnd. Wer die Zahl zuerst nennt, gewinnt.", "Die Züge des Bots sind auch Hinweise: achte auch auf sein „heiß / kalt“.", "⚡ „+1 Zug“ ist eine Marke: zwei Züge hintereinander. Drück sie vor deinem Zug, wenn du nah dran bist."], "3": ["🎓 Auf der Linie sind Boni 🎁 versteckt. Tritt darauf und er wirkt: gute treffen den Gegner, Fallen treffen dich.", "❓ „Etwas ist in der Nähe“ — ein Bonus liegt nah. Riskieren oder umgehen — du entscheidest.", "Ein Bonus hat gewirkt! Was er tut, steht auf der Karte. Spiel weiter."]}, "lessonDone": "🎓 Lektion {n} geschafft!", "lessonOpen": "🔓 Online ist offen", "tutAllDone": "Tutorial geschafft! Dein 🎓-Symbol ist im Profil.", "lessonNext": "🎓 Lektion {n}", "lessonFinish": "🎓 Fertig", "tutReplay": "🎓 Tutorial wiederholen", "bcTitle": "Neuer Bonus: {name}", "bcNear": "❓ Etwas ist in der Nähe", "bcOk": "Verstanden", "bcDesc": {"extra": "Wer darauf tritt, bekommt zwei „+1 Zug“-Marken. Eine Marke gibt zwei Züge hintereinander.", "fog": "Nebel legt sich auf den Gegner: bis zum Rundenende sieht er die Züge des anderen nicht.", "blind": "Blindheit legt sich auf den Gegner: bis zum Rundenende sieht er seine eigenen Züge nicht.", "lava": "Der nächste Zug des Gegners fliegt in die Lava — eine zufällige Zahl.", "skip": "Eine Falle: wer darauf tritt, setzt den nächsten Zug aus.", "gift": "Eine Falle: wer darauf tritt, schenkt dem Gegner eine „+1 Zug“-Marke.", "memory": "Eine Falle: wer darauf tritt, sieht bis zum Rundenende nur die letzten zwei Züge.", "near": "Ein paar Schritte von deiner Zahl liegt ein Bonus — gut oder Falle. Riskieren oder umgehen — du entscheidest."}, "lgApprentice": "🎓 Lehrling: kein Stern verloren", "rkApprentice": "🎓 Lehrling · ohne Sternverlust: noch {n}", "tutIconLocked": "Öffnet sich nach dem Tutorial"},
       title: "Hot or Cold", docTitle: "Hot or Cold",
       attemptsPrefix: "Versuche: ", moveForms: ["Zug", "Züge"], newGame: "Neues Spiel", menu: "Menü",
@@ -3703,6 +3775,7 @@
     document.getElementById('tGroupOnline').textContent = L.groupOnline;
     document.getElementById('tModeOnline').textContent = L.online.mode;
     renderTutorialMenu();
+    renderQuestCard();
     // Значок — как у «🎮 Игры»: разделы экрана подписаны одинаково
     document.getElementById('tLblFindFriend').textContent = '🔍 ' + L.online.find;
     document.getElementById('tFindBtn').textContent = L.online.findBtn;
@@ -3800,6 +3873,8 @@
     document.querySelector('.header').classList.toggle('compact', name === 'game');
     document.querySelector('.legend').classList.toggle('hidden', name !== 'game');
     updateAccountChip();
+    // Вернулся в меню — задания могли продвинуться: партия или Испытание
+    if (name === 'mode') loadProgress();
   }
 
   function quitToMenu() {
@@ -5677,7 +5752,186 @@
     } catch (e) {
       ladderInfo = null;
     }
+    if (ladderInfo && ladderInfo.summary) showSeasonSummary(ladderInfo.summary);
     return ladderInfo;
+  }
+
+  // ---------- итоги сезона ----------
+  // Сезон сменился — один раз показываем, чем кончился прошлый. База помнит,
+  // что итоги видели, поэтому на другом устройстве они второй раз не всплывут
+  let seasonShown = null;
+  function showSeasonSummary(sm) {
+    if (!sm || !sm.season || seasonShown === sm.season) return;
+    seasonShown = sm.season;
+    const P = t().prog;
+    const L = t();
+    const lg = Math.max(0, Math.min(5, sm.league || 0));
+    document.getElementById('ssTitle').textContent = P.ssTitle.replace('{season}',
+      seasonMonth(sm.season) + ' ' + String(sm.season).slice(0, 4));
+    const big = document.createElement('span');
+    big.className = 'big';
+    big.textContent = LEAGUE_ICONS[lg];
+    const box = document.getElementById('ssLeague');
+    box.replaceChildren(big, document.createTextNode(L.leagues[lg]));
+    document.getElementById('ssBest').textContent = P.ssBest.replace('{league}', leagueLabel(sm.best || 0));
+    document.getElementById('ssGames').textContent = P.ssGames.replace('{g}', sm.games || 0).replace('{w}', sm.wins || 0);
+    document.getElementById('ssNow').textContent = ladderInfo
+      ? P.ssNow.replace('{league}', leagueLabel(ladderInfo.stars)) : '';
+    document.getElementById('ssBadge').textContent = P.ssBadge;
+    document.getElementById('ssGo').textContent = P.ssGo;
+    document.getElementById('seasonModal').classList.remove('hidden');
+  }
+
+  function closeSeasonSummary() {
+    document.getElementById('seasonModal').classList.add('hidden');
+    if (seasonShown) friendRpc('season_summary_seen', { p_season: seasonShown }).catch(() => {});
+  }
+
+  // ---------- задания дня и достижения ----------
+  // Иконки за серию дней. Копия — в базе (quest_rewards), сверяется тестом
+  const QUEST_ICONS = [{ days: 3, icon: '🔥' }, { days: 7, icon: '🚀' }, { days: 14, icon: '🌋' }, { days: 30, icon: '🌈' }];
+  // Порядок и коды — как в базе (achievement_codes), сверяется тестом
+  const ACHIEVEMENTS = [
+    { code: 'first_win', icon: '🎉' }, { code: 'wins_10', icon: '💪' }, { code: 'wins_50', icon: '🏆' },
+    { code: 'streak_3', icon: '⚡' }, { code: 'league_gold', icon: '🥇' }, { code: 'league_diamond', icon: '💎' },
+    { code: 'legend', icon: '👑' }, { code: 'run_5', icon: '🧗' }, { code: 'run_10', icon: '🏔️' },
+    { code: 'friends_3', icon: '🤝' }, { code: 'quests_7', icon: '📅' }, { code: 'tutorial', icon: '🎓' }
+  ];
+
+  // Что сервер знает о заданиях и достижениях. null — не знаем: нет входа,
+  // нет сети или миграция не применена. Тогда карточки нет вовсе
+  let progressInfo = null;
+
+  async function loadProgress() {
+    if (!runAuth() || !sb) {
+      progressInfo = null;
+      renderQuestCard();
+      return null;
+    }
+    let tz = null;
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch (e) {}
+    try {
+      const p = await friendRpc('my_progress', { p_tz: tz });
+      progressInfo = (p && typeof p === 'object' && Array.isArray(p.quests)) ? p : null;
+    } catch (e) {
+      progressInfo = null;
+    }
+    renderQuestCard();
+    return progressInfo;
+  }
+
+  function questIconDays(icon) {
+    const q = QUEST_ICONS.find(x => x.icon === icon);
+    return q ? q.days : 0;
+  }
+
+  function questIconOpen(icon) {
+    return !!progressInfo && (progressInfo.bestStreak || 0) >= questIconDays(icon);
+  }
+
+  function timeLeftText(sec) {
+    const P = t().prog;
+    const h = Math.floor(sec / 3600);
+    return h >= 1 ? P.hours.replace('{n}', h) : P.minutes.replace('{n}', Math.max(1, Math.ceil(sec / 60)));
+  }
+
+  function renderQuestCard() {
+    const card = document.getElementById('questCard');
+    const show = !!(progressInfo && runAuth() && progressInfo.quests.length);
+    card.classList.toggle('hidden', !show);
+    if (!show) return;
+    const P = t().prog;
+    const I = progressInfo;
+    document.getElementById('qcTitle').textContent = P.title;
+    const streak = document.getElementById('qcStreak');
+    streak.textContent = I.streak > 0 ? P.streak.replace('{n}', I.streak) : '';
+    const list = document.getElementById('qcList');
+    list.replaceChildren();
+    I.quests.forEach(q => {
+      const done = q.progress >= q.goal;
+      const row = document.createElement('div');
+      row.className = 'qc-row' + (done ? ' done' : '');
+      row.dataset.code = q.code;
+      const mark = document.createElement('span');
+      mark.textContent = done ? '✅' : '▫️';
+      const text = document.createElement('span');
+      text.textContent = P.q[q.code] || q.code;
+      const n = document.createElement('span');
+      n.className = 'qc-n';
+      n.textContent = Math.min(q.progress, q.goal) + '/' + q.goal;
+      row.append(mark, text, n);
+      const bar = document.createElement('div');
+      bar.className = 'qc-bar';
+      const fill = document.createElement('span');
+      fill.style.width = Math.round(100 * Math.min(1, q.progress / q.goal)) + '%';
+      bar.appendChild(fill);
+      list.append(row, bar);
+    });
+    // Внизу — что дальше: сколько ждать новых и какая иконка следующая
+    const next = QUEST_ICONS.find(x => x.days > (I.bestStreak || 0));
+    const parts = [I.doneToday ? P.allDone : P.left.replace('{t}', timeLeftText(I.secondsLeft || 0))];
+    if (next) parts.push(P.next.replace('{n}', next.days).replace('{icon}', next.icon));
+    document.getElementById('qcFoot').textContent = parts.join(' · ');
+  }
+
+  // Сетка достижений: открытые — в цвете, закрытые — серые с тем, как открыть
+  function fillAchGrid(box, got, onlyOpen) {
+    const P = t().prog;
+    const have = new Set((got || []).map(a => a.code));
+    box.replaceChildren();
+    ACHIEVEMENTS.filter(a => !onlyOpen || have.has(a.code)).forEach(a => {
+      const tile = document.createElement('div');
+      tile.className = 'ach-tile' + (have.has(a.code) ? '' : ' locked');
+      tile.dataset.code = a.code;
+      const icon = document.createElement('div');
+      icon.className = 'a-icon';
+      icon.textContent = a.icon;
+      const name = document.createElement('div');
+      name.className = 'a-name';
+      name.textContent = P.ach[a.code][0];
+      const sub = document.createElement('div');
+      sub.className = 'a-sub';
+      sub.textContent = P.ach[a.code][1];
+      tile.append(icon, name, sub);
+      box.appendChild(tile);
+    });
+    return have.size;
+  }
+
+  function fillProgressProfile() {
+    const P = t().prog;
+    const I = progressInfo;
+    const on = !!(runAuth() && I);
+    const line = document.getElementById('pfStreak');
+    line.classList.toggle('hidden', !(on && (I.bestStreak || 0) > 0));
+    if (on) line.textContent = P.pfStreak.replace('{n}', I.streak || 0).replace('{best}', I.bestStreak || 0);
+    const fold = document.getElementById('pfAchFold');
+    fold.classList.toggle('hidden', !on);
+    if (!on) return;
+    const n = fillAchGrid(document.getElementById('pfAchGrid'), I.achievements, false);
+    document.getElementById('tAchHead').textContent =
+      P.achHead.replace('{n}', n).replace('{total}', ACHIEVEMENTS.length);
+  }
+
+  async function openFriendAch(name) {
+    const P = t().prog;
+    document.getElementById('achTitle').textContent = P.achTitle.replace('{name}', playerName(name));
+    document.getElementById('achClose').textContent = P.close;
+    document.getElementById('achGrid').replaceChildren();
+    setNote('achNote', '');
+    document.getElementById('achModal').classList.remove('hidden');
+    try {
+      const got = await friendRpc('friend_achievements', { p_friend: name }) || [];
+      // У друга показываем только открытое: чужие замки ни о чём не говорят
+      const n = fillAchGrid(document.getElementById('achGrid'), got, true);
+      if (!n) setNote('achNote', P.achNone);
+    } catch (e) {
+      setNote('achNote', friendErrorText(e.message), true);
+    }
+  }
+
+  function closeFriendAch() {
+    document.getElementById('achModal').classList.add('hidden');
   }
 
   // Какого бота выбрали в прошлый раз. Сначала — 🐼: слабый, но не беспомощный
@@ -6034,6 +6288,8 @@
     localStorage.removeItem('hc_run_since');
     localStorage.removeItem('hc_run_avatar');
     profileInfo = null;
+    progressInfo = null;
+    renderQuestCard();
   }
 
   // ================= ПРОФИЛЬ: иконка, имя, PIN =================
@@ -6254,6 +6510,7 @@
         lg.appendChild(row);
       }
     }
+    fillProgressProfile();
     document.getElementById('pfAccount').classList.toggle('hidden', !auth);
     document.getElementById('pfLogout').classList.toggle('hidden', !auth);
     document.getElementById('tDeleteAccount').classList.toggle('hidden', !auth);
@@ -6312,6 +6569,9 @@
       loadLadder().then(() => {
         if (!document.getElementById('logoutModal').classList.contains('hidden')) fillProfile();
       });
+      loadProgress().then(() => {
+        if (!document.getElementById('logoutModal').classList.contains('hidden')) fillProfile();
+      });
     }
     document.getElementById('logoutModal').classList.remove('hidden');
   }
@@ -6357,9 +6617,12 @@
     // Первая клетка — буква: вернуться к ней можно так же, как выбрать иконку
     // Иконка за обучение — когда сервер о ней знает (миграция 037)
     const tutIcon = profileInfo && 'tutorialDone' in profileInfo ? [TUTORIAL_ICON] : [];
-    ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon].forEach(icon => {
+    // Иконки за серию заданий — когда сервер знает задания (миграция 041)
+    const questIcons = progressInfo ? QUEST_ICONS.map(q => q.icon) : [];
+    ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons].forEach(icon => {
       const b = document.createElement('button');
       const locked = icon === TUTORIAL_ICON ? !tutorialIconOpen()
+        : questIconDays(icon) ? !questIconOpen(icon)
         : rewardLeague('icon', icon) > 0 && !rewardOpen('icon', icon);
       b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '') + (locked ? ' locked' : '');
       b.dataset.icon = icon;
@@ -6408,6 +6671,9 @@
 
   async function chooseAvatar(icon) {
     if (lockedNote('icon', icon)) return;
+    if (questIconDays(icon) && !questIconOpen(icon)) {
+      return setNote('avNote', t().prog.streakLocked.replace('{n}', questIconDays(icon)), true);
+    }
     if (icon === TUTORIAL_ICON) {
       if (!tutorialIconOpen()) return setNote('avNote', t().tut.tutIconLocked, true);
       // Обучение пройдено без входа — сначала сказать базе, иначе иконку не примет
@@ -7820,6 +8086,9 @@
     document.getElementById('fsName').textContent = playerName(name);
     document.getElementById('fsWrite').textContent = L.shWrite;
     document.getElementById('fsRemove').textContent = L.shRemove;
+    document.getElementById('fsAch').textContent = t().prog.fsAch;
+    // Достижения видны только друзьям — так решает и база
+    document.getElementById('fsAch').classList.toggle('hidden', !(row && row.relation === 'friend'));
     document.getElementById('fsReport').textContent = L.shReport;
     document.getElementById('fsBlock').textContent = L.shBlock;
     document.getElementById('fsCancel').textContent = L.shCancel;
@@ -7838,6 +8107,7 @@
     closeFriendSheet();
     if (what === 'write') return openChat(name);
     if (what === 'remove') return removeFriend(name);
+    if (what === 'ach') return openFriendAch(name);
     if (what === 'report') return openReport(name);
     if (what === 'block') return openBlock(name);
   }

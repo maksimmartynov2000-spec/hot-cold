@@ -532,6 +532,23 @@ async function registerPlayer(p, name, pin) {
   const heroB = await B.page.evaluate(() => document.getElementById('rkElo').textContent);
   check('на экране онлайна — лига из настоящей базы', heroB === '🥉 Бронза 10', heroB);
 
+  // Задания дня: засчитывает база по настоящим партиям
+  const decided = (await db.query("select count(*)::int as n from matches m where match_winner(m) is not null and 'Лада' in (m.p0, m.p1)")).rows[0].n;
+  const ladaStats = (await db.query("select online_games, online_wins from player_stats where username = 'Лада'")).rows[0];
+  check('партии Лады с исходом посчитаны базой', decided >= 3 && ladaStats && ladaStats.online_games === decided,
+    JSON.stringify({ decided, ladaStats }));
+  await B.page.evaluate(() => quitToMenu());
+  await B.page.waitForTimeout(1200);
+  const qc = await B.page.evaluate(() => ({ shown: !document.getElementById('questCard').classList.contains('hidden'),
+    rows: [...document.querySelectorAll('#qcList .qc-row')].map(r => r.dataset.code + ' ' + r.querySelector('.qc-n').textContent) }));
+  const dq = (await db.query("select code, goal, progress from daily_quests where username = 'Лада' and day = player_day('Лада') order by slot")).rows;
+  check('в меню — задания дня из настоящей базы, прогресс как в базе',
+    qc.shown && qc.rows.length === 3 && qc.rows.join() === dq.map(q => q.code + ' ' + Math.min(q.progress, q.goal) + '/' + q.goal).join(),
+    JSON.stringify({ qc, dq }));
+  // Первое задание — «сыграть онлайн» или «на звёзды»: у Лады 3 партии с исходом, из них 2 на звёзды
+  check('партии онлайн продвинули первое задание',
+    dq[0].progress === Math.min(dq[0].goal, dq[0].code === 'ladder2' ? lad.games : decided), JSON.stringify(dq[0]));
+
   check('у бота рейтинга нет',
     (await db.query("select count(*) from elo_ratings where username like '@bot:%'")).rows[0].count === '0');
 

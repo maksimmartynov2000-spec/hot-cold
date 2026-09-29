@@ -1,0 +1,631 @@
+-- Задания дня, достижения и итоги сезона. Применять в Supabase: SQL Editor →
+-- вставить целиком → Run. Применить ДО мёржа: игра спрашивает у базы задания.
+--
+-- Задания дня. Каждый день — три задания: сыграть онлайн, выиграть партию на
+-- звёзды, пройти Испытание. Засчитывает только база, по настоящим партиям и
+-- попыткам: из игры прогресс не прислать. День кончается в полночь игрока —
+-- игра сообщает его часовой пояс. Все три выполнены — день в серии. Серия
+-- 3, 7, 14 и 30 дней открывает по иконке.
+--
+-- Достижения — 12 штук. Открываются один раз и навсегда, видны в профиле и
+-- друзьям.
+--
+-- Сезон: за 2 дня до конца — уведомление тем, кто играл в этом сезоне. После
+-- смены сезона игра один раз показывает итоги прошлого: лигу, партии, победы.
+-- Отдельного расписания не нужно: уведомления рассылаются при первом
+-- обращении любого игрока в последние 2 дня сезона.
+
+-- 1. Часовой пояс игрока: день заданий кончается в его полночь
+alter table students add column if not exists tz text;
+alter table students add column if not exists tz_set_at timestamptz;
+
+create or replace function player_day(p_username text)
+returns date
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select (now() at time zone coalesce((select tz from students where username = p_username), 'UTC'))::date;
+$$;
+
+-- 2. Счётчики, из которых складываются достижения. Партии — только с исходом:
+--    отменённая или брошенная без результата не считается
+create table if not exists player_stats (
+  username text primary key references students(username) on update cascade on delete cascade,
+  online_games int not null default 0,
+  online_wins int not null default 0,
+  run_games int not null default 0,
+  run_best int not null default 0,
+  quest_streak int not null default 0,
+  quest_best int not null default 0,
+  quest_last date
+);
+alter table player_stats enable row level security;
+
+-- Кто выиграл партию: null — партия без исхода
+create or replace function match_winner(m matches)
+returns int
+language sql
+immutable
+as $$
+  select case when m.status <> 'finished' then null
+              when m.forfeit_by is not null then 1 - m.forfeit_by
+              when m.wins[1] >= m.wins_needed then 0
+              when m.wins[2] >= m.wins_needed then 1 end;
+$$;
+
+-- Что было до этой миграции. Повторный прогон ничего не меняет: строки уже есть
+insert into player_stats(username, online_games, online_wins, run_games, run_best)
+select s.username,
+  (select count(*) from matches m
+   where match_winner(m) is not null
+     and ((m.p0 = s.username and m.bot_seat is distinct from 0)
+       or (m.p1 = s.username and m.bot_seat is distinct from 1))),
+  (select count(*) from matches m
+   where (match_winner(m) = 0 and m.p0 = s.username and m.bot_seat is distinct from 0)
+      or (match_winner(m) = 1 and m.p1 = s.username and m.bot_seat is distinct from 1)),
+  (select count(*) from runs r where r.username = s.username),
+  coalesce((select max(r.rounds) from runs r where r.username = s.username), 0)
+from students s
+on conflict (username) do nothing;
+
+-- 3. Задания. Три места, на каждом — одно задание из своего набора; какое —
+--    решает имя и дата, так что у всех в один день разные. Копия текстов — в
+--    index.html (QUEST_CODES), сверяется тестом
+create or replace function quest_pool()
+returns table(slot int, ord int, code text, goal int)
+language sql
+immutable
+as $$
+  values (1, 1, 'play2', 2), (1, 2, 'play3', 3), (1, 3, 'ladder2', 2),
+         (2, 1, 'win1', 1),
+         (3, 1, 'run1', 1), (3, 2, 'run_rounds5', 5), (3, 3, 'run_best3', 3);
+$$;
+
+-- Иконки за серию дней. Копия — в index.html (QUEST_ICONS)
+create or replace function quest_rewards()
+returns table(days int, icon text)
+language sql
+immutable
+as $$ values (3, '🔥'), (7, '🚀'), (14, '🌋'), (30, '🌈'); $$;
+
+create or replace function quest_icons()
+returns text[]
+language sql
+immutable
+as $$ select array['🔥', '🚀', '🌋', '🌈']; $$;
+
+create table if not exists daily_quests (
+  username text not null references students(username) on update cascade on delete cascade,
+  day date not null,
+  slot int not null,
+  code text not null,
+  goal int not null,
+  progress int not null default 0,
+  primary key (username, day, slot)
+);
+alter table daily_quests enable row level security;
+
+-- Задания на сегодня: раздаются при первом обращении за день
+create or replace function quest_ensure(p_username text)
+returns date
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare d date;
+begin
+  d := player_day(p_username);
+  if not exists (select 1 from daily_quests where username = p_username and day = d) then
+    insert into daily_quests(username, day, slot, code, goal)
+    select p_username, d, q.slot, q.code, q.goal
+    from (select p.slot, p.code, p.goal,
+                 row_number() over (partition by p.slot order by p.ord) - 1 as i,
+                 count(*) over (partition by p.slot) as n
+          from quest_pool() p) q
+    where q.i = abs(hashtext(p_username || '|' || d::text || '|' || q.slot::text)) % q.n
+    on conflict do nothing;
+  end if;
+  return d;
+end;
+$$;
+
+-- Событие засчитано: online — партия с исходом, ladder — партия на звёзды,
+-- win — победа на звёзды, run — Испытание окончено (p_n — пройдено раундов)
+create or replace function quest_event(p_username text, p_event text, p_n int)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare d date; was_done boolean; now_done boolean;
+begin
+  if p_username is null or p_username like '#%' or p_username like '@bot:%' then return; end if;
+  d := quest_ensure(p_username);
+  select bool_and(progress >= goal) into was_done from daily_quests where username = p_username and day = d;
+  update daily_quests q
+  set progress = least(q.goal, case
+      when q.code in ('play2', 'play3') and p_event = 'online' then q.progress + 1
+      when q.code = 'ladder2' and p_event = 'ladder' then q.progress + 1
+      when q.code = 'win1' and p_event = 'win' then q.progress + 1
+      -- Сдаться сразу — не «пройти Испытание»: нужен хотя бы один раунд
+      when q.code = 'run1' and p_event = 'run' and p_n > 0 then q.progress + 1
+      when q.code = 'run_rounds5' and p_event = 'run' then q.progress + greatest(0, p_n)
+      when q.code = 'run_best3' and p_event = 'run' then greatest(q.progress, p_n)
+      else q.progress end)
+  where q.username = p_username and q.day = d;
+  select bool_and(progress >= goal) into now_done from daily_quests where username = p_username and day = d;
+  if now_done and not was_done then
+    insert into player_stats(username) values (p_username) on conflict do nothing;
+    -- Вчера тоже всё сделано — серия растёт, иначе начинается заново
+    update player_stats
+    set quest_streak = case when quest_last = d - 1 then quest_streak + 1
+                            when quest_last = d then quest_streak else 1 end,
+        quest_last = d
+    where username = p_username;
+    update player_stats set quest_best = greatest(quest_best, quest_streak) where username = p_username;
+  end if;
+end;
+$$;
+
+-- 4. Достижения. Коды — в index.html (ACHIEVEMENTS), сверяется тестом
+create or replace function achievement_codes()
+returns text[]
+language sql
+immutable
+as $$
+  select array['first_win', 'wins_10', 'wins_50', 'streak_3', 'league_gold', 'league_diamond',
+               'legend', 'run_5', 'run_10', 'friends_3', 'quests_7', 'tutorial'];
+$$;
+
+create table if not exists achievements (
+  username text not null references students(username) on update cascade on delete cascade,
+  code text not null,
+  at timestamptz not null default now(),
+  primary key (username, code)
+);
+alter table achievements enable row level security;
+
+-- Открыть всё, что уже заслужено. Вызывается после каждого события и при
+-- чтении: открытое не закрывается
+create or replace function achievements_sync(p_username text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare st player_stats; l ladder; fr int; td boolean;
+begin
+  if p_username is null or p_username like '#%' or p_username like '@bot:%' then return; end if;
+  if not exists (select 1 from students where username = p_username) then return; end if;
+  insert into player_stats(username) values (p_username) on conflict do nothing;
+  select * into st from player_stats where username = p_username;
+  select * into l from ladder where username = p_username;
+  select count(*) into fr from friendships
+  where status = 'accepted' and p_username in (requester, addressee);
+  select tutorial_done into td from students where username = p_username;
+  insert into achievements(username, code)
+  select p_username, c
+  from unnest(array[
+    case when st.online_wins >= 1 then 'first_win' end,
+    case when st.online_wins >= 10 then 'wins_10' end,
+    case when st.online_wins >= 50 then 'wins_50' end,
+    case when coalesce(l.streak, 0) >= 3 then 'streak_3' end,
+    case when coalesce(l.peak, 0) >= 2 then 'league_gold' end,
+    case when coalesce(l.peak, 0) >= 4 then 'league_diamond' end,
+    case when coalesce(l.peak, 0) >= 5 then 'legend' end,
+    case when st.run_best >= 5 then 'run_5' end,
+    case when st.run_best >= 10 then 'run_10' end,
+    case when fr >= 3 then 'friends_3' end,
+    case when st.quest_best >= 7 then 'quests_7' end,
+    case when coalesce(td, false) then 'tutorial' end]) c
+  where c is not null
+  on conflict do nothing;
+end;
+$$;
+
+-- 5. Откуда приходят события
+-- Партия закончилась с исходом: счётчики, задания, достижения — обоим людям
+create or replace function matches_progress()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare seat int; who text; w int;
+begin
+  w := match_winner(new);
+  if w is null then return null; end if;
+  for seat in 0..1 loop
+    if new.bot_seat is not null and new.bot_seat = seat then continue; end if;
+    who := case when seat = 0 then new.p0 else new.p1 end;
+    if who like '#%' then continue; end if;
+    insert into player_stats(username) values (who) on conflict do nothing;
+    update player_stats
+    set online_games = online_games + 1,
+        online_wins = online_wins + case when w = seat then 1 else 0 end
+    where username = who;
+    perform quest_event(who, 'online', 1);
+    -- Победа засчитывается только на звёзды: партию с другом можно отдать нарочно
+    if new.ladder then
+      perform quest_event(who, 'ladder', 1);
+      if w = seat then perform quest_event(who, 'win', 1); end if;
+    end if;
+    perform achievements_sync(who);
+  end loop;
+  return null;
+end;
+$$;
+drop trigger if exists matches_progress on matches;
+create trigger matches_progress after update of status on matches
+  for each row when (new.status = 'finished' and old.status is distinct from 'finished')
+  execute function matches_progress();
+
+-- Испытание закончилось — сдался, кончились попытки или время. Считает база:
+-- таблица runs пополняется и старой функцией из игры, ей не верим
+create or replace function run_sessions_progress()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare n int;
+begin
+  n := greatest(0, new.round - 1);
+  insert into player_stats(username) values (new.username) on conflict do nothing;
+  update player_stats set run_games = run_games + 1, run_best = greatest(run_best, n)
+  where username = new.username;
+  perform quest_event(new.username, 'run', n);
+  perform achievements_sync(new.username);
+  return null;
+end;
+$$;
+drop trigger if exists run_sessions_progress on run_sessions;
+create trigger run_sessions_progress after update of status on run_sessions
+  for each row when (new.status = 'finished' and old.status = 'active')
+  execute function run_sessions_progress();
+
+-- Лига, серия побед, друзья, обучение — достижения сразу
+create or replace function ladder_progress()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  perform achievements_sync(new.username);
+  return null;
+end;
+$$;
+drop trigger if exists ladder_progress on ladder;
+create trigger ladder_progress after update of peak, streak on ladder
+  for each row execute function ladder_progress();
+
+create or replace function friendships_progress()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.status = 'accepted' then
+    perform achievements_sync(new.requester);
+    perform achievements_sync(new.addressee);
+  end if;
+  return null;
+end;
+$$;
+drop trigger if exists friendships_progress on friendships;
+create trigger friendships_progress after insert or update of status on friendships
+  for each row execute function friendships_progress();
+
+create or replace function students_progress()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  perform achievements_sync(new.username);
+  return null;
+end;
+$$;
+drop trigger if exists students_progress on students;
+create trigger students_progress after update of tutorial_done on students
+  for each row when (new.tutorial_done and not old.tutorial_done)
+  execute function students_progress();
+
+-- Всё заслуженное до этой миграции — открыть сразу
+do $$
+declare u text;
+begin
+  for u in select username from students where username not like '#%' and username not like '@bot:%' loop
+    perform achievements_sync(u);
+  end loop;
+end $$;
+
+-- 6. Иконки за серию заданий: ставятся так же, как за лиги
+alter table students drop constraint if exists student_avatar_allowed;
+alter table students add constraint student_avatar_allowed
+  check (avatar is null or avatar = any (avatar_choices() || reward_icons() || tutorial_icon() || quest_icons()));
+
+create or replace function set_avatar(p_username text, p_pin text, p_avatar text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; need int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  -- Иконка за обучение — тому, кто его прошёл
+  if p_avatar = tutorial_icon() then
+    if not coalesce((select tutorial_done from students where username = me), false) then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка за серию заданий — тому, у кого была такая серия
+  elsif p_avatar = any (quest_icons()) then
+    select days into need from quest_rewards() where icon = p_avatar;
+    if coalesce((select quest_best from player_stats where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  elsif p_avatar is not null and not (p_avatar = any (avatar_choices())) then
+    select league into need from league_rewards() where kind = 'icon' and value = p_avatar;
+    if need is null then raise exception 'invalid_avatar'; end if;
+    if coalesce((select peak from ladder where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  end if;
+  update students set avatar = p_avatar where username = me;
+  return p_avatar;
+end;
+$$;
+
+-- 7. Сезон: победы за сезон, итоги прошлого, уведомление за 2 дня до конца
+alter table ladder add column if not exists wins int not null default 0;
+-- Победы текущего сезона до этой миграции. Повторный прогон считает то же самое
+update ladder l
+set wins = (select count(*) from matches m
+            where m.ladder and m.created_at >= date_trunc('month', now() at time zone 'UTC') at time zone 'UTC'
+              and ((m.p0 = l.username and match_winner(m) = 0) or (m.p1 = l.username and match_winner(m) = 1)))
+where l.season = ladder_season();
+
+alter table season_badges add column if not exists best int;
+alter table season_badges add column if not exists games int;
+alter table season_badges add column if not exists wins int;
+-- Старые значки итогов не показывают: их сезоны давно прошли
+alter table season_badges add column if not exists seen boolean not null default true;
+alter table season_badges alter column seen set default false;
+
+create or replace function ladder_touch(p_username text)
+returns ladder
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare r ladder; cur text; s int;
+begin
+  cur := ladder_season();
+  insert into ladder(username, season) values (p_username, cur)
+  on conflict (username) do nothing;
+  select * into r from ladder where username = p_username for update;
+  if r.season <> cur then
+    if r.games > 0 then
+      insert into season_badges(username, season, league, best, games, wins)
+      values (p_username, r.season, ladder_league(r.best), r.best, r.games, r.wins)
+      on conflict (username, season) do nothing;
+    end if;
+    s := case when r.stars >= 150 then 135 else greatest(0, r.stars - 30) end;
+    s := s - s % 3;
+    update ladder
+    set season = cur, stars = s, legend_at = null, streak = 0, best = s, games = 0, wins = 0, updated_at = now()
+    where username = p_username
+    returning * into r;
+  end if;
+  return r;
+end;
+$$;
+
+create or replace function ladder_after(p_username text, p_won boolean)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare r ladder; st int; s int;
+begin
+  r := ladder_touch(p_username);
+  if p_won then
+    st := r.streak + 1;
+    s := least(150, r.stars + case when st >= 3 and r.stars < 150 then 2 else 1 end);
+  else
+    st := 0;
+    -- Начало лиги и ранг 5 — ступени, ниже которых не упасть. Легенда — до
+    -- конца сезона
+    s := case when r.stars >= 150 or r.stars % 15 = 0 then r.stars else r.stars - 1 end;
+    -- Ученик: первые 10 партий на звёзды поражение звезду не отнимает
+    if r.career < apprentice_games() then s := r.stars; end if;
+  end if;
+  update ladder
+  set stars = s,
+      legend_at = case when s >= 150 and r.legend_at is null then now() else r.legend_at end,
+      streak = st,
+      best = greatest(r.best, s),
+      games = r.games + 1,
+      wins = r.wins + case when p_won then 1 else 0 end,
+      career = r.career + 1,
+      peak = greatest(r.peak, ladder_league(s)),
+      updated_at = now()
+  where username = p_username;
+  return s - r.stars;
+end;
+$$;
+
+create table if not exists season_notices (
+  season text primary key,
+  sent_at timestamptz not null default now()
+);
+alter table season_notices enable row level security;
+
+-- За 2 дня до конца сезона — один раз на сезон, тем, кто в нём играл.
+-- p_now — для проверки: тест не ждёт конца месяца
+create or replace function season_end_check(p_now timestamptz default now())
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare ends timestamptz; cur text;
+begin
+  cur := to_char(p_now at time zone 'UTC', 'YYYY-MM');
+  ends := (date_trunc('month', p_now at time zone 'UTC') + interval '1 month') at time zone 'UTC';
+  if p_now < ends - interval '2 days' then return; end if;
+  insert into season_notices(season) values (cur) on conflict do nothing;
+  if not found then return; end if;
+  insert into push_outbox(username, kind)
+  select l.username, 'season_end'
+  from ladder l
+  where l.season = cur and l.games > 0 and l.username not like '#%'
+    and exists (select 1 from push_subscriptions p where p.username = l.username);
+end;
+$$;
+
+create or replace function ladder_status(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; r ladder; badges jsonb; ends timestamptz; summary jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  r := ladder_touch(me);
+  perform season_end_check();
+  select coalesce(jsonb_agg(jsonb_build_object('season', b.season, 'league', b.league) order by b.season), '[]'::jsonb)
+    into badges
+  from season_badges b where b.username = me;
+  -- Итоги прошлого сезона — пока игрок их не видел
+  select jsonb_build_object('season', b.season, 'league', b.league, 'best', b.best,
+                            'games', b.games, 'wins', b.wins)
+    into summary
+  from season_badges b where b.username = me and not b.seen
+  order by b.season desc limit 1;
+  ends := (date_trunc('month', now() at time zone 'UTC') + interval '1 month') at time zone 'UTC';
+  return jsonb_build_object(
+    'season', r.season,
+    'endsIn', greatest(0, floor(extract(epoch from (ends - now())))::int),
+    'stars', r.stars,
+    'streak', r.streak,
+    'best', r.best,
+    'games', r.games,
+    'wins', r.wins,
+    'apprentice', greatest(0, apprentice_games() - r.career),
+    'peak', r.peak,
+    'badges', badges,
+    'summary', summary);
+end;
+$$;
+
+create or replace function season_summary_seen(p_username text, p_pin text, p_season text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  update season_badges set seen = true where username = me and season <= p_season;
+  return true;
+end;
+$$;
+
+-- 8. Что видит игрок: задания, серия, достижения. Заодно запоминаем пояс —
+--    не чаще раза в сутки, чтобы переводом часов не получить лишний день
+create or replace function my_progress(p_username text, p_pin text, p_tz text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; s students; d date; st player_stats; quests jsonb; ach jsonb; streak int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into s from students where username = me;
+  if p_tz is not null and p_tz is distinct from s.tz
+     and (s.tz is null or s.tz_set_at is null or s.tz_set_at <= now() - interval '20 hours')
+     and exists (select 1 from pg_timezone_names where name = p_tz) then
+    update students set tz = p_tz, tz_set_at = now() where username = me;
+  end if;
+  perform season_end_check();
+  perform achievements_sync(me);
+  d := quest_ensure(me);
+  select * into st from player_stats where username = me;
+  select jsonb_agg(jsonb_build_object('code', q.code, 'goal', q.goal, 'progress', q.progress) order by q.slot)
+    into quests
+  from daily_quests q where q.username = me and q.day = d;
+  select coalesce(jsonb_agg(jsonb_build_object('code', a.code, 'at', a.at) order by a.at), '[]'::jsonb)
+    into ach
+  from achievements a where a.username = me;
+  -- Серия жива, если последний выполненный день — сегодня или вчера
+  streak := case when st.quest_last >= d - 1 then st.quest_streak else 0 end;
+  return jsonb_build_object(
+    'day', d,
+    'quests', coalesce(quests, '[]'::jsonb),
+    'streak', coalesce(streak, 0),
+    'bestStreak', coalesce(st.quest_best, 0),
+    'doneToday', coalesce(st.quest_last = d, false),
+    'secondsLeft', greatest(0, floor(extract(epoch from
+        ((d + 1)::timestamp at time zone coalesce((select tz from students where username = me), 'UTC')) - now())))::int,
+    'achievements', ach);
+end;
+$$;
+
+-- Достижения друга — только другу
+create or replace function friend_achievements(p_username text, p_pin text, p_friend text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if not exists (select 1 from friendships f where f.status = 'accepted'
+                 and ((f.requester = me and f.addressee = p_friend)
+                   or (f.requester = p_friend and f.addressee = me))) then
+    raise exception 'not_friends';
+  end if;
+  perform achievements_sync(p_friend);
+  return (select coalesce(jsonb_agg(jsonb_build_object('code', a.code, 'at', a.at) order by a.at), '[]'::jsonb)
+          from achievements a where a.username = p_friend);
+end;
+$$;
+
+revoke execute on function player_day(text) from public, anon;
+revoke execute on function quest_ensure(text) from public, anon;
+revoke execute on function quest_event(text, text, int) from public, anon;
+revoke execute on function achievements_sync(text) from public, anon;
+revoke execute on function season_end_check(timestamptz) from public, anon;
+revoke execute on function ladder_touch(text) from public, anon;
+revoke execute on function ladder_after(text, boolean) from public, anon;
+revoke execute on function matches_progress() from public, anon;
+revoke execute on function run_sessions_progress() from public, anon;
+revoke execute on function ladder_progress() from public, anon;
+revoke execute on function friendships_progress() from public, anon;
+revoke execute on function students_progress() from public, anon;
+grant execute on function quest_pool() to anon;
+grant execute on function quest_rewards() to anon;
+grant execute on function quest_icons() to anon;
+grant execute on function achievement_codes() to anon;
+grant execute on function set_avatar(text, text, text) to anon;
+grant execute on function ladder_status(text, text) to anon;
+grant execute on function season_summary_seen(text, text, text) to anon;
+grant execute on function my_progress(text, text, text) to anon;
+grant execute on function friend_achievements(text, text, text) to anon;
