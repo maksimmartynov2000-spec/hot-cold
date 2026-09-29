@@ -109,7 +109,7 @@ begin
   for i in 1..25 loop
     update students set created_at = now() - interval '2 hours'
     where created_at >= now() - interval '1 hour';
-    perform register_student('Бот' || i, '0000', null);
+    perform register_student('Бот' || i, '000000', null);
   end loop;
   for i in 1..20 loop
     perform send_friend_request('Кира','4321','Бот' || i);

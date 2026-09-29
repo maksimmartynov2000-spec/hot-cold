@@ -32,22 +32,35 @@ const TEXT: Record<string, Record<string, (who: string) => [string, string]>> = 
   en: {
     friend_request: w => ['Hot or Cold', `${w} wants to be friends`],
     challenge: w => ['Hot or Cold', `${w} invites you to play`],
-    talk: w => ['Hot or Cold', `${w} wrote to you`]
+    talk: w => ['Hot or Cold', `${w} wrote to you`],
+    accepted: w => ['Hot or Cold', `${w} accepted — the game is waiting for you`],
+    season_end: () => ['Hot or Cold', 'The season ends in 2 days — time to climb!'],
+    invite_joined: w => ['Hot or Cold', `${w} came by your invite — you are friends now`]
   },
+  // Название игры — по-английски на всех языках, как в самой игре
   ru: {
-    friend_request: w => ['Горячо-холодно', `${w} хочет дружить`],
-    challenge: w => ['Горячо-холодно', `${w} зовёт играть`],
-    talk: w => ['Горячо-холодно', `${w} вам написал`]
+    friend_request: w => ['Hot or Cold', `${w} хочет дружить`],
+    challenge: w => ['Hot or Cold', `${w} зовёт играть`],
+    talk: w => ['Hot or Cold', `${w} вам написал`],
+    accepted: w => ['Hot or Cold', `${w}: вызов принят — партия ждёт вас`],
+    season_end: () => ['Hot or Cold', 'Сезон кончается через 2 дня — успейте подняться!'],
+    invite_joined: w => ['Hot or Cold', `${w}: пришли по вашему приглашению — теперь вы друзья`]
   },
   fr: {
     friend_request: w => ['Hot or Cold', `${w} veut être votre ami`],
     challenge: w => ['Hot or Cold', `${w} vous invite à jouer`],
-    talk: w => ['Hot or Cold', `${w} vous a écrit`]
+    talk: w => ['Hot or Cold', `${w} vous a écrit`],
+    accepted: w => ['Hot or Cold', `${w} : défi accepté — la partie vous attend`],
+    season_end: () => ['Hot or Cold', 'La saison se termine dans 2 jours — c’est le moment de grimper !'],
+    invite_joined: w => ['Hot or Cold', `${w} est venu grâce à votre invitation — vous êtes amis`]
   },
   de: {
     friend_request: w => ['Hot or Cold', `${w} möchte befreundet sein`],
     challenge: w => ['Hot or Cold', `${w} lädt dich zum Spielen ein`],
-    talk: w => ['Hot or Cold', `${w} hat dir geschrieben`]
+    talk: w => ['Hot or Cold', `${w} hat dir geschrieben`],
+    accepted: w => ['Hot or Cold', `${w}: Einladung angenommen — das Spiel wartet auf dich`],
+    season_end: () => ['Hot or Cold', 'Die Saison endet in 2 Tagen — jetzt noch aufsteigen!'],
+    invite_joined: w => ['Hot or Cold', `${w} ist über deine Einladung gekommen — ihr seid jetzt Freunde`]
   }
 };
 

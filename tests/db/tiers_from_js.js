@@ -1,15 +1,15 @@
 // Пояса считаются теперь в двух местах: в браузере и в базе. Расходиться им
 // нельзя — иначе онлайн-игра и одиночная будут говорить разное про один и тот
-// же ход. Этот скрипт достаёт функции прямо из index.html (не копию!) и печатает
+// же ход. Этот скрипт достаёт функции прямо из кода игры (не копию!) и печатает
 // таблицу «диапазон, расстояние, пояс», которую потом сверяем с SQL.
 const fs = require('fs');
 const path = require('path');
 
-const html = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
+const html = require('./game_source')();
 
 function grab(startMarker, endMarker) {
   const a = html.indexOf(startMarker);
-  if (a < 0) throw new Error('не нашёл в index.html: ' + startMarker);
+  if (a < 0) throw new Error('не нашёл в коде игры: ' + startMarker);
   const b = html.indexOf(endMarker, a);
   if (b < 0) throw new Error('не нашёл конец для: ' + startMarker);
   return html.slice(a, b + endMarker.length);
@@ -18,10 +18,10 @@ function grab(startMarker, endMarker) {
 const src = [
   grab('const RANGE_TIER_UPPER = {', '};'),
   grab('const HOT_TIER_UPPER = [', '];'),
-  grab('function tierStep(v) {', '\n  }'),
-  grab('function roundTier(v, up) {', '\n  }'),
-  grab('function generateTierUpper(rangeMax) {', '\n  }'),
-  grab('function buildFeedbackMeta(rangeMax) {', '\n  }')
+  grab('function tierStep(v) {', '\n}'),
+  grab('function roundTier(v, up) {', '\n}'),
+  grab('function generateTierUpper(rangeMax) {', '\n}'),
+  grab('function buildFeedbackMeta(rangeMax) {', '\n}')
 ].join('\n');
 
 const TIER_COLORS = Array.from({ length: 8 }, () => ({ color: '', bg: '' }));

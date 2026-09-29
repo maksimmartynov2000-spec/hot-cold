@@ -10,6 +10,7 @@ const ROOT = path.resolve(__dirname, '..');
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
   '.png': 'image/png',
   '.webmanifest': 'application/manifest+json'
 };
@@ -68,6 +69,8 @@ function serve() {
   await page.waitForTimeout(600);
 
   check('без сети страница открывается', await page.locator('#screenMode').isVisible());
+  // QR-код приглашения рисуется и без интернета: библиотека лежит рядом с игрой
+  check('без сети библиотека QR-кода на месте', await page.evaluate(() => typeof qrcode === 'function'));
   check('без сети видны все пять режимов',
     (await page.locator('#screenMode .mode-btn:not(.hidden)').count()) === 5);
 
@@ -146,6 +149,17 @@ function serve() {
     await page.evaluate(() => vsBot !== null && history.some(h => h.p === 1)));
 
   check('без сети нет ошибок JS', errors.length === 0, errors.join('; '));
+
+  // Ссылка-приглашение: код запоминается, а из адреса убирается — иначе
+  // обновление страницы звало бы в друзья снова. На file:// адрес не меняется,
+  // поэтому это проверяется здесь, на сервере
+  const ctx2 = await browser.newContext({ viewport: { width: 430, height: 850 } });
+  const p2 = await ctx2.newPage();
+  await p2.goto('http://127.0.0.1:' + port + '/index.html?invite=abcd2345');
+  await p2.waitForTimeout(500);
+  const inv = await p2.evaluate(() => ({ search: location.search, code: localStorage.getItem('hc_pending_invite') }));
+  check('ссылка-приглашение: код запомнен и убран из адреса', inv.search === '' && inv.code === 'ABCD2345', JSON.stringify(inv));
+  await ctx2.close();
 
   await browser.close();
   server.close();

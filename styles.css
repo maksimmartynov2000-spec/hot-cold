@@ -1,0 +1,1588 @@
+/* Стили игры. Раньше лежали в index.html — вынесены, чтобы файл игры
+   читался по частям. Порядок правил сохранён: от него зависит, что главнее */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --p0: #6366f1;
+  --p1: #fbbf24;
+  /* Градусник и точка на прямой показывают один и тот же ход, поэтому едут
+     одинаково долго. Отсюда же длительность берёт и анимация в SVG,
+     см. moveDur() — чтобы значение было ровно одно на всю игру */
+  --move-dur: 0.9s;
+}
+
+html {
+  height: 100%;
+}
+
+/* Фон живёт на html и прибит к экрану: на body его высота считалась от экрана,
+   а не от всей страницы, и ниже первого экрана вместо градиента шла плоская
+   тёмная заливка — при длинной истории попыток был виден шов */
+html {
+  min-height: 100%;
+  background-color: #0b1220;
+  background-image: linear-gradient(160deg, #10142c 0%, #1a2142 45%, #0b1220 100%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: cover;
+}
+
+body {
+  min-height: 100%;
+  background: none;
+  overscroll-behavior: none;
+  display: flex;
+  justify-content: center;
+  /* Окно прижато к верху: по центру шапка прыгала от экрана к экрану —
+     в меню посреди экрана, в игре у верхнего края */
+  align-items: flex-start;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  padding: calc(12px + env(safe-area-inset-top))
+           calc(12px + env(safe-area-inset-right))
+           calc(12px + env(safe-area-inset-bottom))
+           calc(12px + env(safe-area-inset-left));
+}
+
+.card {
+  width: 100%;
+  max-width: 520px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 24px 20px;
+  color: #fff;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  position: relative;
+  transition: max-width 0.2s;
+}
+.card.wide { max-width: 1100px; }
+
+/* В потоке, а не абсолютом: в игре шапка сжимается, строка статуса поднимается
+   вверх и раньше уезжала прямо под переключатель языка */
+.top-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+/* Профиль — кружок с первой буквой имени. Цвет берётся из имени, поэтому у
+   каждого свой и не меняется от входа к входу. Без аккаунта — шестерёнка:
+   внутри тогда только язык и вход */
+.avatar-btn, .avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  font-weight: 800;
+  color: #0f1430;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.avatar-btn {
+  width: 32px;
+  height: 32px;
+  font-size: 15px;
+  font-family: inherit;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.avatar-btn.guest {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 16px;
+  box-shadow: none;
+}
+.avatar { width: 30px; height: 30px; font-size: 14px; }
+.own-best { color: rgba(255, 255, 255, 0.45); font-weight: 600; }
+/* Сколько непрочитанного ждёт в «Друзьях» — прямо на кнопке в шапке */
+.hdr-badge {
+  display: inline-block;
+  background: #38bdf8;
+  color: #0f1430;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  padding: 0 4px;
+  margin-left: 3px;
+  vertical-align: top;
+}
+/* Кнопки шапки одного роста с кружком профиля — строка читается ровной */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-width: 32px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 0 7px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 8, 24, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+}
+.modal-card {
+  width: 100%;
+  max-width: 320px;
+  /* Профиль вырос: иконки, смена имени и PIN. На невысоком экране окно
+     прокручивается само, а не уезжает за край */
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  background: #1b1e3d;
+  /* окно живёт за пределами .card, свой цвет текста ему нужен явно —
+     иначе достаётся чёрный по умолчанию от body */
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 18px;
+  padding: 22px 18px 18px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+}
+.modal-card .modal-text {
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.pf-avatar {
+  width: 64px; height: 64px; margin: 0 auto 10px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; font-weight: 800; color: #0f1430; text-transform: uppercase;
+  border: 3px solid rgba(255, 255, 255, 0.85);
+}
+.pf-avatar.guest { background: rgba(255, 255, 255, 0.1); color: #fff; border-width: 1px; }
+.pf-name { font-size: 20px; font-weight: 800; }
+.pf-sub { font-size: 12px; color: rgba(255, 255, 255, 0.5); margin: 2px 0 16px; }
+.pf-league { font-size: 14px; font-weight: 700; color: #fbbf24; margin: -10px 0 14px; }
+.pf-streak { font-size: 13px; font-weight: 700; color: #fb923c; margin: -8px 0 14px; }
+.pf-league .pf-badges { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.55); margin-top: 2px; }
+/* Награда за лигу, до которой ещё не дошёл: видна, но под замком */
+.av-tile.locked, .av-color.locked { opacity: 0.35; position: relative; }
+.av-tile.locked::after, .av-color.locked::after {
+  content: '🔒'; position: absolute; right: -2px; bottom: -2px; font-size: 11px; opacity: 1;
+}
+.pf-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 14px; padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.06); border-radius: 12px;
+  font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.85);
+}
+.pf-row .lang-switcher { font-size: 14px; padding: 6px 8px; }
+/* Иконка в кружке крупнее буквы: у эмодзи много воздуха вокруг рисунка */
+.avatar.has-icon { font-size: 17px; }
+.avatar-btn .has-icon { font-size: 18px; }
+.pf-avatar.has-icon { font-size: 36px; }
+.pin-hide { margin-left: 10px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.45); }
+#tShowPin.pin-shown { letter-spacing: 0.02em; color: #fff; }
+/* Карандашик на кружке: подсказка, что его можно нажать и сменить иконку */
+.pf-avatar.editable { position: relative; cursor: pointer; }
+.pf-avatar.editable::after {
+  content: '✎'; position: absolute; right: -4px; bottom: -4px;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 400; color: #0f1430; background: #fff;
+}
+.pf-label {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5); text-align: left; margin: 2px 2px 8px;
+}
+/* Буква и 24 иконки — ровно 5×5. Клетка 44px — меньше детскому пальцу
+   попадать неудобно, в ряды по 8 они выходили по 32px */
+.av-grid { display: grid; grid-template-columns: repeat(5, 44px); justify-content: center;
+           gap: 8px 12px; margin: 12px 0 6px; }
+#pfAvatarBox { margin-bottom: 8px; }
+.av-tile {
+  aspect-ratio: 1; border-radius: 50%; border: none; padding: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; font-family: inherit; line-height: 1;
+  background: rgba(255, 255, 255, 0.08); color: #fff;
+}
+.av-tile.letter { font-weight: 800; font-size: 18px; color: #0f1430; }
+.av-color {
+  aspect-ratio: 1; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.25);
+  padding: 0; cursor: pointer;
+}
+.av-color.sel { outline: 3px solid #fff; outline-offset: 2px; border-color: transparent; }
+/* Черта между цветами и иконками — во всю ширину сетки */
+.av-sep { grid-column: 1 / -1; height: 1px; background: rgba(255, 255, 255, 0.12); margin: 2px 0; }
+.av-tile.sel { outline: 3px solid #fff; outline-offset: 1px; }
+.pf-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.pf-form input {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08);
+  color: #fff; font-size: 15px; font-family: inherit;
+}
+.pf-confirm { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+.pf-confirm .modal-text { font-size: 14px; margin-bottom: 12px; }
+/* Удалить аккаунт — редкое и безвозвратное действие. Оно есть, но не
+   кнопкой вровень с «Готово», а тихой ссылкой внизу, куда случайно не попасть */
+.link-danger {
+  display: block; margin: 18px auto 0; padding: 6px 10px;
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  font-size: 13px; font-weight: 600; color: #f87171; opacity: 0.8;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+
+.lang-switcher {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  padding: 4px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  font-weight: 500;
+  z-index: 5;
+}
+.lang-switcher:focus { border-color: rgba(255,255,255,0.4); }
+
+/* Название живёт в той же строке, что имя, звук и язык: отдельной шапкой
+   оно занимало ещё один-два этажа, а сверху экрана и так мало места.
+   margin-right: auto прижимает его влево, кнопки остаются справа */
+.header {
+  display: flex; align-items: center; gap: 8px;
+  margin-right: auto; min-width: 0;
+}
+.header .emoji { font-size: clamp(22px, 6vw, 28px); line-height: 1; transition: font-size 0.15s; }
+.header h1 {
+  font-size: clamp(17px, 4.5vw, 22px); font-weight: 700;
+  letter-spacing: -0.5px; white-space: nowrap; transition: font-size 0.15s;
+}
+.header.compact .emoji { font-size: 20px; }
+.header.compact h1 { font-size: 15px; opacity: 0.7; }
+
+/* На телефоне в строке тесно: длинное имя выдавливало бы название на второй
+   этаж, поэтому имя обрезаем раньше. Целиком оно видно по нажатию на чип */
+/* На узком экране в верхней строке пять элементов вместо четырёх:
+   подписи и отступы ужимаются, чтобы строка осталась одноэтажной */
+@media (max-width: 460px) {
+  .top-controls { gap: 6px; }
+  .header h1 { font-size: 17px; }
+}
+
+.row { display: flex; gap: 8px; width: 100%; }
+
+/* Цифровая клавиатура телефона минуса не показывает — своя кнопка.
+   Она же и понятнее ребёнку, чем поиск знака среди символов */
+.sign-btn {
+  flex: 0 0 auto;
+  /* 44 пикселя — нижняя граница удобного нажатия пальцем, а на узком
+     телефоне каждый лишний отнимается у самого поля ввода */
+  min-width: 44px;
+  padding: 0 6px;
+  /* Высоту не задаём отступами, а растягиваем по строке: иначе кнопка
+     оказывается выше поля ввода и вся страница подрастает */
+  align-self: stretch;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-family: inherit;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.sign-btn.on {
+  background: rgba(99, 102, 241, 0.3);
+  border-color: rgba(99, 102, 241, 0.75);
+}
+
+input[type=number], input[type=text], select.field {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 16px;
+  outline: none;
+  -moz-appearance: textfield;
+  caret-color: #fff;
+  font-family: inherit;
+}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+select.field option { background: #1e1b4b; color: #fff; }
+
+.btn {
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: none;
+  background: #6366f1;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+.btn:hover { background: #4f46e5; }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn-block { width: 100%; }
+
+.btn-yellow {
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: none;
+  background: #fbbf24;
+  color: #1c1917;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+.btn-yellow:hover { background: #f59e0b; }
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+}
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.16); }
+
+.btn-reset {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  font-family: inherit;
+}
+
+/* ---------- Стартовый экран ---------- */
+.mode-list { display: flex; flex-direction: column; gap: 12px; }
+.mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s, border-color 0.2s;
+}
+.mode-btn:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255,255,255,0.3); }
+.mode-group {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45); margin: 4px 4px -2px;
+}
+.mode-group:not(:first-child) { margin-top: 14px; }
+.mode-btn .m-icon {
+  flex: 0 0 auto;
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.mode-btn .m-text { display: flex; flex-direction: column; min-width: 0; }
+/* Задания дня: карточка, а не кнопка — нажимать в ней нечего */
+.quest-card {
+  padding: 14px 16px; border-radius: 16px;
+  border: 1px solid rgba(251, 146, 60, 0.35); background: rgba(251, 146, 60, 0.08);
+}
+.qc-head { display: flex; justify-content: space-between; align-items: center;
+           font-size: 15px; font-weight: 800; margin-bottom: 8px; }
+.qc-streak { font-size: 14px; color: #fb923c; }
+.qc-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center;
+          font-size: 14px; padding: 5px 0; }
+.qc-row .qc-n { font-size: 13px; font-weight: 700; color: rgba(255, 255, 255, 0.6); }
+.qc-row.done { color: rgba(255, 255, 255, 0.5); }
+.qc-row.done .qc-n { color: #4ade80; }
+.qc-bar { grid-column: 2 / 4; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; margin-top: -2px; }
+.qc-bar > span { display: block; height: 100%; background: #fb923c; }
+.qc-row.done + .qc-bar > span { background: #4ade80; }
+.qc-foot { font-size: 12px; color: rgba(255, 255, 255, 0.5); margin-top: 6px; line-height: 1.4; }
+/* Достижения: три в ряд, закрытые — серые */
+.ach-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ach-tile { padding: 10px 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.07); text-align: center; }
+.ach-tile .a-icon { font-size: 26px; line-height: 1.2; }
+.ach-tile .a-name { font-size: 12px; font-weight: 700; margin-top: 2px; }
+.ach-tile .a-sub { font-size: 11px; color: rgba(255, 255, 255, 0.5); margin-top: 2px; line-height: 1.3; }
+.ach-tile.locked .a-icon { filter: grayscale(1); opacity: 0.35; }
+.ach-tile.locked .a-name { color: rgba(255, 255, 255, 0.5); }
+.season-card .ss-league { font-size: 22px; font-weight: 800; color: #fbbf24; margin: 4px 0 10px; }
+.season-card .ss-league .big { display: block; font-size: 48px; line-height: 1.1; }
+.season-card .ss-line { font-size: 15px; margin: 4px 0; }
+.season-card .ss-line.muted { font-size: 13px; color: rgba(255, 255, 255, 0.5); margin-top: 10px; }
+.mode-btn .m-title { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
+.mode-btn .m-sub { font-size: 13px; color: rgba(255, 255, 255, 0.55); line-height: 1.35; }
+/* Вход и регистрация: подпись под названием, а не сбоку — рядом с длинным
+   «Зарегистрироваться» ей оставалась узкая полоска в четыре строки */
+.setup-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.mode-btn.stack { flex-direction: column; align-items: flex-start; gap: 0; }
+.mode-btn.duel { border-left: 3px solid var(--p1); }
+.mode-btn.solo { border-left: 3px solid var(--p0); }
+.mode-btn.run { border-left: 3px solid #4ade80; }
+.mode-btn.online { border-left: 3px solid #38bdf8; }
+.mode-btn.bot { border-left: 3px solid #a78bfa; }
+.r-stars { margin-top: 8px; text-align: center; }
+/* Салют при победе */
+.confetti { position: fixed; left: 50%; top: 40%; width: 0; height: 0; pointer-events: none; z-index: 60; }
+.confetti span {
+  position: absolute; left: -12px; top: -12px; font-size: 22px; opacity: 0;
+  animation: confetti-fly 1.35s ease-out forwards;
+}
+@keyframes confetti-fly {
+  0% { transform: translate(0, 0) scale(0.4); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1.1) rotate(25deg); opacity: 0; }
+}
+/* Новый рекорд и новая лига — строка подпрыгивает */
+.r-pop { animation: r-pop 0.7s ease-out; }
+@keyframes r-pop { 0% { transform: scale(0.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .r-pop { animation: none; } }
+.r-stars-main { font-size: 17px; font-weight: 800; color: #fbbf24; }
+.r-stars-note { font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); margin-top: 2px; }
+.r-elo .r-elo-note { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
+/* Выбор бота: пять персонажей столбиком, от слабого к сильному. В ряд
+   на телефоне не влезали имена: «Чере…», «Дель…» */
+.bot-pick { display: flex; flex-direction: column; gap: 5px; }
+.bot-tile {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 7px 12px; border-radius: 12px; cursor: pointer; font-family: inherit; color: #fff;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.bot-tile.active { border-color: #a78bfa; background: rgba(167, 139, 250, 0.18); }
+.bot-tile .bt-icon { font-size: 22px; line-height: 1; }
+.bot-tile .bt-name { font-size: 15px; font-weight: 700; }
+.bot-tile .bt-sub { font-size: 13px; color: rgba(255, 255, 255, 0.55); flex: 1; }
+.bot-tile .bt-power { font-size: 11px; letter-spacing: 1px; color: #a78bfa; white-space: nowrap; }
+
+/* ---------- Онлайн: друзья ---------- */
+.friend-list { margin-bottom: 4px; }
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 14px;
+}
+.friend-row:last-child { border-bottom: none; }
+/* Имя забирает всё свободное место и обрезается само: кнопки справа должны
+   стоять на одном месте, каким бы длинным ни было имя */
+.friend-row .fr-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friend-row .fr-wait { font-size: 12px; color: rgba(255, 255, 255, 0.4); }
+/* Имя и под ним — что с другом сейчас */
+.friend-row .fr-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.friend-row .fr-main .fr-name { flex: none; }
+/* До двух строк: на узком телефоне «Ход друга · 💬 1 новое» в строку
+   не влезает, а обрезанный статус ничего не сообщает */
+.friend-row .fr-status {
+  font-size: 12px; line-height: 1.3; color: rgba(255, 255, 255, 0.45);
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.friend-row .fr-status.hot { color: #fbbf24; font-weight: 600; }
+.friend-row.tap { cursor: pointer; border-radius: 12px; }
+.friend-row.tap:hover { background: rgba(255, 255, 255, 0.04); }
+/* Заявка в друзья — заметной карточкой: на неё надо ответить */
+.friend-row.req {
+  background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 12px; padding: 10px; margin-bottom: 6px;
+}
+.fr-btn.x { padding: 5px 9px; }
+#challengeBox {
+  margin: 0 0 14px; padding: 14px; border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.fr-btn {
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.fr-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+.fr-btn:disabled { opacity: 0.45; cursor: default; }
+.fr-btn.yes { background: rgba(74, 222, 128, 0.18); border-color: rgba(74, 222, 128, 0.5); color: #4ade80; }
+.fr-btn.no { background: rgba(248, 113, 113, 0.14); border-color: rgba(248, 113, 113, 0.4); color: #f87171; }
+.fr-block { margin-top: 22px; }
+/* Заголовок экрана, а не раздела: белый и крупнее серых подписей внутри */
+.screen-title { font-size: 19px; font-weight: 800; margin-bottom: 12px; }
+.fr-block.first { margin-top: 4px; }
+/* Сворачиваемый раздел: заголовок — вся строка, в неё легко попасть пальцем */
+.fold-head {
+  list-style: none; cursor: pointer; user-select: none;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 14px; font-weight: 700; color: rgba(255, 255, 255, 0.85);
+}
+.fold-head::-webkit-details-marker { display: none; }
+.fold-head::after {
+  content: '›'; font-size: 22px; line-height: 1; color: rgba(255, 255, 255, 0.5);
+  transition: transform 0.2s;
+}
+.fold[open] > .fold-head::after { transform: rotate(90deg); }
+.fold-body { padding-top: 10px; }
+.pf-fold { margin-top: 8px; }
+.pf-fold .fold-body > .btn-ghost + .fr-note + .btn-ghost,
+.pf-fold .fold-body > .fr-note + .btn-ghost { margin-top: 8px; }
+.fr-btn.more { padding: 5px 9px; font-size: 15px; line-height: 1; letter-spacing: 1px; }
+.friend-row .avatar { margin-right: 2px; }
+.fr-note {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 8px 2px;
+}
+.fr-note.bad { color: #f87171; }
+/* Кнопка, после которой ничего не вернуть, выглядит соответственно */
+.btn-ghost.danger { color: #f87171; border-color: rgba(248, 113, 113, 0.4); }
+
+/* ---------- Переписка с другом ---------- */
+.chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 16px;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+.chat-msg {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+/* Свои справа, чужие слева — привычка, которой не надо учить */
+.chat-msg.mine {
+  align-self: flex-end;
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+.chat-msg.theirs {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+/* Время — мелко в той же строке: отдельной строкой оно удваивало пузырь */
+.chat-msg .cm-ago {
+  float: right;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.45;
+  margin: 7px 0 0 10px;
+  white-space: nowrap;
+}
+.chat-head { display: flex; align-items: center; gap: 10px; }
+.chat-head .chat-more { margin-left: auto; }
+.rp-reasons { display: flex; gap: 6px; margin: 12px 0 10px; }
+.rp-reasons button { flex: 1; }
+.rp-reasons button.on { background: rgba(99, 102, 241, 0.35); border-color: #818cf8; color: #fff; }
+.rp-note { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 15px;
+           padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.2);
+           background: rgba(255, 255, 255, 0.08); color: #fff; }
+.rp-note::placeholder { color: rgba(255, 255, 255, 0.45); }
+.bl-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; }
+.chat-msg { overflow-wrap: anywhere; }
+.chat-compose { display: flex; gap: 8px; margin-top: 10px; }
+.chat-compose input {
+  flex: 1; min-width: 0; padding: 11px 14px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08);
+  color: #fff; font-size: 15px; font-family: inherit;
+}
+.chat-compose .btn { flex: 0 0 auto; width: 46px; padding: 0; border-radius: 50%; font-size: 17px; }
+.chat-left { font-size: 12px; color: rgba(255, 255, 255, 0.45); text-align: right; margin-top: 4px; }
+/* Четыре быстрых ответа — ровной сеткой 2×2: в строку они не влезают
+   ни на одном языке, а «три и одна» смотрелось случайно */
+.chat-pad {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+.chat-pad button {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-pad button:disabled { opacity: 0.4; }
+.chat-modes-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 14px 0 6px;
+}
+/* Сколько сообщений не прочитано — прямо на имени друга */
+.fr-unread {
+  background: #38bdf8;
+  color: #0f1430;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  margin-left: 6px;
+}
+
+/* ---------- Рейтинговый онлайн ---------- */
+/* Разновидности рейтинга. Подпись на кнопке и есть описание правил:
+   «−100…100 · бонусы» говорит ровно то, что нужно знать до игры */
+.rk-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.rk-mode {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  padding: 8px 6px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+/* В одну строку: «−100…100 · бонусы» переносилась, и кнопки выходили
+   разной высоты */
+.rk-mode .rm-name { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+#rkModes .rk-mode { padding: 11px 4px; }
+.rk-mode.active {
+  background: rgba(251, 191, 36, 0.14);
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #fbbf24;
+}
+/* Рейтинг выбранной разновидности — крупно, один раз. Раньше он стоял и на
+   кнопке, и строкой ниже: два одинаковых числа рядом */
+.rk-hero { text-align: center; padding: 10px 0 16px; }
+.rk-elo { font-size: 44px; font-weight: 800; line-height: 1.05; color: #fbbf24;
+          font-variant-numeric: tabular-nums; }
+.rk-elo-sub { font-size: 13px; color: rgba(255, 255, 255, 0.5); margin-top: 4px; }
+.rk-elo.league { font-size: 32px; }
+.rk-stars { font-size: 26px; letter-spacing: 4px; color: #fbbf24; line-height: 1.2; }
+.rk-top { margin-top: 26px; }
+.lb-row.rk-top-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 8px; border-radius: 10px; font-size: 14px; border-bottom: none;
+}
+.rk-top-row + .rk-top-row { margin-top: 2px; }
+.rk-top-row.me { background: rgba(251, 191, 36, 0.12); color: #fbbf24; font-weight: 700; }
+.rk-top-row .rk-place { width: 24px; text-align: center; flex: 0 0 auto;
+                        color: rgba(255, 255, 255, 0.45); font-weight: 700; }
+/* Медаль — эмодзи: полупрозрачный цвет делал её серой */
+.rk-top-row .rk-place.medal { color: #fff; font-size: 18px; }
+.rk-top-row .rk-who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-top-row .rk-pts { font-variant-numeric: tabular-nums; font-weight: 700; }
+.rk-wait { margin-top: 10px; }
+/* Пока ищем соперника, единственное, что меняется, — это строка ожидания.
+   Она должна быть заметна, но не мигать: точки дорисовываются в тексте */
+.rk-wait-text {
+  font-size: 13px;
+  color: #fbbf24;
+  text-align: center;
+  padding: 6px 0 2px;
+}
+.rk-wait-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+  padding-bottom: 10px;
+}
+.rk-row-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 6px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.r-elo { font-size: 15px; font-weight: 700; color: #fbbf24; margin-top: 8px; }
+.r-forfeit { font-size: 13px; color: rgba(255, 255, 255, 0.55); margin-top: 6px; }
+
+/* ---------- Настройка дуэли ---------- */
+.setup-field { margin-bottom: 20px; }
+/* Поле, под которым стоит своя галочка: она должна держаться за него,
+   а не висеть ровно посередине между двумя полями */
+.setup-field.tight { margin-bottom: 8px; }
+.setup-field label {
+  display: block;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.setup-row { display: flex; gap: 8px; margin-top: 4px; }
+
+/* ---------- Игровое поле ---------- */
+/* minmax(0, 1fr), а не просто 1fr: колонка иначе не уже самого длинного
+   слова внутри, и «Дополнительный» на кнопке выталкивало поле дуэли за
+   правый край карточки на телефоне */
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: "p0 p1" "center center";
+  gap: 12px;
+  align-items: start;
+}
+.board.solo { grid-template-columns: 1fr; grid-template-areas: "center"; }
+.board .pc0 { grid-area: p0; }
+.board .pc1 { grid-area: p1; }
+.board .center { grid-area: center; min-width: 0; }
+
+@media (min-width: 860px) {
+  .board.duel {
+    grid-template-columns: 1fr 2fr 1fr;
+    grid-template-areas: "p0 center p1";
+    gap: 20px;
+    align-items: start;
+  }
+  .thermo-wrap { margin: 10px 0 22px; }
+  .thermo-tube {
+    width: 24px;
+    height: 140px;
+    border-radius: 12px 12px 0 0;
+  }
+  .thermo-tube::before { left: 4px; width: 4px; top: 6px; bottom: 6px; }
+  .thermo-bulb { width: 54px; height: 54px; margin-top: -6px; }
+  .thermo-bulb::after { top: 11px; left: 14px; width: 13px; height: 8px; }
+}
+
+.pcard {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: transform 0.2s, background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.pcard.active {
+  transform: scale(1.02);
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+}
+.pcard .p-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 8px;
+  color: #fff;
+  word-break: break-word;
+}
+.pcard .p-name .p-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 7px currentColor;
+}
+.pcard .p-pips { font-size: 13px; letter-spacing: 2px; margin-bottom: 10px; opacity: 0.65; transition: opacity 0.2s; }
+.pcard.active .p-pips { opacity: 1; }
+.pcard .p-wins-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 3px;
+}
+.token-btn {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s;
+}
+.token-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+.token-btn:disabled { opacity: 0.28; cursor: default; }
+.token-btn.armed { background: rgba(74, 222, 128, 0.2); border-color: #4ade80; color: #86efac; }
+
+.info-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  flex-wrap: wrap;
+}
+.info-bar .confirmed { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+.info-bar .confirmed:empty { display: none; }
+.info-bar { position: relative; }
+/* Пузырь поверх поля, а не в потоке: не толкает градусник вниз */
+.bar-tip {
+  position: absolute; top: calc(100% + 6px); right: 8px; z-index: 5;
+  white-space: nowrap;
+  padding: 7px 12px; border-radius: 10px;
+  background: #f8fafc; color: #0f1430; font-size: 13px; font-weight: 600; line-height: 1.35;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.bar-tip::before {
+  content: ''; position: absolute; top: -6px; right: var(--arrow-right, 18px);
+  border: 6px solid transparent; border-top: none; border-bottom-color: #f8fafc;
+}
+.info-bar .attempts { font-size: 13px; font-weight: 600; color: #a5f3fc; }
+.info-bar .attempts.low { color: #f87171; }
+
+.bar-actions { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+.btn-reset.icon { font-size: 15px; padding: 3px 10px; line-height: 1.3; }
+
+/* Градусник и прямую можно убрать: на маленьком экране лишние 150 пикселей
+   иногда дороже красоты. Включённое состояние подсвечено, выключенное бледное */
+.mini-toggle {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 2px 5px;
+  font-size: 13px;
+  line-height: 1.3;
+  cursor: pointer;
+  font-family: inherit;
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+.mini-toggle.on {
+  opacity: 1;
+  background: rgba(99, 102, 241, 0.22);
+  border-color: rgba(99, 102, 241, 0.6);
+}
+
+.turn-banner {
+  padding: 10px 14px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+}
+
+.confirmed strong { color: #fde68a; font-weight: 700; }
+
+.thermo-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 6px 0 18px;
+}
+.thermo-tube {
+  position: relative;
+  width: 18px;
+  height: 104px;
+  border-radius: 9px 9px 0 0;
+  background: rgba(255,255,255,0.07);
+  border: 2px solid rgba(255,255,255,0.32);
+  border-bottom: none;
+  overflow: hidden;
+  z-index: 1;
+}
+.thermo-tube::before {
+  /* стеклянный блик слева по всей трубке */
+  content: "";
+  position: absolute;
+  top: 4px; bottom: 4px; left: 3px;
+  width: 3px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.28);
+  z-index: 3;
+  pointer-events: none;
+}
+.thermo-fill {
+  position: absolute;
+  bottom: 0; left: 0; width: 100%;
+  height: 8%;
+  background: #93C5FD;
+  transition: height var(--move-dur) cubic-bezier(.4,0,.2,1),
+              background-color var(--move-dur) ease;
+  z-index: 1;
+}
+.thermo-fill::after {
+  /* мениск — светлая полоска на поверхности ртути */
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.45);
+}
+.thermo-bulb {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: #93C5FD;
+  border: 2px solid rgba(255,255,255,0.32);
+  box-shadow: 0 0 18px 2px rgba(147,197,253,0.35);
+  transition: background-color var(--move-dur) ease, box-shadow var(--move-dur) ease;
+  z-index: 2;
+}
+.thermo-bulb::after {
+  /* блик-отражение на стекле колбы */
+  content: "";
+  position: absolute;
+  top: 8px; left: 10px;
+  width: 9px; height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.55);
+  transform: rotate(-25deg);
+}
+.thermo-bulb.pulse { animation: thermoPulse 0.8s ease 2; }
+@keyframes thermoPulse {
+  0%, 100% { box-shadow: 0 0 18px 2px rgba(255,255,255,0.4); }
+  50% { box-shadow: 0 0 0 14px rgba(255,255,255,0); }
+}
+
+/* Подсказка и пояс расстояний разведены по краям: «Тепло · 51–100» одной
+   строкой посередине читалось как одно слово с непонятным хвостом */
+.feedback-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  text-align: center;
+  animation: pop 0.3s ease;
+}
+.feedback-panel.with-band { justify-content: space-between; }
+.feedback-panel .fb-label { font-size: clamp(20px, 6vw, 26px); font-weight: 600; }
+.feedback-panel .fb-band {
+  font-size: clamp(15px, 4.4vw, 20px);
+  font-weight: 700;
+  opacity: 0.75;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pop {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feedback-panel { animation: none; }
+  .pcard.active { transform: none; }
+  .thermo-fill, .thermo-bulb { transition: none; }
+  .thermo-bulb.pulse { animation: none; }
+  /* Движение точки по прямой выключается в самом SVG — см. nlCalm() */
+}
+
+/* Компактная раскладка одиночной игры на телефоне — чтобы всё помещалось
+   на экран без прокрутки. На широких экранах (≥860px) не действует. */
+@media (max-width: 859px) {
+  .card.solo-game .info-bar { margin-bottom: 10px; }
+
+  .card.solo-game .thermo-wrap { margin: 0 0 2px; }
+
+  .card.solo-game .numline { margin-bottom: 4px; }
+
+  /* Рамку вокруг подсказки на телефоне оставляем — она же и есть главный
+     сигнал «горячо/холодно». Экономим высоту за счёт отступов, а не фона */
+  .card.solo-game .feedback-panel {
+    padding: 7px 12px;
+    margin-bottom: 4px;
+    border-radius: 12px;
+    animation: none;
+  }
+  .card.solo-game .feedback-panel .fb-label { font-size: 16px; }
+  .card.solo-game .feedback-panel .fb-band { font-size: 14px; }
+
+  .card.solo-game .guess-section { margin-bottom: 10px; }
+  .card.solo-game .guess-section p { margin-bottom: 5px; }
+
+  /* Ходов теперь всегда четыре, и окно под них не растёт — но строки
+     поплотнее, чтобы в те же пиксели их помещалось больше */
+  .card.solo-game .history-list { gap: 4px; }
+  .card.solo-game .history-item { padding: 6px 12px; }
+  .card.solo-game .history-item .h-guess { font-size: 15px; }
+}
+
+/* Числовая прямая: где стоит догадка и в каких двух участках может быть ответ.
+   Проценты внутри SVG считаются от его ширины, поэтому пересчитывать
+   координаты при смене размера экрана не нужно */
+.numline {
+  margin: 0 0 8px;
+  padding: 0 4px;
+}
+.numline svg { display: block; overflow: visible; }
+
+/* После партии под прямой сразу начинается история: без этого отступа
+   подписи делений слипаются с её заголовком. Во время игры между ними
+   стоит поле ввода, и лишнее место там ни к чему */
+.board.over .numline { margin-bottom: 16px; }
+
+/* Дуэль на телефоне. Поле ввода — главное действие — уезжало ниже края
+   экрана: сверху его подпирали высокие карточки игроков, градусник в
+   полэкрана и отступы. Подсказку «холодно/горячо» не трогаем: её смотрят
+   двое с одного телефона, ей нужно быть крупной */
+@media (max-width: 859px) {
+  .card.wide .board { gap: 10px; }
+  .card.wide .pcard { padding: 10px; }
+  /* Увеличенная карточка у края вылезала за рамку — хватает цвета рамки */
+  .card.wide .pcard.active { transform: none; }
+  .card.wide .pcard .p-name { font-size: 14px; margin-bottom: 4px; }
+  .card.wide .pcard .p-pips { margin-bottom: 8px; }
+  .card.wide .token-btn { padding: 6px 6px; }
+  .card.wide .info-bar { margin-bottom: 10px; padding: 8px 12px; }
+  .card.wide .turn-banner { margin-bottom: 10px; padding: 8px 12px; }
+  .card.wide .thermo-wrap { margin: 0 0 4px; }
+}
+
+/* Прямая заняла место, которого на невысоком экране нет. Забираем его у
+   градусника: «где именно» теперь показывает прямая, а ему остаётся
+   «насколько горячо». Условие по высоте, а не по ширине — широкий, но
+   низкий ноутбук стеснён так же, как телефон */
+@media (max-height: 900px) {
+  .card.solo-game .thermo-wrap { margin-top: 0; }
+  .card.solo-game .thermo-tube { height: 62px; }
+  .card.solo-game .thermo-bulb { width: 36px; height: 36px; }
+  .card.solo-game .thermo-bulb::after { top: 8px; left: 10px; width: 9px; height: 6px; }
+}
+/* То же для дуэли, но только на телефоне: на широком экране градусник
+   стоит в средней колонке, и высоты ему там хватает */
+@media (max-height: 900px) and (max-width: 859px) {
+  .card.wide .thermo-wrap { margin-top: 0; }
+  .card.wide .thermo-tube { height: 62px; }
+  .card.wide .thermo-bulb { width: 36px; height: 36px; }
+  .card.wide .thermo-bulb::after { top: 8px; left: 10px; width: 9px; height: 6px; }
+}
+
+/* Широкому, но низкому экрану телефонные правила не достаются, а место
+   ему нужно так же — подрезаем отступ под градусником отдельно */
+@media (max-height: 900px) and (min-width: 860px) {
+  .card.solo-game .thermo-wrap { margin-bottom: 8px; }
+}
+
+/* Строка бонуса: либо «рядом», либо что именно сработало. Появляется
+   только когда есть что сказать — в остальное время её просто нет */
+.bonus-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 7px 12px;
+  border-radius: 12px;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  font-size: 14px;
+  color: #fbbf24;
+}
+/* Реплика соперника: цвет берёт от того, кто сказал */
+.say-bubble {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 14px;
+  text-align: center;
+  animation: pop 0.25s ease;
+}
+.say-bubble .s-who { font-weight: 700; margin-right: 6px; }
+
+.say-pad {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin: 0 0 10px;
+}
+@media (min-width: 520px) {
+  .say-pad { grid-template-columns: repeat(4, 1fr); }
+}
+.say-pad button {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 10px;
+  padding: 8px 6px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.say-pad button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+.say-pad button:disabled { opacity: 0.4; cursor: default; }
+.say-pad button.mute { grid-column: 1 / -1; color: rgba(255, 255, 255, 0.5); }
+
+.turn-clock {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.55);
+  transition: color 0.2s;
+}
+.turn-clock.low { color: #fb923c; }
+.turn-clock.out { color: #f87171; }
+.match-note {
+  margin: 0 0 8px;
+  padding: 7px 12px;
+  border-radius: 12px;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  font-size: 13px;
+  color: #f87171;
+}
+.bonus-line .b-name { font-weight: 700; }
+.bonus-line .b-desc { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+/* Пустая строка помех не должна занимать место: без бонусов её просто нет */
+.p-effects { margin-top: 6px; font-size: 15px; letter-spacing: 3px; }
+.p-effects:empty { display: none; }
+.history-item .h-masked { opacity: 0.45; }
+.modal-backdrop.curtain { background: #0b1020; }
+.inv-qr { background: #fff; border-radius: 14px; padding: 10px; width: 200px; height: 200px;
+          margin: 12px auto 8px; box-sizing: border-box; }
+.inv-qr svg { width: 100%; height: 100%; display: block; }
+.inv-link { font-size: 12px; text-align: center; word-break: break-all; color: rgba(255, 255, 255, 0.6);
+            user-select: all; }
+.inv-hint { font-size: 13px; opacity: 0.8; margin-top: 8px; }
+.curtain .ct-text { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 8px; }
+.curtain .ct-why { font-size: 13px; opacity: 0.75; }
+.mode-btn.tut { border-color: rgba(251, 191, 36, 0.55); background: rgba(251, 191, 36, 0.1); }
+.mode-btn .m-sub { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); margin-top: 2px; }
+.mode-btn.locked { opacity: 0.6; }
+.coach { margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.4;
+         background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.45); color: #fde68a; }
+.result-box .r-lesson { margin-top: 10px; font-weight: 700; color: #fbbf24; }
+.bonus-card { text-align: center; }
+.bonus-card .bc-icon { font-size: 48px; line-height: 1.1; }
+.bonus-card .bc-title { font-size: 18px; font-weight: 800; margin: 6px 0 4px; }
+.r-next { margin-top: 10px; font-size: 13px; color: rgba(255, 255, 255, 0.55); text-align: center; }
+.turn-banner.count { font-size: 1.4em; letter-spacing: 0.02em; }
+.turn-banner .tb-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); letter-spacing: 0; }
+
+/* Панель отнятого хода живёт на месте поля ввода и выглядит так же
+   заметно: этот ход — событие, а не пауза */
+.forced-turn {
+  background: rgba(251, 146, 60, 0.12);
+  border: 1px solid rgba(251, 146, 60, 0.5);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.forced-turn p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.4;
+}
+/* Подсказка про жетон: только когда его правда есть чем взвести */
+.forced-turn .forced-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.final-box {
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid #fbbf24;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.final-box p {
+  text-align: center;
+  font-size: 14px;
+  color: #fde68a;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.result-box {
+  border-radius: 14px;
+  padding: 14px 14px 16px;
+  margin-bottom: 16px;
+  text-align: center;
+  line-height: 1.4;
+}
+.result-win { background: rgba(22, 163, 74, 0.16); border: 1px solid #16a34a; color: #86efac; }
+.result-lose { background: rgba(239, 68, 68, 0.16); border: 1px solid #ef4444; color: #fca5a5; }
+.result-round { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255,255,255,0.2); color: #fff; }
+/* Значок в строку с заголовком, а не отдельным этажом над ним */
+.result-box .r-icon { font-size: 18px; line-height: 1; margin-right: 5px; vertical-align: -1px; }
+.result-box .r-title { font-size: 17px; font-weight: 800; }
+/* Имена сверху, счёт отдельной строкой под ними: в одну строку
+   «Лев 0 : 3 Кира» глаз не находит, где чей счёт */
+.result-box .r-score {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+  row-gap: 2px;
+  margin-top: 10px;
+}
+.result-box .rs-name {
+  font-size: 13px; font-weight: 600; text-align: center;
+  overflow-wrap: anywhere;
+}
+.result-box .rs-num { font-size: 30px; font-weight: 800; text-align: center; line-height: 1.1; }
+/* Двоеточие едет по потоку сетки во вторую строку: явный grid-row сбивал
+   раскладку и уводил «1» в среднюю колонку */
+/* Двоеточие того же кегля, что и цифры: по базовой линии мелкое «:»
+   садилось ниже середины счёта */
+.result-box .r-vs {
+  font-size: 30px; font-weight: 700; line-height: 1.1;
+  color: rgba(255,255,255,0.3); padding: 0 12px;
+}
+.result-box .r-secret { margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.45); }
+/* Точность партии — кнопкой: нажал и видишь разбор */
+.result-box .r-review {
+  margin-top: 10px; padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.08);
+  color: #fff; font: 600 14px inherit; font-family: inherit;
+}
+.gr-badge {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  min-width: 22px; height: 22px; padding: 0 4px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; color: #fff; line-height: 1;
+}
+.gr-badge.gr-hit { background: transparent !important; font-size: 16px; }
+.h-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; margin-left: auto; }
+.h-grade { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+.h-grade .gr-badge { min-width: 18px; height: 18px; font-size: 10px; }
+.h-grade .g-name { font-weight: 700; }
+.h-grade .g-pct { margin-left: 0; }
+.review-card { max-width: 380px; }
+.rv-title { font-size: 18px; font-weight: 800; text-align: center; }
+.rv-acc { display: flex; flex-direction: column; align-items: center; margin: 10px 0 6px; }
+.rv-acc-num { font-size: 40px; font-weight: 800; color: #81b64c; line-height: 1.1;
+              display: flex; gap: 28px; justify-content: center; }
+.rv-acc-player { display: flex; flex-direction: column; align-items: center; font-size: 34px; }
+.rv-acc-player small { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.rv-acc-label { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+.rv-sum { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 8px 0 12px; }
+.rv-chip { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 700;
+           padding: 3px 8px 3px 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); }
+.rv-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; text-align: left; }
+.rv-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px;
+  padding: 7px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.04); font-size: 14px;
+}
+.rv-num { color: rgba(255, 255, 255, 0.4); font-size: 12px; min-width: 24px; }
+.rv-guess { font-weight: 800; min-width: 36px; font-variant-numeric: tabular-nums; }
+.rv-grade { display: flex; align-items: center; gap: 8px; flex: 1; }
+.rv-grade .g-name { font-weight: 700; font-size: 13px; }
+.rv-grade .g-pct, .h-grade .g-pct { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums;
+                                    color: rgba(255, 255, 255, 0.75); }
+.rv-grade .g-pct { font-size: 13px; }
+.rv-round { font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.5); margin: 8px 0 2px; }
+.rv-round:first-child { margin-top: 0; }
+.rv-final { flex-basis: 100%; font-size: 11px; color: rgba(255, 255, 255, 0.4); padding-left: 32px; }
+.result-box .r-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: center; flex-wrap: wrap; }
+
+.guess-section { margin-bottom: 16px; }
+.guess-section p { margin-bottom: 8px; font-size: 14px; color: rgba(255, 255, 255, 0.65); font-weight: 500; }
+
+.history-section { margin-bottom: 16px; }
+.history-title {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.history-list::-webkit-scrollbar { width: 4px; }
+.history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  gap: 10px;
+}
+.history-item .h-num { color: rgba(255, 255, 255, 0.4); font-size: 12px; flex-shrink: 0; }
+.history-item .h-who { font-size: 12px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-item .h-guess { font-weight: 700; font-size: 16px; flex-shrink: 0; }
+.history-item .h-label { font-size: 13px; font-weight: 600; text-align: right; word-break: break-word; }
+
+.legend { margin-top: 14px; }
+#scaleBox { margin-bottom: 8px; }
+.legend-body { margin-top: 10px; }
+
+.legend-bar { display: none; }
+
+.legend-grid {
+  display: grid;
+  /* Верхнюю границу подняли: при крупном шрифте «Очень холодно 501–1000»
+     в 210 пикселей уже не помещалось и переносилось на вторую строку */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 260px));
+  justify-content: center;
+  /* Строки стоят плотнее: шрифт вырос, и без этого шкала перестала помещаться */
+  gap: 3px 18px;
+}
+.legend-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+.legend-item .l-label { font-weight: 600; }
+.legend-item .l-range { color: rgba(255, 255, 255, 0.5); font-variant-numeric: tabular-nums; }
+
+@media (min-width: 860px) {
+  .legend-bar {
+    display: flex;
+    height: 10px;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+  }
+  .legend-bar span { flex: 1; }
+
+  /* Восемь колонок в ряд раскладывались по ширине окна, а живут они внутри
+     карточки вдвое уже: на планшете подписи налезали друг на друга и
+     обрезались. Список остаётся списком, просто в две колонки */
+  .legend-grid { grid-template-columns: repeat(2, 1fr); column-gap: 20px; }
+  .legend-item { font-size: 13px; }
+}
+
+.instruction-box {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.instruction-box summary {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+.instruction-box p {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.4;
+  white-space: pre-line;
+}
+
+.hidden { display: none !important; }
+
+:focus-visible { outline: 2px solid #a5f3fc; outline-offset: 2px; }
+
+#updateBanner {
+  cursor: pointer;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  color: #fbbf24;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 10px;
+}
+.lb-wrap { margin-top: 14px; }
+.lb-list { margin-top: 8px; }
+.lb-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 6px;
+}
+.lb-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ---------- Хаб режима на рейтинг ---------- */
+.run-result {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 16px 14px;
+  margin-bottom: 20px;
+  text-align: center;
+  line-height: 1.7;
+}
+.run-result .rr-title {
+  font-size: 17px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.run-result p { margin: 0; font-size: 14px; }
+.run-result .rr-best { margin-top: 10px; font-size: 15px; font-weight: 700; color: #fbbf24; }
+.run-result .rr-error { margin-top: 10px; font-size: 13px; color: #f87171; }
+.run-result #shareBtn { margin-top: 14px; }
+
+/* На телефоне в верхней строке имени места нет — там и так тесно. А знать,
+   под кем ты играешь, нужно именно здесь: с этого экрана игра и начинается */
+.run-greeting {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+  margin: 0 0 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-greeting strong { color: rgba(255, 255, 255, 0.85); }
+/* Под названием экрана «Играет …» — подзаголовок, а не отдельная строка
+   посередине */
+.screen-title + .run-greeting { text-align: left; margin: -8px 0 16px; }
+#screenRunHub .frost-row { margin: 4px 0 14px; }
+#screenRunHub .lb-wrap { margin-top: 28px; }
+#screenRunHub .lb-list { margin-top: 10px; }
+
+.run-hub-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.run-hub-actions .btn-ghost { flex: 1; }
+/* Переключатель «мороз и жара». Вся строка — часть label, чтобы по подписи
+   можно было попасть пальцем, а не только по самой галочке */
+.frost-row .fr-text { display: flex; flex-direction: column; gap: 1px; }
+.frost-row:has(.row-hint) { align-items: flex-start; }
+.frost-row:has(.row-hint) input { margin-top: 1px; }
+.frost-row .row-hint { font-size: 12px; color: rgba(255, 255, 255, 0.5); line-height: 1.3; }
+.frost-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px;
+  padding: 2px 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  user-select: none;
+}
+/* Системный чекбокс на тёмном фоне — белый квадрат, самое яркое пятно на
+   экране. Рисуем свой: погашенный в покое, синий с галочкой во включённом */
+.frost-row input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  margin: 0;
+  position: relative;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.frost-row input:checked { background: #6366f1; border-color: #6366f1; }
+.frost-row input:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.lb-empty {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 10px 2px;
+}
+.lb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lb-head .lb-title { margin-bottom: 0; }
+.lb-tabs { display: flex; gap: 4px; }
+.lb-tab {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.lb-tab.active {
+  background: rgba(74, 222, 128, 0.15);
+  border-color: #4ade80;
+  color: #4ade80;
+}

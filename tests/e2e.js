@@ -133,8 +133,8 @@ async function registerPlayer(p, name, pin) {
   const A = await openPlayer(browser, db, 'ru');
   const B = await openPlayer(browser, db, 'ru');
 
-  await registerPlayer(A, 'Тимур', '1111');
-  await registerPlayer(B, 'Лада', '2222');
+  await registerPlayer(A, 'Тимур', '111111');
+  await registerPlayer(B, 'Лада', '222222');
   check('оба аккаунта зарегистрированы в настоящей базе',
     (await db.query("select count(*) from students where username in ('Тимур','Лада')")).rows[0].count === '2');
   check('после регистрации открылся рейтинг', await A.page.locator('#screenOnline').isVisible());
@@ -378,7 +378,7 @@ async function registerPlayer(p, name, pin) {
   // «Тимур» стоит по алфавиту после «Лады», «Артур» — перед ней: в парах, что
   // хранятся по алфавиту (переписка, лесенка против накрутки), строки должны
   // перевернуться, иначе база откажет в переименовании целиком
-  await db.query("select send_friend_phrase('Тимур', '1111', 'Лада', 'play')");
+  await db.query("select send_friend_phrase('Тимур', '111111', 'Лада', 'play')");
   for (const P of [A, B]) await P.page.evaluate(() => quitToMenu());
 
   // Текст вне игры: грубое слово база прячет сама
@@ -462,12 +462,12 @@ async function registerPlayer(p, name, pin) {
 
   await A.page.evaluate(() => { document.getElementById('pfEditFold').open = true; });
   await A.page.click('#tPinStart');
-  await A.page.fill('#pinOld', '1111');
-  await A.page.fill('#pinNew', '3333');
+  await A.page.fill('#pinOld', '111111');
+  await A.page.fill('#pinNew', '333333');
   await A.page.click('#tPinSave');
   await A.page.waitForTimeout(700);
   check('новый PIN подходит в базе',
-    (await db.query("select check_student_pin('Артур', '3333') as u")).rows[0].u === 'Артур');
+    (await db.query("select check_student_pin('Артур', '333333') as u")).rows[0].u === 'Артур');
   await A.page.click('#tProfileDone');
   await A.page.click('#friendsBtn');
   await A.page.waitForTimeout(800);
@@ -531,6 +531,23 @@ async function registerPlayer(p, name, pin) {
   await B.page.waitForTimeout(1200);
   const heroB = await B.page.evaluate(() => document.getElementById('rkElo').textContent);
   check('на экране онлайна — лига из настоящей базы', heroB === '🥉 Бронза 10', heroB);
+
+  // Задания дня: засчитывает база по настоящим партиям
+  const decided = (await db.query("select count(*)::int as n from matches m where match_winner(m) is not null and 'Лада' in (m.p0, m.p1)")).rows[0].n;
+  const ladaStats = (await db.query("select online_games, online_wins from player_stats where username = 'Лада'")).rows[0];
+  check('партии Лады с исходом посчитаны базой', decided >= 3 && ladaStats && ladaStats.online_games === decided,
+    JSON.stringify({ decided, ladaStats }));
+  await B.page.evaluate(() => quitToMenu());
+  await B.page.waitForTimeout(1200);
+  const qc = await B.page.evaluate(() => ({ shown: !document.getElementById('questCard').classList.contains('hidden'),
+    rows: [...document.querySelectorAll('#qcList .qc-row')].map(r => r.dataset.code + ' ' + r.querySelector('.qc-n').textContent) }));
+  const dq = (await db.query("select code, goal, progress from daily_quests where username = 'Лада' and day = player_day('Лада') order by slot")).rows;
+  check('в меню — задания дня из настоящей базы, прогресс как в базе',
+    qc.shown && qc.rows.length === 3 && qc.rows.join() === dq.map(q => q.code + ' ' + Math.min(q.progress, q.goal) + '/' + q.goal).join(),
+    JSON.stringify({ qc, dq }));
+  // Первое задание — «сыграть онлайн» или «на звёзды»: у Лады 3 партии с исходом, из них 2 на звёзды
+  check('партии онлайн продвинули первое задание',
+    dq[0].progress === Math.min(dq[0].goal, dq[0].code === 'ladder2' ? lad.games : decided), JSON.stringify(dq[0]));
 
   check('у бота рейтинга нет',
     (await db.query("select count(*) from elo_ratings where username like '@bot:%'")).rows[0].count === '0');

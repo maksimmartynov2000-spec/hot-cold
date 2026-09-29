@@ -62,12 +62,13 @@ fi
 rm -f "$DIR/.scratch.log"
 su postgres -c "dropdb --if-exists hotcold_scratch" >/dev/null 2>&1
 
-# 2. Тестовая база
+# 2. Тестовая база. Игроки — старые аккаунты с PIN из 4 цифр: регистрация
+#    теперь просит 6 (миграция 040), а вход старым PIN работает как раньше
 su postgres -c "dropdb --if-exists hotcold_test" >/dev/null 2>&1
 su postgres -c "createdb hotcold_test"
 su postgres -c "psql -q -d hotcold_test -v ON_ERROR_STOP=1 \
   -f $DIR/00_base.sql $(mig_args $FIRST) \
-  -c \"select register_student('Лев','1234',null), register_student('Кира','4321',null), register_student('Максим','1111',null);\"" >/dev/null
+  -c \"insert into students(username, pin_hash) values ('Лев', extensions.crypt('1234', extensions.gen_salt('bf'))), ('Кира', extensions.crypt('4321', extensions.gen_salt('bf'))), ('Максим', extensions.crypt('1111', extensions.gen_salt('bf')));\"" >/dev/null
 
 # 3. Файлы проверки из supabase/checks: на базе со всеми миграциями в каждом
 #    должны быть только ✔ — иначе пользователь увидит ложную тревогу

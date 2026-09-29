@@ -3,6 +3,13 @@
 -- миграции проверялись на настоящем PostgreSQL, а не на глаз. В проде не нужен.
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
+
+-- Realtime: в Supabase схема и realtime.send есть в каждом проекте. Здесь —
+-- пустышка той же подписи; что уходит в каналы, проверяет test_realtime.sql
+create schema if not exists realtime;
+create or replace function realtime.send(payload jsonb, event text, topic text, private boolean default true)
+returns void language sql as $$ select null::void $$;
+
 do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
 end $$;

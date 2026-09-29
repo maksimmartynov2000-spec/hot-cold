@@ -13,8 +13,27 @@ function launchOptions() {
 function stubSupabase(opts) {
   return function (opts) {
     window.__rpcCalls = [];
+    window.__sigFire = (payload) => {
+      const ch = window.__sigChannel;
+      if (!ch || ch.removed) return false;
+      ch.handlers.filter(h => h.type === 'broadcast' && h.filter.event === 'sig').forEach(h => h.cb({ event: 'sig', payload }));
+      return true;
+    };
     window.supabase = {
       createClient: () => ({
+        // Realtime: канал запоминается, а «сигнал из базы» тест посылает сам —
+        // window.__sigFire({ k, id }). opts.noRealtime — клиент без каналов
+        channel: opts.noRealtime ? undefined : (name) => {
+          const ch = { name, handlers: [], removed: false };
+          ch.on = (type, filter, cb) => { ch.handlers.push({ type, filter, cb }); return ch; };
+          ch.subscribe = (cb) => {
+            window.__sigChannel = ch;
+            setTimeout(() => { if (cb) cb(opts.realtimeDown ? 'CHANNEL_ERROR' : 'SUBSCRIBED'); }, 0);
+            return ch;
+          };
+          return ch;
+        },
+        removeChannel: (ch) => { ch.removed = true; if (window.__sigChannel === ch) window.__sigChannel = null; },
         from: () => ({
           select: () => ({ eq: () => ({ single: async () => ({ data: null, error: 'stub' }) }) })
         }),
@@ -29,7 +48,34 @@ function stubSupabase(opts) {
           if (window.__rpcError && window.__rpcError.name === name) {
             return { data: null, error: { message: window.__rpcError.message } };
           }
+          if (name === 'my_signal_key') return { data: opts.noSignalKey ? null : 'k' + (localStorage.getItem('hc_run_user') || ''), error: opts.noSignalKey ? { message: 'Could not find the function public.my_signal_key' } : null };
           if (name === 'list_friends') return { data: window.__friends || [], error: null };
+          // Задания и достижения (миграция 041): «сервер» — window.__progress,
+          // достижения друзей — window.__friendAch {имя: [...]}
+          if (name === 'my_progress') {
+            (window.__progressCalls = window.__progressCalls || []).push(args);
+            if (!window.__progress) return { data: null, error: { message: 'Could not find the function public.my_progress' } };
+            return { data: window.__progress, error: null };
+          }
+          if (name === 'friend_achievements') {
+            const A = (window.__friendAch || {})[args.p_friend];
+            if (!A) return { data: null, error: { message: 'not_friends' } };
+            return { data: A, error: null };
+          }
+          if (name === 'season_summary_seen') {
+            (window.__seasonSeen = window.__seasonSeen || []).push(args.p_season);
+            if (window.__ladder) window.__ladder.summary = null;
+            return { data: true, error: null };
+          }
+          // Приглашения (миграция 039): чей код — window.__invites {код: имя}
+          if (name === 'my_invite_code') return { data: 'ABCD2345', error: null };
+          if (name === 'invite_owner') return { data: (window.__invites || {})[String(args.p_code).toUpperCase()] || null, error: null };
+          if (name === 'accept_invite') {
+            const host = (window.__invites || {})[String(args.p_code).toUpperCase()];
+            (window.__accepted = window.__accepted || []).push(args.p_code);
+            if (!host) return { data: null, error: { message: 'no_such_invite' } };
+            return { data: host, error: null };
+          }
           // Жалобы и блокировка (миграция 036): «сервер» — window.__reports и __blocked
           if (name === 'report_player') {
             (window.__reports = window.__reports || []).push(args);
@@ -91,7 +137,7 @@ function stubSupabase(opts) {
             if (name === 'rename_student') return { data: args.p_new, error: null };
             if (name === 'change_pin') {
               if (args.p_pin !== P.pin) return { data: null, error: { message: 'auth_failed' } };
-              if (!/^[0-9]{4}$/.test(args.p_new_pin || '')) return { data: null, error: { message: 'invalid_pin' } };
+              if (!/^[0-9]{6}$/.test(args.p_new_pin || '')) return { data: null, error: { message: 'invalid_pin' } };
               P.pin = args.p_new_pin; P.hint = args.p_hint;
               return { data: true, error: null };
             }
@@ -431,6 +477,8 @@ function stubSupabase(opts) {
       localStorage.setItem('hc_tutorial', JSON.stringify({ done: [], skipped: true }));
       localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'lava', 'skip', 'gift', 'memory', 'near']));
     }
+    if (opts.progress) window.__progress = opts.progress;
+    if (opts.ladder) window.__ladder = opts.ladder;
     if (opts.user) {
       localStorage.setItem('hc_run_user', opts.user);
       localStorage.setItem('hc_run_pin', '1234');

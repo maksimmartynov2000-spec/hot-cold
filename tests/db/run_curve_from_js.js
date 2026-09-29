@@ -1,8 +1,8 @@
 // Кривая сложности «Игры на рейтинг» теперь считается и в браузере, и в базе.
-// Функции достаём из index.html, а не из копии рядом: копия разошлась бы молча.
+// Функции достаём из кода игры, а не из копии рядом: копия разошлась бы молча.
 const fs = require('fs');
 const path = require('path');
-const html = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
+const html = require('./game_source')();
 
 function grab(start, end) {
   const a = html.indexOf(start);
@@ -12,10 +12,10 @@ function grab(start, end) {
 }
 
 const src = [
-  grab('function minAttempts(rangeMax) {', '\n  }'),
-  grab('function roundRangeValue(v) {', '\n  }'),
-  grab('function runRangeForRound(n) {', '\n  }'),
-  grab('function runAttemptsForRound(n, range) {', '\n  }')
+  grab('function minAttempts(rangeMax) {', '\n}'),
+  grab('function roundRangeValue(v) {', '\n}'),
+  grab('function runRangeForRound(n) {', '\n}'),
+  grab('function runAttemptsForRound(n, range) {', '\n}')
 ].join('\n');
 
 const RUN_CONFIG = {

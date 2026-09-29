@@ -7,12 +7,13 @@
 -- https://supabase.com/dashboard/project/fzakcsvyceqsnowvkxfu/sql/new
 
 update students
-set pin_hash = extensions.crypt('1234', extensions.gen_salt('bf')),
+set pin_hash = extensions.crypt('123456', extensions.gen_salt('bf')),
     failed_logins = 0,
     locked_until = null
 where username_lower = lower('ИМЯ_УЧЕНИКА');
 
--- 1234 — новый PIN, скажите его ученику и попросите не оставлять таким.
+-- 123456 — новый PIN (6 цифр), скажите его ученику и попросите сменить
+-- в профиле: «Имя и PIN» → «Сменить PIN».
 -- failed_logins и locked_until обнуляются заодно: если ученик до этого
 -- перебирал PIN и попал под блокировку, она снимется.
 

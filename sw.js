@@ -4,12 +4,18 @@
 
 // Версию поднимаем, когда меняется что-то из CORE: старый кеш отдаётся сразу,
 // и без смены имени телефон продолжил бы брать прежний manifest
-const CACHE = 'hot-cold-v3';
+const CACHE = 'hot-cold-v5';
 
 // Своё, что нужно для запуска
 const CORE = [
   './',
   './index.html',
+  './styles.css',
+  './js/i18n.js',
+  './js/game.js',
+  './js/online.js',
+  './js/main.js',
+  './vendor/qrcode.js',
   './manifest.webmanifest',
   './icon-180.png',
   './icon-192.png',
@@ -43,17 +49,26 @@ self.addEventListener('fetch', event => {
   // это живые данные, и офлайн они должны честно падать, а не отдавать старое
   if (url.hostname.endsWith('.supabase.co')) return;
 
-  // Сама страница: сначала сеть — чтобы обновление приезжало сразу,
-  // и только при её отсутствии показываем сохранённую копию
-  if (req.mode === 'navigate' || url.pathname.endsWith('/index.html')) {
+  // Сама страница и её стили и скрипты: сначала сеть — чтобы обновление
+  // приезжало сразу, и только без сети показываем сохранённую копию. Стили и
+  // скрипты — так же, как страница: иначе новая страница встретилась бы со
+  // старым скриптом из кеша, и игра сломалась бы на несовпадении
+  const own = url.origin === self.location.origin && /\/(index\.html|styles\.css|js\/[^/]+\.js)$/.test(url.pathname);
+  if (req.mode === 'navigate' || own) {
     event.respondWith(
-      fetch(req)
+      // no-cache: спросить сервер, не изменился ли файл, а не брать из кеша браузера
+      fetch(req, { cache: 'no-cache' })
         .then(res => {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+          }
           return res;
         })
-        .catch(() => caches.match(req).then(hit => hit || caches.match('./index.html')))
+        // Без сети: сохранённая копия. Вместо страницы с другим адресом —
+        // главная; вместо скрипта страницу не подсовываем
+        .catch(() => caches.match(req).then(hit => hit ||
+          (req.mode === 'navigate' ? caches.match('./index.html') : Response.error())))
     );
     return;
   }

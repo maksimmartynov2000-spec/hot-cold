@@ -204,13 +204,13 @@ declare gone text; n int;
 begin
   delete from matches; delete from friend_chat; delete from friend_chat_read;
   delete from students where username like 'Прохожий%';
-  perform register_student('Прохожий','5555');
-  perform send_friend_request('Прохожий','5555','Лев');
+  perform register_student('Прохожий','555555');
+  perform send_friend_request('Прохожий','555555','Лев');
   perform respond_friend_request('Лев','1234','Прохожий',true);
-  perform send_friend_phrase('Прохожий','5555','Лев','hi');
+  perform send_friend_phrase('Прохожий','555555','Лев','hi');
   perform friend_thread('Лев','1234','Прохожий');
 
-  gone := delete_account('Прохожий','5555');
+  gone := delete_account('Прохожий','555555');
   select count(*) into n from friend_chat;
   if n is distinct from 0 then raise exception 'ОШИБКА: переписка осталась (% строк)', n; end if;
   select count(*) into n from friend_chat_read;
