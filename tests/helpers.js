@@ -50,6 +50,13 @@ function stubSupabase(opts) {
           }
           if (name === 'my_signal_key') return { data: opts.noSignalKey ? null : 'k' + (localStorage.getItem('hc_run_user') || ''), error: opts.noSignalKey ? { message: 'Could not find the function public.my_signal_key' } : null };
           if (name === 'list_friends') return { data: window.__friends || [], error: null };
+          // «В игре сейчас» (миграция 043): кто в игре — window.__online,
+          // без него — как сервер без миграции
+          if (name === 'mark_seen') { window.__seen = (window.__seen || 0) + 1; return { data: true, error: null }; }
+          if (name === 'friends_online') {
+            if (!window.__online) return { data: null, error: { message: 'Could not find the function public.friends_online' } };
+            return { data: window.__online, error: null };
+          }
           // Задания и достижения (миграция 041): «сервер» — window.__progress,
           // достижения друзей — window.__friendAch {имя: [...]}
           if (name === 'my_progress') {
@@ -477,6 +484,10 @@ function stubSupabase(opts) {
       localStorage.setItem('hc_tutorial', JSON.stringify({ done: [], skipped: true }));
       localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'lava', 'skip', 'gift', 'memory', 'near']));
     }
+    // Старые проверки писались, когда по умолчанию был диапазон 1–1000.
+    // Новое умолчание (1–100) проверяет testUxPass с opts.freshSetup
+    // Новичку не ставим: любой ключ hc_ делает его «старым игроком» (tutInit)
+    if (!opts.freshSetup && !opts.newbie && localStorage.getItem('hc_range') === null) localStorage.setItem('hc_range', '1000');
     if (opts.progress) window.__progress = opts.progress;
     if (opts.ladder) window.__ladder = opts.ladder;
     if (opts.user) {

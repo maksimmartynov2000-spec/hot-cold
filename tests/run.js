@@ -2955,12 +2955,15 @@ async function testRanked(browser) {
     sub: document.getElementById('rkEloSub').textContent
   }));
   check('у экрана есть название', modes.title === '🌐 Игра онлайн', modes.title);
-  check('четыре разновидности с условиями прямо в названии',
-    modes.names.join(' | ') === '1–100 | −100…100 | 1–100 · бонусы | −100…100 · бонусы',
+  // Названия словами — «−100…100 · бонусы» ребёнку ничего не говорило;
+  // диапазон мелко под названием
+  check('четыре разновидности словами',
+    modes.names.join(' | ') === '🎯 Обычная | ❄️🔥 Мороз и Жара | 🎁 С бонусами | ❄️🎁 Всё сразу',
     modes.names.join(' | '));
   // Рейтинг один раз — крупно под кнопками, а не ещё и на каждой кнопке
-  check('на кнопках разновидностей только название, без рейтинга',
-    modes.chips.join(' | ') === modes.names.join(' | '), modes.chips.join(' | '));
+  check('на кнопках — название и диапазон, без рейтинга',
+    modes.chips.join(' | ') === '🎯 Обычная1–100 | ❄️🔥 Мороз и Жара−100…100 | 🎁 С бонусами1–100 | ❄️🎁 Всё сразу−100…100',
+    modes.chips.join(' | '));
   check('кнопки одной высоты — ничего не переносится', new Set(modes.heights).size === 1, modes.heights.join());
   check('длинного описания правил больше нет', !modes.rules);
   check('выбрана первая разновидность', modes.active.join() === 'true,false,false,false', modes.active.join());
@@ -2975,8 +2978,10 @@ async function testRanked(browser) {
     [...document.querySelectorAll('#rkTopList .rk-top-row')].map(r => ({
       place: r.querySelector('.rk-place').textContent, me: r.classList.contains('me'),
       face: !!r.querySelector('.avatar') })));
-  check('в топе медали вместо номеров у первых трёх',
-    topLook.map(r => r.place).join() === '🥇,🥈', JSON.stringify(topLook));
+  // Место — цифрой в цветном кружке: медали путались с медалями лиг
+  check('в топе место цифрой, первые три — в цветном кружке',
+    topLook.map(r => r.place).join() === '1,2' &&
+    await page.evaluate(() => document.querySelector('#rkTopList .rk-place').classList.contains('p1')), JSON.stringify(topLook));
   check('своя строка выделена, у каждого — кружок',
     topLook.map(r => r.me).join() === 'false,true' && topLook.every(r => r.face), JSON.stringify(topLook));
 
@@ -3052,9 +3057,9 @@ async function testRanked(browser) {
   }));
   check('встали в очередь выбранной разновидности', queued.mode === 1, String(queued.mode));
   check('вместо кнопки видно ожидание', queued.waiting && queued.playHidden);
-  check('в ожидании сказано, что ищут и сколько ждём',
-    queued.text.indexOf('Ищем соперника') >= 0 && queued.text.indexOf('в очереди') >= 0, queued.text);
-  check('и что пока никого нет', queued.text.indexOf('только вы') >= 0, queued.text);
+  check('в ожидании сказано, что ищут, и идёт секундомер',
+    queued.text.indexOf('Ищем соперника') >= 0 && /\d:\d\d$/.test(queued.text), queued.text);
+  check('и что пока никого нет — отдельной строкой', queued.sub.split('\n')[0] === 'пока ждёте только вы', queued.sub);
   check('одинокому ожиданию подсказано, давно ли тут играли',
     queued.sub.indexOf('4 мин назад') >= 0, queued.sub);
 
@@ -3137,8 +3142,9 @@ async function testRanked(browser) {
     document.getElementById('resultBox').textContent.replace(/[\s  ]/g, ''));
   check('сказано, что соперник вышел из игры',
     card.indexOf('Киравышелизигры') >= 0, card);
-  check('показан новый рейтинг и прибавка',
-    card.indexOf('1198') >= 0 && card.indexOf('(+18)') >= 0, card);
+  // Число рейтинга не показываем никогда — только лиги и звёзды
+  check('числа рейтинга в итоге нет',
+    card.indexOf('1198') < 0 && card.indexOf('(+18)') < 0 && card.indexOf('Рейтинг:') < 0, card);
 
   // Реванш: приглашение уходит, но с экрана не уносит — соперник ещё не согласился
   const beforeBtns = await page.evaluate(() =>
@@ -4063,8 +4069,8 @@ async function testCalmScreens(browser) {
       place: r.querySelector('.rk-place').textContent, face: !!r.querySelector('.avatar'),
       name: r.querySelector('.rk-who').textContent, me: r.classList.contains('me') }));
   });
-  check('топ «Испытания» с медалями и кружками',
-    runTop.length > 0 && runTop[0].place === '🥇' && runTop.every(r => r.face), JSON.stringify(runTop));
+  check('топ «Испытания»: место цифрой, у каждого кружок',
+    runTop.length > 0 && runTop[0].place === '1' && runTop.every(r => r.face), JSON.stringify(runTop));
   check('два запроса подряд не задваивают строки',
     new Set(runTop.map(r => r.name)).size === runTop.length, JSON.stringify(runTop));
   await page.click('#tRunStart');
@@ -4360,7 +4366,8 @@ async function testReview(browser) {
   check('рядом с оценкой — процент хода, у «в точку» процента нет',
     modal.rows.every((r, i) => i === 5 ? r.pct === '' : r.pct === res.rv.moves[i].score + '%') &&
     modal.rows[5].name === 'В точку!', JSON.stringify(modal.rows));
-  check('лучший ход в разборе не подсказывается', !modal.rows.some(r => /лучше|21/.test(r.text)),
+  // «Можно лучше» — это оценка; подсказкой было бы «лучше было 21»
+  check('лучший ход в разборе не подсказывается', !modal.rows.some(r => /лучше было|21/.test(r.text)),
     JSON.stringify(modal.rows.map(r => r.text)));
   await page.click('#tReviewClose');
   check('разбор закрывается', !(await page.locator('#reviewModal').isVisible()));
@@ -4852,10 +4859,13 @@ async function testBots(browser) {
       roundWinner: 0, eloDelta: [10, 0], elo: 1010 });
     return refreshMatch(true);
   });
-  const endBot = await page.evaluate(() => (document.querySelector('#resultBox .r-elo-note') || {}).textContent || '');
-  check('в итоге сказано, что с ботом рейтинг вдвое меньше', /вдвое меньше/.test(endBot), endBot);
+  // Число рейтинга не показываем нигде — ни с ботом, ни с человеком
+  await page.waitForTimeout(200);
+  const endBot = await page.evaluate(() => ({ elo: !!document.querySelector('#resultBox .r-elo'), text: document.getElementById('resultBox').textContent }));
+  check('в итоге партии с ботом числа рейтинга нет', !endBot.elo && !/Рейтинг:|1\s?010/.test(endBot.text), endBot.text);
   await page.evaluate(() => { window.__match.botSeat = null; return refreshMatch(true); });
-  check('с человеком такой приписки нет', await page.evaluate(() => !document.querySelector('#resultBox .r-elo-note')));
+  await page.waitForTimeout(200);
+  check('и с человеком тоже', await page.evaluate(() => !/Рейтинг:/.test(document.getElementById('resultBox').textContent)));
 
   // Реванш с ботом начинается сразу, без «ждём согласия»
   await page.evaluate(() => { window.__match.botSeat = 1; return refreshMatch(true); });
@@ -6099,6 +6109,130 @@ async function testSplitFiles() {
     !/<script>(?!\s*<\/script>)/.test(html) && !/<style>/.test(html));
 }
 
+// Разбор глазами ученика: ошибки ввода, повтор, мягкие оценки, умолчания
+// тренировки, правила Испытания, PIN при регистрации, «в игре сейчас»
+async function testUxPass(browser) {
+  console.log('\nРазбор глазами ученика');
+  const note = p => p.evaluate(() => {
+    const el = document.getElementById('guessNote');
+    return { text: el.classList.contains('hidden') ? '' : el.textContent, bad: el.classList.contains('bad') };
+  });
+  // Тренировка: новичку 1–100, выбор запоминается
+  let page = await newGame(browser, { freshSetup: true });
+  await page.click('.mode-btn.solo');
+  await page.waitForTimeout(200);
+  check('тренировка по умолчанию — 1–100', (await page.inputValue('#rangeMax')) === '100', await page.inputValue('#rangeMax'));
+  await page.selectOption('#rangeMax', '20');
+  await page.selectOption('#attemptsCount', { index: 2 });
+  const att = await page.inputValue('#attemptsCount');
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(200);
+  // Число вне диапазона — сказано словами, ход не сделан
+  await page.fill('#guessInput', '38');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(150);
+  let n = await note(page);
+  check('число вне диапазона — «Нужно число от 1 до 20», ход не засчитан',
+    n.text === 'Нужно число от 1 до 20' && n.bad && await page.evaluate(() => history.length === 0), JSON.stringify(n));
+  await page.fill('#guessInput', '');
+  await page.type('#guessInput', '5');
+  n = await note(page);
+  check('начал набирать — замечание ушло', n.text === '', JSON.stringify(n));
+  // Повтор — предупреждение, попытка потрачена
+  const s = await page.evaluate(() => secret);
+  const g = s === 1 ? 2 : 1;
+  for (let i = 0; i < 2; i++) { await page.fill('#guessInput', String(g)); await page.click('#tSubmitGuess'); await page.waitForTimeout(150); }
+  n = await note(page);
+  check('повтор — «уже называли», попытка потрачена',
+    n.text === g + ' уже называли — ответ тот же, попытка потрачена' && !n.bad &&
+    await page.evaluate(() => history.length === 2), JSON.stringify(n));
+  const grades = await page.evaluate(() => document.getElementById('historyList').textContent);
+  check('оценки ходов — без шахматных слов', !/Зевок|Неточность|Ошибка/.test(grades), grades.slice(0, 200));
+  // Перезагрузка — как новый заход: выбор должен пережить её
+  await page.reload();
+  await page.waitForTimeout(800);
+  await page.click('.mode-btn.solo');
+  await page.waitForTimeout(200);
+  const again = { r: await page.inputValue('#rangeMax'), a: await page.inputValue('#attemptsCount'), want: att };
+  check('в следующий раз — прошлый выбор: 1–20 и те же попытки',
+    again.r === '20' && again.a === att, JSON.stringify(again));
+  await page.context().close();
+
+  // Дуэль: число соперника — тоже повтор
+  page = await newGame(browser, {});
+  await page.click('.mode-btn.duel');
+  await page.selectOption('#rangeMax', '100');
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(200);
+  const s2 = await page.evaluate(() => secret);
+  const g2 = s2 === 1 ? 2 : 1;
+  for (let i = 0; i < 2; i++) { await page.fill('#guessInput', String(g2)); await page.click('#tSubmitGuess'); await page.waitForTimeout(150); await liftCurtainIfShown(page); }
+  check('дуэль: число соперника назвали снова — тоже предупреждение', (await note(page)).text.startsWith(g2 + ' уже называли'));
+  await page.context().close();
+
+  // Онлайн: вне диапазона — на сервер не уходит
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => openMatch(1));
+  await page.waitForTimeout(500);
+  await page.fill('#guessInput', '500');
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(200);
+  n = await note(page);
+  check('онлайн: вне диапазона — замечание, на сервер не отправлено',
+    n.text === 'Нужно число от 1 до 100' && await page.evaluate(() => !window.__rpcCalls.some(c => c.name === 'match_guess')), JSON.stringify(n));
+  await page.context().close();
+
+  // Испытание: правила раскрыты, пока не играл
+  page = await newGame(browser, { user: 'Лев' });
+  await page.click('.mode-btn.run');
+  await page.waitForTimeout(500);
+  let rules = await page.evaluate(() => ({ open: document.getElementById('runRules').open,
+    head: document.getElementById('tRunRulesHead').textContent, n: document.querySelectorAll('#runRulesList li').length }));
+  check('Испытание: «❓ Как играть» раскрыто до первой игры, 4 правила',
+    rules.open && rules.head === '❓ Как играть' && rules.n === 4, JSON.stringify(rules));
+  await page.click('#tRunStart');
+  await page.waitForTimeout(400);
+  await page.evaluate(() => openRunHub());
+  await page.waitForTimeout(300);
+  check('после первой игры правила свёрнуты', await page.evaluate(() => !document.getElementById('runRules').open));
+  await page.context().close();
+
+  // Регистрация: PIN скрыт, «глаз» показывает; подсказка — не «123456»
+  page = await newGame(browser, {});
+  await page.evaluate(() => { authReturn = 'mode'; showRunAuth('register'); });
+  let pin = await page.evaluate(() => ({ type: document.getElementById('runPin').type, ph: document.getElementById('runPin').placeholder }));
+  check('регистрация: PIN скрыт, подсказка «Любые 6 цифр»', pin.type === 'password' && pin.ph === 'Любые 6 цифр', JSON.stringify(pin));
+  await page.click('#runPinEye');
+  check('«глаз» показывает набранный PIN', (await page.evaluate(() => document.getElementById('runPin').type)) === 'text');
+  await page.evaluate(() => showRunAuth('login'));
+  check('на входе PIN снова скрыт', (await page.evaluate(() => document.getElementById('runPin').type)) === 'password');
+  await page.context().close();
+
+  // «В игре сейчас»: зелёная точка, выше остальных, отметка «я здесь»
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    window.__friends = [{ username: 'Кира', relation: 'friend' }, { username: 'Ося', relation: 'friend' }];
+    window.__online = ['Ося'];
+  });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(500);
+  const fr = await page.evaluate(() => ({ seen: window.__seen || 0,
+    rows: [...document.querySelectorAll('#friendsList .friend-row')].map(r => r.dataset.name + ':' +
+      (r.querySelector('.avatar').classList.contains('online') ? 'on' : 'off') + ':' + (r.querySelector('.fr-status') || {}).textContent) }));
+  check('друг в игре — зелёная точка, «В игре сейчас», выше остальных',
+    fr.rows.join('|') === 'Ося:on:В игре сейчас|Кира:off:Написать' &&
+    await page.evaluate(() => document.querySelector('#friendsList .fr-status.on') !== null), fr.rows.join('|'));
+  check('игра отмечается «я здесь»', fr.seen >= 1, String(fr.seen));
+  await page.context().close();
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => { window.__friends = [{ username: 'Кира', relation: 'friend' }]; });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(500);
+  check('сервер без миграции — список друзей как раньше, без точек',
+    await page.evaluate(() => document.querySelectorAll('#friendsList .friend-row').length === 1 && !document.querySelector('.avatar.online')));
+  await page.context().close();
+}
+
 // Старый PIN из 4 цифр — профиль предлагает сменить на 6
 async function testPinShort(browser) {
   console.log('\nPIN из 4 цифр — предложение сменить');
@@ -6677,6 +6811,7 @@ async function testKeyPage(browser) {
     await testProgress(browser);
     await testRealtime(browser);
     await testSplitFiles();
+    await testUxPass(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

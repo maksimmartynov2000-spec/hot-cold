@@ -312,7 +312,7 @@ body {
   border-color: rgba(99, 102, 241, 0.75);
 }
 
-input[type=number], input[type=text], select.field {
+input[type=number], input[type=text], input[type=password], select.field {
   flex: 1;
   min-width: 0;
   width: 100%;
@@ -477,7 +477,6 @@ select.field option { background: #1e1b4b; color: #fff; }
 @media (prefers-reduced-motion: reduce) { .r-pop { animation: none; } }
 .r-stars-main { font-size: 17px; font-weight: 800; color: #fbbf24; }
 .r-stars-note { font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); margin-top: 2px; }
-.r-elo .r-elo-note { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
 /* Выбор бота: пять персонажей столбиком, от слабого к сильному. В ряд
    на телефоне не влезали имена: «Чере…», «Дель…» */
 .bot-pick { display: flex; flex-direction: column; gap: 5px; }
@@ -524,6 +523,7 @@ select.field option { background: #1e1b4b; color: #fff; }
   overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 .friend-row .fr-status.hot { color: #fbbf24; font-weight: 600; }
+.friend-row .fr-status.on { color: #4ade80; font-weight: 600; }
 .friend-row.tap { cursor: pointer; border-radius: 12px; }
 .friend-row.tap:hover { background: rgba(255, 255, 255, 0.04); }
 /* Заявка в друзья — заметной карточкой: на неё надо ответить */
@@ -577,6 +577,12 @@ select.field option { background: #1e1b4b; color: #fff; }
 .pf-fold .fold-body > .fr-note + .btn-ghost { margin-top: 8px; }
 .fr-btn.more { padding: 5px 9px; font-size: 15px; line-height: 1; letter-spacing: 1px; }
 .friend-row .avatar { margin-right: 2px; }
+/* Друг в игре сейчас — зелёная точка на кружке */
+.friend-row .avatar.online { position: relative; overflow: visible; }
+.friend-row .avatar.online::after {
+  content: ''; position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px;
+  border-radius: 50%; background: #22c55e; border: 2px solid #1a1f3d;
+}
 .fr-note {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.45);
@@ -699,7 +705,8 @@ select.field option { background: #1e1b4b; color: #fff; }
 }
 /* В одну строку: «−100…100 · бонусы» переносилась, и кнопки выходили
    разной высоты */
-.rk-mode .rm-name { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.rk-mode .rm-name { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.rk-mode .rm-range { font-size: 11px; font-weight: 600; opacity: 0.6; margin-top: 2px; }
 #rkModes .rk-mode { padding: 11px 4px; }
 .rk-mode.active {
   background: rgba(251, 191, 36, 0.14);
@@ -721,26 +728,32 @@ select.field option { background: #1e1b4b; color: #fff; }
 }
 .rk-top-row + .rk-top-row { margin-top: 2px; }
 .rk-top-row.me { background: rgba(251, 191, 36, 0.12); color: #fbbf24; font-weight: 700; }
-.rk-top-row .rk-place { width: 24px; text-align: center; flex: 0 0 auto;
-                        color: rgba(255, 255, 255, 0.45); font-weight: 700; }
-/* Медаль — эмодзи: полупрозрачный цвет делал её серой */
-.rk-top-row .rk-place.medal { color: #fff; font-size: 18px; }
+.rk-top-row .rk-place { width: 24px; height: 24px; line-height: 24px; border-radius: 50%;
+                        text-align: center; flex: 0 0 auto; font-size: 13px;
+                        color: rgba(255, 255, 255, 0.45); font-weight: 800; }
+.rk-top-row .rk-place.p1 { background: #fbbf24; color: #0f1430; }
+.rk-top-row .rk-place.p2 { background: #cbd5e1; color: #0f1430; }
+.rk-top-row .rk-place.p3 { background: #d97706; color: #0f1430; }
 .rk-top-row .rk-who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rk-top-row .rk-pts { font-variant-numeric: tabular-nums; font-weight: 700; }
 .rk-wait { margin-top: 10px; }
 /* Пока ищем соперника, единственное, что меняется, — это строка ожидания.
    Она должна быть заметна, но не мигать: точки дорисовываются в тексте */
 .rk-wait-text {
-  font-size: 13px;
+  font-size: 16px;
+  font-weight: 700;
   color: #fbbf24;
   text-align: center;
-  padding: 6px 0 2px;
+  padding: 6px 0 4px;
+  font-variant-numeric: tabular-nums;
 }
 .rk-wait-sub {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.55);
   text-align: center;
   padding-bottom: 10px;
+  white-space: pre-line;
 }
 .rk-row-tag {
   font-size: 11px;
@@ -752,7 +765,6 @@ select.field option { background: #1e1b4b; color: #fff; }
   margin-left: 6px;
   white-space: nowrap;
 }
-.r-elo { font-size: 15px; font-weight: 700; color: #fbbf24; margin-top: 8px; }
 .r-forfeit { font-size: 13px; color: rgba(255, 255, 255, 0.55); margin-top: 6px; }
 
 /* ---------- Настройка дуэли ---------- */
@@ -1338,7 +1350,21 @@ select.field option { background: #1e1b4b; color: #fff; }
 .rv-final { flex-basis: 100%; font-size: 11px; color: rgba(255, 255, 255, 0.4); padding-left: 32px; }
 .result-box .r-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: center; flex-wrap: wrap; }
 
+.run-rules { margin-bottom: 12px; }
+.run-rules-list { list-style: none; padding: 10px 4px 2px; margin: 0; }
+.run-rules-list li { font-size: 14px; line-height: 1.45; color: rgba(255, 255, 255, 0.8); padding-left: 22px; position: relative; margin-bottom: 6px; }
+.run-rules-list li::before { content: '•'; position: absolute; left: 8px; color: #fbbf24; }
+.pin-wrap { position: relative; }
+.pin-wrap input { padding-right: 52px; }
+.pin-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+           width: 40px; height: 36px; border: none; border-radius: 8px; cursor: pointer;
+           background: rgba(255, 255, 255, 0.08); font-size: 18px; line-height: 1; opacity: 0.6; }
+.pin-eye.on { opacity: 1; background: rgba(99, 102, 241, 0.35); }
 .guess-section { margin-bottom: 16px; }
+.guess-note { margin-top: 8px; font-size: 14px; font-weight: 600; color: #fbbf24; text-align: center; }
+.guess-note.bad { color: #f87171; }
+#guessInput.shake { animation: guessShake 0.35s; border-color: #f87171; }
+@keyframes guessShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 .guess-section p { margin-bottom: 8px; font-size: 14px; color: rgba(255, 255, 255, 0.65); font-weight: 500; }
 
 .history-section { margin-bottom: 16px; }

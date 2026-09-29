@@ -1,0 +1,50 @@
+-- «В игре сейчас» у друзей. Применять в Supabase: SQL Editor → вставить
+-- целиком → Run. Можно и после мёржа: без неё игра просто не показывает,
+-- кто из друзей сейчас в игре.
+--
+-- Открытая игра раз в минуту отмечается «я здесь». Друзья видят зелёную
+-- точку, если отметка свежее двух минут. Видно только друзьям — и только
+-- «сейчас / не сейчас», без времени последнего захода.
+
+alter table students add column if not exists last_seen timestamptz;
+
+-- Отметка «я здесь». Чаще раза в 20 секунд не пишем: вкладок может быть
+-- несколько, а запись в таблицу игроков — не бесплатная
+create or replace function mark_seen(p_username text, p_pin text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  update students set last_seen = now()
+  where username = me and (last_seen is null or last_seen < now() - interval '20 seconds');
+  return true;
+end;
+$$;
+
+-- Кто из друзей сейчас в игре
+create or replace function friends_online(p_username text, p_pin text)
+returns text[]
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; names text[];
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select coalesce(array_agg(s.username order by s.username), '{}'::text[]) into names
+  from friendships f
+  join students s on s.username = case when f.requester = me then f.addressee else f.requester end
+  where f.status = 'accepted' and me in (f.requester, f.addressee)
+    and s.last_seen > now() - interval '2 minutes';
+  return names;
+end;
+$$;
+
+grant execute on function mark_seen(text, text) to anon;
+grant execute on function friends_online(text, text) to anon;

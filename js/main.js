@@ -7,6 +7,8 @@ document.getElementById('guessInput').addEventListener('keydown', e => { if (e.k
   document.getElementById(id).addEventListener('input', e => {
     filterNumberInput(e.target);
     renderSignBtn(id, signId);
+    // Начали набирать новое число — старое замечание уже прочитано
+    if (id === 'guessInput') setGuessNote('');
   });
 });
 document.getElementById('finalInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitFinal(); });
@@ -46,7 +48,9 @@ document.getElementById('winsNeeded').value = '3';
 applyTranslations();
 showScreen('mode');
 // Подтянуть свою иконку и проверить, что сохранённый вход ещё наш
-if (runAuth()) { syncProfile(); startSignals(); }
+if (runAuth()) { syncProfile(); startSignals(); startSeen(); }
+// Вернулся в игру — сразу отметиться «я здесь», не дожидаясь минуты
+document.addEventListener('visibilitychange', () => { if (!document.hidden) markSeen(); });
 checkPendingInvite();
 
 checkRemoteConfig();

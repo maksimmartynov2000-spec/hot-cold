@@ -57,6 +57,7 @@ function runLogout() {
   progressInfo = null;
   renderQuestCard();
   stopSignals();
+  stopSeen();
 }
 
 // ================= ПРОФИЛЬ: иконка, имя, PIN =================
@@ -648,6 +649,7 @@ function afterAuth() {
   // Запомнить, чей это аккаунт, и подтянуть свою иконку
   syncProfile();
   startSignals();
+  startSeen();
   // Пришёл по ссылке-приглашению и только что вошёл — теперь можно добавить
   if (pendingInvite()) setTimeout(checkPendingInvite, 300);
   if (authReturn === 'mode') return showScreen('mode');
@@ -690,7 +692,9 @@ function showRunAuth(authMode) {
     authMode === 'register' ? L.run.registerBtn : L.run.loginBtn;
   // Вход — старым 4-значным PIN тоже; регистрация — только 6 цифр
   document.getElementById('tRunPin').textContent = authMode === 'register' ? L.run.pin : L.run.pinLogin;
-  document.getElementById('runPin').placeholder = authMode === 'register' ? '123456' : '';
+  // В подсказке не «123456»: ребёнок так и вводил
+  document.getElementById('runPin').placeholder = authMode === 'register' ? L.run.pinPh : '';
+  showRunPin(false);
   runAuthError('');
   showScreen('auth');
 }
@@ -826,9 +830,33 @@ async function openRunHub(message) {
   document.getElementById('runHubMessage').innerHTML = message || '';
   setNote('runNote', '');
   renderUnfinished();
+  renderRunRules();
   showScreen('runHub');
   await loadRunPending();
   await renderRunLeaderboard();
+}
+
+// Правила Испытания. Раскрыты, пока человек ни разу его не начинал
+function renderRunRules() {
+  const R = t().run;
+  document.getElementById('tRunRulesHead').textContent = R.rulesHead;
+  document.getElementById('runRulesList').replaceChildren(...R.rules.map(line => {
+    const li = document.createElement('li');
+    li.textContent = line;
+    return li;
+  }));
+  let seen = false;
+  try { seen = localStorage.getItem('hc_run_rules_seen') === '1'; } catch (e) {}
+  document.getElementById('runRules').open = !seen;
+}
+
+function showRunPin(show) {
+  document.getElementById('runPin').type = show ? 'text' : 'password';
+  document.getElementById('runPinEye').classList.toggle('on', show);
+}
+
+function toggleRunPinEye() {
+  showRunPin(document.getElementById('runPin').type === 'password');
 }
 
 function renderGreeting(name) {
@@ -879,13 +907,14 @@ function setLeaderboardScope(scope) {
 
 // Строка любого топа — рейтинга и «Испытания» одинаково. Первые три —
 // медалями: место читается с одного взгляда
-const MEDALS = ['🥇', '🥈', '🥉'];
+// Место — цифрой в кружке, первые три — золотой, серебряный, бронзовый.
+// Медали-эмодзи путались с медалями лиг: «🥇 Аня … 🥇 Золото 1»
 function topRow(i, name, points, isMe) {
   const row = document.createElement('div');
   row.className = 'lb-row rk-top-row' + (isMe ? ' me' : '');
   const place = document.createElement('span');
-  place.className = 'rk-place' + (i < 3 ? ' medal' : '');
-  place.textContent = MEDALS[i] || String(i + 1);
+  place.className = 'rk-place' + (i < 3 ? ' p' + (i + 1) : '');
+  place.textContent = String(i + 1);
   const face = document.createElement('span');
   face.className = 'avatar';
   paintAvatar(face, name);
@@ -1067,7 +1096,7 @@ const FRIEND_ORDER = { incoming: 0, friend: 1, outgoing: 2 };
 
 // Что с другом сейчас и что с этим делать. Чем меньше rank, тем выше в
 // списке: сначала те, кто ждёт от вас действия
-function friendState(relation, unread, m) {
+function friendState(relation, unread, m, here) {
   const L = t().online;
   const parts = [];
   let rank = 5, hot = false;
@@ -1082,6 +1111,8 @@ function friendState(relation, unread, m) {
     parts.push('💬 ' + withPlural(unread, L.msgForms));
     rank = Math.min(rank, 2); hot = true;
   }
+  // Друг в игре прямо сейчас — вызов, скорее всего, примут: выше остальных
+  if (!parts.length && here) return { rank: 4.5, text: L.stOnline, hot: false, on: true };
   if (!parts.length) parts.push(L.stWrite);
   return { rank, text: parts.join(' · '), hot };
 }
@@ -1118,6 +1149,8 @@ function friendRow(name, relation, unread, match) {
   } else {
     paintAvatar(face, name);
   }
+  const here = relation === 'friend' && friendsOnline.has(name);
+  face.classList.toggle('online', here);
   row.appendChild(face);
 
   const main = document.createElement('span');
@@ -1126,10 +1159,10 @@ function friendRow(name, relation, unread, match) {
   who.className = 'fr-name';
   who.textContent = playerName(name);
   main.appendChild(who);
-  const st = friendState(relation, unread, match);
+  const st = friendState(relation, unread, match, here);
   if (st.text) {
     const status = document.createElement('span');
-    status.className = 'fr-status' + (st.hot ? ' hot' : '');
+    status.className = 'fr-status' + (st.hot ? ' hot' : '') + (st.on ? ' on' : '');
     status.textContent = st.text;
     main.appendChild(status);
   }
@@ -1209,7 +1242,8 @@ function renderFriendsList() {
   });
   box.innerHTML = '';
   friendsData
-    .map(r => ({ r, st: friendState(r.relation, r.unread, best[r.username]) }))
+    .map(r => ({ r, st: friendState(r.relation, r.unread, best[r.username],
+                                    r.relation === 'friend' && friendsOnline.has(r.username)) }))
     .sort((a, b) => (FRIEND_ORDER[a.r.relation] - FRIEND_ORDER[b.r.relation]) ||
                     (a.st.rank - b.st.rank) ||
                     String(a.r.username).localeCompare(String(b.r.username)))
@@ -1235,7 +1269,14 @@ async function loadFriends(quiet) {
   if (friendsBusy) return;
   friendsBusy = true;
   try {
-    const rows = (await friendRpc('list_friends')) || [];
+    // Кто из друзей в игре — отдельным запросом: без миграции 043 его нет,
+    // и тогда список просто без зелёных точек
+    const [list, here] = await Promise.all([
+      friendRpc('list_friends'),
+      friendRpc('friends_online').catch(() => null)
+    ]);
+    const rows = list || [];
+    friendsOnline = new Set(Array.isArray(here) ? here : []);
     setFriendsBadge(rows);
     renderFriends(rows);
     if (!findDecided) {
@@ -2005,6 +2046,30 @@ async function removeFriend(name) {
 // нет — номер матча и своё место за доской. Ветвится только ввод: ход, жетон
 // и следующий раунд уходят на сервер, а не считаются здесь
 const MATCH_POLL_MS = 2000;
+// ================= «В ИГРЕ СЕЙЧАС» =================
+// Открытая игра раз в минуту отмечается «я здесь» (миграция 043). Друзья
+// видят зелёную точку, пока отметка свежее двух минут. Свёрнутая вкладка не
+// отмечается: игрок ушёл, звать его бесполезно
+const SEEN_MS = 60000;
+let friendsOnline = new Set();
+let seenTimer = null;
+
+function markSeen() {
+  if (!runAuth() || !sb || document.hidden) return;
+  friendRpc('mark_seen').catch(() => {});
+}
+
+function startSeen() {
+  if (seenTimer) return;
+  markSeen();
+  seenTimer = setInterval(markSeen, SEEN_MS);
+}
+
+function stopSeen() {
+  if (seenTimer) { clearInterval(seenTimer); seenTimer = null; }
+  friendsOnline = new Set();
+}
+
 // ================= МГНОВЕННЫЕ СИГНАЛЫ (Realtime) =================
 // База толкает в личный канал «что-то изменилось»: ход, вызов, заявка,
 // сообщение. В сигнале только вид и номер — что именно, игра спрашивает
@@ -2122,17 +2187,7 @@ function renderChatPad() {
 function renderChatModes() {
   const box = document.getElementById('chatModes');
   box.innerHTML = '';
-  RANKED_MODES.forEach(mode => {
-    const b = document.createElement('button');
-    b.className = 'rk-mode';
-    b.dataset.mode = mode;
-    const name = document.createElement('div');
-    name.className = 'rm-name';
-    name.textContent = rankedModeLabel(mode);
-    b.appendChild(name);
-    b.onclick = () => challengeRankedFromChat(mode);
-    box.appendChild(b);
-  });
+  RANKED_MODES.forEach(mode => box.appendChild(rankedModeButton(mode, false, () => challengeRankedFromChat(mode))));
 }
 
 function renderChat(messages) {
@@ -2472,10 +2527,29 @@ function stopRankedPoll() {
 function rankedModeFrost(mode) { return (mode & 1) === 1; }
 function rankedModeBonuses(mode) { return (mode & 2) === 2; }
 
+// Разновидность словами: «−100…100 · бонусы» ребёнку ничего не говорило.
+// Диапазон — мелкой строкой под названием (rankedModeRange)
 function rankedModeLabel(mode) {
-  const L = t().online;
-  const bounds = rankedModeFrost(mode) ? '−100…100' : '1–100';
-  return bounds + (rankedModeBonuses(mode) ? ' · ' + L.rkBonusTag : '');
+  return t().online.rkModeNames[mode] || '';
+}
+
+function rankedModeRange(mode) {
+  return rankedModeFrost(mode) ? '−100…100' : '1–100';
+}
+
+function rankedModeButton(mode, active, onClick) {
+  const b = document.createElement('button');
+  b.className = 'rk-mode' + (active ? ' active' : '');
+  b.dataset.mode = mode;
+  const name = document.createElement('div');
+  name.className = 'rm-name';
+  name.textContent = rankedModeLabel(mode);
+  const range = document.createElement('div');
+  range.className = 'rm-range';
+  range.textContent = rankedModeRange(mode);
+  b.append(name, range);
+  b.onclick = onClick;
+  return b;
 }
 
 // Переключение разновидности выводит из очереди: ждать в двух местах нельзя,
@@ -2496,17 +2570,7 @@ function renderRankedModes() {
   const box = document.getElementById('rkModes');
   if (!box) return;
   box.innerHTML = '';
-  RANKED_MODES.forEach(mode => {
-    const b = document.createElement('button');
-    b.className = 'rk-mode' + (mode === rankedMode ? ' active' : '');
-    b.dataset.mode = mode;
-    const name = document.createElement('div');
-    name.className = 'rm-name';
-    name.textContent = rankedModeLabel(mode);
-    b.appendChild(name);
-    b.onclick = () => setRankedMode(mode);
-    box.appendChild(b);
-  });
+  RANKED_MODES.forEach(mode => box.appendChild(rankedModeButton(mode, mode === rankedMode, () => setRankedMode(mode))));
 }
 
 // Давность в человеческих словах. Меньше полутора минут — «только что»:
@@ -2557,18 +2621,19 @@ function renderRanked(st) {
 
   // Точки в конце — единственная живая деталь на экране ожидания: по ней
   // видно, что опрос идёт, а не подвис
+  // Сверху — «ищем» и секундомер, ниже — по строке на каждую подробность.
+  // Раньше всё шло одной строкой через точки и читалось как шифр
   const dots = '.'.repeat(1 + (Math.floor(st.waited / 3) % 3));
-  document.getElementById('rkWaitText').textContent = [
-    L.rkSearching + dots,
-    L.rkWaited.replace('{n}', st.waited),
-    st.queue > 1 ? L.rkQueueMany.replace('{n}', st.queue) : L.rkQueueOne
-  ].join(' · ');
+  const mm = Math.floor(st.waited / 60), ss = st.waited % 60;
+  document.getElementById('rkWaitText').textContent =
+    '🔍 ' + L.rkSearching + dots + '  ' + mm + ':' + String(ss).padStart(2, '0');
   // Когда ждёшь один, полезно знать две вещи: скоро ли бот и давно ли тут
   // вообще играли люди
   const botLine = !st.botWait ? ''
     : (st.waited < st.botWait ? L.rkBotSoon.replace('{n}', st.botWait - st.waited) : L.rkBotNow);
-  document.getElementById('rkWaitSub').textContent =
-    st.queue > 1 ? botLine : [botLine, rankedAgoText(st.lastAgo)].filter(Boolean).join(' · ');
+  document.getElementById('rkWaitSub').textContent = (st.queue > 1
+    ? [L.rkQueueMany.replace('{n}', st.queue), botLine]
+    : [L.rkQueueOne, botLine, rankedAgoText(st.lastAgo)]).filter(Boolean).join('\n');
 }
 
 async function loadRanked(quiet) {
@@ -2750,6 +2815,8 @@ function applyMatchState(st) {
   D.names = st.names.map(playerName);
   D.winsNeeded = st.winsNeeded;
   D.wins = st.wins.slice();
+  // Новый раунд — замечание про прошлое число к нему не относится
+  if (D.round !== st.round) setGuessNote('');
   D.round = st.round;
   D.cur = st.cur;
   D.tokens = st.tokens.slice();
@@ -2862,9 +2929,10 @@ async function openMatch(id) {
 
 async function onlineGuess() {
   const input = document.getElementById('guessInput');
-  const guess = parseInt(input.value);
-  if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
+  const guess = readGuess();
+  if (guess === null) return;
   if (D.cur !== online.seat) return setMatchNote(t().online.errNotYourTurn);
+  noteIfRepeat(guess, history);
   input.value = '';
   try {
     await friendRpc('match_guess', { p_match_id: online.id, p_guess: guess });
@@ -3179,6 +3247,7 @@ function runAttemptsForRound(n, range) {
 // Клиент только показывает то, что ему прислали, и отправляет догадки
 async function startRun(fresh) {
   const L = t();
+  try { localStorage.setItem('hc_run_rules_seen', '1'); } catch (e) {}
   try {
     const st = await friendRpc('run_start',
       { p_frost: !!frostMode, p_fresh: !!fresh });
@@ -3222,8 +3291,9 @@ async function runGuess() {
   // пока на экране висит «+очки»
   if (!RUN || RUN.locked) return;
   const input = document.getElementById('guessInput');
-  const guess = parseInt(input.value);
-  if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
+  const guess = readGuess();
+  if (guess === null) return;
+  noteIfRepeat(guess, history);
   RUN.locked = true;
   input.value = '';
 

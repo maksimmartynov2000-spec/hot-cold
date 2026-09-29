@@ -583,6 +583,7 @@ function showScreen(name) {
 }
 
 function quitToMenu() {
+  setGuessNote('');
   endLessonMode();
   liftCurtain();
   curtainPrevCur = null;
@@ -664,7 +665,9 @@ function buildRangeOptions() {
     o.textContent = boundsLabel(n);
     sel.appendChild(o);
   });
-  sel.value = RANGE_PRESETS.includes(parseInt(prev)) ? prev : '1000';
+  const saved = savedSetup('hc_range');
+  sel.value = RANGE_PRESETS.includes(parseInt(prev)) ? prev
+    : RANGE_PRESETS.includes(parseInt(saved)) ? saved : DEFAULT_RANGE;
   buildAttemptsOptions();
   buildBonusCountOptions();
 }
@@ -672,6 +675,21 @@ function buildRangeOptions() {
 function onRangeChange() {
   buildAttemptsOptions();
   buildBonusCountOptions();
+  saveSetupChoice();
+}
+
+// Диапазон и попытки запоминаются: ребёнок выбрал удобное — в следующий раз
+// не надо искать заново. Новичку — 1–100: 1–1000 для младших тяжеловато
+const DEFAULT_RANGE = '100';
+function saveSetupChoice() {
+  try {
+    localStorage.setItem('hc_range', document.getElementById('rangeMax').value);
+    localStorage.setItem('hc_attempts', document.getElementById('attemptsCount').value);
+  } catch (e) {}
+}
+
+function savedSetup(key) {
+  try { return localStorage.getItem(key); } catch (e) { return null; }
 }
 
 // Лесенкой, а не полем ввода: настройку открывают дети и родители, вызывать
@@ -714,7 +732,9 @@ function buildAttemptsOptions() {
     o.value = v; o.textContent = v;
     sel.appendChild(o);
   });
-  sel.value = options.includes(parseInt(prev)) ? prev : String(min);
+  const saved = savedSetup('hc_attempts');
+  sel.value = options.includes(parseInt(prev)) ? prev
+    : options.includes(parseInt(saved)) ? saved : String(min);
 }
 
 function applyRangeToInputs() {
@@ -772,6 +792,7 @@ function startSolo() {
 function resetSolo() {
   secret = RANGE_MIN + Math.floor(Math.random() * rangeCount());
   history = [];
+  setGuessNote('');
   gameOver = false;
   gameOverType = null;
   movesUsed = 0;
@@ -782,14 +803,48 @@ function resetSolo() {
   renderAll();
 }
 
+// Строка под полем ввода. Число вне диапазона — красным и поле вздрагивает;
+// повтор — жёлтым, ход при этом засчитан
+function setGuessNote(text, bad) {
+  const el = document.getElementById('guessNote');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('hidden', !text);
+  el.classList.toggle('bad', !!bad);
+}
+
+// Что ввели в поле: число в диапазоне или null. Пустое поле — молча null:
+// нажали «Проверить», ничего не набрав, — объяснять нечего
+function readGuess() {
+  const input = document.getElementById('guessInput');
+  const raw = input.value.trim();
+  if (!raw || raw === '-') return null;
+  const guess = parseInt(raw);
+  if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) {
+    setGuessNote(t().outOfRange.replace('{a}', formatNum(RANGE_MIN)).replace('{b}', formatNum(RANGE_MAX)), true);
+    input.classList.remove('shake');
+    void input.offsetWidth;
+    input.classList.add('shake');
+    return null;
+  }
+  setGuessNote('');
+  return guess;
+}
+
+// Это число в раунде уже называли (кто угодно): ответ будет тот же
+function noteIfRepeat(guess, before) {
+  if (before.some(h => h.guess === guess)) setGuessNote(t().repeatGuess.replace('{n}', formatNum(guess)));
+}
+
 function handleGuess() {
   if (online) return onlineGuess();
   if (mode === 'duel') return duelGuess();
   if (mode === 'run') return runGuess();
   if (gameOver) return;
   const input = document.getElementById('guessInput');
-  const guess = parseInt(input.value);
-  if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
+  const guess = readGuess();
+  if (guess === null) return;
+  noteIfRepeat(guess, history);
 
   const distance = Math.abs(guess - secret);
   const meta = getFeedback(distance);
@@ -868,6 +923,7 @@ function startMatch() {
 function startRound() {
   secret = RANGE_MIN + Math.floor(Math.random() * rangeCount());
   history = [];
+  setGuessNote('');
   D.tokens = [1, 1];
   if (D.handicap === 1) D.tokens[0] = 2;
   if (D.handicap === 2) D.tokens[1] = 2;
@@ -926,8 +982,9 @@ function duelGuess() {
   if (D.roundOver || D.matchOver) return;
   if (vsBot && D.cur === 1) return;
   const input = document.getElementById('guessInput');
-  const guess = parseInt(input.value);
-  if (isNaN(guess) || guess < RANGE_MIN || guess > RANGE_MAX) return;
+  const guess = readGuess();
+  if (guess === null) return;
+  noteIfRepeat(guess, history);
   input.value = '';
   duelPlay(guess);
 }
@@ -1638,7 +1695,6 @@ function renderResult() {
     // Рейтинговый матч заканчивается двумя способами, и второй надо назвать
     // словами: иначе победа «из ничего» выглядит ошибкой
     let forfeitLine = null;
-    let eloLine = null;
     // Партия на звёзды: сколько прибавилось, где теперь, что открылось.
     // Число рейтинга здесь не показываем — его заменяют звёзды
     const starBox = online && D.matchOver && onlineReview && onlineReview.id === online.id && onlineReview.stars
@@ -1651,23 +1707,9 @@ function renderResult() {
           ? L.online.rkLeftYou
           : L.online.rkLeftThem.replace('{name}', D.names[online.forfeitBy]);
       }
-      // Число рейтинга — только если в базе ещё нет лиг. С лигами его
-      // заменяют звёзды, а рейтинг работает на подбор соперника незаметно
-      if (D.matchOver && online.eloDelta && !starBox && !ladderInfo) {
-        const d = online.eloDelta[online.seat];
-        eloLine = document.createElement('div');
-        eloLine.className = 'r-elo';
-        eloLine.textContent = L.online.rkDelta
-          .replace('{n}', formatNum(online.elo))
-          .replace('{d}', (d > 0 ? '+' : '') + d);
-        // С ботом рейтинг вдвое меньше — мелкой строкой под числом
-        if (online.botSeat !== null) {
-          const half = document.createElement('small');
-          half.className = 'r-elo-note';
-          half.textContent = L.online.rkBotHalf;
-          eloLine.appendChild(half);
-        }
-      }
+      // Числа рейтинга игрок не видит никогда: его заменяют лиги и звёзды,
+      // а рейтинг незаметно подбирает соперника. Раньше число всплывало,
+      // если лига ещё не успела загрузиться (например, после перезагрузки)
     }
 
     // Партия с человеком без звёзд (реванш, вызов друга): иначе кажется,
@@ -1722,7 +1764,6 @@ function renderResult() {
     box.appendChild(secretLine);
     if (reviewBtn) box.appendChild(reviewBtn);
     if (starBox) box.appendChild(starBox);
-    if (eloLine) box.appendChild(eloLine);
     if (noStarsLine) box.appendChild(noStarsLine);
     if (sentLine) box.appendChild(sentLine);
     box.appendChild(actions);
