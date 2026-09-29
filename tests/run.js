@@ -6080,6 +6080,25 @@ async function testRealtime(browser) {
   }
 }
 
+// Игра разделена на файлы: каждый, что подключает index.html, должен быть в
+// кеше service worker, иначе без сети игра не откроется
+async function testSplitFiles() {
+  console.log('\nФайлы игры и офлайн-кеш');
+  const fs = require('fs'), path = require('path');
+  const root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  const own = [...html.matchAll(/<(?:script src|link rel="stylesheet" href)="([^"]+)"/g)].map(m => m[1])
+    .filter(u => !/^https?:/.test(u));
+  const missing = own.filter(u => !sw.includes("'./" + u + "'"));
+  const absent = own.filter(u => !fs.existsSync(path.join(root, u)));
+  check('всё своё, что подключает страница, есть на диске и в кеше service worker',
+    own.length >= 6 && missing.length === 0 && absent.length === 0,
+    'файлов ' + own.length + '; нет в кеше: ' + missing.join(' ') + '; нет на диске: ' + absent.join(' '));
+  check('в index.html не осталось встроенного кода и стилей',
+    !/<script>(?!\s*<\/script>)/.test(html) && !/<style>/.test(html));
+}
+
 // Старый PIN из 4 цифр — профиль предлагает сменить на 6
 async function testPinShort(browser) {
   console.log('\nPIN из 4 цифр — предложение сменить');
@@ -6657,6 +6676,7 @@ async function testKeyPage(browser) {
     await testPinShort(browser);
     await testProgress(browser);
     await testRealtime(browser);
+    await testSplitFiles();
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
