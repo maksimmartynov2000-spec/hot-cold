@@ -6001,6 +6001,85 @@ async function testProgress(browser) {
   await p5.context().close();
 }
 
+// Мгновенные сигналы через Realtime (миграция 042)
+async function testRealtime(browser) {
+  console.log('\nМгновенные сигналы (Realtime)');
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.waitForTimeout(200);
+  let st = await page.evaluate(() => ({ name: window.__sigChannel && window.__sigChannel.name, live: sigLive }));
+  check('вошёл — подписан на свой канал', st.name === 'hc:kЛев' && st.live === true, JSON.stringify(st));
+
+  const calls = n => page.evaluate(n => window.__rpcCalls.filter(c => c.name === n).length, n);
+  // Партия: опрос выключаем — обновить экран должен только сигнал
+  await page.evaluate(() => openMatch(1));
+  await page.waitForTimeout(500);
+  await page.evaluate(() => stopMatchPoll());
+  let before = await calls('match_state');
+  await page.evaluate(() => {
+    const M = window.__match;
+    M.moves.push({ seat: 1, guess: 77, tier: 3 });
+    M.cur = 0;
+    window.__sigFire({ k: 'match', id: 1 });
+  });
+  await page.waitForTimeout(300);
+  // Ходы партии — в общем списке игры (глобальный history, не window.history)
+  const seen = await page.evaluate(() => history.map(h => h.guess).join('|'));
+  check('сигнал «партия» — ход соперника сразу на экране, без опроса',
+    (await calls('match_state')) === before + 1 && seen.includes('77'), (await calls('match_state')) - before + ' / ' + seen.slice(0, 120));
+  before = await calls('match_state');
+  await page.evaluate(() => window.__sigFire({ k: 'match', id: 99 }));
+  await page.waitForTimeout(200);
+  check('сигнал про другую партию эту не трогает', (await calls('match_state')) === before);
+  // Сигнал во время запроса не теряется: после ответа — ещё один
+  before = await calls('match_state');
+  await page.evaluate(async () => {
+    const p = refreshMatch(true);
+    window.__sigFire({ k: 'match', id: 1 });
+    await p;
+  });
+  await page.waitForTimeout(300);
+  check('сигнал, пришедший во время запроса, не теряется', (await calls('match_state')) === before + 2,
+    String((await calls('match_state')) - before));
+  await page.evaluate(() => backToOnline());
+  await page.waitForTimeout(300);
+
+  // Друзья: заявка приходит сразу
+  await page.evaluate(() => { quitToMenu(); });
+  await page.click('#friendsBtn');
+  await page.waitForTimeout(500);
+  await page.evaluate(() => { stopFriendsPoll(); window.__friends = [{ username: 'Гриша', relation: 'incoming', unread: 0 }]; });
+  before = await calls('list_friends');
+  await page.evaluate(() => window.__sigFire({ k: 'friends' }));
+  await page.waitForTimeout(300);
+  const rows = await page.evaluate(() => [...document.querySelectorAll('#friendsList .friend-row')].map(r => r.dataset.name));
+  check('сигнал «друзья» — заявка видна сразу', (await calls('list_friends')) === before + 1 && rows.includes('Гриша'), rows.join());
+  // Сообщение другу: в переписке — сразу
+  await page.evaluate(() => { window.__talk = { 'Кира': [{ id: 1, mine: false, code: 'play', ago: 5 }] }; openChat('Кира'); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { stopChatPoll(); window.__talk['Кира'].push({ id: 2, mine: false, code: 'hour', ago: 1 }); });
+  before = await calls('friend_thread');
+  await page.evaluate(() => window.__sigFire({ k: 'chat', id: 2 }));
+  await page.waitForTimeout(300);
+  check('сигнал «сообщение» — в открытой переписке сразу', (await calls('friend_thread')) === before + 1);
+
+  // Вышел — канал закрыт
+  await page.evaluate(() => { runLogout(); });
+  st = await page.evaluate(() => ({ ch: window.__sigChannel, live: sigLive, fired: window.__sigFire({ k: 'friends' }) }));
+  check('вышел из аккаунта — канал закрыт', st.ch === null && st.live === false && st.fired === false, JSON.stringify(st));
+  await page.context().close();
+
+  // Старый сервер без миграции и клиент без Realtime — игра как раньше, на опросе
+  for (const opts of [{ user: 'Лев', noSignalKey: true }, { user: 'Лев', noRealtime: true }, { user: 'Лев', realtimeDown: true }]) {
+    const p = await newGame(browser, opts);
+    await p.waitForTimeout(200);
+    await p.click('#friendsBtn');
+    await p.waitForTimeout(400);
+    const r = await p.evaluate(() => ({ live: sigLive, friends: !document.getElementById('screenFriends').classList.contains('hidden') }));
+    check('без Realtime (' + Object.keys(opts).filter(k => k !== 'user')[0] + ') — канала нет, друзья открываются', !r.live && r.friends, JSON.stringify(r));
+    await p.context().close();
+  }
+}
+
 // Старый PIN из 4 цифр — профиль предлагает сменить на 6
 async function testPinShort(browser) {
   console.log('\nPIN из 4 цифр — предложение сменить');
@@ -6577,6 +6656,7 @@ async function testKeyPage(browser) {
     await testInviteLink(browser);
     await testPinShort(browser);
     await testProgress(browser);
+    await testRealtime(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

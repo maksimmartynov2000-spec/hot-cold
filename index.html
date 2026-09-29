@@ -6290,6 +6290,7 @@
     profileInfo = null;
     progressInfo = null;
     renderQuestCard();
+    stopSignals();
   }
 
   // ================= ПРОФИЛЬ: иконка, имя, PIN =================
@@ -6880,6 +6881,7 @@
   function afterAuth() {
     // Запомнить, чей это аккаунт, и подтянуть свою иконку
     syncProfile();
+    startSignals();
     // Пришёл по ссылке-приглашению и только что вошёл — теперь можно добавить
     if (pendingInvite()) setTimeout(checkPendingInvite, 300);
     if (authReturn === 'mode') return showScreen('mode');
@@ -8237,6 +8239,54 @@
   // нет — номер матча и своё место за доской. Ветвится только ввод: ход, жетон
   // и следующий раунд уходят на сервер, а не считаются здесь
   const MATCH_POLL_MS = 2000;
+  // ================= МГНОВЕННЫЕ СИГНАЛЫ (Realtime) =================
+  // База толкает в личный канал «что-то изменилось»: ход, вызов, заявка,
+  // сообщение. В сигнале только вид и номер — что именно, игра спрашивает
+  // обычными функциями с PIN. Канала нет (нет сети, старый сервер) — всё
+  // работает на опросе, как раньше. Опрос партии остаётся каждые 2 с: на нём
+  // держатся таймер хода, ход бота и отметка «соперник на месте»
+  let sigChannel = null;
+  let sigLive = false;
+  let sigStarting = false;
+
+  async function startSignals() {
+    if (sigChannel || sigStarting || !runAuth() || !sb || typeof sb.channel !== 'function') return;
+    sigStarting = true;
+    let key = null;
+    const who = myName();
+    try { key = await friendRpc('my_signal_key'); } catch (e) {}
+    sigStarting = false;
+    // Пока ждали ключ, могли выйти или войти под другим именем
+    if (!key || typeof key !== 'string' || !runAuth() || myName() !== who || sigChannel) return;
+    try {
+      sigChannel = sb.channel('hc:' + key)
+        .on('broadcast', { event: 'sig' }, msg => onSignal((msg && msg.payload) || {}))
+        .subscribe(status => { sigLive = status === 'SUBSCRIBED'; });
+    } catch (e) {
+      sigChannel = null;
+      sigLive = false;
+    }
+  }
+
+  function stopSignals() {
+    if (sigChannel && sb) { try { sb.removeChannel(sigChannel); } catch (e) {} }
+    sigChannel = null;
+    sigLive = false;
+  }
+
+  function onSignal(p) {
+    if (!runAuth()) return;
+    if (p.k === 'match') {
+      if (online && screen === 'game' && online.id === p.id) refreshMatch(true);
+      else if (screen === 'online' || screen === 'friends') loadMatches(true);
+    } else if (p.k === 'friends') {
+      if (screen === 'online' || screen === 'friends') loadFriends(true);
+    } else if (p.k === 'chat') {
+      if (screen === 'chat' && chatWith) loadChat(true);
+      else if (screen === 'online' || screen === 'friends') loadFriends(true);
+    }
+  }
+
   // ================= ПЕРЕПИСКА С ДРУГОМ =================
   // Вне игры друзья пишут текстом. Готовые фразы остались кодами: код
   // переводится у читающего, поэтому «Привет!» дойдёт до француза по-французски.
@@ -8249,9 +8299,12 @@
 
   function startChatPoll() {
     stopChatPoll();
+    let tick = 0;
     chatTimer = setInterval(() => {
-      if (screen === 'chat' && chatWith) loadChat(true);
-      else stopChatPoll();
+      if (!(screen === 'chat' && chatWith)) return stopChatPoll();
+      // Канал жив — новое сообщение приходит сигналом, опрос лишь страхует: раз в 10 с
+      if (sigLive && (tick++ % 2)) return;
+      loadChat(true);
     }, CHAT_POLL_MS);
   }
 
@@ -8973,8 +9026,13 @@
     }
   }
 
+  // Сигнал пришёл, пока ответ на прошлый запрос ещё в пути, — спросить ещё
+  // раз сразу после: иначе свежий ход ждал бы следующего опроса
+  let matchAgain = false;
+
   async function refreshMatch(quiet) {
-    if (!online || matchBusy) return;
+    if (!online) return;
+    if (matchBusy) { matchAgain = true; return; }
     matchBusy = true;
     try {
       const st = await friendRpc('match_state', { p_match_id: online.id });
@@ -8984,6 +9042,10 @@
       if (!quiet) setMatchNote(onlineMatchError(e.message));
     } finally {
       matchBusy = false;
+      if (matchAgain) {
+        matchAgain = false;
+        if (online && screen === 'game') refreshMatch(true);
+      }
     }
   }
 
@@ -9510,7 +9572,7 @@
   applyTranslations();
   showScreen('mode');
   // Подтянуть свою иконку и проверить, что сохранённый вход ещё наш
-  if (runAuth()) syncProfile();
+  if (runAuth()) { syncProfile(); startSignals(); }
   checkPendingInvite();
 
   checkRemoteConfig();

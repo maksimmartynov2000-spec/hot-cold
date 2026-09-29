@@ -13,8 +13,27 @@ function launchOptions() {
 function stubSupabase(opts) {
   return function (opts) {
     window.__rpcCalls = [];
+    window.__sigFire = (payload) => {
+      const ch = window.__sigChannel;
+      if (!ch || ch.removed) return false;
+      ch.handlers.filter(h => h.type === 'broadcast' && h.filter.event === 'sig').forEach(h => h.cb({ event: 'sig', payload }));
+      return true;
+    };
     window.supabase = {
       createClient: () => ({
+        // Realtime: канал запоминается, а «сигнал из базы» тест посылает сам —
+        // window.__sigFire({ k, id }). opts.noRealtime — клиент без каналов
+        channel: opts.noRealtime ? undefined : (name) => {
+          const ch = { name, handlers: [], removed: false };
+          ch.on = (type, filter, cb) => { ch.handlers.push({ type, filter, cb }); return ch; };
+          ch.subscribe = (cb) => {
+            window.__sigChannel = ch;
+            setTimeout(() => { if (cb) cb(opts.realtimeDown ? 'CHANNEL_ERROR' : 'SUBSCRIBED'); }, 0);
+            return ch;
+          };
+          return ch;
+        },
+        removeChannel: (ch) => { ch.removed = true; if (window.__sigChannel === ch) window.__sigChannel = null; },
         from: () => ({
           select: () => ({ eq: () => ({ single: async () => ({ data: null, error: 'stub' }) }) })
         }),
@@ -29,6 +48,7 @@ function stubSupabase(opts) {
           if (window.__rpcError && window.__rpcError.name === name) {
             return { data: null, error: { message: window.__rpcError.message } };
           }
+          if (name === 'my_signal_key') return { data: opts.noSignalKey ? null : 'k' + (localStorage.getItem('hc_run_user') || ''), error: opts.noSignalKey ? { message: 'Could not find the function public.my_signal_key' } : null };
           if (name === 'list_friends') return { data: window.__friends || [], error: null };
           // Задания и достижения (миграция 041): «сервер» — window.__progress,
           // достижения друзей — window.__friendAch {имя: [...]}
