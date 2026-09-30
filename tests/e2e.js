@@ -319,7 +319,7 @@ async function registerPlayer(p, name, pin) {
   check('первый встал в очередь и ждёт', await A.page.locator('#rkWaitBox').isVisible());
   check('очередь записана в базу',
     (await db.query("select count(*) from ranked_queue where username = 'Тимур'")).rows[0].count === '1');
-  const waitText = await A.page.locator('#rkWaitText').textContent();
+  const waitText = await A.page.locator('#rkWaitSub').textContent();
   check('в ожидании написано, что соперника ещё нет',
     waitText.indexOf('только вы') >= 0, waitText);
 
@@ -548,6 +548,17 @@ async function registerPlayer(p, name, pin) {
   // Первое задание — «сыграть онлайн» или «на звёзды»: у Лады 3 партии с исходом, из них 2 на звёзды
   check('партии онлайн продвинули первое задание',
     dq[0].progress === Math.min(dq[0].goal, dq[0].code === 'ladder2' ? lad.games : decided), JSON.stringify(dq[0]));
+
+  // «В игре сейчас» через настоящую базу: первый отметился — второй видит точку
+  await db.query("update students set last_seen = null where username in ('Артур', 'Лада')");
+  await A.page.evaluate(() => markSeen());
+  await A.page.waitForTimeout(500);
+  await B.page.evaluate(() => openFriends());
+  await B.page.waitForTimeout(1200);
+  const presence = await B.page.evaluate(() => [...document.querySelectorAll('#friendsList .friend-row')]
+    .map(r => r.dataset.name + ':' + r.querySelector('.avatar').classList.contains('online')));
+  check('друг отметился «я здесь» — у второго зелёная точка', presence.includes('Артур:true'), presence.join());
+  await B.page.evaluate(() => quitToMenu());
 
   check('у бота рейтинга нет',
     (await db.query("select count(*) from elo_ratings where username like '@bot:%'")).rows[0].count === '0');

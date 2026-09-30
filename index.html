@@ -114,7 +114,7 @@
 
     <div class="setup-field" id="attemptsField">
       <label id="tLblAttempts">Attempts</label>
-      <select class="field" id="attemptsCount"></select>
+      <select class="field" id="attemptsCount" onchange="saveSetupChoice()"></select>
     </div>
 
     <div id="duelOnlyFields">
@@ -267,6 +267,9 @@
             <input type="text" id="guessInput" placeholder="" inputmode="numeric" autocomplete="off" />
             <button class="btn" onclick="handleGuess()" id="tSubmitGuess">Check</button>
           </div>
+          <!-- Число вне диапазона или названное повторно: объясняем словами,
+               а не молчим — иначе кажется, что кнопка сломалась -->
+          <div class="guess-note hidden" id="guessNote" role="status"></div>
         </div>
 
         <div class="history-section hidden" id="historySection">
@@ -312,7 +315,12 @@
     </div>
     <div class="setup-field">
       <label id="tRunPin"></label>
-      <input type="text" id="runPin" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="123456" />
+      <!-- PIN скрыт, как и в профиле; глаз показывает набранное — проверить
+           себя до того, как PIN запомнит сервер -->
+      <div class="pin-wrap">
+        <input type="password" id="runPin" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
+        <button type="button" class="pin-eye" id="runPinEye" onclick="toggleRunPinEye()" aria-label="PIN">👁</button>
+      </div>
     </div>
     <div class="setup-field hidden" id="hintField">
       <label id="tRunHint"></label>
@@ -485,6 +493,11 @@
       <button class="btn btn-block" style="margin-top:14px" id="tUnfinishedResume" onclick="resumeSavedRun()"></button>
       <button class="btn-ghost btn-block" style="margin-top:8px" id="tUnfinishedFinish" onclick="finishSavedRun()"></button>
     </div>
+    <!-- Правила: пока человек ни разу не играл — раскрыты, потом свёрнуты -->
+    <details class="fold run-rules" id="runRules">
+      <summary class="fold-head" id="tRunRulesHead"></summary>
+      <ul class="fold-body run-rules-list" id="runRulesList"></ul>
+    </details>
     <label class="frost-row">
       <input type="checkbox" id="frostRun" onchange="setFrostMode(this.checked)" />
       <span class="fr-text"><span id="tFrostRun"></span><small class="row-hint" id="tFrostRunHint"></small></span>
