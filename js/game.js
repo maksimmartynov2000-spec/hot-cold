@@ -299,7 +299,7 @@ const D = {
   fog: [false, false],        // не видит ЧУЖИЕ ходы до конца раунда
   blind: [false, false],      // не видит СВОИ ходы до конца раунда
   fogFrom: [0, 0],            // с какого хода (номер в истории) они закрыты:
-  blindFrom: [0, 0],          // ход, которым помеху взяли, и прежние игрок уже видел
+  blindFrom: [0, 0],          // всегда 0 — закрыто всё в раунде
   autoLava: [false, false],   // следующий ход за него сделает случай
   skip: [false, false],       // пропускает свой следующий ход
   shortMemory: [false, false],// видит вдвое меньше ходов до конца раунда
@@ -580,6 +580,8 @@ function showScreen(name) {
   updateAccountChip();
   // Вернулся в меню — задания могли продвинуться: партия или Испытание
   if (name === 'mode') loadProgress();
+  // Ушёл с доски — праздник звёзд закрывается: он про только что сыгранную партию
+  if (name !== 'game') closeStarsShowNow();
 }
 
 function quitToMenu() {
@@ -1044,8 +1046,10 @@ function applyBonus(type, by) {
   const rival = 1 - by;
   if (type === 'extra') D.tokens[by] += 2;
   // Отметка — номер следующего хода: этот ход уже в истории и остаётся виден
-  if (type === 'fog' && !D.fog[rival]) { D.fog[rival] = true; D.fogFrom[rival] = history.length; }
-  if (type === 'blind' && !D.blind[rival]) { D.blind[rival] = true; D.blindFrom[rival] = history.length; }
+  // Туман закрывает все ходы соперника в раунде, слепота — все свои, и прежние
+  // тоже: видеть под туманом хоть один чужой ход выглядело ошибкой (как в базе, 044)
+  if (type === 'fog' && !D.fog[rival]) { D.fog[rival] = true; D.fogFrom[rival] = 0; }
+  if (type === 'blind' && !D.blind[rival]) { D.blind[rival] = true; D.blindFrom[rival] = 0; }
   if (type === 'lava') D.autoLava[rival] = true;
   if (type === 'skip') D.skip[by] = true;
   if (type === 'gift') D.tokens[rival] += 1;
@@ -1421,6 +1425,11 @@ function nlPlay(svg) {
 // Где стояла точка в прошлый раз и от какого хода. Ключ нужен, чтобы прямая
 // не дёргалась на перерисовках без хода — от поворота экрана или кнопки
 let nlAnim = { key: null, x: null };
+// Что нарисовано сейчас — без движений. Онлайн один ход приносит две-три
+// перерисовки подряд (ответ на ход и сигналы Realtime); если прямая от них не
+// меняется, её не трогаем — иначе начатое движение обрывалось и точка
+// прыгала в конец
+let nlDrawn = null;
 
 function nlTick(v, y1, y2, stroke, width) {
   return '<line x1="' + nlPos(v) + '%" y1="' + y1 + '" x2="' + nlPos(v) + '%" y2="' + y2 +
@@ -1540,6 +1549,9 @@ function renderNumberLine() {
 
   if (animKey !== nlAnim.key) nlAnim = { key: animKey, x: dotX };
 
+  const still = out.replace(/<animate [^>]*\/>/g, '');
+  if (!fresh && still === nlDrawn && svg.firstChild) return;
+  nlDrawn = still;
   svg.innerHTML = out;
   nlPlay(svg);
 }
@@ -2195,6 +2207,8 @@ async function loadOnlineReview() {
   if (!online || online.id !== id || !res || !Array.isArray(res.moves)) return;
   onlineReview = { id, data: analyseOnlineMatch(res.moves), stars: res.stars || null };
   renderAll();
+  // Партия на звёзды только что кончилась — праздник на весь экран
+  if (onlineReview.stars && online.justFinished) showStarsShow(onlineReview.stars, online.seat, id);
 }
 
 // Салют в дуэли: с другом на одном телефоне — любому выигранному раунду,
@@ -2210,6 +2224,179 @@ function duelCelebrate(starBox) {
   // Итог онлайн-партии приходит двумя шагами: сначала раунд, потом звёзды.
   // Новая лига — отдельный повод, даже если за раунд салют уже был
   celebrate(newLeague ? key + ':lg' : key, icons, D.matchOver || newLeague);
+}
+
+// ---------- звёзды после партии на весь экран ----------
+// Как в Hearthstone: герб ранга, звёзды загораются (или гаснут) по одной;
+// набрал три — щит переворачивается на новый ранг; новая лига — лучи, салют
+// и открытые награды. Нажатие пропускает. Показываем один раз на партию
+let starsShowState = null;
+
+function starsShownKey() { return 'hc_stars_shown'; }
+
+function starsAlreadyShown(id) {
+  try { return (JSON.parse(localStorage.getItem(starsShownKey()) || '[]')).indexOf(id) >= 0; } catch (e) { return false; }
+}
+
+function markStarsShown(id) {
+  try {
+    const list = JSON.parse(localStorage.getItem(starsShownKey()) || '[]').filter(x => x !== id);
+    list.push(id);
+    localStorage.setItem(starsShownKey(), JSON.stringify(list.slice(-50)));
+  } catch (e) {}
+}
+
+function shRender(stars, extraClass) {
+  const p = ladderPos(stars);
+  const em = document.getElementById('shEmblem');
+  em.innerHTML = leagueEmblem(p.league, p.legend ? null : p.rank, 150);
+  em.style.setProperty('--lg-glow', LEAGUE_ART[p.league].glow);
+  document.getElementById('shTitle').textContent = leagueLabel(stars).replace(/^\S+\s/, '');
+  const box = document.getElementById('shStars');
+  box.replaceChildren();
+  if (p.legend) return;
+  for (let i = 0; i < 3; i++) {
+    const s = document.createElement('span');
+    s.className = 'sh-star' + (i < p.inRank ? ' on' : '');
+    s.textContent = '★';
+    box.appendChild(s);
+  }
+}
+
+function showStarsShow(stars, seat, matchId) {
+  const d = (stars.delta || [])[seat];
+  const after = (stars.after || [])[seat];
+  if (typeof d !== 'number' || typeof after !== 'number') return;
+  if (starsAlreadyShown(matchId)) return;
+  markStarsShown(matchId);
+  const was = after - d;
+  const L = t();
+  const shell = document.getElementById('starsShow');
+  const stage = document.getElementById('shStage');
+  stage.classList.remove('big');
+  document.getElementById('shNote').textContent = '';
+  document.getElementById('shRewards').classList.add('hidden');
+  const tap = document.getElementById('shTap');
+  tap.textContent = L.path.tap;
+  tap.classList.remove('on');
+  shRender(was);
+  shell.classList.remove('hidden');
+  void shell.offsetWidth;
+  shell.classList.add('on');
+  const unlock = (stars.unlock || [])[seat];
+  starsShowState = { was, after, d, unlock, step: was, timer: null, done: false };
+  let calm = false;
+  try { calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (calm) return shFinish();
+  starsShowState.timer = setTimeout(shStep, 900);
+}
+
+// Шаг: звезда загорается или гаснет; сменился ранг — щит переворачивается
+function shStep() {
+  const S = starsShowState;
+  if (!S || S.done) return;
+  if (S.step === S.after) return shFinish();
+  const dir = S.after > S.step ? 1 : -1;
+  const from = ladderPos(S.step);
+  const next = S.step + dir;
+  const to = ladderPos(next);
+  S.step = next;
+  if (to.legend !== from.legend || to.rank !== from.rank || to.league !== from.league) {
+    // Новый ранг: досветить третью звезду, перевернуть щит
+    if (dir > 0) {
+      const stars = document.querySelectorAll('#shStars .sh-star');
+      const last = stars[2];
+      if (last) { last.classList.add('on', 'gain'); }
+      playTone(880, 0.12);
+    }
+    S.timer = setTimeout(() => {
+      const em = document.getElementById('shEmblem');
+      em.classList.add('flip');
+      S.timer = setTimeout(() => {
+        shRender(next);
+        // Назад на ранг вниз: три звезды минус одна — две горят
+        em.classList.remove('flip');
+        if (to.league > from.league || (to.legend && !from.legend)) shLeagueUp(to);
+        else if (dir > 0) { playTone(660, 0.14); playTone(990, 0.22, 0.12); }
+        else playTone(220, 0.25);
+        S.timer = setTimeout(shStep, to.league > from.league ? 1600 : 700);
+      }, 350);
+    }, dir > 0 ? 450 : 200);
+    return;
+  }
+  const stars = document.querySelectorAll('#shStars .sh-star');
+  if (dir > 0) {
+    const s = stars[to.inRank - 1];
+    if (s) { s.classList.add('on', 'gain'); }
+    playTone(880 + 120 * to.inRank, 0.12);
+  } else {
+    const s = stars[from.inRank - 1];
+    if (s) { s.classList.remove('on'); s.classList.add('lose'); }
+    playTone(260, 0.22);
+  }
+  S.timer = setTimeout(shStep, 650);
+}
+
+function shLeagueUp(to) {
+  document.getElementById('shStage').classList.add('big');
+  celebrate('sh:' + Date.now(), [LEAGUE_ICONS[to.league], '⭐', '✨'], true);
+}
+
+// Конец: подпись (почему ±0, серия, новая лига) и награды
+function shFinish() {
+  const S = starsShowState;
+  if (!S || S.done) return;
+  S.done = true;
+  clearTimeout(S.timer);
+  shRender(S.after);
+  const L = t().online;
+  const lines = [];
+  if (S.d === 2) lines.push('⭐⭐ ' + L.lgStreak);
+  else if (S.d > 0) lines.push('+' + S.d + ' ★');
+  else if (S.d < 0) lines.push('−' + (-S.d) + ' ★');
+  else if (S.after < 150) lines.push('🛡 ' + (S.after % 15 === 0 ? L.lgFloor : t().tut.lgApprentice));
+  const pa = ladderPos(S.after), pw = ladderPos(S.was);
+  if (pa.league > pw.league) {
+    lines.push(L.lgNew.replace('{l}', t().leagues[pa.league]));
+    document.getElementById('shStage').classList.add('big');
+  }
+  document.getElementById('shNote').textContent = lines.join(' · ');
+  if (typeof S.unlock === 'number') {
+    const box = document.getElementById('shRewards');
+    box.replaceChildren(...LEAGUE_REWARDS.filter(r => r.league === S.unlock).map((r, i) => {
+      const el = document.createElement('div');
+      el.className = 'sh-rew';
+      el.style.animationDelay = (0.2 * i) + 's';
+      if (r.kind === 'icon') { el.innerHTML = rewardArt(r.value, 0) || r.value; el.style.background = 'rgba(255,255,255,0.1)'; }
+      else el.style.background = avatarBgCss(r.value);
+      return el;
+    }));
+    box.classList.remove('hidden');
+  }
+  document.getElementById('shTap').classList.add('on');
+}
+
+function closeStarsShowNow() {
+  const shell = document.getElementById('starsShow');
+  if (!shell || shell.classList.contains('hidden')) return;
+  if (starsShowState) clearTimeout(starsShowState.timer);
+  starsShowState = null;
+  shell.classList.remove('on');
+  shell.classList.add('hidden');
+  showNextAchievement();
+}
+
+// Первое нажатие — сразу к итогу, второе — закрыть
+function starsShowTap() {
+  const S = starsShowState;
+  if (S && !S.done) return shFinish();
+  const shell = document.getElementById('starsShow');
+  shell.classList.remove('on');
+  setTimeout(() => {
+    shell.classList.add('hidden');
+    starsShowState = null;
+    showNextAchievement();
+  }, 400);
 }
 
 function starsResult(stars, seat) {
@@ -2463,6 +2650,162 @@ function ladderPos(stars) {
            inRank: stars % 3, legend: false };
 }
 
+// ---------- герб лиги (SVG) ----------
+// Щит в цвете лиги с номером ранга. Чем выше лига, тем богаче: с Золота —
+// лавры, с Платины — камень сверху, Алмаз — грани, Легенда — корона.
+// Рисуется кодом: работает без интернета и чёткий на любом экране
+const LEAGUE_ART = [
+  { a: '#e0a070', b: '#8a4a22', edge: '#5a2d12', glow: 'rgba(208,139,79,0.45)' },   // Бронза
+  { a: '#f1f5f9', b: '#8a99ad', edge: '#4b5563', glow: 'rgba(203,213,225,0.5)' },   // Серебро
+  { a: '#fde68a', b: '#d97706', edge: '#7c3f00', glow: 'rgba(251,191,36,0.55)' },   // Золото
+  { a: '#a5f3fc', b: '#0e7490', edge: '#083344', glow: 'rgba(34,211,238,0.55)' },   // Платина
+  { a: '#e9d5ff', b: '#7c3aed', edge: '#3b0764', glow: 'rgba(192,132,252,0.6)' },   // Алмаз
+  { a: '#fbcfe8', b: '#be185d', edge: '#500724', glow: 'rgba(244,114,182,0.65)' }   // Легенда
+];
+let emblemSeq = 0;
+
+function leagueEmblem(league, rank, size) {
+  const c = LEAGUE_ART[league] || LEAGUE_ART[0];
+  const id = 'lg' + (++emblemSeq);
+  const s = size || 64;
+  let extra = '';
+  // Лавры по бокам — с Золота
+  if (league >= 2) {
+    const leaf = (x, y, r) => '<ellipse cx="' + x + '" cy="' + y + '" rx="3.2" ry="7" transform="rotate(' + r + ' ' + x + ' ' + y + ')" fill="' + c.b + '" stroke="' + c.edge + '" stroke-width="0.8"/>';
+    extra += leaf(9, 46, -35) + leaf(7, 36, -15) + leaf(8, 26, 5) + leaf(91, 46, 35) + leaf(93, 36, 15) + leaf(92, 26, -5);
+  }
+  // Камень сверху — с Платины; у Алмаза он гранёный
+  if (league >= 3 && league < 5) {
+    extra += '<path d="M50 2 L58 10 L50 18 L42 10 Z" fill="url(#' + id + 'g)" stroke="' + c.edge + '" stroke-width="1.2"/>' +
+             '<path d="M50 2 L54 10 L50 18" fill="rgba(255,255,255,0.35)"/>';
+  }
+  // Корона у Легенды
+  if (league === 5) {
+    extra += '<path d="M33 18 L36 4 L44 12 L50 1 L56 12 L64 4 L67 18 Z" fill="url(#' + id + 'g)" stroke="' + c.edge + '" stroke-width="1.4" stroke-linejoin="round"/>' +
+             '<circle cx="50" cy="3" r="2.2" fill="#fff"/><circle cx="36" cy="5" r="1.6" fill="#fff"/><circle cx="64" cy="5" r="1.6" fill="#fff"/>';
+  }
+  const facets = league === 4
+    ? '<path d="M50 22 L74 34 L50 92 L26 34 Z" fill="rgba(255,255,255,0.12)"/><path d="M50 22 L50 92 L26 34 Z" fill="rgba(0,0,0,0.12)"/>' : '';
+  const label = rank === null || rank === undefined ? (league === 5 ? '★' : '') : String(rank);
+  return '<svg class="lg-emblem" width="' + s + '" height="' + s + '" viewBox="0 0 100 100" aria-hidden="true">' +
+    '<defs><linearGradient id="' + id + 'g" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0" stop-color="' + c.a + '"/><stop offset="1" stop-color="' + c.b + '"/></linearGradient>' +
+    '<radialGradient id="' + id + 'h" cx="0.35" cy="0.25" r="0.6"><stop offset="0" stop-color="rgba(255,255,255,0.55)"/>' +
+    '<stop offset="1" stop-color="rgba(255,255,255,0)"/></radialGradient></defs>' +
+    extra +
+    '<path d="M50 16 L82 26 C82 58 72 80 50 96 C28 80 18 58 18 26 Z" fill="url(#' + id + 'g)" stroke="' + c.edge + '" stroke-width="2.5" stroke-linejoin="round"/>' +
+    facets +
+    '<path d="M50 23 L76 31 C76 57 68 75 50 89 C32 75 24 57 24 31 Z" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.5"/>' +
+    '<path d="M50 16 L82 26 C82 58 72 80 50 96 C28 80 18 58 18 26 Z" fill="url(#' + id + 'h)"/>' +
+    (label ? '<text x="50" y="66" text-anchor="middle" font-size="' + (label.length > 1 ? 30 : 34) + '" font-weight="900" ' +
+             'fill="#fff" stroke="' + c.edge + '" stroke-width="3" paint-order="stroke" font-family="system-ui, sans-serif">' + label + '</text>' : '') +
+    '</svg>';
+}
+
+// ---------- путь по лигам ----------
+// Все пять лиг и Легенда, по десять рангов: где игрок сейчас, что пройдено,
+// что впереди и что откроется. Сверху — Легенда, как вершина лестницы
+function openPath() {
+  if (!ladderInfo) return;
+  const P = t().path;
+  const L = t();
+  const pos = ladderPos(ladderInfo.stars);
+  const peak = ladderInfo.peak || 0;
+  document.getElementById('pathTitle').textContent = P.title;
+  const days = Math.floor((ladderInfo.endsIn || 0) / 86400);
+  const month = seasonMonth(ladderInfo.season);
+  document.getElementById('pathSub').textContent = days > 0
+    ? L.online.lgSeason.replace('{m}', month).replace('{n}', days) : L.online.lgSeasonLast.replace('{m}', month);
+  document.getElementById('pathRulesHead').textContent = P.rulesHead;
+  document.getElementById('pathRules').replaceChildren(...P.rules.map(r => {
+    const li = document.createElement('li');
+    li.textContent = r;
+    return li;
+  }));
+  document.getElementById('pathClose').textContent = t().prog.close;
+  const list = document.getElementById('pathList');
+  list.replaceChildren();
+  let currentBox = null;
+  for (let lg = 5; lg >= 0; lg--) {
+    const box = document.createElement('div');
+    const here = pos.league === lg;
+    box.className = 'path-league' + (here ? ' current' : lg > pos.league ? ' ahead' : ' passed');
+    box.dataset.league = lg;
+    const head = document.createElement('div');
+    head.className = 'pl-head';
+    const em = document.createElement('span');
+    em.innerHTML = leagueEmblem(lg, null, 44);
+    const txt = document.createElement('div');
+    const name = document.createElement('div');
+    name.className = 'pl-name';
+    name.textContent = L.leagues[lg];
+    if (here) {
+      const h = document.createElement('span');
+      h.className = 'pl-here';
+      h.textContent = P.here;
+      name.appendChild(h);
+    }
+    txt.appendChild(name);
+    // Награды лиги: открытые — в цвете, закрытые — серые
+    const rew = LEAGUE_REWARDS.filter(r => r.league === lg);
+    if (rew.length) {
+      const line = document.createElement('div');
+      line.className = 'pl-rew';
+      line.appendChild(document.createTextNode(P.rewards + ' '));
+      rew.forEach(r => {
+        const open = peak >= lg;
+        if (r.kind === 'icon') {
+          const i = document.createElement('span');
+          i.className = 'r-item' + (open ? '' : ' locked');
+          i.innerHTML = rewardArt(r.value, 20);
+          line.appendChild(i);
+        } else {
+          const sw = document.createElement('span');
+          sw.className = 'r-swatch' + (open ? '' : ' locked');
+          sw.style.background = avatarBgCss(r.value);
+          line.appendChild(sw);
+        }
+      });
+      txt.appendChild(line);
+    }
+    head.append(em, txt);
+    box.appendChild(head);
+    if (lg === 5) {
+      const lt = document.createElement('div');
+      lt.className = 'pl-legend';
+      lt.textContent = P.legend;
+      box.appendChild(lt);
+    } else {
+      const ranks = document.createElement('div');
+      ranks.className = 'pl-ranks';
+      for (let r = 10; r >= 1; r--) {
+        const chip = document.createElement('div');
+        const passed = lg < pos.league || (here && r > pos.rank);
+        const isHere = here && r === pos.rank;
+        chip.className = 'pl-rank' + (passed ? ' passed' : '') + (isHere ? ' here' : '') + (r === 10 || r === 5 ? ' floor' : '');
+        chip.textContent = String(r);
+        if (isHere) {
+          const st = document.createElement('span');
+          st.className = 'pl-star';
+          st.textContent = starsLine(ladderInfo.stars);
+          chip.appendChild(st);
+        }
+        ranks.appendChild(chip);
+      }
+      box.appendChild(ranks);
+    }
+    if (here) currentBox = box;
+    list.appendChild(box);
+  }
+  document.getElementById('pathModal').classList.remove('hidden');
+  // Сразу к своей лиге: сверху Легенда, а играет человек обычно внизу
+  if (currentBox) setTimeout(() => currentBox.scrollIntoView({ block: 'center' }), 30);
+}
+
+function closePath() {
+  document.getElementById('pathModal').classList.add('hidden');
+}
+
 function leagueLabel(stars) {
   const p = ladderPos(stars);
   return LEAGUE_ICONS[p.league] + ' ' + t().leagues[p.league] + (p.legend ? '' : ' ' + p.rank);
@@ -2536,13 +2879,48 @@ function closeSeasonSummary() {
 // ---------- задания дня и достижения ----------
 // Иконки за серию дней. Копия — в базе (quest_rewards), сверяется тестом
 const QUEST_ICONS = [{ days: 3, icon: '🔥' }, { days: 7, icon: '🚀' }, { days: 14, icon: '🌋' }, { days: 30, icon: '🌈' }];
-// Порядок и коды — как в базе (achievement_codes), сверяется тестом
-const ACHIEVEMENTS = [
-  { code: 'first_win', icon: '🎉' }, { code: 'wins_10', icon: '💪' }, { code: 'wins_50', icon: '🏆' },
-  { code: 'streak_3', icon: '⚡' }, { code: 'league_gold', icon: '🥇' }, { code: 'league_diamond', icon: '💎' },
-  { code: 'legend', icon: '👑' }, { code: 'run_5', icon: '🧗' }, { code: 'run_10', icon: '🏔️' },
-  { code: 'friends_3', icon: '🤝' }, { code: 'quests_7', icon: '📅' }, { code: 'tutorial', icon: '🎓' }
+// Достижения — лестницами, как в Hearthstone: 1 → 5 → 10 → 25 → 50 → 100
+// побед. stat — счётчик из my_progress.stats, по нему видно, сколько до
+// следующей ступени. Порядок и коды — как в базе (achievement_codes), сверяется тестом
+const ACH_LADDERS = [
+  { key: 'wins', icon: '🏆', stat: 'wins',
+    tiers: [[1, 'first_win'], [5, 'wins_5'], [10, 'wins_10'], [25, 'wins_25'], [50, 'wins_50'], [100, 'wins_100']] },
+  { key: 'games', icon: '🎮', stat: 'games', tiers: [[10, 'games_10'], [50, 'games_50'], [200, 'games_200']] },
+  { key: 'streak', icon: '⚡', stat: 'winStreak', tiers: [[3, 'streak_3'], [5, 'streak_5'], [10, 'streak_10']] },
+  { key: 'league', icon: '🛡️', stat: 'peak',
+    tiers: [[1, 'league_silver'], [2, 'league_gold'], [3, 'league_platinum'], [4, 'league_diamond'], [5, 'legend']] },
+  { key: 'quests', icon: '📅', stat: 'questBest', tiers: [[3, 'quests_3'], [7, 'quests_7'], [14, 'quests_14'], [30, 'quests_30']] },
+  { key: 'run', icon: '🧗', stat: 'runBest', tiers: [[5, 'run_5'], [10, 'run_10'], [15, 'run_15'], [20, 'run_20']] },
+  { key: 'friends', icon: '🤝', stat: 'friends', tiers: [[1, 'friends_1'], [3, 'friends_3'], [10, 'friends_10']] },
+  { key: 'tutorial', icon: '🎓', stat: 'tutorial', tiers: [[1, 'tutorial']] }
 ];
+const ACHIEVEMENTS = ACH_LADDERS.reduce((all, l) => all.concat(l.tiers.map(([n, code]) => ({ code, ladder: l, n }))), []);
+
+// Название ступени: «10 побед», «Золото», «Первая победа»
+function achTierName(ladder, n) {
+  const T = t().prog.lad[ladder.key];
+  if (ladder.key === 'league') return t().leagues[n];
+  if (ladder.key === 'tutorial') return T.done;
+  if (ladder.key === 'wins' && n === 1) return T.first;
+  return withPlural(n, T.forms);
+}
+
+// Медаль ступени: 1 — бронза, 2 — серебро и т. д.; 0 — ещё не открыто
+function achMedal(ladder, tier, big) {
+  const m = document.createElement('div');
+  m.className = 'ach-medal t' + tier + (big ? ' big' : '');
+  const i = document.createElement('span');
+  i.className = 'am-icon';
+  i.textContent = ladder.icon;
+  m.appendChild(i);
+  if (tier > 0 && ladder.tiers.length > 1) {
+    const b = document.createElement('span');
+    b.className = 'am-tier';
+    b.textContent = String(tier);
+    m.appendChild(b);
+  }
+  return m;
+}
 
 // Что сервер знает о заданиях и достижениях. null — не знаем: нет входа,
 // нет сети или миграция не применена. Тогда карточки нет вовсе
@@ -2563,6 +2941,7 @@ async function loadProgress() {
     progressInfo = null;
   }
   renderQuestCard();
+  if (progressInfo) noticeNewAchievements(progressInfo.achievements);
   return progressInfo;
 }
 
@@ -2620,28 +2999,153 @@ function renderQuestCard() {
   document.getElementById('qcFoot').textContent = parts.join(' · ');
 }
 
-// Сетка достижений: открытые — в цвете, закрытые — серые с тем, как открыть
-function fillAchGrid(box, got, onlyOpen) {
+// Сколько ступеней лестницы открыто
+function achTier(ladder, have) {
+  let tier = 0;
+  ladder.tiers.forEach(([, code], i) => { if (have.has(code)) tier = i + 1; });
+  return tier;
+}
+
+// Свой профиль: по строке на лестницу — медаль ступени, сколько есть и
+// сколько до следующей
+function fillAchLadders(box, got, stats) {
   const P = t().prog;
   const have = new Set((got || []).map(a => a.code));
   box.replaceChildren();
-  ACHIEVEMENTS.filter(a => !onlyOpen || have.has(a.code)).forEach(a => {
-    const tile = document.createElement('div');
-    tile.className = 'ach-tile' + (have.has(a.code) ? '' : ' locked');
-    tile.dataset.code = a.code;
-    const icon = document.createElement('div');
-    icon.className = 'a-icon';
-    icon.textContent = a.icon;
-    const name = document.createElement('div');
-    name.className = 'a-name';
-    name.textContent = P.ach[a.code][0];
-    const sub = document.createElement('div');
-    sub.className = 'a-sub';
-    sub.textContent = P.ach[a.code][1];
-    tile.append(icon, name, sub);
-    box.appendChild(tile);
+  ACH_LADDERS.forEach(l => {
+    const tier = achTier(l, have);
+    const row = document.createElement('div');
+    row.className = 'lad-row' + (tier === l.tiers.length ? ' done' : '');
+    row.dataset.ladder = l.key;
+    row.dataset.tier = tier;
+    const main = document.createElement('div');
+    main.className = 'lad-main';
+    const title = document.createElement('div');
+    title.className = 'lad-title';
+    title.textContent = P.lad[l.key].title;
+    if (tier > 0) {
+      const cur = document.createElement('span');
+      cur.className = 'lad-cur';
+      cur.textContent = ' · ' + achTierName(l, l.tiers[tier - 1][0]);
+      title.appendChild(cur);
+    }
+    main.appendChild(title);
+    const next = l.tiers[tier];
+    const pips = document.createElement('div');
+    pips.className = 'lad-pips';
+    pips.textContent = l.tiers.map((x, i) => i < tier ? '●' : '○').join(' ');
+    if (next) {
+      const val = stats && typeof stats[l.stat] === 'number' ? stats[l.stat] : null;
+      const prev = tier ? l.tiers[tier - 1][0] : 0;
+      const bar = document.createElement('div');
+      bar.className = 'lad-bar';
+      const fill = document.createElement('span');
+      fill.style.width = val === null ? '0%'
+        : Math.round(100 * Math.max(0, Math.min(1, (val - prev) / (next[0] - prev)))) + '%';
+      bar.appendChild(fill);
+      const nextText = document.createElement('div');
+      nextText.className = 'lad-next';
+      nextText.textContent = P.ladNext.replace('{name}', achTierName(l, next[0])) +
+        (val !== null && l.key !== 'league' && l.key !== 'tutorial'
+          ? ' · ' + formatNum(Math.min(val, next[0])) + ' / ' + formatNum(next[0]) : '');
+      main.append(bar, nextText);
+    } else {
+      const doneText = document.createElement('div');
+      doneText.className = 'lad-next';
+      doneText.textContent = P.ladAll;
+      main.appendChild(doneText);
+    }
+    main.appendChild(pips);
+    row.append(achMedal(l, tier), main);
+    box.appendChild(row);
   });
   return have.size;
+}
+
+// У друга — только открытое: по плитке на лестницу с его высшей ступенью
+function fillAchTiles(box, got) {
+  const have = new Set((got || []).map(a => a.code));
+  box.replaceChildren();
+  let n = 0;
+  ACH_LADDERS.forEach(l => {
+    const tier = achTier(l, have);
+    if (!tier) return;
+    n++;
+    const tile = document.createElement('div');
+    tile.className = 'ach-tile';
+    tile.dataset.ladder = l.key;
+    tile.dataset.tier = tier;
+    const name = document.createElement('div');
+    name.className = 'a-name';
+    name.textContent = achTierName(l, l.tiers[tier - 1][0]);
+    tile.append(achMedal(l, tier), name);
+    box.appendChild(tile);
+  });
+  return n;
+}
+
+// ---------- уведомление «Новое достижение» ----------
+// Медленно выезжает сверху и так же медленно уходит; несколько — по очереди.
+// Какие уже показаны — помним по имени: на одном телефоне играют по очереди
+let achQueue = [];
+let achShowing = false;
+
+function achSeenKey() {
+  const a = runAuth();
+  return a ? 'hc_ach_seen_' + a.username.toLowerCase() : null;
+}
+
+function noticeNewAchievements(got) {
+  const key = achSeenKey();
+  if (!key || !Array.isArray(got)) return;
+  let seen = null;
+  try { seen = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) {}
+  const codes = got.map(a => a.code);
+  try { localStorage.setItem(key, JSON.stringify(codes)); } catch (e) {}
+  // Первый раз на этом телефоне — всё открытое считаем уже виденным: иначе
+  // после обновления игры на человека высыпалось бы десяток уведомлений
+  if (!Array.isArray(seen)) return;
+  codes.filter(c => seen.indexOf(c) < 0).forEach(c => {
+    const a = ACHIEVEMENTS.find(x => x.code === c);
+    if (a) achQueue.push(a);
+  });
+  showNextAchievement();
+}
+
+function showNextAchievement() {
+  // Пока идёт праздник звёзд на весь экран — ждём его конца
+  if (achShowing || !achQueue.length || starsShowOpen()) return;
+  const a = achQueue.shift();
+  const box = document.getElementById('achToast');
+  const tier = a.ladder.tiers.findIndex(x => x[1] === a.code) + 1;
+  document.getElementById('atHead').textContent = t().prog.toastHead;
+  document.getElementById('atName').textContent = achTierName(a.ladder, a.n);
+  const medal = document.getElementById('atMedal');
+  medal.replaceChildren(achMedal(a.ladder, tier, true));
+  box.dataset.code = a.code;
+  achShowing = true;
+  box.classList.remove('hidden');
+  void box.offsetWidth;
+  box.classList.add('show');
+  soundAchievement();
+  setTimeout(() => {
+    box.classList.remove('show');
+    setTimeout(() => {
+      box.classList.add('hidden');
+      achShowing = false;
+      showNextAchievement();
+    }, 900);
+  }, 4200);
+}
+
+// Праздник звёзд на весь экран открыт? Его делает starsShow (ниже)
+function starsShowOpen() {
+  const el = document.getElementById('starsShow');
+  return !!el && !el.classList.contains('hidden');
+}
+
+function soundAchievement() {
+  try { playTone(660, 0.12); playTone(880, 0.16, 0.12); playTone(1175, 0.28, 0.26); } catch (e) {}
 }
 
 function fillProgressProfile() {
@@ -2654,7 +3158,7 @@ function fillProgressProfile() {
   const fold = document.getElementById('pfAchFold');
   fold.classList.toggle('hidden', !on);
   if (!on) return;
-  const n = fillAchGrid(document.getElementById('pfAchGrid'), I.achievements, false);
+  const n = fillAchLadders(document.getElementById('pfAchGrid'), I.achievements, I.stats);
   document.getElementById('tAchHead').textContent =
     P.achHead.replace('{n}', n).replace('{total}', ACHIEVEMENTS.length);
 }
@@ -2669,7 +3173,7 @@ async function openFriendAch(name) {
   try {
     const got = await friendRpc('friend_achievements', { p_friend: name }) || [];
     // У друга показываем только открытое: чужие замки ни о чём не говорят
-    const n = fillAchGrid(document.getElementById('achGrid'), got, true);
+    const n = fillAchTiles(document.getElementById('achGrid'), got);
     if (!n) setNote('achNote', P.achNone);
   } catch (e) {
     setNote('achNote', friendErrorText(e.message), true);

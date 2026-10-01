@@ -1,0 +1,198 @@
+-- Туман прячет все ходы соперника; достижения — лестницами. Применять в
+-- Supabase: SQL Editor → вставить целиком → Run. Применить ДО мёржа.
+--
+-- Туман. Раньше закрывались только ходы, сделанные после того, как туман лёг:
+-- ход соперника до тумана оставался виден, и это выглядело ошибкой — «я же
+-- под туманом, а вижу». Теперь под туманом не видно ни одного хода соперника
+-- в раунде, под слепотой — ни одного своего. Так же и для бота.
+--
+-- Достижения. Было 12 разовых, стало 29 — лестницами, как в Hearthstone:
+-- 1 → 5 → 10 → 25 → 50 → 100 побед и так далее. Старые коды сохранены:
+-- открытое раньше не пропадает.
+
+-- 1. Туман и слепота — на все ходы раунда. Отметка «с какого хода» теперь 0:
+--    так игра и бот уже понимают «закрыто всё»
+create or replace function matches_hide_from()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare i int;
+begin
+  if new.fog is distinct from old.fog or new.blind is distinct from old.blind then
+    for i in 1..2 loop
+      if coalesce(new.fog[i], false) and not coalesce(old.fog[i], false) then
+        new.fog_from[i] := 0;
+      end if;
+      if coalesce(new.blind[i], false) and not coalesce(old.blind[i], false) then
+        new.blind_from[i] := 0;
+      end if;
+    end loop;
+  end if;
+  return new;
+end;
+$$;
+
+-- Партии, где туман уже лежит, — тоже закрыть целиком
+update matches set fog_from = array[0, 0]::bigint[], blind_from = array[0, 0]::bigint[]
+where status = 'active' and (fog_from <> array[0, 0]::bigint[] or blind_from <> array[0, 0]::bigint[]);
+
+-- 2. Лучшая серия побед за всё время: текущая серия обнуляется поражением,
+--    а лестница «3 → 5 → 10 подряд» должна помнить рекорд
+alter table player_stats add column if not exists best_win_streak int not null default 0;
+update player_stats p set best_win_streak = greatest(p.best_win_streak, l.streak)
+from ladder l where l.username = p.username;
+
+create or replace function ladder_progress()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  insert into player_stats(username) values (new.username) on conflict do nothing;
+  update player_stats set best_win_streak = greatest(best_win_streak, new.streak)
+  where username = new.username;
+  perform achievements_sync(new.username);
+  return null;
+end;
+$$;
+
+-- 3. Достижения лестницами. Порядок и коды — в js/online.js (ACHIEVEMENTS),
+--    сверяется тестом
+create or replace function achievement_codes()
+returns text[]
+language sql
+immutable
+as $$
+  select array['first_win', 'wins_5', 'wins_10', 'wins_25', 'wins_50', 'wins_100',
+               'games_10', 'games_50', 'games_200',
+               'streak_3', 'streak_5', 'streak_10',
+               'league_silver', 'league_gold', 'league_platinum', 'league_diamond', 'legend',
+               'quests_3', 'quests_7', 'quests_14', 'quests_30',
+               'run_5', 'run_10', 'run_15', 'run_20',
+               'friends_1', 'friends_3', 'friends_10',
+               'tutorial'];
+$$;
+
+create or replace function achievements_sync(p_username text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare st player_stats; l ladder; fr int; td boolean; peak int;
+begin
+  if p_username is null or p_username like '#%' or p_username like '@bot:%' then return; end if;
+  if not exists (select 1 from students where username = p_username) then return; end if;
+  insert into player_stats(username) values (p_username) on conflict do nothing;
+  select * into st from player_stats where username = p_username;
+  select * into l from ladder where username = p_username;
+  peak := coalesce(l.peak, 0);
+  select count(*) into fr from friendships
+  where status = 'accepted' and p_username in (requester, addressee);
+  select tutorial_done into td from students where username = p_username;
+  insert into achievements(username, code)
+  select p_username, c
+  from unnest(array[
+    case when st.online_wins >= 1 then 'first_win' end,
+    case when st.online_wins >= 5 then 'wins_5' end,
+    case when st.online_wins >= 10 then 'wins_10' end,
+    case when st.online_wins >= 25 then 'wins_25' end,
+    case when st.online_wins >= 50 then 'wins_50' end,
+    case when st.online_wins >= 100 then 'wins_100' end,
+    case when st.online_games >= 10 then 'games_10' end,
+    case when st.online_games >= 50 then 'games_50' end,
+    case when st.online_games >= 200 then 'games_200' end,
+    case when greatest(st.best_win_streak, coalesce(l.streak, 0)) >= 3 then 'streak_3' end,
+    case when greatest(st.best_win_streak, coalesce(l.streak, 0)) >= 5 then 'streak_5' end,
+    case when greatest(st.best_win_streak, coalesce(l.streak, 0)) >= 10 then 'streak_10' end,
+    case when peak >= 1 then 'league_silver' end,
+    case when peak >= 2 then 'league_gold' end,
+    case when peak >= 3 then 'league_platinum' end,
+    case when peak >= 4 then 'league_diamond' end,
+    case when peak >= 5 then 'legend' end,
+    case when st.quest_best >= 3 then 'quests_3' end,
+    case when st.quest_best >= 7 then 'quests_7' end,
+    case when st.quest_best >= 14 then 'quests_14' end,
+    case when st.quest_best >= 30 then 'quests_30' end,
+    case when st.run_best >= 5 then 'run_5' end,
+    case when st.run_best >= 10 then 'run_10' end,
+    case when st.run_best >= 15 then 'run_15' end,
+    case when st.run_best >= 20 then 'run_20' end,
+    case when fr >= 1 then 'friends_1' end,
+    case when fr >= 3 then 'friends_3' end,
+    case when fr >= 10 then 'friends_10' end,
+    case when coalesce(td, false) then 'tutorial' end]) c
+  where c is not null
+  on conflict do nothing;
+end;
+$$;
+
+-- Всё, что заслужено по новым ступеням, — открыть сразу
+do $$
+declare u text;
+begin
+  for u in select username from students where username not like '#%' and username not like '@bot:%' loop
+    perform achievements_sync(u);
+  end loop;
+end $$;
+
+-- 4. Игра показывает, сколько осталось до следующей ступени: счётчики — в ответе
+create or replace function my_progress(p_username text, p_pin text, p_tz text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; s students; d date; st player_stats; quests jsonb; ach jsonb; streak int;
+        fr int; peak int; cur_streak int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into s from students where username = me;
+  if p_tz is not null and p_tz is distinct from s.tz
+     and (s.tz is null or s.tz_set_at is null or s.tz_set_at <= now() - interval '20 hours')
+     and exists (select 1 from pg_timezone_names where name = p_tz) then
+    update students set tz = p_tz, tz_set_at = now() where username = me;
+  end if;
+  perform season_end_check();
+  perform achievements_sync(me);
+  d := quest_ensure(me);
+  select * into st from player_stats where username = me;
+  select jsonb_agg(jsonb_build_object('code', q.code, 'goal', q.goal, 'progress', q.progress) order by q.slot)
+    into quests
+  from daily_quests q where q.username = me and q.day = d;
+  select coalesce(jsonb_agg(jsonb_build_object('code', a.code, 'at', a.at) order by a.at), '[]'::jsonb)
+    into ach
+  from achievements a where a.username = me;
+  select count(*) into fr from friendships
+  where status = 'accepted' and me in (requester, addressee);
+  select coalesce(l.peak, 0), coalesce(l.streak, 0) into peak, cur_streak from ladder l where l.username = me;
+  -- Серия жива, если последний выполненный день — сегодня или вчера
+  streak := case when st.quest_last >= d - 1 then st.quest_streak else 0 end;
+  return jsonb_build_object(
+    'day', d,
+    'quests', coalesce(quests, '[]'::jsonb),
+    'streak', coalesce(streak, 0),
+    'bestStreak', coalesce(st.quest_best, 0),
+    'doneToday', coalesce(st.quest_last = d, false),
+    'secondsLeft', greatest(0, floor(extract(epoch from
+        ((d + 1)::timestamp at time zone coalesce((select tz from students where username = me), 'UTC')) - now())))::int,
+    'achievements', ach,
+    'stats', jsonb_build_object(
+      'wins', coalesce(st.online_wins, 0),
+      'games', coalesce(st.online_games, 0),
+      'winStreak', greatest(coalesce(st.best_win_streak, 0), coalesce(cur_streak, 0)),
+      'peak', coalesce(peak, 0),
+      'questBest', coalesce(st.quest_best, 0),
+      'runBest', coalesce(st.run_best, 0),
+      'friends', fr,
+      'tutorial', coalesce(s.tutorial_done, false)));
+end;
+$$;
+
+revoke execute on function ladder_progress() from public, anon;
+revoke execute on function achievements_sync(text) from public, anon;
+grant execute on function achievement_codes() to anon;
+grant execute on function my_progress(text, text, text) to anon;

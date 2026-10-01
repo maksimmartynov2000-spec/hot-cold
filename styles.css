@@ -193,6 +193,15 @@ body {
 .pf-row .lang-switcher { font-size: 14px; padding: 6px 8px; }
 /* Иконка в кружке крупнее буквы: у эмодзи много воздуха вокруг рисунка */
 .avatar.has-icon { font-size: 17px; }
+/* Наградная иконка — рисунок во весь кружок с небольшим полем */
+.has-art { padding: 3px !important; overflow: hidden; }
+.has-art .reward-art { display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35)); }
+.pf-avatar.has-art { padding: 7px !important; }
+.av-tile.has-art { padding: 5px; }
+/* Фон Алмаза и Легенды переливается — медленно, чтобы не рябило */
+.shine { background-size: 220% 220% !important; animation: bgShine 6s ease-in-out infinite; }
+@keyframes bgShine { 0%, 100% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } }
+@media (prefers-reduced-motion: reduce) { .shine { animation: none; } }
 .avatar-btn .has-icon { font-size: 18px; }
 .pf-avatar.has-icon { font-size: 36px; }
 .pin-hide { margin-left: 10px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.45); }
@@ -438,12 +447,88 @@ select.field option { background: #1e1b4b; color: #fff; }
 .qc-foot { font-size: 12px; color: rgba(255, 255, 255, 0.5); margin-top: 6px; line-height: 1.4; }
 /* Достижения: три в ряд, закрытые — серые */
 .ach-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.ach-tile { padding: 10px 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.07); text-align: center; }
-.ach-tile .a-icon { font-size: 26px; line-height: 1.2; }
-.ach-tile .a-name { font-size: 12px; font-weight: 700; margin-top: 2px; }
-.ach-tile .a-sub { font-size: 11px; color: rgba(255, 255, 255, 0.5); margin-top: 2px; line-height: 1.3; }
-.ach-tile.locked .a-icon { filter: grayscale(1); opacity: 0.35; }
-.ach-tile.locked .a-name { color: rgba(255, 255, 255, 0.5); }
+.ach-tile { padding: 12px 4px 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.07); text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ach-tile .a-name { font-size: 12px; font-weight: 700; line-height: 1.25; }
+/* Медаль ступени: кружок с иконкой лестницы, кольцо — цвет ступени */
+.ach-medal { position: relative; width: 46px; height: 46px; border-radius: 50%; flex: 0 0 auto;
+             display: flex; align-items: center; justify-content: center;
+             background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18), rgba(255,255,255,0.04) 70%);
+             box-shadow: inset 0 0 0 3px var(--tier, rgba(255,255,255,0.15)), 0 0 12px var(--glow, transparent); }
+.ach-medal .am-icon { font-size: 22px; line-height: 1; }
+.ach-medal.t0 .am-icon { filter: grayscale(1); opacity: 0.35; }
+.ach-medal .am-tier { position: absolute; right: -3px; bottom: -3px; min-width: 18px; height: 18px; padding: 0 4px;
+                      border-radius: 9px; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center;
+                      color: #0f1430; background: var(--tier, #fff); }
+.ach-medal.t1 { --tier: #d08b4f; }
+.ach-medal.t2 { --tier: #cbd5e1; }
+.ach-medal.t3 { --tier: #fbbf24; --glow: rgba(251, 191, 36, 0.35); }
+.ach-medal.t4 { --tier: #22d3ee; --glow: rgba(34, 211, 238, 0.35); }
+.ach-medal.t5 { --tier: #c084fc; --glow: rgba(192, 132, 252, 0.45); }
+.ach-medal.t6 { --tier: #f472b6; --glow: rgba(244, 114, 182, 0.5); }
+.ach-medal.big { width: 58px; height: 58px; }
+.ach-medal.big .am-icon { font-size: 28px; }
+/* Лестницы в профиле */
+.lad-list { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.lad-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); }
+.lad-row.done { background: rgba(251, 191, 36, 0.09); }
+.lad-main { flex: 1; min-width: 0; }
+.lad-title { font-size: 14px; font-weight: 700; }
+.lad-title .lad-cur { color: #fbbf24; font-weight: 700; }
+.lad-bar { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; margin: 6px 0 4px; }
+.lad-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.lad-next { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
+.lad-pips { font-size: 9px; letter-spacing: 1px; color: rgba(251, 191, 36, 0.8); margin-top: 3px; }
+/* Звёзды после партии — на весь экран */
+.stars-show { position: fixed; inset: 0; z-index: 250; display: flex; align-items: center; justify-content: center;
+              background: radial-gradient(circle at 50% 40%, rgba(40, 34, 96, 0.96), rgba(8, 10, 28, 0.97));
+              opacity: 0; transition: opacity 0.4s ease; cursor: pointer; }
+.stars-show.on { opacity: 1; }
+.sh-stage { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center;
+            width: min(360px, calc(100vw - 32px)); }
+.sh-rays { position: absolute; top: 70px; left: 50%; width: 520px; height: 520px; margin: -260px 0 0 -260px;
+           border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.6s;
+           background: repeating-conic-gradient(rgba(251, 191, 36, 0.16) 0 8deg, transparent 8deg 22deg);
+           -webkit-mask: radial-gradient(circle, #000 20%, transparent 70%); mask: radial-gradient(circle, #000 20%, transparent 70%);
+           animation: shSpin 14s linear infinite; }
+.sh-stage.big .sh-rays { opacity: 1; }
+@keyframes shSpin { to { transform: rotate(360deg); } }
+.sh-emblem { position: relative; width: 150px; height: 150px; transition: transform 0.35s ease-in;
+             filter: drop-shadow(0 8px 24px var(--lg-glow, rgba(0,0,0,0.4))); }
+.sh-emblem svg { width: 150px; height: 150px; }
+.sh-emblem.flip { transform: rotateY(90deg) scale(0.9); }
+.sh-stage.big .sh-emblem { animation: shPulse 1.2s ease-in-out 2; }
+@keyframes shPulse { 50% { transform: scale(1.15); } }
+.sh-title { font-size: 26px; font-weight: 900; margin-top: 8px; color: #fff; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
+.sh-stars { display: flex; gap: 14px; margin-top: 12px; min-height: 52px; }
+.sh-star { font-size: 46px; line-height: 1; color: rgba(255, 255, 255, 0.16); transition: color 0.2s, text-shadow 0.2s; }
+.sh-star.on { color: #fbbf24; text-shadow: 0 0 18px rgba(251, 191, 36, 0.8); }
+.sh-star.gain { animation: shGain 0.55s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes shGain { 0% { transform: scale(0.2) rotate(-60deg); } 60% { transform: scale(1.5) rotate(10deg); } 100% { transform: scale(1); } }
+.sh-star.lose { animation: shLose 0.6s ease; }
+@keyframes shLose { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); }
+                    60% { transform: translateX(-5px) scale(0.9); } 80% { transform: translateX(4px) scale(0.85); } }
+.sh-note { font-size: 16px; font-weight: 700; color: #fde68a; margin-top: 14px; min-height: 22px; }
+.sh-rewards { display: flex; gap: 12px; justify-content: center; margin-top: 12px; }
+.sh-rewards .sh-rew { width: 64px; height: 64px; border-radius: 50%; padding: 6px; animation: shGain 0.6s ease both; }
+.sh-tap { font-size: 13px; color: rgba(255, 255, 255, 0.45); margin-top: 26px; opacity: 0; transition: opacity 0.5s; }
+.sh-tap.on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .sh-rays, .sh-stage.big .sh-emblem, .sh-star.gain, .sh-star.lose { animation: none; }
+  .sh-emblem { transition: none; }
+}
+
+/* Уведомление о достижении: выезжает медленно, чтобы его заметили */
+.ach-toast { position: fixed; left: 50%; top: 14px; z-index: 300; width: min(360px, calc(100vw - 32px));
+             display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 16px;
+             background: linear-gradient(135deg, #2a2160, #1b1f45); border: 1px solid rgba(251, 191, 36, 0.55);
+             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 24px rgba(251, 191, 36, 0.25);
+             transform: translate(-50%, -150%); opacity: 0;
+             transition: transform 0.9s cubic-bezier(.2, .8, .2, 1), opacity 0.9s ease; pointer-events: none; }
+.ach-toast.show { transform: translate(-50%, 0); opacity: 1; }
+.ach-toast .at-head { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #fbbf24; }
+.ach-toast .at-name { font-size: 17px; font-weight: 800; margin-top: 2px; color: #fff; }
+@media (prefers-reduced-motion: reduce) { .ach-toast { transition: opacity 0.4s; transform: translate(-50%, 0); } }
 .season-card .ss-league { font-size: 22px; font-weight: 800; color: #fbbf24; margin: 4px 0 10px; }
 .season-card .ss-league .big { display: block; font-size: 48px; line-height: 1.1; }
 .season-card .ss-line { font-size: 15px; margin: 4px 0; }
@@ -719,6 +804,37 @@ select.field option { background: #1e1b4b; color: #fff; }
 .rk-elo { font-size: 44px; font-weight: 800; line-height: 1.05; color: #fbbf24;
           font-variant-numeric: tabular-nums; }
 .rk-elo-sub { font-size: 13px; color: rgba(255, 255, 255, 0.5); margin-top: 4px; }
+/* Герб лиги над названием; весь блок нажимается — открывает путь по лигам */
+#rkHero { cursor: pointer; }
+.rk-emblem { display: flex; justify-content: center; margin-bottom: 2px; filter: drop-shadow(0 4px 12px var(--lg-glow, transparent)); }
+.rk-path-link { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 700; color: #a5b4fc; }
+.pf-league { cursor: pointer; }
+/* Путь по лигам */
+.path-card { max-height: 88vh; overflow-y: auto; text-align: left; }
+.path-card .modal-text { text-align: center; margin-bottom: 4px; }
+.path-sub { text-align: center; font-size: 13px; color: rgba(255, 255, 255, 0.55); margin-bottom: 10px; }
+.path-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.path-league { padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.05);
+               border: 1px solid rgba(255, 255, 255, 0.08); }
+.path-league.current { border-color: rgba(251, 191, 36, 0.6); background: rgba(251, 191, 36, 0.08);
+                       box-shadow: 0 0 18px rgba(251, 191, 36, 0.15); }
+.path-league.ahead { opacity: 0.85; }
+.pl-head { display: flex; align-items: center; gap: 10px; }
+.pl-name { font-size: 16px; font-weight: 800; }
+.pl-here { font-size: 12px; font-weight: 800; color: #fbbf24; margin-left: 6px; }
+.pl-rew { font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pl-rew .r-item { font-size: 18px; line-height: 1; }
+.pl-rew .r-item.locked { filter: grayscale(1); opacity: 0.4; }
+.pl-rew .r-swatch { width: 16px; height: 16px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,0.3); }
+.pl-rew .r-swatch.locked { opacity: 0.35; }
+.pl-ranks { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; margin-top: 10px; }
+.pl-rank { position: relative; text-align: center; font-size: 12px; font-weight: 800; padding: 5px 0 4px; border-radius: 7px;
+           background: rgba(255, 255, 255, 0.06); color: rgba(255, 255, 255, 0.55); }
+.pl-rank.passed { background: rgba(251, 191, 36, 0.22); color: #fde68a; }
+.pl-rank.here { background: #fbbf24; color: #0f1430; box-shadow: 0 0 10px rgba(251, 191, 36, 0.6); }
+.pl-rank .pl-star { display: block; font-size: 7px; letter-spacing: -1px; line-height: 1; margin-top: 1px; }
+.pl-rank.floor::after { content: '🛡'; position: absolute; top: -7px; right: -4px; font-size: 10px; }
+.pl-legend { font-size: 13px; color: rgba(255, 255, 255, 0.7); margin-top: 6px; }
 .rk-elo.league { font-size: 32px; }
 .rk-stars { font-size: 26px; letter-spacing: 4px; color: #fbbf24; line-height: 1.2; }
 .rk-top { margin-top: 26px; }

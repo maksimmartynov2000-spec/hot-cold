@@ -19,7 +19,7 @@ returns text language sql as $$
   from jsonb_array_elements(match_state(p_user, p_pin, p_mid)->'moves') with ordinality t(x, n);
 $$;
 
-\echo === 1. туман взят ходом: этот ход виден, следующие закрыты — и на своём ходу, и на чужом
+\echo === 1. туман лёг — закрыты все ходы соперника в раунде, даже тот, которым его взяли (миграция 044)
 do $$
 declare mid bigint; v text;
 begin
@@ -34,20 +34,20 @@ begin
   perform match_guess('Лев', '1234', mid, 50);            -- взял туман, он лёг на Киру
   if not (select fog[2] from matches where id = mid) then raise exception 'ОШИБКА: туман не лёг'; end if;
   v := pg_temp.seen('Кира', '4321', mid);
-  if v <> '50' then raise exception 'ОШИБКА: ход, которым взят туман, закрыт: %', v; end if;
+  if v <> 'h' then raise exception 'УТЕЧКА: под туманом виден ход соперника: %', v; end if;
 
   perform match_guess('Кира', '4321', mid, 90);           -- теперь ходит Лев
   v := pg_temp.seen('Кира', '4321', mid);
-  if v <> '50,90' then raise exception 'ОШИБКА: на ходу Льва Кира видит %', v; end if;
+  if v <> 'h,90' then raise exception 'ОШИБКА: на ходу Льва Кира видит %', v; end if;
 
   perform match_guess('Лев', '1234', mid, 60);            -- ход после тумана
   v := pg_temp.seen('Кира', '4321', mid);
-  if v <> '50,90,h' then raise exception 'ОШИБКА: на своём ходу Кира видит %', v; end if;
+  if v <> 'h,90,h' then raise exception 'ОШИБКА: на своём ходу Кира видит %', v; end if;
 
   perform match_guess('Кира', '4321', mid, 95);           -- снова ходит Лев
   v := pg_temp.seen('Кира', '4321', mid);
   -- Раньше здесь ход Льва открывался: туман работал только на ходу Киры
-  if v <> '50,90,h,95' then raise exception 'УТЕЧКА: на ходу Льва Кира видит %', v; end if;
+  if v <> 'h,90,h,95' then raise exception 'УТЕЧКА: на ходу Льва Кира видит %', v; end if;
 
   v := pg_temp.seen('Лев', '1234', mid);
   if v <> '50,90,60,95' then raise exception 'ОШИБКА: у Льва без тумана закрыто: %', v; end if;
@@ -74,7 +74,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 3. слепота: свои ходы после неё закрыты на любом ходу, прежние видны
+\echo === 3. слепота: закрыты все свои ходы в раунде, и прежние тоже
 do $$
 declare mid bigint; v text;
 begin
@@ -90,10 +90,10 @@ begin
   if not (select blind[2] from matches where id = mid) then raise exception 'ОШИБКА: слепота не легла'; end if;
   perform match_guess('Кира', '4321', mid, 20);           -- после слепоты
   v := pg_temp.seen('Кира', '4321', mid);                 -- ход Льва
-  if v <> '10,50,h' then raise exception 'УТЕЧКА: на ходу Льва Кира видит свои: %', v; end if;
+  if v <> 'h,50,h' then raise exception 'УТЕЧКА: на ходу Льва Кира видит свои: %', v; end if;
   perform match_guess('Лев', '1234', mid, 55);
   v := pg_temp.seen('Кира', '4321', mid);                 -- ход Киры
-  if v <> '10,50,h,55' then raise exception 'ОШИБКА: на своём ходу Кира видит %', v; end if;
+  if v <> 'h,50,h,55' then raise exception 'ОШИБКА: на своём ходу Кира видит %', v; end if;
   v := pg_temp.seen('Лев', '1234', mid);
   if v <> '10,50,20,55' then raise exception 'ОШИБКА: у Льва закрыто: %', v; end if;
   update matches set status = 'finished' where id = mid;
@@ -121,7 +121,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 5. отметка ставится один раз; туман, легший до миграции, закрывает всё
+\echo === 5. туман на уже затуманенного ничего не меняет; закрыто всё
 do $$
 declare mid bigint; f bigint; v text;
 begin
@@ -132,14 +132,14 @@ begin
   perform match_guess('Лев', '1234', mid, 11);
   update matches set fog = array[false, true] where id = mid;
   select fog_from[2] into f from matches where id = mid;
-  if f <> (select max(id) from match_moves where match_id = mid) then raise exception 'ОШИБКА: отметка %', f; end if;
+  if f <> 0 then raise exception 'ОШИБКА: отметка % — должно быть 0, закрыто всё', f; end if;
   perform match_guess('Кира', '4321', mid, 12);
   perform match_guess('Лев', '1234', mid, 13);
   -- Повторный туман на уже затуманенного отметку не двигает
   update matches set fog = array[false, true], cur = 1 where id = mid;
   if (select fog_from[2] from matches where id = mid) <> f then raise exception 'ОШИБКА: отметка сдвинулась'; end if;
   v := pg_temp.seen('Кира', '4321', mid);
-  if v <> '11,12,h' then raise exception 'ОШИБКА: %', v; end if;
+  if v <> 'h,12,h' then raise exception 'ОШИБКА: %', v; end if;
   -- Партия, где туман лёг до миграции: отметки нет (0) — закрыты все чужие ходы
   update matches set fog_from = array[0, 0] where id = mid;
   v := pg_temp.seen('Кира', '4321', mid);
@@ -148,7 +148,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 6. бот под туманом видит то же, что человек: ход до тумана — да, после — нет
+\echo === 6. бот под туманом видит то же, что человек: ни одного хода соперника
 do $$
 declare mid bigint; v int[];
 begin
@@ -162,8 +162,7 @@ begin
   perform match_guess_core(mid, 0, 38);
   v := bot_candidates(mid, 1, false);
   if v is distinct from (select array_agg(x order by x) from generate_series(1, 100) x
-                         where feedback_tier(100, abs(x - 40)) = feedback_tier(100, 39)
-                           and feedback_tier(100, abs(x - 27)) = feedback_tier(100, 26)) then
+                         where feedback_tier(100, abs(x - 27)) = feedback_tier(100, 26)) then
     raise exception 'ОШИБКА: бот под туманом видит не то: %', v;
   end if;
   update matches set status = 'finished' where id = mid;

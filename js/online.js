@@ -167,9 +167,14 @@ function colorOf(name) {
 
 function paintAvatar(el, name) {
   const icon = avatarOf(name);
-  el.textContent = icon || avatarLetter(name);
+  // Наградная иконка — рисунком (js/art.js), обычная — эмодзи, без иконки — буква
+  const art = icon ? rewardArt(icon, 0) : '';
+  if (art) el.innerHTML = art; else el.textContent = icon || avatarLetter(name);
   el.classList.toggle('has-icon', !!icon);
-  el.style.background = colorOf(name);
+  el.classList.toggle('has-art', !!art);
+  const bg = colorOf(name);
+  el.style.background = avatarBgCss(bg);
+  el.classList.toggle('shine', isShinyBg(bg));
   el.dataset.avatarFor = name;
 }
 
@@ -373,7 +378,7 @@ function renderAvatarGrid() {
       const locked = rewardLeague('color', color) > 0 && !rewardOpen('color', color);
       c.className = 'av-color' + (color === bg ? ' sel' : '') + (locked ? ' locked' : '');
       c.dataset.color = color;
-      c.style.background = color;
+      c.style.background = avatarBgCss(color);
       c.setAttribute('aria-label', color);
       c.onclick = () => chooseColor(color);
       grid.appendChild(c);
@@ -394,8 +399,10 @@ function renderAvatarGrid() {
       : rewardLeague('icon', icon) > 0 && !rewardOpen('icon', icon);
     b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '') + (locked ? ' locked' : '');
     b.dataset.icon = icon;
-    b.textContent = icon || avatarLetter(me);
-    b.style.background = bg;
+    const art = icon ? rewardArt(icon, 0) : '';
+    if (art) b.innerHTML = art; else b.textContent = icon || avatarLetter(me);
+    b.classList.toggle('has-art', !!art);
+    b.style.background = avatarBgCss(bg);
     b.onclick = () => chooseAvatar(icon);
     grid.appendChild(b);
   });
@@ -2595,7 +2602,15 @@ function renderRanked(st) {
     // Лига — крупно, звёзды под ней. Число рейтинга видно только Легенде:
     // ниже его заменяют звёзды, а рейтинг работает на подбор соперника
     const p = ladderPos(ladderInfo.stars);
-    elo.textContent = leagueLabel(ladderInfo.stars);
+    elo.textContent = leagueLabel(ladderInfo.stars).replace(/^\S+\s/, '');
+    // Герб лиги рисунком; эмодзи-медаль из подписи убрана — она бы дублировала герб
+    const em = document.getElementById('rkEmblem');
+    em.innerHTML = leagueEmblem(p.league, p.legend ? null : p.rank, 76);
+    em.style.setProperty('--lg-glow', LEAGUE_ART[p.league].glow);
+    em.classList.remove('hidden');
+    const link = document.getElementById('rkPathLink');
+    link.textContent = t().path.link;
+    link.classList.remove('hidden');
     // Число рейтинга не показываем и Легенде: лестница — лиги и звёзды
     starsEl.textContent = p.legend ? '' : starsLine(ladderInfo.stars);
     const days = Math.floor((ladderInfo.endsIn || 0) / 86400);
@@ -2608,6 +2623,8 @@ function renderRanked(st) {
     ap.textContent = t().tut.rkApprentice.replace('{n}', left);
     ap.classList.toggle('hidden', !(left > 0));
   } else {
+    document.getElementById('rkEmblem').classList.add('hidden');
+    document.getElementById('rkPathLink').classList.add('hidden');
     elo.textContent = mine ? formatNum(mine.elo) : '—';
     document.getElementById('rkEloSub').textContent = mine
       ? L.rkEloSub.replace('{g}', mine.games) : L.rkEloSub.replace('{g}', '0');
@@ -2794,6 +2811,16 @@ function applyMatchState(st) {
   online.ranked = !!st.ranked;
   online.forfeitBy = (st.forfeitBy === null || st.forfeitBy === undefined) ? null : st.forfeitBy;
   online.eloDelta = st.eloDelta || null;
+  // Партия кончилась — чуть погодя спросить, не открылось ли достижение:
+  // уведомление выезжает поверх итога партии
+  // Партию закончили у нас на глазах (а не открыли старую) — тогда звёзды
+  // покажем на весь экран
+  if (!st.matchOver) online.wasPlaying = true;
+  if (st.matchOver && online.wasPlaying) online.justFinished = true;
+  if (st.matchOver && !online.progressAsked) {
+    online.progressAsked = true;
+    setTimeout(() => { if (runAuth()) loadProgress(); }, 2500);
+  }
   online.elo = st.elo;
   online.botSeat = (st.botSeat === null || st.botSeat === undefined) ? null : st.botSeat;
   // Начало партии и перерыв: сервер присылает остаток секунд, дальше
@@ -3338,6 +3365,8 @@ async function runGuess() {
 
 // Результат уже записан сервером: отправлять нечего, остаётся показать
 async function endRun(res) {
+  // Испытание кончилось — то же: могло открыться «Испытание: 10»
+  setTimeout(() => { if (runAuth()) loadProgress(); }, 2000);
   const L = t();
   const finalScore = (res && typeof res.score === 'number') ? res.score : (RUN ? RUN.totalScore : 0);
   const roundsSurvived = (res && typeof res.rounds === 'number')

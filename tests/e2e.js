@@ -530,7 +530,8 @@ async function registerPlayer(p, name, pin) {
   await B.page.evaluate(() => backToOnline());
   await B.page.waitForTimeout(1200);
   const heroB = await B.page.evaluate(() => document.getElementById('rkElo').textContent);
-  check('на экране онлайна — лига из настоящей базы', heroB === '🥉 Бронза 10', heroB);
+  const emblemB = await B.page.evaluate(() => !!document.querySelector('#rkEmblem:not(.hidden) svg.lg-emblem'));
+  check('на экране онлайна — герб и лига из настоящей базы', heroB === 'Бронза 10' && emblemB, heroB);
 
   // Задания дня: засчитывает база по настоящим партиям
   const decided = (await db.query("select count(*)::int as n from matches m where match_winner(m) is not null and 'Лада' in (m.p0, m.p1)")).rows[0].n;
