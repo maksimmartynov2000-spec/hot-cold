@@ -2103,8 +2103,19 @@ async function testDotMotion(browser) {
   await page.waitForTimeout(500);
   await page.click('#toggleThermoBtn');
   await page.waitForTimeout(200);
-  const idle = await anim();
-  check('без нового хода точка стоит', idle.from === null && !idle.fade, JSON.stringify(idle));
+  // Прямую при перерисовке без хода не трогают вовсе: закончившееся движение
+  // остаётся в разметке, но точка стоит на своём числе и никуда не едет
+  const idle = await page.evaluate(async () => {
+    const dot = () => [...document.querySelectorAll('#numLineSvg circle')].find(e => e.getAttribute('r') === '5');
+    const at = () => Math.round(dot().cx.animVal.valueInSpecifiedUnits * 10) / 10;
+    const a = at();
+    renderAll();
+    const b = at();
+    await new Promise(r => setTimeout(r, 300));
+    return { a, b, c: at(), base: Math.round(parseFloat(dot().getAttribute('cx')) * 10) / 10, cx: dot().getAttribute('cx') };
+  });
+  check('без нового хода точка стоит', idle.a === idle.base && idle.b === idle.base && idle.c === idle.base,
+    JSON.stringify(idle));
   check('и остаётся на месте последнего хода', idle.cx === second.cx);
   await page.click('#toggleThermoBtn');
 
@@ -6233,6 +6244,44 @@ async function testUxPass(browser) {
   await page.context().close();
 }
 
+// Онлайн один ход приносит несколько перерисовок подряд (ответ на ход и
+// сигналы Realtime). Точка на прямой должна доехать плавно, а не прыгнуть
+// в конец на второй перерисовке
+async function testLineSmooth(browser) {
+  console.log('\nПрямая: плавный ход точки при повторных перерисовках');
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => { Object.assign(window.__match, { moves: [{ seat: 0, guess: 10, tier: 2 }, { seat: 1, guess: 20, tier: 3 }], cur: 0 }); openMatch(1); });
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => stopMatchPoll());
+  const s = await page.evaluate(async () => {
+    window.__match.moves.push({ seat: 1, guess: 90, tier: 5 });
+    const pos = () => {
+      const c = [...document.querySelectorAll('#numLineSvg circle')].find(e => e.getAttribute('r') === '5');
+      return c ? c.cx.animVal.valueInSpecifiedUnits : null;
+    };
+    await refreshMatch(true);
+    const t0 = performance.now();
+    await new Promise(r => setTimeout(r, 150));
+    await refreshMatch(true);
+    await refreshMatch(true);
+    const out = [];
+    while (performance.now() - t0 < 1300) {
+      out.push({ t: Math.round(performance.now() - t0), x: pos() });
+      await new Promise(r => setTimeout(r, 40));
+    }
+    return out;
+  });
+  const end = s[s.length - 1].x;
+  // Через 0,35 с после хода точка ещё в пути — не у цели
+  const mid = s.filter(p => p.t > 250 && p.t < 450).map(p => p.x);
+  const steps = s.map((p, i) => i ? p.x - s[i - 1].x : 0);
+  check('после второй перерисовки точка продолжает ехать, а не прыгает в конец',
+    mid.length > 0 && mid.every(x => x < end - 3) && Math.max(...steps) < 25,
+    s.map(p => p.t + ':' + Math.round(p.x)).join(' '));
+  check('и доезжает до своего числа', end > 80, String(end));
+  await page.context().close();
+}
+
 // Старый PIN из 4 цифр — профиль предлагает сменить на 6
 async function testPinShort(browser) {
   console.log('\nPIN из 4 цифр — предложение сменить');
@@ -6812,6 +6861,7 @@ async function testKeyPage(browser) {
     await testRealtime(browser);
     await testSplitFiles();
     await testUxPass(browser);
+    await testLineSmooth(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

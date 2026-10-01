@@ -1421,6 +1421,11 @@ function nlPlay(svg) {
 // Где стояла точка в прошлый раз и от какого хода. Ключ нужен, чтобы прямая
 // не дёргалась на перерисовках без хода — от поворота экрана или кнопки
 let nlAnim = { key: null, x: null };
+// Что нарисовано сейчас — без движений. Онлайн один ход приносит две-три
+// перерисовки подряд (ответ на ход и сигналы Realtime); если прямая от них не
+// меняется, её не трогаем — иначе начатое движение обрывалось и точка
+// прыгала в конец
+let nlDrawn = null;
 
 function nlTick(v, y1, y2, stroke, width) {
   return '<line x1="' + nlPos(v) + '%" y1="' + y1 + '" x2="' + nlPos(v) + '%" y2="' + y2 +
@@ -1540,6 +1545,9 @@ function renderNumberLine() {
 
   if (animKey !== nlAnim.key) nlAnim = { key: animKey, x: dotX };
 
+  const still = out.replace(/<animate [^>]*\/>/g, '');
+  if (!fresh && still === nlDrawn && svg.firstChild) return;
+  nlDrawn = still;
   svg.innerHTML = out;
   nlPlay(svg);
 }
