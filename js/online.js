@@ -120,7 +120,7 @@ function avatarLetter(name) {
 // выбирал, у того он и остаётся прежним
 const AVATAR_BG = ['#fbbf24', '#34d399', '#60a5fa', '#f472b6', '#a78bfa',
                    '#fb923c', '#2dd4bf', '#a3e635', '#f87171', '#e2e8f0'];
-const AVATAR_CHOICES = ['🦊', '🐼', '🐯', '🦁', '🐨', '🐸', '🐵', '🐧', '🦉', '🐙', '🦄', '🐲', '🐶', '🐱', '🐰', '🐻', '🐮', '🐷', '🐔', '🐢', '🦋', '🐝', '🐬', '🦈'];
+const AVATAR_CHOICES = ['🦊', '🐼', '🐯', '🦁', '🐨', '🐸', '🐵', '🐧', '🦉', '🐙', '🦄', '🐊', '🐶', '🐱', '🐰', '🐻', '🦙', '🐹', '🐥', '🐢', '🦋', '🐝', '🐬', '🦈'];
 
 // Иконки других игроков: имя → { icon, color }; пустые — буква и цвет из
 // имени. Заполняется по мере того, как имена появляются в списках, заново —
@@ -167,8 +167,8 @@ function colorOf(name) {
 
 function paintAvatar(el, name) {
   const icon = avatarOf(name);
-  // Наградная иконка — рисунком (js/art.js), обычная — эмодзи, без иконки — буква
-  const art = icon ? rewardArt(icon, 0) : '';
+  // Иконка — рисунком (js/art.js); иконка, которой в наборе уже нет, — эмодзи; без иконки — буква
+  const art = icon ? iconArt(icon, 0) : '';
   if (art) el.innerHTML = art; else el.textContent = icon || avatarLetter(name);
   el.classList.toggle('has-icon', !!icon);
   el.classList.toggle('has-art', !!art);
@@ -399,7 +399,7 @@ function renderAvatarGrid() {
       : rewardLeague('icon', icon) > 0 && !rewardOpen('icon', icon);
     b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '') + (locked ? ' locked' : '');
     b.dataset.icon = icon;
-    const art = icon ? rewardArt(icon, 0) : '';
+    const art = icon ? iconArt(icon, 0) : '';
     if (art) b.innerHTML = art; else b.textContent = icon || avatarLetter(me);
     b.classList.toggle('has-art', !!art);
     b.style.background = avatarBgCss(bg);

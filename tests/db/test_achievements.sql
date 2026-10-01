@@ -57,7 +57,93 @@ begin
   then raise exception 'ОШИБКА: счётчики %', s; end if;
   if not exists (select 1 from achievements where username = 'Лев' and code = 'friends_1') then raise exception 'ОШИБКА: нет первого друга'; end if;
   if exists (select 1 from achievements where not (code = any (achievement_codes()))) then raise exception 'ОШИБКА: код не из списка'; end if;
-  if array_length(achievement_codes(), 1) <> 29 then raise exception 'ОШИБКА: достижений %', array_length(achievement_codes(), 1); end if;
+  if array_length(achievement_codes(), 1) <> 50 then raise exception 'ОШИБКА: достижений %', array_length(achievement_codes(), 1); end if;
+end $$;
+\echo ok
+
+\echo === 5. с первой попытки: первый настоящий ход раунда угадал число
+do $$
+declare mid bigint;
+begin
+  insert into matches(p0, p1, status, wins, wins_needed) values ('Лев', 'Кира', 'finished', array[3, 1], 3) returning id into mid;
+  insert into match_moves(match_id, round, seat, guess, tier) values
+    (mid, 1, 0, 50, 8),                    -- сразу угадал
+    (mid, 2, 1, 10, 3), (mid, 2, 0, 20, 8), -- соперник промахнулся, свой первый ход — в точку
+    (mid, 3, 0, 5, 2), (mid, 3, 0, 6, 8);   -- угадал со второй — не считается
+  insert into match_moves(match_id, round, seat, guess, tier, kind) values (mid, 4, 0, null, null, 'timeout');
+  insert into match_moves(match_id, round, seat, guess, tier) values (mid, 4, 0, 7, 8); -- истёкшее время — не попытка
+  insert into match_moves(match_id, round, seat, guess, tier) values (mid, 5, 1, 9, 8);  -- угадала Кира, не Лев
+  if ach_first_try('Лев') <> 3 then raise exception 'ОШИБКА: с первой попытки у Льва %', ach_first_try('Лев'); end if;
+  if ach_first_try('Кира') <> 1 then raise exception 'ОШИБКА: с первой попытки у Киры %', ach_first_try('Кира'); end if;
+  perform achievements_sync('Лев');
+  if (select count(*) from achievements where username = 'Лев' and code in ('first_try_1', 'first_try_3')) <> 2
+     or exists (select 1 from achievements where username = 'Лев' and code = 'first_try_10')
+  then raise exception 'ОШИБКА: ступени «с первой попытки»'; end if;
+end $$;
+\echo ok
+
+\echo === 6. режимы: считаются только победы на звёзды, каждый режим один раз
+do $$ begin
+  -- Победа над Кирой из шага 5 — не на звёзды, режима у неё нет
+  insert into matches(p0, p1, status, wins, wins_needed, ranked, ranked_mode) values
+    ('Лев', 'Максим', 'finished', array[3, 0], 3, true, 1),
+    ('Максим', 'Лев', 'finished', array[1, 3], 3, true, 1),
+    ('Лев', 'Максим', 'finished', array[3, 2], 3, true, 2),
+    ('Лев', 'Максим', 'finished', array[0, 3], 3, true, 3),   -- проиграл
+    ('Лев', 'Максим', 'active', array[2, 0], 3, true, 0);     -- не доиграна
+  if ach_modes('Лев') <> 2 then raise exception 'ОШИБКА: режимов %', ach_modes('Лев'); end if;
+  perform achievements_sync('Лев');
+  if not exists (select 1 from achievements where username = 'Лев' and code = 'modes_2')
+     or exists (select 1 from achievements where username = 'Лев' and code = 'modes_3')
+  then raise exception 'ОШИБКА: ступени режимов'; end if;
+end $$;
+\echo ok
+
+\echo === 7. победы над друзьями: разные друзья, не просто игроки
+do $$ begin
+  -- Кира — друг (из шага 4), её Лев обыграл в шаге 5; Максима обыгрывал, но он не друг
+  if ach_friends_beaten('Лев') <> 1 then raise exception 'ОШИБКА: друзей обыграно %', ach_friends_beaten('Лев'); end if;
+  if ach_friends_beaten('Кира') <> 0 then raise exception 'ОШИБКА: Кира никого не обыгрывала'; end if;
+  insert into friendships(requester, addressee, status) values ('Максим', 'Лев', 'accepted');
+  if ach_friends_beaten('Лев') <> 2 then raise exception 'ОШИБКА: Максим стал другом — должно быть 2'; end if;
+  perform achievements_sync('Лев');
+  if not exists (select 1 from achievements where username = 'Лев' and code = 'rivals_1') then raise exception 'ОШИБКА: нет «победы над другом»'; end if;
+end $$;
+\echo ok
+
+\echo === 8. игра видит счётчики новых лестниц
+do $$
+declare s jsonb;
+begin
+  s := my_progress('Лев', '1234', null)->'stats';
+  if (s->>'firstTry')::int <> 3 or (s->>'modes')::int <> 2 or (s->>'rivals')::int <> 2
+  then raise exception 'ОШИБКА: счётчики %', s; end if;
+end $$;
+\echo ok
+
+\echo === 9. новые ступени старых лестниц открываются
+do $$ begin
+  update player_stats set online_wins = 1000, online_games = 1000, quest_best = 100, run_best = 30, best_win_streak = 20
+  where username = 'Лев';
+  perform achievements_sync('Лев');
+  if (select count(*) from achievements where username = 'Лев'
+      and code in ('wins_250','wins_500','wins_1000','games_500','games_1000','streak_15','streak_20',
+                   'quests_60','quests_100','run_25','run_30')) <> 11
+  then raise exception 'ОШИБКА: верхние ступени'; end if;
+end $$;
+\echo ok
+
+\echo === 10. иконки: новые звери выбираются, убранные — нет
+do $$ begin
+  if set_avatar('Лев', '1234', '🐊') is distinct from '🐊' then raise exception 'ОШИБКА: 🐊 не встал'; end if;
+  begin
+    perform set_avatar('Лев', '1234', '🐲');
+    raise exception 'ОШИБКА: убранная иконка принята';
+  exception when sqlstate 'P0001' then if sqlerrm not like '%invalid_avatar%' then raise; end if;
+  end;
+  if array_length(avatar_choices(), 1) <> 24 or avatar_choices() && array['🐲','🐮','🐷','🐔'] then
+    raise exception 'ОШИБКА: набор %', avatar_choices();
+  end if;
 end $$;
 \echo ok
 

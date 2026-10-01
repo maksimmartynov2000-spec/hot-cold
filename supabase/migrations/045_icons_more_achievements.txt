@@ -1,0 +1,262 @@
+-- Новый набор иконок и новые достижения. Применять в Supabase: SQL Editor →
+-- вставить целиком → Run. Применить ДО мёржа.
+--
+-- Иконки. Все иконки игра теперь рисует сама, в одном стиле. Четыре зверя
+-- набора заменены: 🐲 → 🐊, 🐮 → 🦙, 🐷 → 🐹, 🐔 → 🐥. Кто выбрал
+-- убранного, получает его замену — сам ничего делать не должен.
+--
+-- Достижения. Было 29, стало 50: старые лестницы продлены вверх
+-- (до 1000 побед, 1000 партий, 20 подряд, 100 дней заданий, 30 раундов
+-- Испытания, 20 друзей) и добавлены три новые — угадал с первой попытки,
+-- победы в разных режимах на звёзды, победы над разными друзьями.
+
+-- 1. Иконки. Проверку столбца на время снять: старые значения уже не из
+--    набора, новые — ещё не из набора
+alter table students drop constraint if exists student_avatar_allowed;
+
+update students set avatar = case avatar
+  when '🐲' then '🐊' when '🐮' then '🦙' when '🐷' then '🐹' when '🐔' then '🐥' end
+where avatar in ('🐲', '🐮', '🐷', '🐔');
+
+-- Копия набора — в js/online.js (AVATAR_CHOICES), сверяется тестом
+create or replace function avatar_choices()
+returns text[]
+language sql
+immutable
+as $$
+  select array['🦊','🐼','🐯','🦁','🐨','🐸','🐵','🐧','🦉','🐙','🦄','🐊',
+               '🐶','🐱','🐰','🐻','🦙','🐹','🐥','🐢','🦋','🐝','🐬','🦈'];
+$$;
+
+alter table students add constraint student_avatar_allowed
+  check (avatar is null or avatar = any (avatar_choices() || reward_icons() || tutorial_icon() || quest_icons()));
+
+-- 2. Счётчики для новых лестниц. Считаются по партиям, а не копятся:
+--    так они верны и для всего, что было сыграно до этой миграции
+
+-- Сколько раундов угадано первым же ходом. Ход без числа (истекло время)
+-- попыткой не считается
+create or replace function ach_first_try(p_username text)
+returns int
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with mine as (
+    select id, 0 as seat from matches where p0 = p_username and bot_seat is distinct from 0
+    union all
+    select id, 1 from matches where p1 = p_username and bot_seat is distinct from 1
+  )
+  select count(*)::int from (
+    select distinct on (mv.match_id, mv.round) mv.tier
+    from mine join match_moves mv on mv.match_id = mine.id and mv.seat = mine.seat
+    where mv.guess is not null
+    order by mv.match_id, mv.round, mv.id
+  ) first_moves
+  where tier = 8;
+$$;
+
+-- В скольких режимах на звёзды есть победа
+create or replace function ach_modes(p_username text)
+returns int
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select count(distinct coalesce(m.ranked_mode, 0))::int
+  from matches m
+  where m.ranked and m.status = 'finished'
+    and ((m.p0 = p_username and match_winner(m) = 0) or (m.p1 = p_username and match_winner(m) = 1));
+$$;
+
+-- Сколько разных друзей обыграно (с ботом не считается)
+create or replace function ach_friends_beaten(p_username text)
+returns int
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select count(distinct case when m.p0 = p_username then m.p1 else m.p0 end)::int
+  from matches m
+  where m.status = 'finished' and m.bot_seat is null
+    and ((m.p0 = p_username and match_winner(m) = 0) or (m.p1 = p_username and match_winner(m) = 1))
+    and exists (select 1 from friendships f
+                where f.status = 'accepted'
+                  and ((f.requester = m.p0 and f.addressee = m.p1) or (f.requester = m.p1 and f.addressee = m.p0)));
+$$;
+
+-- 3. Список достижений. Порядок и коды — в js/game.js (ACH_LADDERS),
+--    сверяется тестом
+create or replace function achievement_codes()
+returns text[]
+language sql
+immutable
+as $$
+  select array['first_win', 'wins_5', 'wins_10', 'wins_25', 'wins_50', 'wins_100', 'wins_250', 'wins_500', 'wins_1000',
+               'games_10', 'games_50', 'games_200', 'games_500', 'games_1000',
+               'streak_3', 'streak_5', 'streak_10', 'streak_15', 'streak_20',
+               'first_try_1', 'first_try_3', 'first_try_10',
+               'modes_2', 'modes_3', 'modes_4',
+               'league_silver', 'league_gold', 'league_platinum', 'league_diamond', 'legend',
+               'quests_3', 'quests_7', 'quests_14', 'quests_30', 'quests_60', 'quests_100',
+               'run_5', 'run_10', 'run_15', 'run_20', 'run_25', 'run_30',
+               'friends_1', 'friends_3', 'friends_10', 'friends_20',
+               'rivals_1', 'rivals_3', 'rivals_10',
+               'tutorial'];
+$$;
+
+create or replace function achievements_sync(p_username text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare st player_stats; l ladder; fr int; td boolean; peak int; ws int; ft int; md int; rv int;
+begin
+  if p_username is null or p_username like '#%' or p_username like '@bot:%' then return; end if;
+  if not exists (select 1 from students where username = p_username) then return; end if;
+  insert into player_stats(username) values (p_username) on conflict do nothing;
+  select * into st from player_stats where username = p_username;
+  select * into l from ladder where username = p_username;
+  peak := coalesce(l.peak, 0);
+  ws := greatest(st.best_win_streak, coalesce(l.streak, 0));
+  select count(*) into fr from friendships
+  where status = 'accepted' and p_username in (requester, addressee);
+  select tutorial_done into td from students where username = p_username;
+  ft := ach_first_try(p_username);
+  md := ach_modes(p_username);
+  rv := ach_friends_beaten(p_username);
+  insert into achievements(username, code)
+  select p_username, c
+  from unnest(array[
+    case when st.online_wins >= 1 then 'first_win' end,
+    case when st.online_wins >= 5 then 'wins_5' end,
+    case when st.online_wins >= 10 then 'wins_10' end,
+    case when st.online_wins >= 25 then 'wins_25' end,
+    case when st.online_wins >= 50 then 'wins_50' end,
+    case when st.online_wins >= 100 then 'wins_100' end,
+    case when st.online_wins >= 250 then 'wins_250' end,
+    case when st.online_wins >= 500 then 'wins_500' end,
+    case when st.online_wins >= 1000 then 'wins_1000' end,
+    case when st.online_games >= 10 then 'games_10' end,
+    case when st.online_games >= 50 then 'games_50' end,
+    case when st.online_games >= 200 then 'games_200' end,
+    case when st.online_games >= 500 then 'games_500' end,
+    case when st.online_games >= 1000 then 'games_1000' end,
+    case when ws >= 3 then 'streak_3' end,
+    case when ws >= 5 then 'streak_5' end,
+    case when ws >= 10 then 'streak_10' end,
+    case when ws >= 15 then 'streak_15' end,
+    case when ws >= 20 then 'streak_20' end,
+    case when ft >= 1 then 'first_try_1' end,
+    case when ft >= 3 then 'first_try_3' end,
+    case when ft >= 10 then 'first_try_10' end,
+    case when md >= 2 then 'modes_2' end,
+    case when md >= 3 then 'modes_3' end,
+    case when md >= 4 then 'modes_4' end,
+    case when peak >= 1 then 'league_silver' end,
+    case when peak >= 2 then 'league_gold' end,
+    case when peak >= 3 then 'league_platinum' end,
+    case when peak >= 4 then 'league_diamond' end,
+    case when peak >= 5 then 'legend' end,
+    case when st.quest_best >= 3 then 'quests_3' end,
+    case when st.quest_best >= 7 then 'quests_7' end,
+    case when st.quest_best >= 14 then 'quests_14' end,
+    case when st.quest_best >= 30 then 'quests_30' end,
+    case when st.quest_best >= 60 then 'quests_60' end,
+    case when st.quest_best >= 100 then 'quests_100' end,
+    case when st.run_best >= 5 then 'run_5' end,
+    case when st.run_best >= 10 then 'run_10' end,
+    case when st.run_best >= 15 then 'run_15' end,
+    case when st.run_best >= 20 then 'run_20' end,
+    case when st.run_best >= 25 then 'run_25' end,
+    case when st.run_best >= 30 then 'run_30' end,
+    case when fr >= 1 then 'friends_1' end,
+    case when fr >= 3 then 'friends_3' end,
+    case when fr >= 10 then 'friends_10' end,
+    case when fr >= 20 then 'friends_20' end,
+    case when rv >= 1 then 'rivals_1' end,
+    case when rv >= 3 then 'rivals_3' end,
+    case when rv >= 10 then 'rivals_10' end,
+    case when coalesce(td, false) then 'tutorial' end]) c
+  where c is not null
+  on conflict do nothing;
+end;
+$$;
+
+-- Всё, что заслужено по новым ступеням, — открыть сразу
+do $$
+declare u text;
+begin
+  for u in select username from students where username not like '#%' and username not like '@bot:%' loop
+    perform achievements_sync(u);
+  end loop;
+end $$;
+
+-- 4. Игра показывает, сколько осталось до следующей ступени и на новых лестницах
+create or replace function my_progress(p_username text, p_pin text, p_tz text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; s students; d date; st player_stats; quests jsonb; ach jsonb; streak int;
+        fr int; peak int; cur_streak int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into s from students where username = me;
+  if p_tz is not null and p_tz is distinct from s.tz
+     and (s.tz is null or s.tz_set_at is null or s.tz_set_at <= now() - interval '20 hours')
+     and exists (select 1 from pg_timezone_names where name = p_tz) then
+    update students set tz = p_tz, tz_set_at = now() where username = me;
+  end if;
+  perform season_end_check();
+  perform achievements_sync(me);
+  d := quest_ensure(me);
+  select * into st from player_stats where username = me;
+  select jsonb_agg(jsonb_build_object('code', q.code, 'goal', q.goal, 'progress', q.progress) order by q.slot)
+    into quests
+  from daily_quests q where q.username = me and q.day = d;
+  select coalesce(jsonb_agg(jsonb_build_object('code', a.code, 'at', a.at) order by a.at), '[]'::jsonb)
+    into ach
+  from achievements a where a.username = me;
+  select count(*) into fr from friendships
+  where status = 'accepted' and me in (requester, addressee);
+  select coalesce(l.peak, 0), coalesce(l.streak, 0) into peak, cur_streak from ladder l where l.username = me;
+  -- Серия жива, если последний выполненный день — сегодня или вчера
+  streak := case when st.quest_last >= d - 1 then st.quest_streak else 0 end;
+  return jsonb_build_object(
+    'day', d,
+    'quests', coalesce(quests, '[]'::jsonb),
+    'streak', coalesce(streak, 0),
+    'bestStreak', coalesce(st.quest_best, 0),
+    'doneToday', coalesce(st.quest_last = d, false),
+    'secondsLeft', greatest(0, floor(extract(epoch from
+        ((d + 1)::timestamp at time zone coalesce((select tz from students where username = me), 'UTC')) - now())))::int,
+    'achievements', ach,
+    'stats', jsonb_build_object(
+      'wins', coalesce(st.online_wins, 0),
+      'games', coalesce(st.online_games, 0),
+      'winStreak', greatest(coalesce(st.best_win_streak, 0), coalesce(cur_streak, 0)),
+      'firstTry', ach_first_try(me),
+      'modes', ach_modes(me),
+      'peak', coalesce(peak, 0),
+      'questBest', coalesce(st.quest_best, 0),
+      'runBest', coalesce(st.run_best, 0),
+      'friends', fr,
+      'rivals', ach_friends_beaten(me),
+      'tutorial', coalesce(s.tutorial_done, false)));
+end;
+$$;
+
+revoke execute on function ach_first_try(text) from public, anon;
+revoke execute on function ach_modes(text) from public, anon;
+revoke execute on function ach_friends_beaten(text) from public, anon;
+revoke execute on function achievements_sync(text) from public, anon;
+grant execute on function avatar_choices() to anon;
+grant execute on function achievement_codes() to anon;
+grant execute on function my_progress(text, text, text) to anon;

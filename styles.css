@@ -195,9 +195,11 @@ body {
 .avatar.has-icon { font-size: 17px; }
 /* Наградная иконка — рисунок во весь кружок с небольшим полем */
 .has-art { padding: 3px !important; overflow: hidden; }
-.has-art .reward-art { display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35)); }
+.has-art .icon-art { display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35)); }
 .pf-avatar.has-art { padding: 7px !important; }
-.av-tile.has-art { padding: 5px; }
+.av-tile.has-art { padding: 5px; overflow: visible; }
+/* В шапке рисунок — во весь кружок кнопки, иначе фон лёг бы квадратом */
+#accountChipName.has-art { display: block; width: 100%; height: 100%; border-radius: 50%; box-sizing: border-box; }
 /* Фон Алмаза и Легенды переливается — медленно, чтобы не рябило */
 .shine { background-size: 220% 220% !important; animation: bgShine 6s ease-in-out infinite; }
 @keyframes bgShine { 0%, 100% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } }
@@ -466,6 +468,9 @@ select.field option { background: #1e1b4b; color: #fff; }
 .ach-medal.t4 { --tier: #22d3ee; --glow: rgba(34, 211, 238, 0.35); }
 .ach-medal.t5 { --tier: #c084fc; --glow: rgba(192, 132, 252, 0.45); }
 .ach-medal.t6 { --tier: #f472b6; --glow: rgba(244, 114, 182, 0.5); }
+.ach-medal.t7 { --tier: #f87171; --glow: rgba(248, 113, 113, 0.5); }
+.ach-medal.t8 { --tier: #34d399; --glow: rgba(52, 211, 153, 0.55); }
+.ach-medal.t9 { --tier: #fde047; --glow: rgba(253, 224, 71, 0.7); }
 .ach-medal.big { width: 58px; height: 58px; }
 .ach-medal.big .am-icon { font-size: 28px; }
 /* Лестницы в профиле */

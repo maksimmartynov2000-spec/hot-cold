@@ -13,8 +13,8 @@ checks(nn, what, ok) as (values
   (2, 'лучшая серия побед запоминается',
       exists (select 1 from information_schema.columns
               where table_schema = 'public' and table_name = 'player_stats' and column_name = 'best_win_streak')),
-  (3, 'достижений 29, лестницами',
-      coalesce(array_length(achievement_codes(), 1), 0) = 29),
+  (3, 'достижений не меньше 29, лестницами',
+      coalesce(array_length(achievement_codes(), 1), 0) >= 29),
   (4, 'игра видит, сколько до следующей ступени',
       exists (select 1 from fn where name = 'my_progress' and src like '%winStreak%'))
 )

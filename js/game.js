@@ -2367,7 +2367,7 @@ function shFinish() {
       const el = document.createElement('div');
       el.className = 'sh-rew';
       el.style.animationDelay = (0.2 * i) + 's';
-      if (r.kind === 'icon') { el.innerHTML = rewardArt(r.value, 0) || r.value; el.style.background = 'rgba(255,255,255,0.1)'; }
+      if (r.kind === 'icon') { el.innerHTML = iconArt(r.value, 0) || r.value; el.style.background = 'rgba(255,255,255,0.1)'; }
       else el.style.background = avatarBgCss(r.value);
       return el;
     }));
@@ -2757,7 +2757,7 @@ function openPath() {
         if (r.kind === 'icon') {
           const i = document.createElement('span');
           i.className = 'r-item' + (open ? '' : ' locked');
-          i.innerHTML = rewardArt(r.value, 20);
+          i.innerHTML = iconArt(r.value, 20);
           line.appendChild(i);
         } else {
           const sw = document.createElement('span');
@@ -2879,19 +2879,27 @@ function closeSeasonSummary() {
 // ---------- задания дня и достижения ----------
 // Иконки за серию дней. Копия — в базе (quest_rewards), сверяется тестом
 const QUEST_ICONS = [{ days: 3, icon: '🔥' }, { days: 7, icon: '🚀' }, { days: 14, icon: '🌋' }, { days: 30, icon: '🌈' }];
-// Достижения — лестницами, как в Hearthstone: 1 → 5 → 10 → 25 → 50 → 100
+// Достижения — лестницами, как в Hearthstone: 1 → 5 → 10 → … → 1000
 // побед. stat — счётчик из my_progress.stats, по нему видно, сколько до
 // следующей ступени. Порядок и коды — как в базе (achievement_codes), сверяется тестом
 const ACH_LADDERS = [
   { key: 'wins', icon: '🏆', stat: 'wins',
-    tiers: [[1, 'first_win'], [5, 'wins_5'], [10, 'wins_10'], [25, 'wins_25'], [50, 'wins_50'], [100, 'wins_100']] },
-  { key: 'games', icon: '🎮', stat: 'games', tiers: [[10, 'games_10'], [50, 'games_50'], [200, 'games_200']] },
-  { key: 'streak', icon: '⚡', stat: 'winStreak', tiers: [[3, 'streak_3'], [5, 'streak_5'], [10, 'streak_10']] },
+    tiers: [[1, 'first_win'], [5, 'wins_5'], [10, 'wins_10'], [25, 'wins_25'], [50, 'wins_50'], [100, 'wins_100'],
+            [250, 'wins_250'], [500, 'wins_500'], [1000, 'wins_1000']] },
+  { key: 'games', icon: '🎮', stat: 'games',
+    tiers: [[10, 'games_10'], [50, 'games_50'], [200, 'games_200'], [500, 'games_500'], [1000, 'games_1000']] },
+  { key: 'streak', icon: '⚡', stat: 'winStreak',
+    tiers: [[3, 'streak_3'], [5, 'streak_5'], [10, 'streak_10'], [15, 'streak_15'], [20, 'streak_20']] },
+  { key: 'firstTry', icon: '🎯', stat: 'firstTry', tiers: [[1, 'first_try_1'], [3, 'first_try_3'], [10, 'first_try_10']] },
+  { key: 'modes', icon: '🧩', stat: 'modes', tiers: [[2, 'modes_2'], [3, 'modes_3'], [4, 'modes_4']] },
   { key: 'league', icon: '🛡️', stat: 'peak',
     tiers: [[1, 'league_silver'], [2, 'league_gold'], [3, 'league_platinum'], [4, 'league_diamond'], [5, 'legend']] },
-  { key: 'quests', icon: '📅', stat: 'questBest', tiers: [[3, 'quests_3'], [7, 'quests_7'], [14, 'quests_14'], [30, 'quests_30']] },
-  { key: 'run', icon: '🧗', stat: 'runBest', tiers: [[5, 'run_5'], [10, 'run_10'], [15, 'run_15'], [20, 'run_20']] },
-  { key: 'friends', icon: '🤝', stat: 'friends', tiers: [[1, 'friends_1'], [3, 'friends_3'], [10, 'friends_10']] },
+  { key: 'quests', icon: '📅', stat: 'questBest',
+    tiers: [[3, 'quests_3'], [7, 'quests_7'], [14, 'quests_14'], [30, 'quests_30'], [60, 'quests_60'], [100, 'quests_100']] },
+  { key: 'run', icon: '🧗', stat: 'runBest',
+    tiers: [[5, 'run_5'], [10, 'run_10'], [15, 'run_15'], [20, 'run_20'], [25, 'run_25'], [30, 'run_30']] },
+  { key: 'friends', icon: '🤝', stat: 'friends', tiers: [[1, 'friends_1'], [3, 'friends_3'], [10, 'friends_10'], [20, 'friends_20']] },
+  { key: 'rivals', icon: '⚔️', stat: 'rivals', tiers: [[1, 'rivals_1'], [3, 'rivals_3'], [10, 'rivals_10']] },
   { key: 'tutorial', icon: '🎓', stat: 'tutorial', tiers: [[1, 'tutorial']] }
 ];
 const ACHIEVEMENTS = ACH_LADDERS.reduce((all, l) => all.concat(l.tiers.map(([n, code]) => ({ code, ladder: l, n }))), []);
