@@ -344,11 +344,13 @@
 
     <div id="olRanked">
       <div class="rk-modes" id="rkModes"></div>
-      <div class="rk-hero">
+      <div class="rk-hero" id="rkHero" onclick="if (ladderInfo) openPath()">
+        <div class="rk-emblem hidden" id="rkEmblem"></div>
         <div class="rk-elo" id="rkElo"></div>
         <div class="rk-stars hidden" id="rkStars"></div>
         <div class="rk-elo-sub" id="rkEloSub"></div>
         <div class="rk-elo-sub hidden" id="rkApprentice"></div>
+        <div class="rk-path-link hidden" id="rkPathLink"></div>
       </div>
       <div class="fr-note hidden" id="rkNote"></div>
       <button class="btn btn-block" id="tRkPlay" onclick="startRanked()"></button>
@@ -571,7 +573,7 @@
     <div class="pf-name" id="accountName"></div>
     <div class="pf-sub" id="tAccountTitle"></div>
     <!-- Лига и значки прошлых сезонов: одна строка под именем -->
-    <div class="pf-league hidden" id="pfLeague"></div>
+    <div class="pf-league hidden" id="pfLeague" onclick="if (ladderInfo) { closeLogoutModal(); openPath(); }"></div>
     <div class="pf-streak hidden" id="pfStreak"></div>
 
     <div id="pfAccount">
@@ -587,7 +589,7 @@
       <!-- Достижения: открытые — в цвете, остальные — серые, с тем, как открыть -->
       <details class="fold pf-fold hidden" id="pfAchFold" style="margin-bottom:8px">
         <summary class="fold-head" id="tAchHead"></summary>
-        <div class="fold-body"><div class="ach-grid" id="pfAchGrid"></div></div>
+        <div class="fold-body"><div class="lad-list" id="pfAchGrid"></div></div>
       </details>
 
       <button class="btn-ghost btn-block" id="tShowPin" onclick="revealOwnPin()"></button>
@@ -737,6 +739,39 @@
   </div>
 </div>
 
+<!-- Путь по лигам: все лиги и ранги, где игрок сейчас, что впереди -->
+<div class="modal-backdrop hidden" id="pathModal" onclick="if (event.target === this) closePath()">
+  <div class="modal-card path-card">
+    <div class="modal-text" id="pathTitle"></div>
+    <div class="path-sub" id="pathSub"></div>
+    <details class="fold" id="pathRulesFold">
+      <summary class="fold-head" id="pathRulesHead"></summary>
+      <ul class="fold-body run-rules-list" id="pathRules"></ul>
+    </details>
+    <div class="path-list" id="pathList"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="pathClose" onclick="closePath()"></button>
+  </div>
+</div>
+
+<!-- Звёзды после партии на рейтинг — на весь экран, как в Hearthstone -->
+<div class="stars-show hidden" id="starsShow" onclick="starsShowTap()">
+  <div class="sh-stage" id="shStage">
+    <div class="sh-rays"></div>
+    <div class="sh-emblem" id="shEmblem"></div>
+    <div class="sh-title" id="shTitle"></div>
+    <div class="sh-stars" id="shStars"></div>
+    <div class="sh-note" id="shNote"></div>
+    <div class="sh-rewards hidden" id="shRewards"></div>
+    <div class="sh-tap" id="shTap"></div>
+  </div>
+</div>
+
+<!-- Новое достижение: медленно выезжает сверху -->
+<div class="ach-toast hidden" id="achToast" role="status">
+  <div id="atMedal"></div>
+  <div class="at-text"><div class="at-head" id="atHead"></div><div class="at-name" id="atName"></div></div>
+</div>
+
 <!-- Достижения друга -->
 <div class="modal-backdrop hidden" id="achModal" onclick="if (event.target === this) closeFriendAch()">
   <div class="modal-card">
@@ -799,6 +834,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="vendor/qrcode.js"></script>
 <script src="js/i18n.js"></script>
+<script src="js/art.js"></script>
 <script src="js/game.js"></script>
 <script src="js/online.js"></script>
 <script src="js/main.js"></script>

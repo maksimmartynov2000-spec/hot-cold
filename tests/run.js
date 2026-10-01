@@ -1142,8 +1142,8 @@ async function testBonusMode(browser) {
     marks: document.getElementById('peff1').textContent
   }));
   check('«Туман» ложится на соперника', fog.onRival && fog.turn === 1, JSON.stringify(fog));
-  // Ход, которым туман взяли, сделан до тумана — его соперник уже видел
-  check('ход, которым взяли туман, виден', fog.masked.join() === '40', fog.masked.join());
+  // Под туманом не видно ни одного чужого хода — даже того, которым туман взяли
+  check('туман лёг — закрыт и ход, которым его взяли', fog.masked.join() === '•••', fog.masked.join());
   check('на карточке соперника виден значок помехи', fog.marks.indexOf('🙈') >= 0, fog.marks);
   // Телефон передают из рук в руки: при помехе между ходами — шторка
   const lift = async () => {
@@ -1169,7 +1169,7 @@ async function testBonusMode(browser) {
     masked: [...document.querySelectorAll('.history-item .h-guess')].map(e => e.textContent),
     panel: !document.getElementById('feedbackPanel').classList.contains('hidden')
   }));
-  check('чужой ход после тумана в истории скрыт', fog2.turn === 1 && fog2.masked.join() === '•••,10,40',
+  check('все чужие ходы под туманом скрыты', fog2.turn === 1 && fog2.masked.join() === '•••,10,•••',
     JSON.stringify(fog2));
   check('подсказка к нему тоже скрыта', fog2.panel === false);
   await done(page);
@@ -5018,11 +5018,14 @@ async function testLeagues(browser) {
   await page.evaluate(() => openOnlineEntry());
   await page.waitForTimeout(500);
   const hero = await page.evaluate(() => ({
+    emblem: !!document.querySelector('#rkEmblem:not(.hidden) svg.lg-emblem'),
     elo: document.getElementById('rkElo').textContent, stars: document.getElementById('rkStars').textContent,
     sub: document.getElementById('rkEloSub').textContent, top: document.getElementById('tRkTop').textContent,
     rows: [...document.querySelectorAll('#rkTopList .rk-top-row')].map(r => r.querySelector('.rk-who').textContent + ':' +
                                                                          r.querySelector('.rk-pts').textContent) }));
-  check('на экране онлайна — лига и звёзды вместо числа', hero.elo === '🥇 Золото 9' && hero.stars === '★☆☆', JSON.stringify(hero));
+  // Медаль-эмодзи заменил герб лиги рисунком
+  check('на экране онлайна — герб, лига и звёзды вместо числа',
+    hero.emblem && hero.elo === 'Золото 9' && hero.stars === '★☆☆', JSON.stringify(hero));
   check('сказано, какой сезон и сколько осталось', hero.sub === 'Сезон: сентябрь · осталось 4 дн.', hero.sub);
   check('топ сезона — по лигам', hero.top === 'Топ сезона' && hero.rows.join() === 'Кира:👑 Легенда,Максим:🥇 Золото 9',
     JSON.stringify(hero.rows));
@@ -5035,7 +5038,7 @@ async function testLeagues(browser) {
   });
   // Число рейтинга не показываем никому: лестница — лиги и звёзды
   check('Легенде — только лига, без числа рейтинга; в последний день — «последний день»',
-    legend.elo === '👑 Легенда' && legend.stars === '' && /последний день/.test(legend.sub), JSON.stringify(legend));
+    legend.elo === 'Легенда' && legend.stars === '' && /последний день/.test(legend.sub), JSON.stringify(legend));
   const calls = await page.evaluate(() => window.__ladderCalls);
   await page.evaluate(() => loadRanked(true));
   check('лестница не спрашивается на каждом опросе', await page.evaluate(n => window.__ladderCalls === n, calls));
@@ -5315,20 +5318,20 @@ async function testFogWholeRound(browser) {
   await me(10);
   await bot(30);                                   // бот взял туман — он лёг на человека
   let r = await rows();
-  check('бот взял туман: этот ход человеку виден', r.cur === 0 && r.shown.join() === '30,10', JSON.stringify(r));
+  check('бот взял туман — и этот его ход человеку закрыт', r.cur === 0 && r.shown.join() === '•••,10', JSON.stringify(r));
   await me(20);
   await bot(50);                                   // ход после тумана
   r = await rows();
-  check('ход бота после тумана закрыт на ходу человека', r.cur === 0 && r.shown.join() === '•••,20,30,10', JSON.stringify(r));
-  check('закрытый ход бота не звучит — по звуку не угадать пояс', r.snd === 3, 'звуков ' + r.snd);
+  check('все ходы бота закрыты на ходу человека', r.cur === 0 && r.shown.join() === '•••,20,•••,10', JSON.stringify(r));
+  check('закрытые ходы бота не звучат — по звуку не угадать пояс', r.snd === 2, 'звуков ' + r.snd);
   await me(60);
   r = await rows();
-  check('и на ходу бота он тоже закрыт', r.cur === 1 && r.shown.join() === '60,•••,20,30', JSON.stringify(r));
+  check('и на ходу бота они тоже закрыты', r.cur === 1 && r.shown.join() === '60,•••,20,•••', JSON.stringify(r));
   await bot(90);                                   // бот угадал — раунд окончен, всё открыто
   r = await rows();
   check('раунд окончен — ходы открыты', r.shown.includes('50') && !r.shown.includes('•••'), JSON.stringify(r));
 
-  // Туман на боте: ход, которым его взял человек, бот видит, следующие — нет
+  // Туман на боте: ни одного хода человека он не видит
   await page.evaluate(() => {
     nextRound(); stopBot();
     secret = 90; D.cur = 0; history = [];
@@ -5343,12 +5346,13 @@ async function testFogWholeRound(browser) {
     const flags = { fog: D.fog[1], blind: D.blind[1], shortMemory: D.shortMemory[1],
                     fogFrom: D.fogFrom[1], blindFrom: D.blindFrom[1] };
     const got = Array.from(botCandidates(moves, 1, flags, false)).join('');
-    const want = Array.from(botCandidates(moves.slice(0, 2), 1, {}, false)).join('');
+    // Под туманом бот видит только свои ходы — ни одного хода человека
+    const want = Array.from(botCandidates(moves.filter(m => m.p === 1), 1, {}, false)).join('');
     const all = Array.from(botCandidates(moves, 1, {}, false)).join('');
     return { fog: D.fog[1], from: D.fogFrom[1], same: got === want, differs: want !== all };
   });
-  check('бот под туманом видит ход, которым туман взяли, и не видит следующий',
-    view.fog && view.from === 1 && view.same && view.differs, JSON.stringify(view));
+  check('бот под туманом не видит ни одного хода человека',
+    view.fog && view.from === 0 && view.same && view.differs, JSON.stringify(view));
   await page.context().close();
 }
 
@@ -5881,17 +5885,21 @@ async function testProgress(browser) {
 
   // Коды и иконки — одни в игре и в базе
   const mig = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', '041_progress.txt'), 'utf8');
+  // Список достижений — из последней миграции, где его меняли
+  const migDir = path.join(__dirname, '..', 'supabase', 'migrations');
+  const achMig = fs.readdirSync(migDir).sort().reverse().map(f => fs.readFileSync(path.join(migDir, f), 'utf8'))
+    .find(x => /function achievement_codes\(\)/.test(x));
   const page = await newGame(browser, { user: 'Лев', profile: {}, progress: PROG });
   const js = await page.evaluate(() => ({ ach: ACHIEVEMENTS.map(a => a.code), icons: QUEST_ICONS.map(q => q.days + q.icon),
     q: Object.keys(t().prog.q), langs: ['en', 'ru', 'fr', 'de'].map(l => {
       const P = i18n[l].prog;
-      return ACHIEVEMENTS.every(a => P.ach[a.code] && P.ach[a.code][0] && P.ach[a.code][1]) &&
+      return ACH_LADDERS.every(l => P.lad[l.key] && P.lad[l.key].title) &&
         Object.keys(i18n.ru.prog.q).every(k => P.q[k]) && Object.keys(i18n.ru.prog).every(k => k in P);
     }) }));
-  const dbAch = mig.match(/select array\[('first_win'[^\]]*)\]/)[1].replace(/\s/g, '').split(',').map(x => x.replace(/'/g, ''));
+  const dbAch = achMig.match(/select array\[('first_win'[^\]]*)\]/)[1].replace(/\s/g, '').split(',').map(x => x.replace(/'/g, ''));
   const dbIcons = [...mig.match(/values \(3, '🔥'\)[^;]*;/)[0].matchAll(/\((\d+), '([^']+)'\)/g)].map(m => m[1] + m[2]);
   const dbQuests = [...mig.match(/create or replace function quest_pool\(\)[\s\S]*?\$\$;/)[0].matchAll(/'([a-z_0-9]+)'/g)].map(m => m[1]);
-  check('достижения: 12 кодов, те же, что в базе, в том же порядке', js.ach.length === 12 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
+  check('достижения: 29 кодов лестницами, те же, что в базе, в том же порядке', js.ach.length === 29 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
   check('иконки за серию — те же, что в базе', js.icons.join() === dbIcons.join(), js.icons.join() + ' / ' + dbIcons.join());
   check('у каждого задания из базы есть текст', dbQuests.length === 7 && dbQuests.every(c => js.q.includes(c)), dbQuests.join());
   check('тексты заданий и достижений есть на всех 4 языках', js.langs.every(Boolean), JSON.stringify(js.langs));
@@ -5924,11 +5932,13 @@ async function testProgress(browser) {
   let pf = await page.evaluate(() => ({ streak: document.getElementById('pfStreak').textContent,
     streakShown: !document.getElementById('pfStreak').classList.contains('hidden'),
     head: document.getElementById('tAchHead').textContent,
-    open: [...document.querySelectorAll('#pfAchGrid .ach-tile:not(.locked)')].map(x => x.dataset.code),
-    locked: document.querySelectorAll('#pfAchGrid .ach-tile.locked').length }));
+    rows: [...document.querySelectorAll('#pfAchGrid .lad-row')].map(x => x.dataset.ladder + ':' + x.dataset.tier),
+    wins: (document.querySelector('#pfAchGrid .lad-row[data-ladder="wins"]') || {}).textContent || '' }));
   check('профиль: серия заданий и лучшая', pf.streakShown && pf.streak === '📅 Серия заданий: 3 дн. · лучшая 4', pf.streak);
-  check('профиль: «🏅 Достижения: 2 из 12», открытые в цвете, остальные серые',
-    pf.head === '🏅 Достижения: 2 из 12' && pf.open.join() === 'first_win,tutorial' && pf.locked === 10, JSON.stringify(pf));
+  check('профиль: «🏅 Достижения: 2 из 29», по строке на лестницу со ступенью',
+    pf.head === '🏅 Достижения: 2 из 29' && pf.rows.join() === 'wins:1,games:0,streak:0,league:0,quests:0,run:0,friends:0,tutorial:1',
+    JSON.stringify(pf));
+  check('у лестницы — что открыто и что дальше', /Первая победа/.test(pf.wins) && /Дальше: 5 побед/.test(pf.wins), pf.wins);
   await page.click('#tAvatarStart');
   await page.waitForTimeout(200);
   const tiles = await page.evaluate(() => ['🔥', '🚀'].map(i => {
@@ -5991,9 +6001,10 @@ async function testProgress(browser) {
   await p4.waitForTimeout(400);
   const fa = await p4.evaluate(() => ({ open: !document.getElementById('achModal').classList.contains('hidden'),
     title: document.getElementById('achTitle').textContent,
-    tiles: [...document.querySelectorAll('#achGrid .ach-tile')].map(x => x.dataset.code + (x.classList.contains('locked') ? '🔒' : '')) }));
-  check('окно: «Достижения: Кира» — только открытые, по порядку списка',
-    fa.open && fa.title === 'Достижения: Кира' && fa.tiles.join() === 'first_win,league_gold', JSON.stringify(fa));
+    tiles: [...document.querySelectorAll('#achGrid .ach-tile')].map(x => x.dataset.ladder + ':' + x.dataset.tier + ':' + x.textContent) }));
+  // У друга — по плитке на лестницу с его высшей ступенью
+  check('окно: «Достижения: Кира» — высшая ступень каждой открытой лестницы',
+    fa.open && fa.title === 'Достижения: Кира' && fa.tiles.join() === 'wins:1:🏆1Первая победа,league:2:🛡️2Золото', JSON.stringify(fa));
   await p4.evaluate(() => { window.__friendAch['Кира'] = []; closeFriendAch(); openFriendAch('Кира'); });
   await p4.waitForTimeout(300);
   check('у друга пока ничего — «Пока ни одного»', await p4.evaluate(() => document.getElementById('achNote').textContent === 'Пока ни одного'));
@@ -6159,9 +6170,14 @@ async function testUxPass(browser) {
     await page.evaluate(() => history.length === 2), JSON.stringify(n));
   const grades = await page.evaluate(() => document.getElementById('historyList').textContent);
   check('оценки ходов — без шахматных слов', !/Зевок|Неточность|Ошибка/.test(grades), grades.slice(0, 200));
-  // Перезагрузка — как новый заход: выбор должен пережить её
+  // Перезагрузка — как новый заход: выбор должен пережить её. Сначала убедиться,
+  // что он записан: под нагрузкой браузер сбрасывает запись на диск не сразу,
+  // а живой игрок и не перезагружает страницу через миллисекунды после выбора
+  await page.waitForFunction(() => localStorage.getItem('hc_range') === '20');
+  await page.waitForTimeout(500);
   await page.reload();
-  await page.waitForTimeout(800);
+  await page.waitForSelector('.mode-btn.solo', { state: 'visible' });
+  await page.waitForTimeout(300);
   await page.click('.mode-btn.solo');
   await page.waitForTimeout(200);
   const again = { r: await page.inputValue('#rangeMax'), a: await page.inputValue('#attemptsCount'), want: att };
@@ -6279,6 +6295,129 @@ async function testLineSmooth(browser) {
     mid.length > 0 && mid.every(x => x < end - 3) && Math.max(...steps) < 25,
     s.map(p => p.t + ':' + Math.round(p.x)).join(' '));
   check('и доезжает до своего числа', end > 80, String(end));
+  await page.context().close();
+}
+
+// Лиги и награды: путь по лигам, звёзды на весь экран, уведомление о
+// достижении, рисунки наград
+async function testLeagueShow(browser) {
+  console.log('\nЛиги и награды: путь, звёзды на весь экран, уведомление, рисунки');
+  const LAD = { season: '2026-10', endsIn: 25 * 86400, stars: 37, streak: 1, best: 40, games: 14, peak: 1, badges: [], apprentice: 0 };
+  // Путь по лигам
+  let page = await newGame(browser, { user: 'Лев', profile: {}, ladder: LAD });
+  await page.evaluate(() => loadLadder());
+  await page.click('.mode-btn.online');
+  await page.waitForTimeout(700);
+  await page.click('#rkHero');
+  await page.waitForTimeout(300);
+  const path = await page.evaluate(() => ({
+    open: !document.getElementById('pathModal').classList.contains('hidden'),
+    leagues: [...document.querySelectorAll('#pathList .path-league')].map(b => b.dataset.league + (b.classList.contains('current') ? '*' : '')),
+    here: (document.querySelector('#pathList .pl-rank.here') || {}).firstChild ? document.querySelector('#pathList .pl-rank.here').firstChild.textContent : null,
+    passed: document.querySelectorAll('#pathList .path-league.current .pl-rank.passed').length,
+    floors: document.querySelectorAll('#pathList .path-league.current .pl-rank.floor').length,
+    rew: [...document.querySelectorAll('#pathList .path-league[data-league="2"] .r-item')].map(e => e.classList.contains('locked')) }));
+  // 37 звёзд — Серебро, ранг 8 (30…32 — ранг 10, 33…35 — ранг 9, 36…38 — ранг 8)
+  check('путь по лигам: все лиги сверху вниз, текущая — Серебро',
+    path.open && path.leagues.join() === '5,4,3,2,1*,0', JSON.stringify(path));
+  check('«вы здесь» — ранг 8, пройдено 10 и 9, ступени 🛡 на 10 и 5',
+    path.here === '8' && path.passed === 2 && path.floors === 2, JSON.stringify(path));
+  check('награды Золота ещё закрыты', path.rew.length === 2 && path.rew.every(Boolean), JSON.stringify(path.rew));
+  await page.context().close();
+
+  // Звёзды на весь экран: Серебро 1 ★★ → +2 → Золото 10 ★
+  page = await newGame(browser, { user: 'Лев', ladder: LAD });
+  await page.evaluate(() => {
+    Object.assign(window.__match, { ranked: true, rankedMode: 0, ladder: true, moves: [{ seat: 0, guess: 50, tier: 4 }], cur: 0 });
+    window.__matchStars = { delta: [2, 0], after: [61, null], unlock: [2, null] };
+    openMatch(1);
+  });
+  await page.waitForTimeout(700);
+  await page.evaluate(() => { Object.assign(window.__match, { roundOver: true, roundWinner: 0, matchOver: true, status: 'finished', wins: [3, 0] }); refreshMatch(true); });
+  await page.waitForTimeout(600);
+  const s0 = await page.evaluate(() => ({ open: !document.getElementById('starsShow').classList.contains('hidden'),
+    title: document.getElementById('shTitle').textContent, on: document.querySelectorAll('#shStars .sh-star.on').length }));
+  check('после партии на звёзды — показ на весь экран, сначала «было»: Серебро 1 ★★',
+    s0.open && s0.title === 'Серебро 1' && s0.on === 2, JSON.stringify(s0));
+  await page.waitForTimeout(4200);
+  const s1 = await page.evaluate(() => ({ title: document.getElementById('shTitle').textContent,
+    on: document.querySelectorAll('#shStars .sh-star.on').length, big: document.getElementById('shStage').classList.contains('big'),
+    note: document.getElementById('shNote').textContent, rewards: document.querySelectorAll('#shRewards:not(.hidden) .sh-rew').length,
+    tap: document.getElementById('shTap').classList.contains('on') }));
+  check('звёзды прошли по одной: Золото 10 ★, новая лига — лучи и награды',
+    s1.title === 'Золото 10' && s1.on === 1 && s1.big && /Новая лига: Золото/.test(s1.note) && s1.rewards === 3 && s1.tap, JSON.stringify(s1));
+  await page.click('#starsShow');
+  await page.waitForTimeout(600);
+  check('нажатие закрывает', await page.evaluate(() => document.getElementById('starsShow').classList.contains('hidden')));
+  // Та же партия ещё раз — второй раз не показываем
+  await page.evaluate(() => { onlineReview = null; online.justFinished = true; return loadOnlineReview(); });
+  await page.waitForTimeout(300);
+  check('та же партия второй раз праздник не показывает', await page.evaluate(() => document.getElementById('starsShow').classList.contains('hidden')));
+  await page.context().close();
+
+  // Открыл уже законченную партию (из списка) — праздника нет: он — для только что сыгранной
+  page = await newGame(browser, { user: 'Лев', ladder: LAD });
+  await page.evaluate(() => {
+    Object.assign(window.__match, { id: 55, ranked: true, ladder: true, roundOver: true, roundWinner: 0, matchOver: true,
+      status: 'finished', wins: [3, 0], moves: [{ seat: 0, guess: 50, tier: 8 }] });
+    window.__matchStars = { delta: [1, 0], after: [38, null], unlock: [null, null] };
+    openMatch(55);
+  });
+  await page.waitForTimeout(900);
+  check('старая партия из списка — без праздника', await page.evaluate(() => document.getElementById('starsShow').classList.contains('hidden')));
+  await page.context().close();
+
+  // Поражение — звезда гаснет; нажатие сразу показывает итог
+  page = await newGame(browser, { user: 'Лев', ladder: LAD });
+  const loss = await page.evaluate(async () => {
+    showStarsShow({ delta: [-1], after: [36] }, 0, 777);
+    const before = document.querySelectorAll('#shStars .sh-star.on').length;
+    starsShowTap();
+    return { before, after: document.querySelectorAll('#shStars .sh-star.on').length,
+             title: document.getElementById('shTitle').textContent, note: document.getElementById('shNote').textContent };
+  });
+  // 37 звёзд — ранг 8 и одна звезда в нём; поражение её гасит
+  check('поражение: было ★ в ранге 8, стало пусто; итог «−1 ★»', loss.before === 1 && loss.after === 0 &&
+    loss.title === 'Серебро 8' && loss.note === '−1 ★', JSON.stringify(loss));
+  const floor = await page.evaluate(() => {
+    starsShowTap();
+    showStarsShow({ delta: [0], after: [45] }, 0, 778);
+    starsShowTap();
+    return document.getElementById('shNote').textContent;
+  });
+  check('ступень: «🛡 … ниже не упасть»', /^🛡/.test(floor), floor);
+  await page.context().close();
+
+  // Уведомление о новом достижении: медленно выезжает, одно за другим
+  page = await newGame(browser, { user: 'Лев', profile: {},
+    progress: { day: '2026-10-01', streak: 0, bestStreak: 0, doneToday: false, secondsLeft: 3600, quests: [],
+                achievements: [{ code: 'first_win' }], stats: { wins: 1 } } });
+  await page.waitForTimeout(500);
+  check('первый заход — уже открытое уведомлением не сыплется',
+    await page.evaluate(() => document.getElementById('achToast').classList.contains('hidden')));
+  await page.evaluate(() => { window.__progress.achievements.push({ code: 'wins_5' }); return loadProgress(); });
+  await page.waitForTimeout(1200);
+  const toast = await page.evaluate(() => ({ shown: document.getElementById('achToast').classList.contains('show'),
+    head: document.getElementById('atHead').textContent, name: document.getElementById('atName').textContent,
+    dur: getComputedStyle(document.getElementById('achToast')).transitionDuration }));
+  check('новое достижение — «🏅 Новое достижение · 5 побед», выезжает медленно',
+    toast.shown && toast.head === '🏅 Новое достижение' && toast.name === '5 побед' && parseFloat(toast.dur) >= 0.8, JSON.stringify(toast));
+  await page.context().close();
+
+  // Рисунки наград: наградная иконка — рисунком, фон — металлом
+  page = await newGame(browser, { user: 'Лев', profile: { avatar: '🦅', color: '#d946ef' } });
+  await page.evaluate(() => { setMyAvatar('🦅'); setMyColor('#d946ef'); updateAccountChip(); });
+  await page.waitForTimeout(200);
+  const chip = await page.evaluate(() => {
+    const el = document.querySelector('#accountChip .avatar, #accountChip [data-avatar-for]') || document.getElementById('accountChip');
+    return { svg: !!el.querySelector('svg.reward-art'), bg: el.style.background, shine: el.classList.contains('shine') };
+  });
+  check('наградная иконка 🦅 — рисунком, фон Легенды — градиент с переливом',
+    chip.svg && /gradient/.test(chip.bg) && chip.shine, JSON.stringify(chip));
+  const plain = await page.evaluate(() => { setMyAvatar('🦊'); setMyColor('#34d399'); updateAccountChip();
+    const el = document.querySelector('#accountChip [data-avatar-for]') || document.getElementById('accountChip');
+    return { text: el.textContent, svg: !!el.querySelector('svg') }; });
+  check('обычная иконка — эмодзи, как раньше', plain.text === '🦊' && !plain.svg, JSON.stringify(plain));
   await page.context().close();
 }
 
@@ -6862,6 +7001,7 @@ async function testKeyPage(browser) {
     await testSplitFiles();
     await testUxPass(browser);
     await testLineSmooth(browser);
+    await testLeagueShow(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
