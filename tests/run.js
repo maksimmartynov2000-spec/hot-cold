@@ -5899,7 +5899,7 @@ async function testProgress(browser) {
   const dbAch = achMig.match(/select array\[('first_win'[^\]]*)\]/)[1].replace(/\s/g, '').split(',').map(x => x.replace(/'/g, ''));
   const dbIcons = [...mig.match(/values \(3, '🔥'\)[^;]*;/)[0].matchAll(/\((\d+), '([^']+)'\)/g)].map(m => m[1] + m[2]);
   const dbQuests = [...mig.match(/create or replace function quest_pool\(\)[\s\S]*?\$\$;/)[0].matchAll(/'([a-z_0-9]+)'/g)].map(m => m[1]);
-  check('достижения: 29 кодов лестницами, те же, что в базе, в том же порядке', js.ach.length === 29 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
+  check('достижения: 50 кодов лестницами, те же, что в базе, в том же порядке', js.ach.length === 50 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
   check('иконки за серию — те же, что в базе', js.icons.join() === dbIcons.join(), js.icons.join() + ' / ' + dbIcons.join());
   check('у каждого задания из базы есть текст', dbQuests.length === 7 && dbQuests.every(c => js.q.includes(c)), dbQuests.join());
   check('тексты заданий и достижений есть на всех 4 языках', js.langs.every(Boolean), JSON.stringify(js.langs));
@@ -5935,10 +5935,26 @@ async function testProgress(browser) {
     rows: [...document.querySelectorAll('#pfAchGrid .lad-row')].map(x => x.dataset.ladder + ':' + x.dataset.tier),
     wins: (document.querySelector('#pfAchGrid .lad-row[data-ladder="wins"]') || {}).textContent || '' }));
   check('профиль: серия заданий и лучшая', pf.streakShown && pf.streak === '📅 Серия заданий: 3 дн. · лучшая 4', pf.streak);
-  check('профиль: «🏅 Достижения: 2 из 29», по строке на лестницу со ступенью',
-    pf.head === '🏅 Достижения: 2 из 29' && pf.rows.join() === 'wins:1,games:0,streak:0,league:0,quests:0,run:0,friends:0,tutorial:1',
+  check('профиль: «🏅 Достижения: 2 из 50», по строке на лестницу со ступенью',
+    pf.head === '🏅 Достижения: 2 из 50' && pf.rows.join() === 'wins:1,games:0,streak:0,firstTry:0,modes:0,league:0,quests:0,run:0,friends:0,rivals:0,tutorial:1',
     JSON.stringify(pf));
   check('у лестницы — что открыто и что дальше', /Первая победа/.test(pf.wins) && /Дальше: 5 побед/.test(pf.wins), pf.wins);
+  // Новые лестницы и верх старых: сколько до следующей ступени
+  const lad = await page.evaluate(() => {
+    const box = document.createElement('div');
+    const got = ['first_win', 'wins_5', 'wins_10', 'wins_25', 'wins_50', 'wins_100', 'wins_250', 'wins_500', 'wins_1000',
+                 'first_try_1', 'modes_2', 'rivals_1', 'rivals_3'].map(code => ({ code }));
+    fillAchLadders(box, got, { wins: 1200, firstTry: 2, modes: 2, rivals: 4 });
+    const row = k => box.querySelector('.lad-row[data-ladder="' + k + '"]');
+    return { wins: row('wins').textContent, winsMedal: row('wins').querySelector('.ach-medal').className,
+      first: row('firstTry').textContent, modes: row('modes').textContent, rivals: row('rivals').textContent };
+  });
+  check('победы: все 9 ступеней, «1000 побед», медаль высшей ступени',
+    /1\s?000 побед/.test(lad.wins) && /Все ступени пройдены/.test(lad.wins) && /\bt9\b/.test(lad.winsMedal), JSON.stringify(lad));
+  check('с первой попытки: дальше «3 раза», 2 / 3', /С первой попытки · 1 раз/.test(lad.first) && /Дальше: 3 раза · 2 \/ 3/.test(lad.first), lad.first);
+  check('режимы и друзья: «2 режима» → «3 режима», «3 друга» → «10 друзей» 4 / 10',
+    /Дальше: 3 режима · 2 \/ 3/.test(lad.modes) && /Победы над друзьями · 3 друга/.test(lad.rivals) && /Дальше: 10 друзей · 4 \/ 10/.test(lad.rivals),
+    lad.modes + ' | ' + lad.rivals);
   await page.click('#tAvatarStart');
   await page.waitForTimeout(200);
   const tiles = await page.evaluate(() => ['🔥', '🚀'].map(i => {
@@ -6410,14 +6426,23 @@ async function testLeagueShow(browser) {
   await page.waitForTimeout(200);
   const chip = await page.evaluate(() => {
     const el = document.querySelector('#accountChip .avatar, #accountChip [data-avatar-for]') || document.getElementById('accountChip');
-    return { svg: !!el.querySelector('svg.reward-art'), bg: el.style.background, shine: el.classList.contains('shine') };
+    return { svg: !!el.querySelector('svg.icon-art'), bg: el.style.background, shine: el.classList.contains('shine') };
   });
   check('наградная иконка 🦅 — рисунком, фон Легенды — градиент с переливом',
     chip.svg && /gradient/.test(chip.bg) && chip.shine, JSON.stringify(chip));
   const plain = await page.evaluate(() => { setMyAvatar('🦊'); setMyColor('#34d399'); updateAccountChip();
     const el = document.querySelector('#accountChip [data-avatar-for]') || document.getElementById('accountChip');
+    return { text: el.textContent, svg: !!el.querySelector('svg'), shine: el.classList.contains('shine') }; });
+  check('обычная иконка — тоже рисунком, без перелива', plain.text === '🦊' && plain.svg && !plain.shine, JSON.stringify(plain));
+  // Иконка, которой в наборе уже нет (у друга, пока база не обновлена), — эмодзи
+  const gone = await page.evaluate(() => { avatarCache['Старый'] = { icon: '🐲', color: '' };
+    const el = document.createElement('span'); paintAvatar(el, 'Старый');
     return { text: el.textContent, svg: !!el.querySelector('svg') }; });
-  check('обычная иконка — эмодзи, как раньше', plain.text === '🦊' && !plain.svg, JSON.stringify(plain));
+  check('иконка не из набора — эмодзи вместо рисунка', gone.text === '🐲' && !gone.svg, JSON.stringify(gone));
+  // Все иконки, которые можно выбрать, нарисованы
+  const drawn = await page.evaluate(() => AVATAR_CHOICES.concat(LEAGUE_REWARDS.filter(r => r.kind === 'icon').map(r => r.value),
+    QUEST_ICONS.map(q => q.icon), [TUTORIAL_ICON]).filter(i => !iconArt(i, 0)));
+  check('у каждой иконки набора и наград есть рисунок', drawn.length === 0, drawn.join());
   await page.context().close();
 }
 
