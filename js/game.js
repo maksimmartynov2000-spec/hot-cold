@@ -434,9 +434,6 @@ function applyTranslations() {
   document.getElementById('tSubmitGuess').textContent = L.submitGuess;
   document.getElementById('tHistoryTitle').textContent = L.historyTitle;
   document.getElementById('tLegendTitle').textContent = L.legendTitle;
-  // Приветствие собирается из имени, поэтому при смене языка его надо пересобрать
-  const greetAuth = runAuth();
-  renderGreeting(greetAuth && greetAuth.username);
 
   document.getElementById('tModeSolo').textContent = L.modeSolo;
   document.getElementById('tModeDuel').textContent = L.modeDuel;
@@ -452,11 +449,10 @@ function applyTranslations() {
   document.getElementById('tLblHandicap').textContent = L.lblHandicap;
   document.getElementById('tBack').textContent = L.back;
   document.getElementById('tStartMatch').textContent = L.startMatch;
-  document.getElementById('tWinsLabel0').textContent = L.winsLabel;
-  document.getElementById('tWinsLabel1').textContent = L.winsLabel;
 
-  document.getElementById('nameP1').placeholder = L.defP1;
-  document.getElementById('nameP2').placeholder = L.defP2;
+  // Подпись над полем уже «Игрок 1» — в самом поле подсказка, что туда писать
+  document.getElementById('nameP1').placeholder = L.run.name;
+  document.getElementById('nameP2').placeholder = L.run.name;
   document.getElementById('guessInput').placeholder =
     L.placeholderTpl.replace('{a}', formatNum(RANGE_MIN)).replace('{b}', formatNum(RANGE_MAX));
   document.getElementById('finalInput').placeholder = L.finalInput;
@@ -580,8 +576,11 @@ function showScreen(name) {
   updateAccountChip();
   // Вернулся в меню — задания могли продвинуться: партия или Испытание
   if (name === 'mode') loadProgress();
-  // Ушёл с доски — праздник звёзд закрывается: он про только что сыгранную партию
-  if (name !== 'game') closeStarsShowNow();
+  // Ушёл с доски — праздник звёзд и салют закрываются: они про только что сыгранную партию
+  if (name !== 'game') {
+    closeStarsShowNow();
+    document.querySelectorAll('.confetti').forEach(el => el.remove());
+  }
 }
 
 function quitToMenu() {
@@ -594,6 +593,10 @@ function quitToMenu() {
   vsBot = null;
   mode = null;
   D.matchOver = false;
+  // Итог прошлой партии забыт: иначе перерисовка в меню приняла бы его за
+  // свежую победу и снова запустила салют
+  gameOver = false;
+  gameOverType = null;
   applyTranslations();
   showScreen('mode');
 }
@@ -1610,7 +1613,9 @@ function renderStatus() {
     else {
       banner.classList.remove('count');
       banner.classList.remove('hidden');
-      banner.textContent = L.turnOf + D.names[D.cur] + (D.armed ? '  ' + L.tokenArmed : '');
+      // «Ходит: Максим», когда Максим — это вы, читается странно: свой ход — «Ваш ход»
+      const mineNow = online ? D.cur === online.seat : (vsBot && D.cur === 0);
+      banner.textContent = (mineNow ? L.yourTurnNow : L.turnOf + D.names[D.cur]) + (D.armed ? '  ' + L.tokenArmed : '');
       banner.style.borderColor = P_COLORS[D.cur];
       banner.style.background = 'rgba(255,255,255,0.06)';
       banner.style.color = P_COLORS[D.cur];
@@ -1626,7 +1631,7 @@ function renderStatus() {
     const over = roundOver();
     const left = MAX_GUESSES - history.length;
     attempts.textContent = over ? withPlural(movesUsed, L.moveForms)
-                                : L.attemptsPrefix + left + ' / ' + MAX_GUESSES;
+                                : L.attemptsLeft.replace('{n}', left).replace('{m}', MAX_GUESSES);
     attempts.className = 'attempts' + (!over && left <= 3 ? ' low' : '');
     document.getElementById('finalBox').classList.toggle('hidden', mode === 'run' || gameOverType !== 'lose_waiting');
     document.getElementById('guessSection').classList.toggle('hidden', gameOver);
@@ -1671,7 +1676,10 @@ function renderResult() {
     icon.className = 'r-icon';
     icon.textContent = D.matchOver ? '🏆' : '🎯';
     title.appendChild(icon);
-    title.appendChild(document.createTextNode(D.names[w] + (D.matchOver ? L.matchWin : L.roundWin)));
+    // Своя победа — «Вы выиграли», а не своё же имя в третьем лице
+    const meWon = online ? w === online.seat : (vsBot && w === 0);
+    title.appendChild(document.createTextNode(meWon ? (D.matchOver ? L.youWinMatch : L.youWinRound)
+      : D.names[w] + (D.matchOver ? L.matchWin : L.roundWin)));
 
     // Сетка из трёх колонок: имя стоит ровно над своим счётом
     const score = document.createElement('div');
@@ -1698,9 +1706,11 @@ function renderResult() {
       reviewBtn = document.createElement('button');
       reviewBtn.className = 'r-review';
       reviewBtn.id = 'reviewBtn';
-      const pct = a => a === null ? '—' : a + '%';
-      reviewBtn.textContent = '📊 ' + D.names[0] + ' ' + pct(drv.accuracy[0]) + ' · ' +
-        D.names[1] + ' ' + pct(drv.accuracy[1]) + ' · ' + L.review.open;
+      // Точность — только у того, у кого она есть: «Максим —» читается как ошибка
+      const parts = [0, 1].filter(i => drv.accuracy[i] !== null)
+        .map(i => D.names[i] + ' ' + drv.accuracy[i] + '%');
+      reviewBtn.textContent = '📊 ' + (parts.length ? parts.join(' · ') + ' · ' + L.review.open
+        : (online ? L.review.title : L.review.titleRound));
       reviewBtn.onclick = openReview;
     }
 
@@ -1798,8 +1808,9 @@ function renderResult() {
       rec.textContent = L.newRecord;
       box.appendChild(rec);
     }
-    // Салют один раз на партию: ключ — сама история ходов этой партии
-    if (gameOverType === 'win') {
+    // Салют один раз на партию: ключ — сама история ходов этой партии.
+    // Только на доске: перерисовки в меню и настройках салют не запускают
+    if (gameOverType === 'win' && screen === 'game') {
       celebrate(history, lastWinIsRecord ? ['🏆', '⭐', '✨', '🎉'] : ['🎉', '✨', '⭐'], lastWinIsRecord);
     }
 
@@ -1834,7 +1845,13 @@ function renderPlayers() {
     card.classList.toggle('active', D.cur === p && !D.roundOver);
 
     const nameEl = document.getElementById('pname' + p);
-    nameEl.innerHTML = '<span class="p-dot" style="background:' + P_COLORS[p] + ';color:' + P_COLORS[p] + '"></span>' + escapeHtml(D.names[p]);
+    // У бота вместо точки — его зверь: в имени эмодзи зверя больше нет
+    const bot = (vsBot && p === 1) ? vsBot.bot
+      : (online && online.botSeat === p && online.rawNames ? botOf(online.rawNames[p]) : null);
+    const mark = bot && iconArt(bot.icon, 0)
+      ? '<span class="p-bot" style="background:' + bot.color + '">' + iconArt(bot.icon, 0) + '</span>'
+      : '<span class="p-dot" style="background:' + P_COLORS[p] + ';color:' + P_COLORS[p] + '"></span>';
+    nameEl.innerHTML = mark + escapeHtml(D.names[p]);
 
     let pips = '';
     for (let i = 0; i < D.winsNeeded; i++) pips += (i < D.wins[p] ? '●' : '○');
@@ -1872,12 +1889,8 @@ function renderHistory() {
   section.classList.remove('hidden');
   list.innerHTML = '';
 
-  // Оценка хода, как на chess.com: в тренировке — сразу после хода,
-  // в игре с другом — после раунда
-  const rv0 = currentReview(true);
-  // Разбор онлайн-партии идёт по всем раундам, а в истории — последние ходы
-  // последнего: значки к ним не привязать
-  const rv = rv0 && rv0.match ? null : rv0;
+  // Оценки ходов — только в разборе после партии: во время игры они отвлекают
+  // от главного — горячо или холодно
 
   // Видны только последние ходы: остальное игрок держит в голове. Номера
   // остаются настоящими, поэтому пропуск виден и без пояснений
@@ -1902,15 +1915,6 @@ function renderHistory() {
       : '<span class="h-num">#' + realIndex + '</span>' + who +
         '<span class="h-guess">' + h.guess + '</span>' +
         '<span class="h-label" style="color:' + h.meta.color + '">' + getFbText(h.meta) + '</span>';
-    // У угаданного хода значок не нужен: «🎯 В точку!» уже написано
-    // Оценка — второй строкой под ответом: в одну строку на телефоне не влезает
-    if (rv && rv.moves[realIndex - 1] && rv.moves[realIndex - 1].grade !== 'hit') {
-      const label = item.querySelector('.h-label');
-      const side = document.createElement('span');
-      side.className = 'h-side';
-      label.replaceWith(side);
-      side.append(label, gradeLine(rv.moves[realIndex - 1], 'h-grade'));
-    }
     list.appendChild(item);
   });
 }
@@ -2456,9 +2460,9 @@ function analyseOnlineMatch(list) {
   return { duel: true, match: true, moves, rounds: info, accuracy: [acc(0), acc(1)] };
 }
 
-// live — оценки уже во время тренировки: каждая считается только по ходам
-// до неё, поэтому после партии они те же. Лучший ход при этом не показываем
-function currentReview(live) {
+// Разбор — только когда партия (или раунд дуэли) кончилась: во время игры
+// оценок нет, чтобы не отвлекать от «горячо / холодно»
+function currentReview() {
   if (online) {
     return (D.matchOver && onlineReview && onlineReview.id === online.id) ? onlineReview.data : null;
   }
@@ -2473,7 +2477,7 @@ function currentReview(live) {
     return data;
   }
   if (mode !== 'solo' || online) return null;
-  if (!(gameOverType === 'win' || gameOverType === 'lose') && !live) return null;
+  if (!(gameOverType === 'win' || gameOverType === 'lose')) return null;
   const key = history.length + ':' + finalGuessValue + ':' + secret;
   if (reviewCache && reviewCache.key === key) return reviewCache.data;
   const data = analyseGame(history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex })),
@@ -2623,8 +2627,10 @@ function botOf(name) {
   return BOTS.find(b => b.id === n) || null;
 }
 
+// Имя бота текстом — без эмодзи зверя: зверь нарисован в кружке рядом,
+// а 🤖 говорит, что это бот
 function botName(bot) {
-  return bot.icon + ' ' + t().bots[bot.key] + ' 🤖';
+  return t().bots[bot.key] + ' 🤖';
 }
 
 // ================= ЛИГИ =================
@@ -2986,7 +2992,8 @@ function renderQuestCard() {
     row.className = 'qc-row' + (done ? ' done' : '');
     row.dataset.code = q.code;
     const mark = document.createElement('span');
-    mark.textContent = done ? '✅' : '▫️';
+    mark.className = 'qc-mark';
+    mark.textContent = done ? '✅' : '○';
     const text = document.createElement('span');
     text.textContent = P.q[q.code] || q.code;
     const n = document.createElement('span');
@@ -3002,9 +3009,10 @@ function renderQuestCard() {
   });
   // Внизу — что дальше: сколько ждать новых и какая иконка следующая
   const next = QUEST_ICONS.find(x => x.days > (I.bestStreak || 0));
-  const parts = [I.doneToday ? P.allDone : P.left.replace('{t}', timeLeftText(I.secondsLeft || 0))];
-  if (next) parts.push(P.next.replace('{n}', next.days).replace('{icon}', next.icon));
-  document.getElementById('qcFoot').textContent = parts.join(' · ');
+  const parts = [escapeHtml(I.doneToday ? P.allDone : P.left.replace('{t}', timeLeftText(I.secondsLeft || 0)))];
+  if (next) parts.push(escapeHtml(P.next.replace('{n}', next.days)).replace('{icon}',
+    '<span class="qc-icon">' + (iconArt(next.icon, 18) || next.icon) + '</span>'));
+  document.getElementById('qcFoot').innerHTML = parts.join(' · ');
 }
 
 // Сколько ступеней лестницы открыто
@@ -3212,7 +3220,9 @@ function renderBotPick() {
     tile.dataset.bot = b.key;
     const icon = document.createElement('span');
     icon.className = 'bt-icon';
-    icon.textContent = b.icon;
+    // Тот же рисунок, что у иконок игроков, в кружке цвета бота
+    const art = iconArt(b.icon, 0);
+    if (art) { icon.innerHTML = art; icon.firstChild.style.background = b.color; } else icon.textContent = b.icon;
     const name = document.createElement('span');
     name.className = 'bt-name';
     name.textContent = L.bots[b.key];

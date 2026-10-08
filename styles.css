@@ -211,11 +211,14 @@ body {
 /* Карандашик на кружке: подсказка, что его можно нажать и сменить иконку */
 .pf-avatar.editable { position: relative; cursor: pointer; }
 .pf-avatar.editable::after {
-  content: '✎'; position: absolute; right: -4px; bottom: -4px;
-  width: 22px; height: 22px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 400; color: #0f1430; background: #fff;
+  content: ''; position: absolute; right: -4px; bottom: -4px;
+  width: 24px; height: 24px; border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  /* Карандаш рисунком: знак ✎ в шрифтах телефонов мелкий и похож на ® */
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 20l1-5L15.5 4.5a2.1 2.1 0 0 1 3 0l1 1a2.1 2.1 0 0 1 0 3L9 19z' fill='%23fbbf24' stroke='%231f1d36' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M13.5 6.5l4 4' stroke='%231f1d36' stroke-width='2'/%3E%3C/svg%3E") center / 15px no-repeat;
 }
+/* Рисунок в кружке профиля не выходит за край, а карандаш — выходит */
+.pf-avatar.has-art.editable { overflow: visible; }
 .pf-label {
   font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
   color: rgba(255, 255, 255, 0.5); text-align: left; margin: 2px 2px 8px;
@@ -296,6 +299,9 @@ body {
 }
 
 .row { display: flex; gap: 8px; width: 100%; }
+/* Длинная надпись (немецкий, французский) переносится, а не вылезает за край.
+   Только у главной кнопки: «Отмена» рядом остаётся по ширине своего слова */
+.row > .btn { min-width: 0; white-space: normal; line-height: 1.2; }
 
 /* Цифровая клавиатура телефона минуса не показывает — своя кнопка.
    Она же и понятнее ребёнку, чем поиск знака среди символов */
@@ -576,9 +582,13 @@ select.field option { background: #1e1b4b; color: #fff; }
   background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15);
 }
 .bot-tile.active { border-color: #a78bfa; background: rgba(167, 139, 250, 0.18); }
-.bot-tile .bt-icon { font-size: 22px; line-height: 1; }
+.bot-tile .bt-icon { font-size: 22px; line-height: 1; flex: 0 0 auto; }
+.bot-tile .bt-icon .icon-art { display: block; width: 34px; height: 34px; padding: 3px; box-sizing: border-box; border-radius: 50%; }
 .bot-tile .bt-name { font-size: 15px; font-weight: 700; }
 .bot-tile .bt-sub { font-size: 13px; color: rgba(255, 255, 255, 0.55); flex: 1; }
+.p-bot { display: inline-block; width: 18px; height: 18px; padding: 1px; box-sizing: border-box; border-radius: 50%;
+         vertical-align: -3px; margin-right: 6px; }
+.p-bot .icon-art { display: block; }
 .bot-tile .bt-power { font-size: 11px; letter-spacing: 1px; color: #a78bfa; white-space: nowrap; }
 
 /* ---------- Онлайн: друзья ---------- */
@@ -758,11 +768,7 @@ select.field option { background: #1e1b4b; color: #fff; }
   text-overflow: ellipsis;
 }
 .chat-pad button:disabled { opacity: 0.4; }
-.chat-modes-label {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
-  margin: 14px 0 6px;
-}
+.chat-modes-fold { margin-top: 10px; }
 /* Сколько сообщений не прочитано — прямо на имени друга */
 .fr-unread {
   background: #38bdf8;
@@ -967,15 +973,8 @@ select.field option { background: #1e1b4b; color: #fff; }
   flex-shrink: 0;
   box-shadow: 0 0 7px currentColor;
 }
-.pcard .p-pips { font-size: 13px; letter-spacing: 2px; margin-bottom: 10px; opacity: 0.65; transition: opacity 0.2s; }
+.pcard .p-pips { font-size: 13px; letter-spacing: 2px; margin: 6px 0 10px; opacity: 0.65; transition: opacity 0.2s; }
 .pcard.active .p-pips { opacity: 1; }
-.pcard .p-wins-label {
-  font-size: 11px;
-  color: rgba(255,255,255,0.4);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 3px;
-}
 .token-btn {
   width: 100%;
   padding: 8px 10px;
@@ -999,7 +998,7 @@ select.field option { background: #1e1b4b; color: #fff; }
   align-items: center;
   gap: 6px;
   margin-bottom: 16px;
-  padding: 10px 12px;
+  padding: 10px 10px 10px 12px;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 12px;
   flex-wrap: wrap;
@@ -1019,11 +1018,11 @@ select.field option { background: #1e1b4b; color: #fff; }
   content: ''; position: absolute; top: -6px; right: var(--arrow-right, 18px);
   border: 6px solid transparent; border-top: none; border-bottom-color: #f8fafc;
 }
-.info-bar .attempts { font-size: 13px; font-weight: 600; color: #a5f3fc; }
+.info-bar .attempts { font-size: 13px; font-weight: 600; color: #a5f3fc; white-space: nowrap; }
 .info-bar .attempts.low { color: #f87171; }
 
-.bar-actions { display: flex; align-items: center; gap: 5px; margin-left: auto; }
-.btn-reset.icon { font-size: 15px; padding: 3px 10px; line-height: 1.3; }
+.bar-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.btn-reset.icon { font-size: 15px; padding: 3px 8px; line-height: 1.3; }
 
 /* Градусник и прямую можно убрать: на маленьком экране лишние 150 пикселей
    иногда дороже красоты. Включённое состояние подсвечено, выключенное бледное */
@@ -1333,8 +1332,6 @@ select.field option { background: #1e1b4b; color: #fff; }
 .inv-qr { background: #fff; border-radius: 14px; padding: 10px; width: 200px; height: 200px;
           margin: 12px auto 8px; box-sizing: border-box; }
 .inv-qr svg { width: 100%; height: 100%; display: block; }
-.inv-link { font-size: 12px; text-align: center; word-break: break-all; color: rgba(255, 255, 255, 0.6);
-            user-select: all; }
 .inv-hint { font-size: 13px; opacity: 0.8; margin-top: 8px; }
 .curtain .ct-text { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 8px; }
 .curtain .ct-why { font-size: 13px; opacity: 0.75; }
@@ -1437,11 +1434,6 @@ select.field option { background: #1e1b4b; color: #fff; }
   font-size: 11px; font-weight: 800; color: #fff; line-height: 1;
 }
 .gr-badge.gr-hit { background: transparent !important; font-size: 16px; }
-.h-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; margin-left: auto; }
-.h-grade { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
-.h-grade .gr-badge { min-width: 18px; height: 18px; font-size: 10px; }
-.h-grade .g-name { font-weight: 700; }
-.h-grade .g-pct { margin-left: 0; }
 .review-card { max-width: 380px; }
 .rv-title { font-size: 18px; font-weight: 800; text-align: center; }
 .rv-acc { display: flex; flex-direction: column; align-items: center; margin: 10px 0 6px; }
@@ -1462,7 +1454,7 @@ select.field option { background: #1e1b4b; color: #fff; }
 .rv-guess { font-weight: 800; min-width: 36px; font-variant-numeric: tabular-nums; }
 .rv-grade { display: flex; align-items: center; gap: 8px; flex: 1; }
 .rv-grade .g-name { font-weight: 700; font-size: 13px; }
-.rv-grade .g-pct, .h-grade .g-pct { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums;
+.rv-grade .g-pct { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums;
                                     color: rgba(255, 255, 255, 0.75); }
 .rv-grade .g-pct { font-size: 13px; }
 .rv-round { font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
@@ -1630,21 +1622,6 @@ select.field option { background: #1e1b4b; color: #fff; }
 .run-result .rr-error { margin-top: 10px; font-size: 13px; color: #f87171; }
 .run-result #shareBtn { margin-top: 14px; }
 
-/* На телефоне в верхней строке имени места нет — там и так тесно. А знать,
-   под кем ты играешь, нужно именно здесь: с этого экрана игра и начинается */
-.run-greeting {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.55);
-  text-align: center;
-  margin: 0 0 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.run-greeting strong { color: rgba(255, 255, 255, 0.85); }
-/* Под названием экрана «Играет …» — подзаголовок, а не отдельная строка
-   посередине */
-.screen-title + .run-greeting { text-align: left; margin: -8px 0 16px; }
 #screenRunHub .frost-row { margin: 4px 0 14px; }
 #screenRunHub .lb-wrap { margin-top: 28px; }
 #screenRunHub .lb-list { margin-top: 10px; }
@@ -1733,3 +1710,8 @@ select.field option { background: #1e1b4b; color: #fff; }
   border-color: #4ade80;
   color: #4ade80;
 }
+
+/* Задание дня: пустой кружок — ещё не сделано; иконка награды — рисунком */
+.qc-mark { display: inline-block; width: 20px; text-align: center; color: rgba(255, 255, 255, 0.45); }
+.qc-icon .icon-art { vertical-align: -4px; }
+.fr-status.act { color: #93c5fd; }
