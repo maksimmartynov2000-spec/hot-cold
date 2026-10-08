@@ -299,8 +299,9 @@ body {
 }
 
 .row { display: flex; gap: 8px; width: 100%; }
-/* Длинная надпись (немецкий, французский) переносится, а не вылезает за край */
-.row > .btn, .row > .btn-ghost { min-width: 0; white-space: normal; line-height: 1.2; }
+/* Длинная надпись (немецкий, французский) переносится, а не вылезает за край.
+   Только у главной кнопки: «Отмена» рядом остаётся по ширине своего слова */
+.row > .btn { min-width: 0; white-space: normal; line-height: 1.2; }
 
 /* Цифровая клавиатура телефона минуса не показывает — своя кнопка.
    Она же и понятнее ребёнку, чем поиск знака среди символов */
@@ -585,8 +586,8 @@ select.field option { background: #1e1b4b; color: #fff; }
 .bot-tile .bt-icon .icon-art { display: block; width: 34px; height: 34px; padding: 3px; box-sizing: border-box; border-radius: 50%; }
 .bot-tile .bt-name { font-size: 15px; font-weight: 700; }
 .bot-tile .bt-sub { font-size: 13px; color: rgba(255, 255, 255, 0.55); flex: 1; }
-.p-bot { display: inline-block; width: 22px; height: 22px; padding: 2px; box-sizing: border-box; border-radius: 50%;
-         vertical-align: -5px; margin-right: 6px; }
+.p-bot { display: inline-block; width: 18px; height: 18px; padding: 1px; box-sizing: border-box; border-radius: 50%;
+         vertical-align: -3px; margin-right: 6px; }
 .p-bot .icon-art { display: block; }
 .bot-tile .bt-power { font-size: 11px; letter-spacing: 1px; color: #a78bfa; white-space: nowrap; }
 

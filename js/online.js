@@ -2829,6 +2829,8 @@ function applyMatchState(st) {
   FEEDBACK_META = buildFeedbackMeta(maxDistance() + 1);
 
   D.names = st.names.map(playerName);
+  // Имена как в базе: по ним узнаём бота, переведённое имя для этого не годится
+  online.rawNames = st.names.slice();
   D.winsNeeded = st.winsNeeded;
   D.wins = st.wins.slice();
   // Новый раунд — замечание про прошлое число к нему не относится

@@ -1847,7 +1847,7 @@ function renderPlayers() {
     const nameEl = document.getElementById('pname' + p);
     // У бота вместо точки — его зверь: в имени эмодзи зверя больше нет
     const bot = (vsBot && p === 1) ? vsBot.bot
-      : (online && online.botSeat === p ? BOTS.find(b => botName(b) === D.names[p]) : null);
+      : (online && online.botSeat === p && online.rawNames ? botOf(online.rawNames[p]) : null);
     const mark = bot && iconArt(bot.icon, 0)
       ? '<span class="p-bot" style="background:' + bot.color + '">' + iconArt(bot.icon, 0) + '</span>'
       : '<span class="p-dot" style="background:' + P_COLORS[p] + ';color:' + P_COLORS[p] + '"></span>';
@@ -2460,9 +2460,9 @@ function analyseOnlineMatch(list) {
   return { duel: true, match: true, moves, rounds: info, accuracy: [acc(0), acc(1)] };
 }
 
-// live — оценки уже во время тренировки: каждая считается только по ходам
-// до неё, поэтому после партии они те же. Лучший ход при этом не показываем
-function currentReview(live) {
+// Разбор — только когда партия (или раунд дуэли) кончилась: во время игры
+// оценок нет, чтобы не отвлекать от «горячо / холодно»
+function currentReview() {
   if (online) {
     return (D.matchOver && onlineReview && onlineReview.id === online.id) ? onlineReview.data : null;
   }
@@ -2477,7 +2477,7 @@ function currentReview(live) {
     return data;
   }
   if (mode !== 'solo' || online) return null;
-  if (!(gameOverType === 'win' || gameOverType === 'lose') && !live) return null;
+  if (!(gameOverType === 'win' || gameOverType === 'lose')) return null;
   const key = history.length + ':' + finalGuessValue + ':' + secret;
   if (reviewCache && reviewCache.key === key) return reviewCache.data;
   const data = analyseGame(history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex })),
@@ -3009,7 +3009,7 @@ function renderQuestCard() {
   });
   // Внизу — что дальше: сколько ждать новых и какая иконка следующая
   const next = QUEST_ICONS.find(x => x.days > (I.bestStreak || 0));
-  const parts = [I.doneToday ? P.allDone : P.left.replace('{t}', timeLeftText(I.secondsLeft || 0))];
+  const parts = [escapeHtml(I.doneToday ? P.allDone : P.left.replace('{t}', timeLeftText(I.secondsLeft || 0)))];
   if (next) parts.push(escapeHtml(P.next.replace('{n}', next.days)).replace('{icon}',
     '<span class="qc-icon">' + (iconArt(next.icon, 18) || next.icon) + '</span>'));
   document.getElementById('qcFoot').innerHTML = parts.join(' · ');

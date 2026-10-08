@@ -6337,33 +6337,49 @@ async function testAudit(browser) {
     JSON.stringify(banner));
   await done(page);
 
-  // Немецкий: длинные надписи не вылезают за край и не обрезаются
-  page = await newGame(browser, { user: 'Лев', lang: 'de' });
-  await page.evaluate(() => {
-    window.__friends = [{ username: 'Аня', relation: 'friend' }, { username: 'Ося', relation: 'incoming' }];
-  });
-  await page.click('#friendsBtn');
-  await page.waitForTimeout(500);
-  await page.evaluate(() => openChallenge('Аня'));
-  await page.waitForTimeout(300);
-  const de = await page.evaluate(() => {
-    const card = document.getElementById('card').getBoundingClientRect();
-    const send = document.getElementById('tChSend').getBoundingClientRect();
-    const st = document.querySelector('#friendsList .friend-row.req .fr-status');
-    return { inside: send.right <= card.right + 0.5, wide: document.documentElement.scrollWidth - innerWidth,
-             cut: st ? st.scrollWidth > st.clientWidth + 1 : null, status: st && st.textContent };
-  });
-  check('немецкий: кнопка вызова внутри экрана, заявка в друзья не обрезана',
-    de.inside && de.wide <= 0 && de.cut === false, JSON.stringify(de));
-  // Запас на будущее: даже длинная надпись переносится внутри кнопки, а не вылезает за край
-  const long = await page.evaluate(() => {
-    const btn = document.getElementById('tChSend');
-    btn.textContent = 'Herausforderung senden an alle Freunde';
-    const card = document.getElementById('card').getBoundingClientRect();
-    return { inside: btn.getBoundingClientRect().right <= card.right + 0.5, wide: document.documentElement.scrollWidth - innerWidth };
-  });
-  check('длинная надпись на кнопке переносится, а не вылезает за край', long.inside && long.wide <= 0, JSON.stringify(long));
-  await done(page);
+  // Узкий телефон (360 px), все четыре языка: длинные надписи не вылезают за край
+  // и не обрезаются — ни на кнопках вызова, ни в статусах друзей
+  for (const lang of ['en', 'ru', 'fr', 'de']) {
+    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 } });
+    const q = await ctx.newPage();
+    q.on('pageerror', e => check('без ошибок JS', false, e.message));
+    await applyStub(q, { user: 'Лев', lang });
+    await q.goto(GAME_URL);
+    await q.waitForTimeout(300);
+    await q.evaluate(() => {
+      window.__friends = [{ username: 'Аня', relation: 'friend' }, { username: 'Ося', relation: 'incoming' }];
+    });
+    await q.click('#friendsBtn');
+    await q.waitForTimeout(500);
+    await q.evaluate(() => openChallenge('Аня'));
+    await q.waitForTimeout(300);
+    const m = await q.evaluate(() => {
+      const card = document.getElementById('card').getBoundingClientRect();
+      const send = document.getElementById('tChSend');
+      const btns = [...send.parentElement.children].filter(e => e.tagName === 'BUTTON');
+      const cut = el => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+      return { inside: send.getBoundingClientRect().right <= card.right + 0.5,
+               wide: document.documentElement.scrollWidth - innerWidth,
+               btnCut: btns.filter(cut).map(e => e.textContent),
+               statusCut: [...document.querySelectorAll('#friendsList .fr-status')].filter(cut).map(e => e.textContent) };
+    });
+    check(lang + ', 360 px: кнопки вызова внутри экрана и не обрезаны, статусы друзей целиком',
+      m.inside && m.wide <= 0 && !m.btnCut.length && !m.statusCut.length, JSON.stringify(m));
+    if (lang === 'de') {
+      // Запас на будущее: даже очень длинная надпись переносится внутри кнопки
+      const long = await q.evaluate(() => {
+        const btn = document.getElementById('tChSend');
+        btn.textContent = 'Herausforderung senden an alle Freunde';
+        const card = document.getElementById('card').getBoundingClientRect();
+        const ghost = document.getElementById('tChCancel');
+        return { inside: btn.getBoundingClientRect().right <= card.right + 0.5, wide: document.documentElement.scrollWidth - innerWidth,
+                 ghostCut: ghost.scrollWidth > ghost.clientWidth + 1 };
+      });
+      check('длинная надпись на кнопке переносится, а «Отмена» рядом не сжимается', long.inside && long.wide <= 0 && !long.ghostCut,
+        JSON.stringify(long));
+    }
+    await ctx.close();
+  }
 
   // Боты нарисованы, как иконки игроков; в имени — без эмодзи зверя
   page = await newGame(browser);
@@ -6625,7 +6641,7 @@ async function testPolish(browser) {
   });
   check('у «Мороза» и «Бонусов» — пояснение одной строкой',
     /отрицательные/.test(setup.frost) && /сюрпризы/.test(setup.bonus), JSON.stringify(setup));
-  check('«До скольких побед» и «Фора» — в одну строку', setup.sameRow && setup.wins === 'До скольких побед', JSON.stringify(setup));
+  check('«Играем до» и «Фора» — в одну строку', setup.sameRow && setup.wins === 'Играем до', JSON.stringify(setup));
   await page.evaluate(() => quitToMenu());
 
   // Тренировка: надписи над полем нет, история не обрезается
