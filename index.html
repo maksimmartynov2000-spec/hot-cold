@@ -174,7 +174,6 @@
 
       <div class="pcard pc0" id="pcard0">
         <div class="p-name" id="pname0"></div>
-        <div class="p-wins-label" id="tWinsLabel0">Wins</div>
         <div class="p-pips" id="ppips0"></div>
         <button class="token-btn" id="ptoken0" onclick="useToken(0)"></button>
         <div class="p-effects" id="peff0"></div>
@@ -182,7 +181,6 @@
 
       <div class="pcard pc1" id="pcard1">
         <div class="p-name" id="pname1"></div>
-        <div class="p-wins-label" id="tWinsLabel1">Wins</div>
         <div class="p-pips" id="ppips1"></div>
         <button class="token-btn" id="ptoken1" onclick="useToken(1)"></button>
         <div class="p-effects" id="peff1"></div>
@@ -340,7 +338,6 @@
        есть что показать -->
   <div id="screenOnline" class="hidden">
     <div class="screen-title" id="tOnlineScreen"></div>
-    <div class="run-greeting hidden" id="onlineGreeting"></div>
 
     <div id="olRanked">
       <div class="rk-modes" id="rkModes"></div>
@@ -474,8 +471,11 @@
     <div class="fr-block">
       <div class="lb-title" id="tChatInvite"></div>
       <button class="btn btn-block" id="tChatFriendly" onclick="challengeFromChat()"></button>
-      <div class="chat-modes-label" id="tChatRanked"></div>
-      <div class="rk-modes" id="chatModes"></div>
+      <!-- Режимы по правилам рейтинга нужны редко — свёрнуты под одной строкой -->
+      <details class="fold chat-modes-fold" id="chatModesFold">
+        <summary class="fold-head" id="tChatRanked"></summary>
+        <div class="fold-body"><div class="rk-modes" id="chatModes"></div></div>
+      </details>
     </div>
 
     <div class="run-hub-actions">
@@ -486,7 +486,6 @@
   <!-- ЭКРАН: хаб режима на рейтинг (старт/результат/топ) -->
   <div id="screenRunHub" class="hidden">
     <div class="screen-title" id="tRunScreen"></div>
-    <div class="run-greeting hidden" id="runGreeting"></div>
     <div id="runHubMessage"></div>
     <div class="fr-note hidden" id="runNote"></div>
     <div class="run-result hidden" id="unfinishedBox">
@@ -592,18 +591,18 @@
         <div class="fold-body"><div class="lad-list" id="pfAchGrid"></div></div>
       </details>
 
-      <button class="btn-ghost btn-block" id="tShowPin" onclick="revealOwnPin()"></button>
-      <button class="btn-ghost btn-block hidden" id="tPushToggle" style="margin-top:8px"
+      <button class="btn-ghost btn-block hidden" id="tPushToggle" style="margin-bottom:8px"
               onclick="togglePush()"></button>
       <div class="fr-note hidden" id="pushNote"></div>
 
-      <div class="hidden" id="pfEdit">
-        <!-- Имя и PIN меняют редко: под одной строкой. «Показать PIN» — выше,
-             на виду: его дети забывают чаще всего -->
-        <div class="fr-note hidden" id="pfPinShort" style="margin-bottom:8px"></div>
-        <details class="fold pf-fold" id="pfEditFold">
-        <summary class="fold-head" id="tNamePinHead">Name and PIN</summary>
-        <div class="fold-body">
+      <div class="fr-note hidden" id="pfPinShort" style="margin-bottom:8px"></div>
+      <!-- PIN, имя и их смена — под одной строкой: заходят сюда редко,
+           а «Показать PIN» дети ищут именно рядом со словом PIN -->
+      <details class="fold pf-fold" id="pfEditFold">
+      <summary class="fold-head" id="tNamePinHead">Name and PIN</summary>
+      <div class="fold-body">
+        <button class="btn-ghost btn-block" id="tShowPin" onclick="revealOwnPin()"></button>
+        <div class="hidden" id="pfEdit" style="margin-top:8px">
         <button class="btn-ghost btn-block" id="tRenameStart"
                 onclick="openRename(true)"></button>
         <div class="pf-form hidden" id="renameBox">
@@ -628,14 +627,8 @@
         </div>
         <div class="fr-note hidden" id="pinNote"></div>
         </div>
-        </details>
-        <!-- Кого заблокировал — здесь же и разблокировать. Список грузится,
-             только когда его раскрыли: заходят сюда редко -->
-        <details class="fold pf-fold" id="pfBlockedFold" ontoggle="if (this.open) loadBlocked()">
-        <summary class="fold-head" id="tBlockedHead"></summary>
-        <div class="fold-body" id="pfBlockedList"></div>
-        </details>
       </div>
+      </details>
     </div>
 
     <label class="pf-row">
@@ -650,8 +643,21 @@
 
     <button class="btn-ghost btn-block hidden" id="tSignIn" style="margin-top:14px"
             onclick="signInFromProfile()"></button>
-    <button class="btn-ghost btn-block" id="tTutReplay" style="margin-top:8px"
-            onclick="closeLogoutModal(); startLesson(1)"></button>
+    <!-- Редкое — под «Ещё»: заблокированные, обучение заново, удаление аккаунта -->
+    <details class="fold pf-fold" id="pfMoreFold" style="margin-top:8px">
+      <summary class="fold-head" id="tMoreHead">More</summary>
+      <div class="fold-body">
+        <!-- Кого заблокировал — здесь же и разблокировать. Список грузится,
+             только когда его раскрыли -->
+        <details class="fold pf-fold hidden" id="pfBlockedFold" ontoggle="if (this.open) loadBlocked()">
+        <summary class="fold-head" id="tBlockedHead"></summary>
+        <div class="fold-body" id="pfBlockedList"></div>
+        </details>
+        <button class="btn-ghost btn-block" id="tTutReplay"
+                onclick="closeLogoutModal(); startLesson(1)"></button>
+        <button class="link-danger danger" id="tDeleteAccount" onclick="openDeleteModal()"></button>
+      </div>
+    </details>
 
     <div id="pfLogout">
       <button class="btn-ghost btn-block" id="tLogoutStart" style="margin-top:14px"
@@ -667,7 +673,6 @@
 
     <button class="btn btn-block" id="tProfileDone" style="margin-top:14px"
             onclick="closeLogoutModal()"></button>
-    <button class="link-danger danger" id="tDeleteAccount" onclick="openDeleteModal()"></button>
   </div>
 </div>
 
@@ -677,7 +682,6 @@
   <div class="modal-card">
     <div class="modal-text" id="invTitle" style="font-weight:800"></div>
     <div class="inv-qr" id="invQr"></div>
-    <div class="inv-link" id="invLink"></div>
     <div class="modal-text inv-hint" id="invHint"></div>
     <div class="fr-note hidden" id="invNote"></div>
     <button class="btn btn-block" style="margin-top:10px" id="invShare" onclick="shareInvite()"></button>

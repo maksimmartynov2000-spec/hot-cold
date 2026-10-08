@@ -27,7 +27,7 @@ async function checkRemoteConfig() {
     }
     const banner = document.getElementById('updateBanner');
     if (data.app_version && String(data.app_version) !== APP_VERSION) {
-      banner.textContent = '🔄 Доступна новая версия игры — нажмите, чтобы обновить';
+      banner.textContent = t().updateAvailable;
       banner.onclick = () => location.reload();
       banner.classList.remove('hidden');
     } else if (data.announcement && localStorage.getItem('hc_ann_seen') !== data.announcement) {
@@ -312,6 +312,8 @@ function fillProfile() {
   document.getElementById('pfAvatarBox').classList.toggle('hidden', !(auth && profileInfo));
   face.classList.toggle('editable', !!(auth && profileInfo));
   document.getElementById('pfEdit').classList.toggle('hidden', !(auth && profileInfo));
+  document.getElementById('pfBlockedFold').classList.toggle('hidden', !(auth && profileInfo));
+  document.getElementById('tMoreHead').textContent = L.more;
   if (auth && profileInfo) renderAvatarGrid();
   if (auth) {
     paintPinButton();
@@ -329,6 +331,7 @@ function openLogoutModal() {
   openRename(false);
   openPinChange(false);
   document.getElementById('pfEditFold').open = false;
+  document.getElementById('pfMoreFold').open = false;
   ['avNote', 'renameNote', 'pinNote'].forEach(id => setNote(id, ''));
   fillProfile();
   if (auth) {
@@ -528,7 +531,6 @@ async function saveRename() {
     openRename(false);
     fillProfile();
     updateAccountChip();
-    renderGreeting(renamed);
     setNote('renameNote', L.renameDone);
   } catch (e) {
     if (runAuth()) setNote('renameNote', profileErrorText(e.message), true);
@@ -833,7 +835,6 @@ function paintPinButton() {
 async function openRunHub(message) {
   const auth = runAuth();
   if (!auth) return showScreen('authChoice');
-  renderGreeting(auth.username);
   document.getElementById('runHubMessage').innerHTML = message || '';
   setNote('runNote', '');
   renderUnfinished();
@@ -864,16 +865,6 @@ function showRunPin(show) {
 
 function toggleRunPinEye() {
   showRunPin(document.getElementById('runPin').type === 'password');
-}
-
-function renderGreeting(name) {
-  const html = name
-    ? t().run.greeting.replace('{name}', '<strong>' + escapeHtml(name) + '</strong>')
-    : '';
-  document.querySelectorAll('.run-greeting').forEach(el => {
-    el.classList.toggle('hidden', !name);
-    if (name) el.innerHTML = html;
-  });
 }
 
 // Личный рекорд знаем из двух бесплатных источников: ответа сервера при отправке
@@ -979,7 +970,6 @@ let friendsBusy = false;
 function openOnline() {
   const auth = runAuth();
   if (!auth) { authReturn = 'online'; return showScreen('authChoice'); }
-  renderGreeting(auth.username);
   setNote('rkNote', '');
   applyTranslations();
   renderRankedModes();
@@ -1006,7 +996,6 @@ function openFriends() {
   findDecided = false;
   // Иконки могли смениться с прошлого раза — спрашиваем заново
   Object.keys(avatarCache).forEach(k => { delete avatarCache[k]; });
-  renderGreeting(auth.username);
   document.getElementById('searchResults').innerHTML = '';
   document.getElementById('friendSearch').value = '';
   setNote('searchNote', '');
@@ -1120,7 +1109,8 @@ function friendState(relation, unread, m, here) {
   }
   // Друг в игре прямо сейчас — вызов, скорее всего, примут: выше остальных
   if (!parts.length && here) return { rank: 4.5, text: L.stOnline, hot: false, on: true };
-  if (!parts.length) parts.push(L.stWrite);
+  // Сказать нечего — подсказка-действие: нажатие на строку открывает переписку
+  if (!parts.length) return { rank, text: '💬 ' + L.stWrite, hot: false, act: true };
   return { rank, text: parts.join(' · '), hot };
 }
 
@@ -1169,7 +1159,7 @@ function friendRow(name, relation, unread, match) {
   const st = friendState(relation, unread, match, here);
   if (st.text) {
     const status = document.createElement('span');
-    status.className = 'fr-status' + (st.hot ? ' hot' : '') + (st.on ? ' on' : '');
+    status.className = 'fr-status' + (st.hot ? ' hot' : '') + (st.on ? ' on' : '') + (st.act ? ' act' : '');
     status.textContent = st.text;
     main.appendChild(status);
   }
@@ -1609,7 +1599,6 @@ async function openInvite() {
     return setNote('friendsNote', friendErrorText(e.message), true);
   }
   inviteLink = location.href.split(/[?#]/)[0] + '?invite=' + encodeURIComponent(code);
-  document.getElementById('invLink').textContent = inviteLink;
   const box = document.getElementById('invQr');
   box.innerHTML = '';
   if (typeof qrcode === 'function') {
