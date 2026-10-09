@@ -6381,6 +6381,26 @@ async function testAudit(browser) {
     await ctx.close();
   }
 
+  // Бонусов ровно столько, сколько выбрали: «−1000…1000» и 2000 бонусов — все 2000
+  page = await newGame(browser);
+  await page.click('#tModeDuel');
+  await page.waitForTimeout(150);
+  await page.selectOption('#rangeMax', '2000');
+  await page.check('#frostSetup');
+  await page.check('#bonusSetup');
+  const opts = await page.evaluate(() => [...document.getElementById('bonusCount').options].map(o => o.value));
+  await page.selectOption('#bonusCount', '2000');
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  const bon = await page.evaluate(() => ({ min: RANGE_MIN, max: RANGE_MAX, n: D.bonuses.length,
+    uniq: new Set(D.bonuses.map(b => b.value)).size, onSecret: D.bonuses.some(b => b.value === secret),
+    typed: D.bonuses.every(b => !!b.type) }));
+  check('−1000…1000 и 2000 бонусов — на поле ровно 2000, все на разных числах, кроме загаданного',
+    opts.includes('2000') && bon.min === -1000 && bon.max === 1000 && bon.n === 2000 && bon.uniq === 2000 && !bon.onSecret && bon.typed,
+    JSON.stringify(bon));
+  await page.evaluate(() => quitToMenu());
+  await done(page);
+
   // Боты нарисованы, как иконки игроков; в имени — без эмодзи зверя
   page = await newGame(browser);
   await page.click('#tModeBot');
