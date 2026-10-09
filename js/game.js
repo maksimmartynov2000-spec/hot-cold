@@ -373,12 +373,15 @@ function placeBonuses() {
   for (let i = 0; i < count - traps; i++) pool.push(good[i % good.length]);
   for (let i = 0; i < traps; i++) pool.push(trap[i % trap.length]);
   pool.sort(() => Math.random() - 0.5);
-  const used = new Set([secret]);
-  for (let guard = 0; guard < 800 && D.bonuses.length < count; guard++) {
-    const v = RANGE_MIN + Math.floor(Math.random() * rangeCount());
-    if (used.has(v)) continue;
-    used.add(v);
-    D.bonuses.push({ value: v, type: pool[D.bonuses.length], taken: false });
+  // Места — из перемешанного списка свободных чисел, а не случайными попытками:
+  // попытки кончались раньше, и на «−1000…1000» из 2000 бонусов вставало
+  // меньше половины. Перемешиваем только нужное начало списка
+  const free = [];
+  for (let v = RANGE_MIN; v < RANGE_MIN + rangeCount(); v++) if (v !== secret) free.push(v);
+  for (let i = 0; i < count && i < free.length; i++) {
+    const j = i + Math.floor(Math.random() * (free.length - i));
+    [free[i], free[j]] = [free[j], free[i]];
+    D.bonuses.push({ value: free[i], type: pool[i], taken: false });
   }
 }
 
