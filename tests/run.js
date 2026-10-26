@@ -6394,10 +6394,12 @@ async function testAudit(browser) {
   await page.waitForTimeout(300);
   const bon = await page.evaluate(() => ({ min: RANGE_MIN, max: RANGE_MAX, n: D.bonuses.length,
     uniq: new Set(D.bonuses.map(b => b.value)).size, onSecret: D.bonuses.some(b => b.value === secret),
-    typed: D.bonuses.every(b => !!b.type) }));
+    typed: D.bonuses.every(b => !!b.type), kinds: [...new Set(D.bonuses.map(b => b.type))].sort().join() }));
   check('−1000…1000 и 2000 бонусов — на поле ровно 2000, все на разных числах, кроме загаданного',
     opts.includes('2000') && bon.min === -1000 && bon.max === 1000 && bon.n === 2000 && bon.uniq === 2000 && !bon.onSecret && bon.typed,
     JSON.stringify(bon));
+  check('«Бросок в лаву» убран: среди 2000 бонусов его нет, остальные виды есть',
+    bon.kinds === 'blind,extra,fog,gift,memory,skip', bon.kinds);
   await page.evaluate(() => quitToMenu());
   await done(page);
 
