@@ -322,7 +322,9 @@ function bonusNearRadius() {
 
 // Полезные бонусы и ловушки. Ловушка бьёт по тому, кто на неё наступил, —
 // из-за этого сигнал «рядом» перестаёт быть приманкой и становится выбором
-const BONUS_GOOD = ['extra', 'fog', 'blind', 'lava'];
+// «Бросок в лаву» убран: ход случайным числом злил больше, чем радовал.
+// Игра по-прежнему умеет его показать — на случай партии, где его взяли раньше
+const BONUS_GOOD = ['extra', 'fog', 'blind'];
 const BONUS_TRAP = ['skip', 'gift', 'memory'];
 const BONUS_TYPES = BONUS_GOOD.concat(BONUS_TRAP);
 const BONUS_TRAP_SHARE = 1 / 3;

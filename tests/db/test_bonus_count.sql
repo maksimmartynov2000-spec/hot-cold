@@ -47,4 +47,18 @@ begin
 end $$;
 \echo ok
 
+\echo === 4. «Бросок в лаву» убран: среди 2000 бонусов лавы нет, остальные виды есть
+do $$
+declare mid bigint; kinds text[];
+begin
+  insert into matches(p0, p1, range_min, range_max, secret, status, bonuses_on, bonus_count)
+  values ('Лев', 'Кира', -1000, 1000, 5, 'active', true, 2000) returning id into mid;
+  perform place_match_bonuses(mid);
+  select array_agg(distinct type order by type) into kinds from match_bonuses where match_id = mid;
+  if kinds is distinct from array['blind','extra','fog','gift','memory','rush','skip'] then
+    raise exception 'ОШИБКА: виды бонусов %', kinds;
+  end if;
+end $$;
+\echo ok
+
 rollback;
