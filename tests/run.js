@@ -182,16 +182,17 @@ async function testScoringAndSubmit(browser) {
   const afterWin = await page.evaluate(() => ({ score: RUN.totalScore, locked: RUN.locked }));
   check('за угаданный раунд начисляются очки', afterWin.score > 0, String(afterWin.score));
 
-  // повторный ввод того же числа в паузе не должен давать очки снова
-  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
-  await page.click('#tSubmitGuess');
+  // повторный ход в паузе между раундами не должен давать очки снова: поля
+  // ввода нет, а прямой вызов отбивает замок
+  check('в паузе между раундами поля ввода нет', !(await page.locator('#guessInput').isVisible()));
+  await page.evaluate(() => { document.getElementById('guessInput').value = String(window.__run.secret); return runGuess(); });
   await page.waitForTimeout(100);
-  await liftCurtainIfShown(page);
   check('в паузе между раундами очки не накручиваются',
     (await page.evaluate(() => RUN.totalScore)) === afterWin.score);
 
   // сливаем раунд -> игра заканчивается и результат уходит на сервер
-  await page.waitForTimeout(900);
+  await page.click('#rsGo');
+  await page.waitForTimeout(300);
   const s2 = await page.evaluate(() => ({ secret: window.__run.secret, RANGE_MAX, MAX_GUESSES }));
   for (let i = 0; i < s2.MAX_GUESSES; i++) {
     let wrong = ((s2.secret + i) % s2.RANGE_MAX) + 1;
@@ -459,7 +460,9 @@ async function testPauseAndGiveUp(browser) {
   const s = await page.evaluate(() => window.__run.secret);
   await page.fill('#guessInput', String(s));
   await page.click('#tSubmitGuess');
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(400);
+  await page.click('#rsGo');
+  await page.waitForTimeout(300);
   await liftCurtainIfShown(page);
   const scoreBefore = await page.evaluate(() => RUN.totalScore);
   check('забег живёт на сервере, а не в браузере',
@@ -6381,6 +6384,35 @@ async function testRedesign(browser) {
   await done(page);
 }
 
+// Испытание: между раундами — карточка «пройден», что меняется, и «дальше»
+async function testRunStage(browser) {
+  console.log('\nИспытание: переход между раундами');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeRun');
+  await page.waitForTimeout(300);
+  await page.click('#tRunStart');
+  await page.waitForTimeout(300);
+  const before = await page.evaluate(() => ({ round: RUN.round, max: RANGE_MAX, tries: MAX_GUESSES }));
+  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(1500);
+  const st = await page.evaluate(() => ({
+    shown: !document.getElementById('runStage').classList.contains('hidden'),
+    text: document.getElementById('runStage').textContent,
+    input: !document.getElementById('guessSection').classList.contains('hidden'),
+    round: RUN.round }));
+  check('после победы раунд сам не переключается — висит карточка', st.shown && st.round === before.round, JSON.stringify(st));
+  check('в карточке: какой раунд пройден и сколько очков', /Раунд 1 пройден!/.test(st.text) && /\+\d+ очк/.test(st.text), st.text);
+  check('в карточке: что будет дальше — числа и попытки', /Дальше — раунд 2/.test(st.text) && /Числа/.test(st.text) && /Попыток/.test(st.text), st.text);
+  check('пока карточка висит, ходить нельзя', !st.input);
+  await page.click('#rsGo');
+  await page.waitForTimeout(300);
+  const after = await page.evaluate(() => ({ round: RUN.round, stage: !document.getElementById('runStage').classList.contains('hidden'),
+    input: !document.getElementById('guessSection').classList.contains('hidden'), locked: RUN.locked }));
+  check('«Раунд 2 →» начинает следующий раунд', after.round === 2 && !after.stage && after.input && !after.locked, JSON.stringify(after));
+  await done(page);
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -7298,6 +7330,7 @@ async function testKeyPage(browser) {
     await testLeagueShow(browser);
     await testAudit(browser);
     await testRedesign(browser);
+    await testRunStage(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

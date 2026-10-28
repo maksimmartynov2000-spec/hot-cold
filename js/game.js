@@ -1207,6 +1207,7 @@ function renderAll() {
   renderNumberLine();
   renderStatus();
   renderResult();
+  renderRunStage();
   renderHistory();
   renderBonusLine();
   renderForcedTurn();
@@ -1314,10 +1315,15 @@ function renderForcedTurn() {
   hint.classList.toggle('hidden', !canArm);
 }
 
+// Испытание между раундами: висит карточка «раунд пройден», ходить нельзя
+function runStaged() {
+  return mode === 'run' && !!RUN && !!RUN.stage;
+}
+
 function renderFeedback() {
   const panel = document.getElementById('feedbackPanel');
   const last = currentMove();
-  const hide = !last || (mode === 'duel' ? D.roundOver : gameOverType === 'win' || gameOverType === 'lose');
+  const hide = !last || runStaged() || (mode === 'duel' ? D.roundOver : gameOverType === 'win' || gameOverType === 'lose');
   if (hide) { panel.classList.add('hidden'); return; }
   panel.style.background = last.meta.bg;
   panel.style.border = '1px solid ' + last.meta.color;
@@ -1664,7 +1670,7 @@ function renderStatus() {
     bar.classList.toggle('low', left <= 3);
     document.getElementById('attFill').style.width = Math.round(100 * left / MAX_GUESSES) + '%';
     document.getElementById('finalBox').classList.toggle('hidden', mode === 'run' || gameOverType !== 'lose_waiting');
-    document.getElementById('guessSection').classList.toggle('hidden', gameOver);
+    document.getElementById('guessSection').classList.toggle('hidden', gameOver || runStaged());
 
     if (mode === 'run') {
       const best = runBest();

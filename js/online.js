@@ -3352,12 +3352,16 @@ async function runGuess() {
   }
 
   if (res.roundWon) {
+    // Раунд пройден: следующий не начинается сам. Сначала карточка — сколько
+    // набрал и что меняется, — и игрок сам нажимает «дальше». Ходить, пока она
+    // висит, нельзя: RUN.locked снимет только следующий раунд
     RUN.totalScore = res.state.score;
+    RUN.stage = {
+      round: RUN.round, points: res.points, moves: history.length, total: res.state.score,
+      from: { min: RANGE_MIN, max: RANGE_MAX, tries: MAX_GUESSES },
+      next: res.state
+    };
     renderAll();
-    const L = t();
-    document.getElementById('feedbackLabel').textContent =
-      L.labels[8] + '  +' + withPlural(res.points, L.run.pointForms);
-    setTimeout(() => { applyRunSnapshot(res.state); applyTranslations(); renderAll(); }, 900);
     return;
   }
 
@@ -3366,6 +3370,42 @@ async function runGuess() {
   history = (res.state.movesLog || []).map(mv => ({
     guess: mv.guess, distance: null, meta: FEEDBACK_META[mv.tier], p: null
   }));
+  renderAll();
+}
+
+function renderRunStage() {
+  const box = document.getElementById('runStage');
+  const S = mode === 'run' && RUN && RUN.stage;
+  box.classList.toggle('hidden', !S);
+  if (!S) return;
+  const L = t();
+  const n = S.next;
+  const range = (a, b) => L.placeholderTpl.replace('{a}', formatNum(a)).replace('{b}', formatNum(b));
+  // Строка «что дальше»: новое значение крупно, прежнее — рядом, если изменилось.
+  // Стрелка — куда изменилось: больше или меньше, чем было
+  const row = (label, now, was, cls) =>
+    '<div class="rs-row"><span class="rs-k">' + label + '</span><span class="rs-v">' + now +
+    (was === null ? '' : ' <span class="rs-was ' + cls + '">' + L.rsWas.replace('{v}', was) + '</span>') + '</span></div>';
+  const rangeChanged = n.rangeMin !== S.from.min || n.rangeMax !== S.from.max;
+  box.innerHTML =
+    '<div class="rs-title">🎯 ' + L.rsDone.replace('{n}', S.round) + '</div>' +
+    '<div class="rs-got">' + L.rsGot.replace('{p}', withPlural(S.points, L.run.pointForms))
+      .replace('{m}', withPlural(S.moves, L.moveForms)) + '</div>' +
+    '<div class="rs-total">' + L.rsTotal.replace('{s}', withPlural(S.total, L.run.pointForms)) + '</div>' +
+    '<div class="rs-next">' + L.rsNext.replace('{n}', n.round) + '</div>' +
+    row(L.rsRange, range(n.rangeMin, n.rangeMax), rangeChanged ? range(S.from.min, S.from.max) : null,
+      n.rangeMax - n.rangeMin >= S.from.max - S.from.min ? 'up' : 'down') +
+    row(L.rsTries, formatNum(n.allowed), n.allowed !== S.from.tries ? formatNum(S.from.tries) : null,
+      n.allowed > S.from.tries ? 'up' : 'down') +
+    '<button class="btn btn-block" id="rsGo" onclick="runNextRound()">' + L.rsGo.replace('{n}', n.round) + '</button>';
+}
+
+function runNextRound() {
+  if (!RUN || !RUN.stage) return;
+  const next = RUN.stage.next;
+  RUN.stage = null;
+  applyRunSnapshot(next);
+  applyTranslations();
   renderAll();
 }
 
