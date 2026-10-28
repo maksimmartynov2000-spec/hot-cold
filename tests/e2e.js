@@ -140,8 +140,8 @@ async function registerPlayer(p, name, pin) {
   check('после регистрации открылся рейтинг', await A.page.locator('#screenOnline').isVisible());
 
   // Друзья — отдельный экран, к нему идут из меню
-  await A.page.click('#tOnlineBack');
-  await B.page.click('#tOnlineBack');
+  await A.page.click('#navPlay');
+  await B.page.click('#navPlay');
   await A.page.waitForTimeout(300);
   await B.page.waitForTimeout(300);
   await A.page.click('#friendsBtn');
@@ -301,8 +301,8 @@ async function registerPlayer(p, name, pin) {
     (await B.page.locator('#screenFriends').isVisible()));
 
   // Рейтинг: играем разновидность с морозом и бонусами — самую непохожую
-  await A.page.click('#tFriendsBack');
-  await B.page.click('#tFriendsBack');
+  await A.page.click('#navPlay');
+  await B.page.click('#navPlay');
   await A.page.waitForTimeout(300);
   await B.page.waitForTimeout(300);
   await A.page.click('#tModeOnline');

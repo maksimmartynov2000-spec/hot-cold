@@ -89,7 +89,7 @@ function serve() {
     JSON.stringify(rankedNote));
   check('и не показывает сырую ошибку fetch',
     rankedNote.note.indexOf('fetch') < 0, rankedNote.note);
-  await page.click('#tOnlineBack');
+  await page.click('#navPlay');
   await page.waitForTimeout(300);
 
   await page.click('#friendsBtn');
@@ -103,7 +103,7 @@ function serve() {
   check('и друзья тоже говорят про связь',
     offlineNote.open && offlineNote.bad && offlineNote.note.length > 0,
     JSON.stringify(offlineNote));
-  await page.click('#tFriendsBack');
+  await page.click('#navPlay');
   await page.waitForTimeout(300);
 
   // Рейтинг тоже перестал работать без сети: забег считает сервер. Это
@@ -119,14 +119,14 @@ function serve() {
   check('без сети рейтинг сразу говорит про связь',
     runOffline.open && runOffline.bad && runOffline.note.length > 0,
     JSON.stringify(runOffline));
-  await page.click('#tRunToMenu');
+  await page.click('#navPlay');
   await page.waitForTimeout(300);
 
   // тренировка должна полностью работать офлайн
   await page.click('#tModeSolo');
   await page.click('#tStartMatch');
   await page.waitForTimeout(300);
-  check('без сети тренировка запускается', await page.locator('#thermoWrap').isVisible());
+  check('без сети тренировка запускается', await page.locator('#guessInput').isVisible());
   const secret = await page.evaluate(() => secret);
   await page.fill('#guessInput', String(secret));
   await page.click('#tSubmitGuess');

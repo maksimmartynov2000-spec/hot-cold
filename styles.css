@@ -1878,7 +1878,7 @@ body.on-game .tabbar { display: none; }
   min-width: 18px; height: 18px; line-height: 18px; font-size: 11px; font-weight: 900; text-align: center; box-sizing: border-box; }
 .tab .avatar-btn { width: 28px; height: 28px; border-width: 2px; font-size: 13px; vertical-align: top; box-shadow: none; }
 /* «В меню» на экранах с нижним меню не нужно: «Играть» — та же кнопка */
-#tOnlineBack, #tFriendsBack { display: none; }
+#tOnlineBack, #tFriendsBack, #tRunToMenu { display: none; }
 
 /* Главный: онлайн — широкими карточками, без интернета — три плитки в ряд */
 #screenMode .mode-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -1960,3 +1960,16 @@ body.on-game #guessInput, body.on-game #tSubmitGuess { min-height: 56px; }
   padding: 16px 12px 14px; margin: 10px 0 14px; }
 :root[data-theme="light"] .rk-top-row.me { background: #fff1db; }
 :root[data-theme="light"] #screenOnline .rk-hero { background: #fff; box-shadow: 0 4px 0 #ebe7f7; }
+
+/* Зелёные и голубые подписи задуманы для тёмного фона — на белом темнее */
+:root[data-theme="light"] .fr-btn.yes { color: #15803d; border-color: rgba(22, 163, 74, 0.5); }
+:root[data-theme="light"] .fr-btn.no { color: #dc2626; }
+:root[data-theme="light"] .friend-row .fr-status.act { color: #2563eb; }
+:root[data-theme="light"] .lb-tab.active { color: #15803d; }
+/* Узкий телефон: строка статуса и пять кнопок должны остаться в одну строку */
+@media (max-width: 380px) {
+  .info-bar { gap: 4px; padding-left: 10px; padding-right: 8px; }
+  .info-bar .attempts { font-size: 14px; }
+  .bar-actions { gap: 3px; }
+  .mini-toggle.scale-btn { min-width: 24px; }
+}

@@ -1400,9 +1400,15 @@ function nlStep(span, maxCount) {
     .find(v => span / v <= maxCount) || span;
 }
 
+// Серые деления и подписи берут цвет темы: в атрибутах SVG переменные CSS
+// не работают, поэтому такой цвет дублируем в style — он главнее атрибута
+function nlThemed(prop, color) {
+  return color.indexOf('var(') >= 0 ? ' style="' + prop + ':' + color + '"' : '';
+}
+
 function nlText(x, y, anchor, size, fill, weight, str) {
   return '<text x="' + x + '%" y="' + y + '" text-anchor="' + anchor + '" font-size="' + size +
-         '" font-weight="' + weight + '" style="fill:' + fill + '">' + str + '</text>';
+         '" font-weight="' + weight + '" fill="' + fill + '"' + nlThemed('fill', fill) + '>' + str + '</text>';
 }
 
 // Игрок с выключенной анимацией в системе не должен ничего ловить глазами
@@ -1458,7 +1464,7 @@ let nlDrawn = null;
 
 function nlTick(v, y1, y2, stroke, width) {
   return '<line x1="' + nlPos(v) + '%" y1="' + y1 + '" x2="' + nlPos(v) + '%" y2="' + y2 +
-         '" style="stroke:' + stroke + '" stroke-width="' + width + '" />';
+         '" stroke="' + stroke + '"' + nlThemed('stroke', stroke) + ' stroke-width="' + width + '" />';
 }
 
 // Партия (или раунд в дуэли) кончилась. Вопрос один и тот же в четырёх местах,
@@ -1552,7 +1558,7 @@ function renderNumberLine() {
     // Ехать есть откуда только со второго хода: первому не от чего отталкиваться
     const from = (fresh && nlAnim.x !== null) ? nlAnim.x : null;
     const move = (from === null) ? '' : nlSlide('cx', from, p);
-    out += '<circle cx="' + p + '%" cy="' + NL.axisY + '" r="5" style="fill:var(--bg)" stroke="' + color +
+    out += '<circle cx="' + p + '%" cy="' + NL.axisY + '" r="5" fill="#0f1430" style="fill:var(--bg)" stroke="' + color +
            '" stroke-width="2.5">' + (move || (fresh ? nlFade() : '')) + '</circle>';
     // у самого края подпись разворачиваем внутрь, иначе она уезжает за карточку
     const anchor = p < 12 ? 'start' : (p > 88 ? 'end' : 'middle');
