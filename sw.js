@@ -4,7 +4,7 @@
 
 // Версию поднимаем, когда меняется что-то из CORE: старый кеш отдаётся сразу,
 // и без смены имени телефон продолжил бы брать прежний manifest
-const CACHE = 'hot-cold-v8';
+const CACHE = 'hot-cold-v9';
 
 // Своё, что нужно для запуска
 const CORE = [
@@ -24,6 +24,11 @@ const CORE = [
   './icon-192.png',
   './icon-512.png'
 ];
+
+// Картинки иконок: их список и имена файлов — в js/art.js, там же, где их
+// рисует игра, чтобы не держать второй список здесь
+importScripts('./js/art.js');
+CORE.push(...[...ICON_ART].map(code => './' + iconFile(code)));
 
 self.addEventListener('install', event => {
   // addAll падает целиком, если хоть один файл не отдался, — кладём по одному
