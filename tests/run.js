@@ -75,9 +75,17 @@ async function testModes(browser) {
   await page.click('#tModeSolo');
   await page.click('#tStartMatch');
   await page.waitForTimeout(200);
-  check('тренировка: термометр виден', await page.locator('#thermoWrap').isVisible());
-  check('тренировка: название игры видно', await page.locator('.header h1').isVisible());
-  check('тренировка: шкала расстояний раскрыта', await page.evaluate(() => document.getElementById('scaleBox').open));
+  // Шапка с названием — только на главном: в партии всё место доске
+  check('тренировка: шапки в партии нет', !(await page.locator('.header h1').isVisible()));
+  check('тренировка: нижнего меню в партии нет', !(await page.locator('#tabbar').isVisible()));
+  check('тренировка: шкала спрятана за «?»', !(await page.locator('#legendGrid').isVisible()));
+  const wrong = await page.evaluate(() => secret === RANGE_MIN ? RANGE_MAX : RANGE_MIN);
+  await page.fill('#guessInput', String(wrong));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(200);
+  check('тренировка: градусник — в карточке ответа',
+    await page.evaluate(() => document.getElementById('thermoWrap').parentElement.id === 'feedbackPanel') &&
+    await page.locator('#thermoWrap').isVisible());
   const secret = await page.evaluate(() => secret);
   await page.fill('#guessInput', String(secret));
   await page.click('#tSubmitGuess');
@@ -92,7 +100,10 @@ async function testModes(browser) {
   await page.click('#tStartMatch');
   await page.waitForTimeout(200);
   check('дуэль: карточки игроков видны', await page.locator('#pcard0').isVisible());
-  check('дуэль: показан чей ход', (await page.locator('#turnBanner').textContent()).trim().length > 0);
+  // Чей ход — ярлык над плашкой игрока, а не отдельная полоса
+  check('дуэль: показан чей ход', await page.locator('#pturn0').isVisible() &&
+    (await page.locator('#pturn0').textContent()).trim().length > 0 && !(await page.locator('#pturn1').isVisible()));
+  check('дуэль: полосы «Ходит» нет', !(await page.locator('#turnBanner').isVisible()));
 
   await done(page);
 }

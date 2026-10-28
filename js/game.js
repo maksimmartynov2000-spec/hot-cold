@@ -441,8 +441,18 @@ function applyTranslations() {
   document.getElementById('tLegendTitle').textContent = L.legendTitle;
 
   document.getElementById('tModeSolo').textContent = L.modeSolo;
-  document.getElementById('tModeDuel').textContent = L.modeDuel;
-  document.getElementById('tModeBot').textContent = L.modeBot;
+  // На плитке меню — коротко: «Игра с другом» в три слова не влезало в треть ширины
+  document.getElementById('tModeDuel').textContent = L.tileDuel;
+  document.getElementById('tModeBot').textContent = L.tileBot;
+  document.getElementById('tNavPlay').textContent = L.navPlay;
+  document.getElementById('tNavFriends').textContent = L.navFriends;
+  document.getElementById('tScaleDone').textContent = L.run.done;
+  document.getElementById('tThemeLabel').textContent = L.themeLabel;
+  document.getElementById('tThemeAuto').textContent = L.themeAuto;
+  document.getElementById('tThemeDark').textContent = L.themeDark;
+  document.getElementById('tThemeLight').textContent = L.themeLight;
+  document.getElementById('themeSwitcher').value = themeChoice();
+  document.getElementById('tSoundLabel').textContent = L.run.sound;
   document.getElementById('tLblBot').textContent = L.lblBot;
   // У каждого экрана своё название — с тем же значком, что в меню
   document.getElementById('tSetupScreen').textContent =
@@ -577,10 +587,16 @@ function showScreen(name) {
   document.getElementById('card').classList.toggle('wide', name === 'game' && mode === 'duel');
   document.getElementById('card').classList.toggle('solo-game', name === 'game' && mode !== 'duel');
   document.querySelector('.header').classList.toggle('compact', name === 'game');
-  document.querySelector('.legend').classList.toggle('hidden', name !== 'game');
+  // Экран — классом на body: по нему стили прячут шапку, нижнее меню и
+  // прижимают поле ввода к низу
+  document.body.className = document.body.className.replace(/\bon-\S+/g, '').trim();
+  document.body.classList.add('on-' + name);
+  document.getElementById('navPlay').classList.toggle('on', name === 'mode');
+  document.getElementById('friendsBtn').classList.toggle('on', name === 'friends' || name === 'chat');
+  if (name !== 'game') closeScale();
   updateAccountChip();
   // Вернулся в меню — задания могли продвинуться: партия или Испытание
-  if (name === 'mode') loadProgress();
+  if (name === 'mode') { loadProgress(); loadLadder().then(renderModeInfo); }
   // Ушёл с доски — праздник звёзд и салют закрываются: они про только что сыгранную партию
   if (name !== 'game') {
     closeStarsShowNow();
@@ -1202,7 +1218,6 @@ function renderAll() {
   renderClock();
   renderSayPad();
   renderSayBubble();
-  syncScaleBox();
   if (duel) renderPlayers();
   checkCurtain();
   // Сначала итог урока: он отмечает урок пройденным, и подсказка гаснет
@@ -1319,7 +1334,7 @@ function renderFeedback() {
   const band = document.getElementById('feedbackBand');
   const showBand = distanceHint && !isHit(last);
   band.classList.toggle('hidden', !showBand);
-  band.textContent = showBand ? last.meta.rangeSign : '';
+  band.textContent = showBand ? t().fbBand.replace('{r}', last.meta.rangeSign) : '';
   band.style.color = last.meta.color;
   panel.classList.toggle('with-band', showBand);
   label.style.color = last.meta.color;
@@ -1332,6 +1347,8 @@ function renderThermo() {
   // поместились на экран
   const hide = !showThermo || (mode !== 'run' && roundOver());
   wrap.classList.toggle('hidden', hide);
+  // Градусник слева от слова — карточка в две колонки; без него слово по центру
+  document.getElementById('feedbackPanel').classList.toggle('with-thermo', !hide);
   if (hide) return;
 
   const fill = document.getElementById('thermoFill');
@@ -1385,7 +1402,7 @@ function nlStep(span, maxCount) {
 
 function nlText(x, y, anchor, size, fill, weight, str) {
   return '<text x="' + x + '%" y="' + y + '" text-anchor="' + anchor + '" font-size="' + size +
-         '" font-weight="' + weight + '" fill="' + fill + '">' + str + '</text>';
+         '" font-weight="' + weight + '" style="fill:' + fill + '">' + str + '</text>';
 }
 
 // Игрок с выключенной анимацией в системе не должен ничего ловить глазами
@@ -1441,7 +1458,7 @@ let nlDrawn = null;
 
 function nlTick(v, y1, y2, stroke, width) {
   return '<line x1="' + nlPos(v) + '%" y1="' + y1 + '" x2="' + nlPos(v) + '%" y2="' + y2 +
-         '" stroke="' + stroke + '" stroke-width="' + width + '" />';
+         '" style="stroke:' + stroke + '" stroke-width="' + width + '" />';
 }
 
 // Партия (или раунд в дуэли) кончилась. Вопрос один и тот же в четырёх местах,
@@ -1469,7 +1486,7 @@ function renderNumberLine() {
 
   // Сама прямая
   out += '<line x1="' + NL.left + '%" y1="' + NL.axisY + '" x2="' + NL.right + '%" y2="' + NL.axisY +
-         '" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round" />';
+         '" style="stroke:rgb(var(--ink) / 0.3)" stroke-width="2" stroke-linecap="round" />';
 
   // Подписей помещается столько, сколько позволяет ширина: считаем её по самому
   // длинному числу на прямой, иначе на узком телефоне они наедут друг на друга.
@@ -1485,7 +1502,7 @@ function renderNumberLine() {
 
   for (let v = Math.ceil(RANGE_MIN / tickStep) * tickStep; v <= RANGE_MAX; v += tickStep) {
     if (v === 0 && RANGE_MIN < 0) continue;       // ноль рисуется отдельно и ярче
-    out += nlTick(v, NL.axisY + 3, NL.axisY + 7, 'rgba(255,255,255,0.22)', 1.5);
+    out += nlTick(v, NL.axisY + 3, NL.axisY + 7, 'rgb(var(--ink) / 0.22)', 1.5);
   }
 
   for (let v = Math.ceil(RANGE_MIN / labelStep) * labelStep; v <= RANGE_MAX; v += labelStep) {
@@ -1493,20 +1510,20 @@ function renderNumberLine() {
     const p = nlPos(v);
     // пропускаем только те, что реально налезли бы на подписи границ
     if (Math.abs(p - NL.left) < labelPct || Math.abs(p - NL.right) < labelPct) continue;
-    out += nlTick(v, NL.axisY + 3, NL.axisY + 9, 'rgba(255,255,255,0.35)', 1.5);
-    out += nlText(p, NL.baseY, 'middle', fs, 'rgba(255,255,255,0.5)', 400, formatNum(v));
+    out += nlTick(v, NL.axisY + 3, NL.axisY + 9, 'rgb(var(--ink) / 0.35)', 1.5);
+    out += nlText(p, NL.baseY, 'middle', fs, 'rgb(var(--ink) / 0.5)', 400, formatNum(v));
   }
 
   // Ноль отмечаем отдельно — ради него всё и затевалось
   if (RANGE_MIN < 0 && RANGE_MAX > 0) {
-    out += nlTick(0, NL.axisY - 7, NL.axisY + 9, 'rgba(255,255,255,0.55)', 1.5);
-    out += nlText(nlPos(0), NL.baseY, 'middle', fs, 'rgba(255,255,255,0.75)', 700, '0');
+    out += nlTick(0, NL.axisY - 7, NL.axisY + 9, 'rgb(var(--ink) / 0.55)', 1.5);
+    out += nlText(nlPos(0), NL.baseY, 'middle', fs, 'rgb(var(--ink) / 0.75)', 700, '0');
   }
 
   // Границы диапазона. Их подписи тоже по центру деления, как у остальных:
   // так соседнее число не приходится выбрасывать из-за мнимого наложения
   [RANGE_MIN, RANGE_MAX].forEach(v => {
-    out += nlText(nlPos(v), NL.baseY, 'middle', fs, 'rgba(255,255,255,0.5)', 400, formatNum(v));
+    out += nlText(nlPos(v), NL.baseY, 'middle', fs, 'rgb(var(--ink) / 0.5)', 400, formatNum(v));
   });
 
   // Раунд кончился — число больше не тайна. Словами его и так называют, но на
@@ -1518,7 +1535,7 @@ function renderNumberLine() {
   // залитая точка снимается: ярким на прямой остаётся только ответ
   (revealed ? visible : rings).forEach(h => {
     out += '<circle cx="' + nlPos(h.guess) + '%" cy="' + NL.axisY + '" r="2.5" fill="none" ' +
-           'stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />';
+           'style="stroke:rgb(var(--ink) / 0.4)" stroke-width="1.5" />';
   });
 
   // Новый ход или нет — видно по ключу. Двигаем точку только на новом ходе:
@@ -1535,7 +1552,7 @@ function renderNumberLine() {
     // Ехать есть откуда только со второго хода: первому не от чего отталкиваться
     const from = (fresh && nlAnim.x !== null) ? nlAnim.x : null;
     const move = (from === null) ? '' : nlSlide('cx', from, p);
-    out += '<circle cx="' + p + '%" cy="' + NL.axisY + '" r="5" fill="#0f1430" stroke="' + color +
+    out += '<circle cx="' + p + '%" cy="' + NL.axisY + '" r="5" style="fill:var(--bg)" stroke="' + color +
            '" stroke-width="2.5">' + (move || (fresh ? nlFade() : '')) + '</circle>';
     // у самого края подпись разворачиваем внутрь, иначе она уезжает за карточку
     const anchor = p < 12 ? 'start' : (p > 88 ? 'end' : 'middle');
@@ -1611,25 +1628,28 @@ function renderStatus() {
       banner.classList.remove('hidden');
       banner.innerHTML = holdText();
       banner.classList.toggle('count', hold === 'count');
-      banner.style.borderColor = 'rgba(255,255,255,0.25)';
-      banner.style.background = 'rgba(255,255,255,0.06)';
+      banner.style.borderColor = 'rgb(var(--ink) / 0.25)';
+      banner.style.background = 'rgb(var(--ink) / 0.06)';
       banner.style.color = '';
-    } else if (D.roundOver) { banner.classList.add('hidden'); }
+    } else if (D.roundOver || !D.armed) { banner.classList.add('hidden'); }
     else {
+      // Чей ход, видно по ярлыку на плашке игрока. Полоса остаётся только
+      // для жетона: что ход будет двойным, иначе нигде не написано
       banner.classList.remove('count');
       banner.classList.remove('hidden');
-      // «Ходит: Максим», когда Максим — это вы, читается странно: свой ход — «Ваш ход»
-      const mineNow = online ? D.cur === online.seat : (vsBot && D.cur === 0);
-      banner.textContent = (mineNow ? L.yourTurnNow : L.turnOf + D.names[D.cur]) + (D.armed ? '  ' + L.tokenArmed : '');
+      banner.textContent = L.tokenArmed;
       banner.style.borderColor = P_COLORS[D.cur];
-      banner.style.background = 'rgba(255,255,255,0.06)';
+      banner.style.background = 'rgb(var(--ink) / 0.06)';
       banner.style.color = P_COLORS[D.cur];
     }
+    renderTurnTags();
+    document.getElementById('attBar').classList.add('hidden');
     document.getElementById('finalBox').classList.add('hidden');
     document.getElementById('guessSection').classList.toggle('hidden',
       D.roundOver || !!forcedTurn() || (online && (D.cur !== online.seat || !!onlineHold())));
   } else {
     banner.classList.add('hidden');
+    renderTurnTags();
     // Партия кончилась — «осталось попыток» уже ничего не значит и читается
     // как ошибка. На этом месте полезно то, что игрок и так хочет знать:
     // за сколько ходов вышло
@@ -1638,6 +1658,10 @@ function renderStatus() {
     attempts.textContent = over ? withPlural(movesUsed, L.moveForms)
                                 : L.attemptsLeft.replace('{n}', left).replace('{m}', MAX_GUESSES);
     attempts.className = 'attempts' + (!over && left <= 3 ? ' low' : '');
+    const bar = document.getElementById('attBar');
+    bar.classList.toggle('hidden', over || mode === 'run');
+    bar.classList.toggle('low', left <= 3);
+    document.getElementById('attFill').style.width = Math.round(100 * left / MAX_GUESSES) + '%';
     document.getElementById('finalBox').classList.toggle('hidden', mode === 'run' || gameOverType !== 'lose_waiting');
     document.getElementById('guessSection').classList.toggle('hidden', gameOver);
 
@@ -1660,6 +1684,22 @@ function renderStatus() {
   }
 }
 
+// Ярлык над плашкой того, кто ходит. «Ходит: Максим», когда Максим — это
+// вы, читается странно: свой ход — «Ваш ход»
+function renderTurnTags() {
+  const L = t();
+  const show = mode === 'duel' && !D.roundOver && !onlineHold();
+  const mineNow = online ? D.cur === online.seat : (vsBot && D.cur === 0);
+  for (let p = 0; p < 2; p++) {
+    const tag = document.getElementById('pturn' + p);
+    const on = show && D.cur === p;
+    tag.classList.toggle('hidden', !on);
+    tag.textContent = on ? (mineNow ? L.yourTurnNow : L.turnTag) : '';
+    tag.style.background = P_COLORS[p];
+    document.getElementById('pcard' + p).style.setProperty('--pc', P_COLORS[p]);
+  }
+}
+
 function renderResult() {
   const box = document.getElementById('resultBox');
   const L = t();
@@ -1676,7 +1716,7 @@ function renderResult() {
 
     const title = document.createElement('div');
     title.className = 'r-title';
-    title.style.color = D.matchOver ? P_COLORS[w] : '#fff';
+    title.style.color = D.matchOver ? P_COLORS[w] : '';
     const icon = document.createElement('span');
     icon.className = 'r-icon';
     icon.textContent = D.matchOver ? '🏆' : '🎯';
@@ -1904,9 +1944,9 @@ function renderHistory() {
     const item = document.createElement('div');
     item.className = 'history-item';
     const masked = hiddenRow(h.p, h);
-    const accent = masked ? 'rgba(255,255,255,0.2)'
+    const accent = masked ? 'rgb(var(--ink) / 0.2)'
                           : ((h.p === null || h.p === undefined) ? h.meta.color : P_COLORS[h.p]);
-    item.style.borderLeft = '3px solid ' + accent;
+    item.style.borderTopColor = accent;
     const who = (h.p === null || h.p === undefined)
       ? ''
       : '<span class="h-who" style="color:' + P_COLORS[h.p] + '">' + escapeHtml(D.names[h.p]) + '</span>';
@@ -1939,7 +1979,7 @@ const GRADE_ICON = { brilliant: '!!', best: '★', excellent: '👍', good: '✓
                      inaccuracy: '?!', mistake: '?', blunder: '??', hit: '🎯', forced: '🌋', limited: '🙈' };
 const GRADE_COLOR = { brilliant: '#1baca6', best: '#81b64c', excellent: '#81b64c', good: '#95b776',
                       inaccuracy: '#f7c631', mistake: '#ffa459', blunder: '#fa412d', hit: '#4ade80',
-                      forced: 'rgba(255,255,255,0.25)', limited: 'rgba(255,255,255,0.25)' };
+                      forced: 'rgb(var(--ink) / 0.25)', limited: 'rgb(var(--ink) / 0.25)' };
 // Пороги доли от лучшего хода. Блестящий — лучший ход (кроме первого),
 // который не совпадает с «очевидной серединой»: его нашёл тот, кто понимает
 // пояса, а не просто делит отрезок пополам
@@ -2376,7 +2416,7 @@ function shFinish() {
       const el = document.createElement('div');
       el.className = 'sh-rew';
       el.style.animationDelay = (0.2 * i) + 's';
-      if (r.kind === 'icon') { el.innerHTML = iconArt(r.value, 0) || r.value; el.style.background = 'rgba(255,255,255,0.1)'; }
+      if (r.kind === 'icon') { el.innerHTML = iconArt(r.value, 0) || r.value; el.style.background = 'rgb(var(--ink) / 0.1)'; }
       else el.style.background = avatarBgCss(r.value);
       return el;
     }));
@@ -2989,6 +3029,9 @@ function renderQuestCard() {
   document.getElementById('qcTitle').textContent = P.title;
   const streak = document.getElementById('qcStreak');
   streak.textContent = I.streak > 0 ? P.streak.replace('{n}', I.streak) : '';
+  const done = I.quests.filter(q => q.progress >= q.goal).length;
+  document.getElementById('qcCount').textContent = done + '/' + I.quests.length;
+  document.getElementById('qcTotal').style.width = Math.round(100 * done / I.quests.length) + '%';
   const list = document.getElementById('qcList');
   list.replaceChildren();
   I.quests.forEach(q => {
@@ -3018,6 +3061,10 @@ function renderQuestCard() {
   if (next) parts.push(escapeHtml(P.next.replace('{n}', next.days)).replace('{icon}',
     '<span class="qc-icon">' + (iconArt(next.icon, 18) || next.icon) + '</span>'));
   document.getElementById('qcFoot').innerHTML = parts.join(' · ');
+}
+
+function toggleQuests() {
+  document.getElementById('questCard').classList.toggle('open');
 }
 
 // Сколько ступеней лестницы открыто
@@ -3333,60 +3380,13 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// Шкала расстояний: в начале каждого раунда — в том виде, в каком её
-// оставил игрок.
-//
-// Если игрок её не трогал: на телефоне она раскрыта только в первой партии —
-// пока шкалу не видел, она нужна; дальше полэкрана под неё жалко, а раскрыть
-// её можно одним нажатием. На широком экране место есть — раскрыта всегда
-const SCALE_NARROW = '(max-width: 859px)';
-function scaleWanted() {
-  let choice = null, played = 0;
-  try {
-    choice = localStorage.getItem('hc_scale_open');
-    played = parseInt(localStorage.getItem('hc_games_done')) || 0;
-  } catch (e) {}
-  if (choice !== null) return choice !== '0';
-  return !(played > 0 && window.matchMedia(SCALE_NARROW).matches);
+// Шкала расстояний — окном по кнопке «?». Под доской она занимала полэкрана,
+// а нужна редко: у новичка в тренировке пояс и так подписан в карточке ответа
+function openScale() {
+  document.getElementById('scaleModal').classList.remove('hidden');
 }
-function countGameDone() {
-  try {
-    const n = parseInt(localStorage.getItem('hc_games_done')) || 0;
-    localStorage.setItem('hc_games_done', String(n + 1));
-  } catch (e) {}
-}
-let scaleAutoValue = null;
-let scaleCollapsed = false;
-
-function setScaleOpen(open) {
-  const box = document.getElementById('scaleBox');
-  if (!box || box.open === open) return;
-  scaleAutoValue = open;
-  box.open = open;
-}
-
-function initScaleBox() {
-  const box = document.getElementById('scaleBox');
-  if (!box) return;
-  // toggle у <details> приходит отложенно, поэтому свой щелчок от щелчка игрока
-  // отличаем не флагом (он успеет сброситься), а совпадением с выставленным
-  box.addEventListener('toggle', () => {
-    const auto = scaleAutoValue;
-    scaleAutoValue = null;
-    if (auto !== null && box.open === auto) return;
-    try { localStorage.setItem('hc_scale_open', box.open ? '1' : '0'); } catch (e) {}
-  });
-  setScaleOpen(scaleWanted());
-}
-
-// В конце раунда шкалу не сворачиваем: страница от этого укорачивалась и
-// прыгала вверх. Раскрыта она или нет — решается в начале раунда
-function syncScaleBox() {
-  const over = roundOver();
-  if (over === scaleCollapsed) return;
-  scaleCollapsed = over;
-  if (over) countGameDone();
-  else setScaleOpen(scaleWanted());
+function closeScale() {
+  document.getElementById('scaleModal').classList.add('hidden');
 }
 
 function buildLegend() {
@@ -3420,6 +3420,14 @@ function renderSoundBtn() {
   const btn = document.getElementById('soundBtn');
   btn.textContent = soundOn ? '🔊' : '🔇';
   btn.setAttribute('aria-label', t().run.sound);
+}
+
+// Тема: «auto» — как в телефоне. Сама раскраска — в applyTheme (index.html):
+// она должна сработать до первой отрисовки страницы
+function changeTheme(value) {
+  try { localStorage.setItem('hc_theme', value); } catch (e) {}
+  applyTheme();
+  if (screen === 'game') renderNumberLine();
 }
 
 function toggleSound() {

@@ -213,29 +213,29 @@ async function fetchAvatars(names) {
 function updateAccountChip() {
   const chip = document.getElementById('accountChip');
   const auth = runAuth();
-  // Профиль виден везде, кроме самой партии: без аккаунта он же — настройки,
-  // а язык должен быть под рукой и у того, кто ещё не вошёл
-  const show = screen !== 'game';
-  chip.classList.toggle('hidden', !show);
-  chip.classList.toggle('guest', !auth);
+  // Профиль — вкладка нижнего меню. Без аккаунта она же — настройки: язык,
+  // тема и звук должны быть под рукой и у того, кто ещё не вошёл.
+  // Друзья — соседняя вкладка, видна и без аккаунта: иначе про друзей никто
+  // не узнает, пока случайно не зайдёт в онлайн. Нажатие приведёт ко входу
+  const box = document.getElementById('accountFace');
+  box.classList.toggle('guest', !auth);
   const face = document.getElementById('accountChipName');
   if (auth) {
     paintAvatar(face, auth.username);
-    chip.style.background = colorOf(auth.username);
+    box.style.background = colorOf(auth.username);
     chip.title = auth.username;
   } else {
     face.textContent = '⚙';
-    chip.style.background = '';
+    box.style.background = '';
     chip.title = t().run.settings;
   }
   chip.setAttribute('aria-label', chip.title);
+  document.getElementById('tNavMe').textContent = auth ? t().navMe : t().run.settings;
+}
 
-  // Друзья живут в шапке рядом с профилем: это не режим игры, а место,
-  // куда заходят между делом
-  // Кнопка видна и без аккаунта: иначе про друзей никто не узнает, пока
-  // случайно не зайдёт в онлайн. Нажатие приведёт ко входу
-  const fr = document.getElementById('friendsBtn');
-  fr.classList.toggle('hidden', screen === 'game' || screen === 'setup');
+// «Играть» в нижнем меню — то же, что «В меню»
+function navPlay() {
+  if (screen !== 'mode') quitToMenu();
 }
 
 // Значок на кнопке считает и непрочитанные фразы, и неотвеченные заявки:
@@ -1724,6 +1724,21 @@ function renderTutorialMenu() {
     sub.classList.toggle('hidden', !locked);
   });
   document.getElementById('tTutReplay').textContent = T.tutReplay;
+  renderModeInfo();
+}
+
+// Строка под «Испытанием» и «Игрой онлайн» — своё: рекорд и лига со звёздами.
+// Пока онлайн закрыт обучением, там подпись про обучение, а не это
+function renderModeInfo() {
+  const locked = !onlineOpen();
+  const best = runAuth() ? runBest() : 0;
+  const run = document.getElementById('tRunInfo');
+  run.textContent = best ? t().run.best + formatNum(best) : '';
+  run.classList.toggle('hidden', locked || !best);
+  const on = document.getElementById('tOnlineInfo');
+  const lg = runAuth() && ladderInfo;
+  on.textContent = lg ? [leagueLabel(ladderInfo.stars), starsLine(ladderInfo.stars)].filter(Boolean).join(' · ') : '';
+  on.classList.toggle('hidden', locked || !lg);
 }
 
 function openLessonGate() {
