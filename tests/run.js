@@ -6531,7 +6531,7 @@ async function testAudit(browser) {
   await page.evaluate(() => { BOT_SPEED = 0; });
   await page.click('#tStartMatch');
   await page.waitForTimeout(400);
-  const turn = await page.evaluate(() => document.getElementById('turnBanner').textContent);
+  const turn = await page.evaluate(() => document.getElementById('pturn0').textContent);
   await page.evaluate(() => { secret = 77; });
   await page.fill('#guessInput', '77');
   await page.click('#tSubmitGuess');
