@@ -12,11 +12,9 @@
   --move-dur: 0.9s;
 }
 
-/* Две темы — тёмная и светлая. Всё, что в стилях было белым по тёмному
-   (рамки, подложки, полупрозрачный текст), берёт цвет «чернил» --ink: в тёмной
-   теме это белый, в светлой — тёмно-синий. Так одна и та же прозрачность
-   работает на обоих фонах, и правила не приходится писать дважды.
-   Тему выбирают в профиле; «как в телефоне» — по умолчанию */
+/* Цвета — переменными: «чернила» --ink (всё полупрозрачное белое — рамки,
+   подложки, бледный текст), фон, плитки, окна. Поменять оформление — значит
+   поменять их здесь, а не искать по всему файлу */
 @font-face {
   font-family: 'Nunito'; font-style: normal; font-weight: 200 1000; font-display: swap;
   src: url(fonts/nunito-cyrillic.woff2) format('woff2');
@@ -52,29 +50,8 @@
   --accent: #ff6b35;
   --accent-depth: #c2410c;
   --gold: #ffd166;
-  /* жёлтый текст: на светлом фоне он не читается — там тёмно-янтарный */
   --yellow: #fbbf24;
   --yellow-soft: #fde68a;
-}
-:root[data-theme="light"] {
-  color-scheme: light;
-  --ink: 35 31 84;
-  --text: #231f54;
-  --muted: rgb(35 31 84 / 0.6);
-  --bg: #fff7ee;
-  --bg-image: radial-gradient(110% 55% at 0% 0%, #ffe1cc 0%, transparent 60%),
-              radial-gradient(110% 55% at 100% 100%, #d7ecff 0%, transparent 60%),
-              linear-gradient(180deg, #fff9f2 0%, #f1f6ff 100%);
-  --tile: #fff;
-  --tile-edge: 0 3px 0 #ebe7f7;
-  --surface: #fff;
-  --bar: rgba(255, 255, 255, 0.94);
-  --depth: rgba(35, 31, 84, 0.18);
-  --depth-soft: #e2ddf3;
-  --band-filter: brightness(0.8) saturate(1.4);
-  --gold: #e8590c;
-  --yellow: #c2410c;
-  --yellow-soft: #b45309;
 }
 
 html {
@@ -1789,7 +1766,6 @@ select.field option { background: var(--surface); color: var(--text); }
 .header h1 { font-weight: 900; font-size: 22px; letter-spacing: 0;
   background: linear-gradient(90deg, #ff7a45, #ffd166 45%, #6fd8ff 60%, #8ea2ff);
   -webkit-background-clip: text; background-clip: text; color: transparent; }
-:root[data-theme="light"] .header h1 { background-image: linear-gradient(90deg, #ff5a1f, #ff9f1c 45%, #1a9cff 60%, #4f5cff); }
 .header .emoji { font-size: 22px; }
 .avatar-btn { border-width: 3px; }
 
@@ -1815,11 +1791,8 @@ select.field option { background: var(--surface); color: var(--text); }
 .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-depth); }
 .btn-ghost { border-radius: 16px; font-weight: 800; color: var(--text); background: rgb(var(--ink) / 0.12);
   border: none; box-shadow: 0 4px 0 var(--depth-soft); }
-:root[data-theme="light"] .btn-ghost { background: #fff; }
 input[type=number], input[type=text], input[type=password], select.field {
   border-radius: 16px; border: 2px solid rgb(var(--ink) / 0.22); background: rgb(var(--ink) / 0.10); font-weight: 800; }
-:root[data-theme="light"] :is(input[type=number], input[type=text], input[type=password], select.field) {
-  background: #fff; border-color: #e2ddf3; }
 #guessInput { font-size: 22px; text-align: center; }
 
 /* Плитки — история, плашки игроков, строки списков, окна выбора */
@@ -1828,11 +1801,7 @@ input[type=number], input[type=text], input[type=password], select.field {
 .info-bar { border-radius: 18px; }
 .info-bar .attempts { color: var(--gold); font-weight: 900; font-size: 16px; }
 .mini-toggle { border-radius: 10px; border: none; box-shadow: 0 2px 0 var(--depth-soft); }
-:root[data-theme="light"] .mini-toggle { background: #fff; border: 2px solid #e2ddf3; box-shadow: none; }
-:root[data-theme="light"] .mini-toggle.on { background: #eef0ff; border-color: #8b93ff; }
 .feedback-panel { border-width: 3px !important; border-radius: 22px; }
-:root[data-theme="light"] .feedback-panel, :root[data-theme="light"] .turn-banner,
-:root[data-theme="light"] .say-bubble { background: #fff !important; }
 .feedback-panel .fb-label, .feedback-panel .fb-band, .history-item .h-label, .legend-item { filter: var(--band-filter); }
 .history-title { font-weight: 900; letter-spacing: 0.08em; }
 .history-item { border-radius: 14px; }
@@ -1842,22 +1811,10 @@ input[type=number], input[type=text], input[type=password], select.field {
 .turn-banner { border-width: 3px !important; border-radius: 18px; font-weight: 900; font-size: 17px; }
 .rk-mode { border-radius: 16px; border-width: 2px; }
 .rk-mode .rm-name { font-weight: 900; }
-:root[data-theme="light"] .rk-mode.active { background: #fff4e6; border-color: #ff9f1c; }
-:root[data-theme="light"] .rk-mode.active .rm-name, :root[data-theme="light"] .rk-mode.active .rm-range { color: #d9480f; opacity: 1; }
 .screen-title { font-size: 24px; font-weight: 900; }
 .lb-row { border-radius: 14px; }
 .fold-head { border-radius: 16px; font-weight: 800; }
 .modal-card { border-radius: 22px; }
-:root[data-theme="light"] .modal-card { border: none; box-shadow: 0 20px 40px rgba(35, 31, 84, 0.25); }
-:root[data-theme="light"] .rk-elo { color: #e8590c !important; }
-:root[data-theme="light"] .rk-stars { color: #f59f00; }
-:root[data-theme="light"] .rk-hero, :root[data-theme="light"] .rk-hero * { text-shadow: none; }
-:root[data-theme="light"] .thermo-tube { background: #fff; border-color: #d9d4ef; }
-:root[data-theme="light"] .thermo-bulb { border-color: #fff; }
-/* В светлой теме часы и заряд в строке состояния iPhone остаются белыми
-   (иначе они не ложатся на фон под ними) — подкладываем под них тёмную полосу */
-:root[data-theme="light"] body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  height: env(safe-area-inset-top); background: #231f54; }
 
 /* ================= РАСКЛАДКА ================= */
 /* Шапка — только на главном: на остальных экранах есть свой заголовок */
@@ -1894,7 +1851,6 @@ body.on-game .tabbar { display: none; }
 /* Задания: строка со счётом и полосой, по нажатию — сами задания */
 .quest-card { border-radius: 22px; border: 2px solid rgba(255, 194, 51, 0.5); cursor: pointer;
   background: linear-gradient(135deg, rgba(255, 194, 51, 0.16), rgba(255, 77, 109, 0.12)); padding: 14px 18px; }
-:root[data-theme="light"] .quest-card { background: #fff; border-color: #ffd59a; box-shadow: 0 4px 0 #ffe7c2; }
 .quest-card .qc-head { font-size: 17px; font-weight: 900; margin-bottom: 0; gap: 10px; justify-content: flex-start; }
 .qc-count { margin-left: auto; color: var(--gold); }
 .qc-chev { font-size: 24px; line-height: 1; opacity: 0.7; transition: transform 0.2s; }
@@ -1958,14 +1914,7 @@ body.on-game #guessInput, body.on-game #tSubmitGuess { min-height: 56px; }
 /* Онлайн */
 #screenOnline .rk-hero { border-radius: 24px; background: linear-gradient(160deg, rgb(var(--ink) / 0.10), rgb(var(--ink) / 0.03));
   padding: 16px 12px 14px; margin: 10px 0 14px; }
-:root[data-theme="light"] .rk-top-row.me { background: #fff1db; }
-:root[data-theme="light"] #screenOnline .rk-hero { background: #fff; box-shadow: 0 4px 0 #ebe7f7; }
 
-/* Зелёные и голубые подписи задуманы для тёмного фона — на белом темнее */
-:root[data-theme="light"] .fr-btn.yes { color: #15803d; border-color: rgba(22, 163, 74, 0.5); }
-:root[data-theme="light"] .fr-btn.no { color: #dc2626; }
-:root[data-theme="light"] .friend-row .fr-status.act { color: #2563eb; }
-:root[data-theme="light"] .lb-tab.active { color: #15803d; }
 /* Узкий телефон: строка статуса и пять кнопок должны остаться в одну строку */
 @media (max-width: 380px) {
   .info-bar { gap: 4px; padding-left: 10px; padding-right: 8px; }

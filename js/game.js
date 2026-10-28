@@ -447,11 +447,6 @@ function applyTranslations() {
   document.getElementById('tNavPlay').textContent = L.navPlay;
   document.getElementById('tNavFriends').textContent = L.navFriends;
   document.getElementById('tScaleDone').textContent = L.run.done;
-  document.getElementById('tThemeLabel').textContent = L.themeLabel;
-  document.getElementById('tThemeAuto').textContent = L.themeAuto;
-  document.getElementById('tThemeDark').textContent = L.themeDark;
-  document.getElementById('tThemeLight').textContent = L.themeLight;
-  document.getElementById('themeSwitcher').value = themeChoice();
   document.getElementById('tSoundLabel').textContent = L.run.sound;
   document.getElementById('tLblBot').textContent = L.lblBot;
   // У каждого экрана своё название — с тем же значком, что в меню
@@ -3426,14 +3421,6 @@ function renderSoundBtn() {
   const btn = document.getElementById('soundBtn');
   btn.textContent = soundOn ? '🔊' : '🔇';
   btn.setAttribute('aria-label', t().run.sound);
-}
-
-// Тема: «auto» — как в телефоне. Сама раскраска — в applyTheme (index.html):
-// она должна сработать до первой отрисовки страницы
-function changeTheme(value) {
-  try { localStorage.setItem('hc_theme', value); } catch (e) {}
-  applyTheme();
-  if (screen === 'game') renderNumberLine();
 }
 
 function toggleSound() {

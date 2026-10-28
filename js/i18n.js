@@ -148,7 +148,7 @@ const i18n = {
     roundWin: " wins the round!", matchWin: " wins the game!",
     secretWas: "Number: ", nextRound: "Next round", newMatch: "New game", toMenu: "Menu",
     quitAsk: "Leave the game? This game won't be saved.", quitStay: "Keep playing", quitGo: "Leave",
-    recordLabel: "Best: ", recordShort: "best {n}", newRecord: "🏆 New record!", updateAvailable: "🔄 A new version of the game is ready — tap to update", yourTurnNow: "Your turn", youWinMatch: "You won the game!", youWinRound: "You won the round!", more: "More", attemptsLeft: "{n} of {m} left", navPlay: "Play", navFriends: "Friends", navMe: "Profile", tileDuel: "With a friend", tileBot: "Vs the bot", fbBand: "off by {r}", turnTag: "playing", themeLabel: "Theme", themeAuto: "Like the phone", themeDark: "Dark", themeLight: "Light",
+    recordLabel: "Best: ", recordShort: "best {n}", newRecord: "🏆 New record!", updateAvailable: "🔄 A new version of the game is ready — tap to update", yourTurnNow: "Your turn", youWinMatch: "You won the game!", youWinRound: "You won the round!", more: "More", attemptsLeft: "{n} of {m} left", navPlay: "Play", navFriends: "Friends", navMe: "Profile", tileDuel: "With a friend", tileBot: "Vs the bot", fbBand: "off by {r}", turnTag: "playing",
     review: { open: "Review", title: "Game review", titleRound: "Round review", round: "Round {n}", accuracy: "Accuracy", finalGuess: "last guess",
       grades: { brilliant: "Super!", best: "Best move", excellent: "Excellent", good: "Good", inaccuracy: "Not bad", mistake: "Could be better", blunder: "Missed", hit: "Bullseye!", forced: "Lava toss \u2014 not graded", limited: "Didn\u2019t see every move \u2014 not graded" } },
     run: {
@@ -379,7 +379,7 @@ const i18n = {
     roundWin: " выигрывает раунд!", matchWin: " выигрывает игру!",
     secretWas: "Число: ", nextRound: "Следующий раунд", newMatch: "Новая игра", toMenu: "В меню",
     quitAsk: "Выйти из игры? Эта партия не сохранится.", quitStay: "Продолжить", quitGo: "Выйти",
-    recordLabel: "Рекорд: ", recordShort: "рекорд {n}", newRecord: "🏆 Новый рекорд!", updateAvailable: "🔄 Доступна новая версия игры — нажмите, чтобы обновить", yourTurnNow: "Ваш ход", youWinMatch: "Вы выиграли игру!", youWinRound: "Вы выиграли раунд!", more: "Ещё", attemptsLeft: "Осталось {n} из {m}", navPlay: "Играть", navFriends: "Друзья", navMe: "Профиль", tileDuel: "С другом", tileBot: "С ботом", fbBand: "разница {r}", turnTag: "ходит", themeLabel: "Тема", themeAuto: "Как в телефоне", themeDark: "Тёмная", themeLight: "Светлая",
+    recordLabel: "Рекорд: ", recordShort: "рекорд {n}", newRecord: "🏆 Новый рекорд!", updateAvailable: "🔄 Доступна новая версия игры — нажмите, чтобы обновить", yourTurnNow: "Ваш ход", youWinMatch: "Вы выиграли игру!", youWinRound: "Вы выиграли раунд!", more: "Ещё", attemptsLeft: "Осталось {n} из {m}", navPlay: "Играть", navFriends: "Друзья", navMe: "Профиль", tileDuel: "С другом", tileBot: "С ботом", fbBand: "разница {r}", turnTag: "ходит",
     review: { open: "Разбор", title: "Разбор партии", titleRound: "Разбор раунда", round: "Раунд {n}", accuracy: "Точность", finalGuess: "последняя догадка",
       grades: { brilliant: "Супер!", best: "Лучший ход", excellent: "Отлично", good: "Хорошо", inaccuracy: "Неплохо", mistake: "Можно лучше", blunder: "Мимо", hit: "В точку!", forced: "Бросок в лаву — без оценки", limited: "Видел не все ходы — без оценки" } },
     run: {
@@ -610,7 +610,7 @@ const i18n = {
     roundWin: " remporte la manche !", matchWin: " remporte la partie !",
     secretWas: "Nombre : ", nextRound: "Manche suivante", newMatch: "Nouvelle partie", toMenu: "Menu",
     quitAsk: "Quitter la partie ? Elle ne sera pas enregistr\u00e9e.", quitStay: "Continuer", quitGo: "Quitter",
-    recordLabel: "Record : ", recordShort: "record {n}", newRecord: "🏆 Nouveau record !", updateAvailable: "🔄 Une nouvelle version du jeu est prête — touche pour mettre à jour", yourTurnNow: "À toi de jouer", youWinMatch: "Tu as gagné la partie !", youWinRound: "Tu as gagné la manche !", more: "Plus", attemptsLeft: "Encore {n} sur {m}", navPlay: "Jouer", navFriends: "Amis", navMe: "Profil", tileDuel: "À deux", tileBot: "Contre le bot", fbBand: "écart {r}", turnTag: "joue", themeLabel: "Thème", themeAuto: "Comme le téléphone", themeDark: "Sombre", themeLight: "Clair",
+    recordLabel: "Record : ", recordShort: "record {n}", newRecord: "🏆 Nouveau record !", updateAvailable: "🔄 Une nouvelle version du jeu est prête — touche pour mettre à jour", yourTurnNow: "À toi de jouer", youWinMatch: "Tu as gagné la partie !", youWinRound: "Tu as gagné la manche !", more: "Plus", attemptsLeft: "Encore {n} sur {m}", navPlay: "Jouer", navFriends: "Amis", navMe: "Profil", tileDuel: "À deux", tileBot: "Contre le bot", fbBand: "écart {r}", turnTag: "joue",
     review: { open: "Analyse", title: "Analyse de la partie", titleRound: "Analyse de la manche", round: "Manche {n}", accuracy: "Pr\u00e9cision", finalGuess: "derni\u00e8re r\u00e9ponse",
       grades: { brilliant: "Super !", best: "Meilleur coup", excellent: "Excellent", good: "Bien", inaccuracy: "Pas mal", mistake: "Peut mieux faire", blunder: "Raté", hit: "Dans le mille !", forced: "Jet de lave \u2014 non not\u00e9", limited: "N\u2019a pas vu tous les coups \u2014 non not\u00e9" } },
     run: {
@@ -841,7 +841,7 @@ const i18n = {
     roundWin: " gewinnt die Runde!", matchWin: " gewinnt das Spiel!",
     secretWas: "Zahl: ", nextRound: "Nächste Runde", newMatch: "Neues Spiel", toMenu: "Menü",
     quitAsk: "Spiel verlassen? Diese Partie wird nicht gespeichert.", quitStay: "Weiterspielen", quitGo: "Verlassen",
-    recordLabel: "Rekord: ", recordShort: "Rekord {n}", newRecord: "🏆 Neuer Rekord!", updateAvailable: "🔄 Eine neue Version des Spiels ist da — tippe zum Aktualisieren", yourTurnNow: "Du bist dran", youWinMatch: "Du hast das Spiel gewonnen!", youWinRound: "Du hast die Runde gewonnen!", more: "Mehr", attemptsLeft: "Noch {n} von {m}", navPlay: "Spielen", navFriends: "Freunde", navMe: "Profil", tileDuel: "Zu zweit", tileBot: "Gegen den Bot", fbBand: "Abstand {r}", turnTag: "ist dran", themeLabel: "Design", themeAuto: "Wie am Handy", themeDark: "Dunkel", themeLight: "Hell",
+    recordLabel: "Rekord: ", recordShort: "Rekord {n}", newRecord: "🏆 Neuer Rekord!", updateAvailable: "🔄 Eine neue Version des Spiels ist da — tippe zum Aktualisieren", yourTurnNow: "Du bist dran", youWinMatch: "Du hast das Spiel gewonnen!", youWinRound: "Du hast die Runde gewonnen!", more: "Mehr", attemptsLeft: "Noch {n} von {m}", navPlay: "Spielen", navFriends: "Freunde", navMe: "Profil", tileDuel: "Zu zweit", tileBot: "Gegen den Bot", fbBand: "Abstand {r}", turnTag: "ist dran",
     review: { open: "Analyse", title: "Partieanalyse", titleRound: "Rundenanalyse", round: "Runde {n}", accuracy: "Genauigkeit", finalGuess: "letzter Tipp",
       grades: { brilliant: "Super!", best: "Bester Zug", excellent: "Exzellent", good: "Gut", inaccuracy: "Nicht schlecht", mistake: "Geht besser", blunder: "Daneben", hit: "Volltreffer!", forced: "Lavawurf \u2014 ohne Wertung", limited: "Nicht alle Z\u00fcge gesehen \u2014 ohne Wertung" } },
     run: {

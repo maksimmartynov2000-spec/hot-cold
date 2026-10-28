@@ -16,9 +16,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <link rel="stylesheet" href="styles.css" />
-  <!-- Тема ставится до первой отрисовки: из скриптов в конце страницы
-       светлая успела бы мигнуть тёмной -->
-  <script src="js/theme.js"></script>
 </head>
 <body>
 <div class="card" id="card">
@@ -665,15 +662,6 @@
         <option value="ru">🇷🇺 Русский</option>
         <option value="fr">🇫🇷 Français</option>
         <option value="de">🇩🇪 Deutsch</option>
-      </select>
-    </label>
-    <!-- Тема: как в телефоне, тёмная или светлая -->
-    <label class="pf-row">
-      <span id="tThemeLabel"></span>
-      <select class="lang-switcher" id="themeSwitcher" onchange="changeTheme(this.value)">
-        <option value="auto" id="tThemeAuto"></option>
-        <option value="dark" id="tThemeDark"></option>
-        <option value="light" id="tThemeLight"></option>
       </select>
     </label>
     <!-- Звук переехал из шапки сюда: выключают его раз и надолго -->

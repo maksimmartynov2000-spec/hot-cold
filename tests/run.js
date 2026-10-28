@@ -6300,34 +6300,14 @@ async function testRedesign(browser) {
     achievements: [], stats: {} };
   const LAD = { season: '2026-10', endsIn: 20 * 86400, stars: 40, streak: 1, best: 40, games: 12, peak: 1, badges: [] };
 
-  // Тема: по умолчанию — как в телефоне, и следит за ним
-  const ctx = await browser.newContext({ viewport: PHONE, colorScheme: 'dark' });
-  const page = await ctx.newPage();
-  page.on('pageerror', e => check('без ошибок JS', false, e.message));
-  await applyStub(page, { user: 'Максим', progress: PROG, ladder: LAD });
-  await page.addInitScript(() => localStorage.setItem('hc_run_best_максим', '1240'));
-  await page.goto(GAME_URL);
-  await page.waitForTimeout(500);
-  const theme = () => page.evaluate(() => document.documentElement.dataset.theme);
-  check('тема по умолчанию — как в телефоне (тёмный)', await theme() === 'dark');
-  await page.emulateMedia({ colorScheme: 'light' });
-  await page.waitForTimeout(100);
-  check('телефон переключился на светлую — и игра за ним', await theme() === 'light');
-  const bg = () => page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
-  check('у светлой темы светлый фон', await bg() === 'rgb(255, 247, 238)', await bg());
-
-  // Выбор в профиле важнее телефона и запоминается
+  const page = await newGame(browser, { user: 'Максим', progress: PROG, ladder: LAD });
+  await page.evaluate(() => { localStorage.setItem('hc_run_best_максим', '1240'); showScreen('mode'); });
+  await page.waitForTimeout(400);
+  // Оформление одно — тёмное, и в светлом телефоне тоже
+  check('фон тёмный', await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor) === 'rgb(20, 15, 51)');
   await page.click('#accountChip');
   await page.waitForTimeout(200);
-  check('в профиле есть выбор темы', await page.locator('#themeSwitcher').isVisible() &&
-    await page.locator('#themeSwitcher').inputValue() === 'auto');
-  await page.selectOption('#themeSwitcher', 'dark');
-  check('выбрали тёмную — тёмная, хотя телефон светлый', await theme() === 'dark');
-  check('выбор темы записан', await page.evaluate(() => localStorage.getItem('hc_theme')) === 'dark');
-  check('цвет строки состояния — под тему',
-    await page.evaluate(() => document.querySelector('meta[name="theme-color"]').content) === '#140f33');
-  await page.selectOption('#themeSwitcher', 'light');
-  check('и светлую можно выбрать', await theme() === 'light');
+  check('выбора темы в профиле нет', await page.locator('#themeSwitcher').count() === 0);
   await page.click('#tProfileDone');
 
   // Нижнее меню вместо значков в шапке
