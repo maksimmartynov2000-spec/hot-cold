@@ -62,11 +62,11 @@ async function run() {
       await page.waitForTimeout(40);
     }
 
-    // Название игры раньше пряталось на телефоне во время игры — ради высоты.
-    // Теперь оно стоит в одной строке с кнопками и ничего не удлиняет
+    // В партии шапки нет: наверху сразу строка статуса, всё место — доске
     const inGame = await topRow();
-    check(d.name + ': название видно во время игры',
-      await page.locator('.header h1').isVisible());
+    check(d.name + ': в партии наверху строка статуса, а не шапка',
+      !(await page.locator('.header h1').isVisible()) &&
+      await page.evaluate(() => document.getElementById('infoBar').getBoundingClientRect().top < 60));
     check(d.name + ': верхняя строка в один этаж (игра)', inGame.height <= inGame.tallest + 1,
       inGame.height + 'px при высоте кнопки ' + inGame.tallest);
 
@@ -86,7 +86,12 @@ async function run() {
     });
     await page.waitForTimeout(250);
     const shot = await page.screenshot();
-    const seam = await page.evaluate(async (src) => {
+    // Поле ввода прибито к низу экрана своей подложкой — её край не шов фона
+    const dockTop = await page.evaluate(() => {
+      const d = [...document.querySelectorAll('#guessSection, #finalBox, #forcedTurn')].find(e => e.getClientRects().length);
+      return d ? d.getBoundingClientRect().top / window.innerHeight : 1;
+    });
+    const seam = await page.evaluate(async ([src, dockTop]) => {
       const img = new Image();
       await new Promise(res => { img.onload = res; img.src = src; });
       const c = document.createElement('canvas');
@@ -94,14 +99,14 @@ async function run() {
       const ctx = c.getContext('2d');
       ctx.drawImage(img, 0, 0);
       let prev = null, jump = 0;
-      for (let y = 0; y < img.height; y++) {
+      for (let y = 0; y < Math.floor(img.height * dockTop) - 2; y++) {
         const d = ctx.getImageData(0, y, 3, 1).data;
         const v = (d[0] + d[1] + d[2] + d[4] + d[5] + d[6] + d[8] + d[9] + d[10]) / 9;
         if (prev !== null) jump = Math.max(jump, Math.abs(v - prev));
         prev = v;
       }
       return +jump.toFixed(2);
-    }, 'data:image/png;base64,' + shot.toString('base64'));
+    }, ['data:image/png;base64,' + shot.toString('base64'), dockTop]);
     check(d.name + ': фон без тёмного шва', seam < 2,
       'перепад ' + seam + (scrolls ? '' : ' (страница помещается целиком)'));
     await page.evaluate(() => window.scrollTo(0, 0));

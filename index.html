@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#10142c" />
+  <meta name="theme-color" content="#140f33" />
 
   <title id="docTitle">Hot or Cold</title>
 
@@ -25,15 +25,6 @@
       <div class="emoji">🌡️</div>
       <h1 id="tTitle">Hot or Cold</h1>
     </div>
-    <!-- Друзья, звук и профиль. Раньше профиль был силуэтом 👤 рядом с 👥 —
-         два одинаковых синих человечка, различимых только по памяти. Теперь
-         профиль — кружок с первой буквой имени, а язык, который меняют раз в
-         жизни, уехал внутрь профиля. Звук остался: его выключают на ходу -->
-    <button class="icon-btn hidden" id="friendsBtn" onclick="openFriendsEntry()">👥<span
-      class="hdr-badge hidden" id="friendsBadge"></span></button>
-    <button class="icon-btn" id="soundBtn" onclick="toggleSound()" aria-label="Звук"></button>
-    <button class="avatar-btn hidden" id="accountChip" onclick="openLogoutModal()"><span
-      id="accountChipName"></span></button>
   </div>
 
   <!-- ЭКРАН 1: выбор режима -->
@@ -55,46 +46,58 @@
           <span class="m-sub" id="tTutSub"></span>
         </span>
       </button>
+      <div class="mode-group" id="tGroupOnline"></div>
+      <!-- Под названием — своё: рекорд Испытания и лига. Так видно, ради чего
+           заходить, не открывая экран -->
+      <button class="mode-btn run wide" onclick="openRunEntry()">
+        <span class="m-icon">🏆</span>
+        <span class="m-text">
+          <span class="m-title" id="tModeRun"></span>
+          <span class="m-sub hidden" id="tRunLock"></span>
+          <span class="m-sub hidden" id="tRunInfo"></span>
+        </span>
+        <span class="m-go">›</span>
+      </button>
+      <button class="mode-btn online wide" onclick="openOnlineEntry()">
+        <span class="m-icon">🌐</span>
+        <span class="m-text">
+          <span class="m-title" id="tModeOnline"></span>
+          <span class="m-sub hidden" id="tOnlineLock"></span>
+          <span class="m-sub hidden" id="tOnlineInfo"></span>
+        </span>
+        <span class="m-go">›</span>
+      </button>
+      <!-- Без интернета — три плитки в ряд: короткие названия, крупные значки -->
       <div class="mode-group" id="tGroupOffline"></div>
-      <button class="mode-btn solo" onclick="openSetup('solo')">
+      <button class="mode-btn solo tile" onclick="openSetup('solo')">
         <span class="m-icon">🎯</span>
         <span class="m-text">
           <span class="m-title" id="tModeSolo">Single player</span>
         </span>
       </button>
-      <button class="mode-btn duel" onclick="openSetup('duel')">
+      <button class="mode-btn duel tile" onclick="openSetup('duel')">
         <span class="m-icon">🤝</span>
         <span class="m-text">
           <span class="m-title" id="tModeDuel">Play with a friend</span>
         </span>
       </button>
-      <button class="mode-btn bot" onclick="openSetup('duel', true)">
+      <button class="mode-btn bot tile" onclick="openSetup('duel', true)">
         <span class="m-icon">🤖</span>
         <span class="m-text">
           <span class="m-title" id="tModeBot">Play the bot</span>
         </span>
       </button>
-      <div class="mode-group" id="tGroupOnline"></div>
-      <button class="mode-btn run" onclick="openRunEntry()">
-        <span class="m-icon">🏆</span>
-        <span class="m-text">
-          <span class="m-title" id="tModeRun"></span>
-          <span class="m-sub hidden" id="tRunLock"></span>
-        </span>
-      </button>
-      <button class="mode-btn online" onclick="openOnlineEntry()">
-        <span class="m-icon">🌐</span>
-        <span class="m-text">
-          <span class="m-title" id="tModeOnline"></span>
-          <span class="m-sub hidden" id="tOnlineLock"></span>
-        </span>
-      </button>
-      <!-- Задания дня: засчитывает база по онлайн-партиям и Испытанию, поэтому
-           карточка — в блоке «нужен интернет» и только у вошедшего -->
-      <div class="quest-card hidden" id="questCard">
-        <div class="qc-head"><span id="qcTitle"></span><span class="qc-streak" id="qcStreak"></span></div>
-        <div id="qcList"></div>
-        <div class="qc-foot" id="qcFoot"></div>
+      <!-- Задания дня — только у вошедшего: засчитывает их база.
+           Свёрнуты в одну строку: сколько сделано и полоса. Сами задания —
+           по нажатию: смотрят их раз в день, а место в меню нужно всегда -->
+      <div class="quest-card hidden" id="questCard" onclick="toggleQuests()">
+        <div class="qc-head"><span id="qcTitle"></span><span class="qc-count" id="qcCount"></span><span
+          class="qc-streak" id="qcStreak"></span><span class="qc-chev">›</span></div>
+        <div class="qc-total"><span id="qcTotal"></span></div>
+        <div class="qc-body">
+          <div id="qcList"></div>
+          <div class="qc-foot" id="qcFoot"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -173,6 +176,7 @@
     <div class="board" id="board">
 
       <div class="pcard pc0" id="pcard0">
+        <div class="p-turn hidden" id="pturn0"></div>
         <div class="p-name" id="pname0"></div>
         <div class="p-pips" id="ppips0"></div>
         <button class="token-btn" id="ptoken0" onclick="useToken(0)"></button>
@@ -180,6 +184,7 @@
       </div>
 
       <div class="pcard pc1" id="pcard1">
+        <div class="p-turn hidden" id="pturn1"></div>
         <div class="p-name" id="pname1"></div>
         <div class="p-pips" id="ppips1"></div>
         <button class="token-btn" id="ptoken1" onclick="useToken(1)"></button>
@@ -196,11 +201,15 @@
             <button class="mini-toggle" id="toggleLineBtn" onclick="toggleLine()">📏</button>
             <button class="mini-toggle" id="toggleHintBtn" onclick="toggleHint()">💡</button>
             <button class="mini-toggle hidden" id="sayBtn" onclick="toggleSayPad()">💬</button>
+            <!-- Шкала расстояний — по кнопке: под доской она занимала полэкрана -->
+            <button class="mini-toggle scale-btn" id="scaleBtn" onclick="openScale()">?</button>
             <button class="btn-reset" onclick="leaveGame()" id="tMenu">Menu</button>
           </span>
           <!-- Что сделала кнопка-значок. Показывается при первом нажатии на
                каждую: без подписи 🌡️ 📏 💡 непонятны, а место под слова нет -->
           <div class="bar-tip hidden" id="barTip" role="status"></div>
+          <!-- Сколько попыток потрачено — полосой: её видно краем глаза -->
+          <div class="att-bar hidden" id="attBar"><span id="attFill"></span></div>
         </div>
 
         <!-- Подсказка учителя во время урока -->
@@ -228,12 +237,13 @@
              первое, что нужно увидеть, — чем она кончилась, а не чем мерили -->
         <div class="result-box hidden" id="resultBox"></div>
 
-        <div class="thermo-wrap hidden" id="thermoWrap">
-          <div class="thermo-tube"><div class="thermo-fill" id="thermoFill"></div></div>
-          <div class="thermo-bulb" id="thermoBulb"></div>
-        </div>
-
+        <!-- Градусник — внутри карточки ответа, слева от слова: это один и тот же
+             ответ, и раньше он стоял двумя блоками друг над другом -->
         <div class="feedback-panel hidden" id="feedbackPanel">
+          <div class="thermo-wrap hidden" id="thermoWrap">
+            <div class="thermo-tube"><div class="thermo-fill" id="thermoFill"></div></div>
+            <div class="thermo-bulb" id="thermoBulb"></div>
+          </div>
           <div class="fb-label" id="feedbackLabel"></div>
           <div class="fb-band hidden" id="feedbackBand"></div>
         </div>
@@ -278,15 +288,6 @@
       </div>
     </div>
 
-    <div class="legend">
-      <details class="instruction-box" id="scaleBox" open>
-        <summary id="tLegendTitle">Distance Scale</summary>
-        <div class="legend-body">
-          <div class="legend-bar" id="legendBar"></div>
-          <div class="legend-grid" id="legendGrid"></div>
-        </div>
-      </details>
-    </div>
   </div>
 
   <!-- ЭКРАН: выбор вход/регистрация -->
@@ -521,6 +522,17 @@
   </div>
 </div>
 
+<!-- Нижнее меню: играть, друзья, профиль. Раньше друзья, звук и профиль были
+     значками в шапке — мелко и далеко от пальца. В партии меню нет: там всё
+     место — доске и полю ввода -->
+<nav class="tabbar" id="tabbar">
+  <button class="tab" id="navPlay" onclick="navPlay()"><span class="tab-ic">🎮</span><span id="tNavPlay"></span></button>
+  <button class="tab" id="friendsBtn" onclick="openFriendsEntry()"><span class="tab-ic">👥<span
+    class="hdr-badge hidden" id="friendsBadge"></span></span><span id="tNavFriends"></span></button>
+  <button class="tab" id="accountChip" onclick="openLogoutModal()"><span class="tab-ic"><span
+    class="avatar-btn" id="accountFace"><span id="accountChipName"></span></span></span><span id="tNavMe"></span></button>
+</nav>
+
 <!-- Пауза в игре на рейтинг -->
 <!-- Разбор партии: точность, сводка по оценкам и каждый ход с лучшим вариантом -->
 <div class="modal-backdrop hidden" id="reviewModal" onclick="if (event.target === this) closeReview()">
@@ -548,6 +560,18 @@
     <div class="modal-text" id="tResignTitle"></div>
     <button class="btn btn-block" id="tResignStay" onclick="closeResign()"></button>
     <button class="btn-ghost btn-block" style="margin-top:8px" id="tResignGo" onclick="resignMatch()"></button>
+  </div>
+</div>
+
+<!-- Шкала расстояний: открывается кнопкой «?» в строке статуса -->
+<div class="modal-backdrop hidden" id="scaleModal" onclick="if (event.target === this) closeScale()">
+  <div class="modal-card legend">
+    <div class="legend-title" id="tLegendTitle">Distance Scale</div>
+    <div class="legend-body">
+      <div class="legend-bar" id="legendBar"></div>
+      <div class="legend-grid" id="legendGrid"></div>
+    </div>
+    <button class="btn btn-block" style="margin-top:14px" id="tScaleDone" onclick="closeScale()"></button>
   </div>
 </div>
 
@@ -640,6 +664,11 @@
         <option value="de">🇩🇪 Deutsch</option>
       </select>
     </label>
+    <!-- Звук переехал из шапки сюда: выключают его раз и надолго -->
+    <div class="pf-row">
+      <span id="tSoundLabel"></span>
+      <button class="icon-btn" id="soundBtn" onclick="toggleSound()" aria-label="Звук"></button>
+    </div>
 
     <button class="btn-ghost btn-block hidden" id="tSignIn" style="margin-top:14px"
             onclick="signInFromProfile()"></button>

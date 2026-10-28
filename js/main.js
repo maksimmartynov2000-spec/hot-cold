@@ -40,9 +40,29 @@ try { localStorage.removeItem('hc_run_state'); } catch (e) {}
 // или смена размера окна требуют пересчёта
 window.addEventListener('resize', () => { if (screen === 'game') renderNumberLine(); });
 
+// Шкала расстояний раньше помнила, раскрыта ли она, и считала сыгранные
+// партии. Теперь она окном по кнопке — эти записи больше ни к чему
+try { localStorage.removeItem('hc_scale_open'); localStorage.removeItem('hc_games_done'); } catch (e) {}
+
+// Поле ввода прижато к низу экрана. На iPhone клавиатура не сжимает страницу,
+// а наезжает на неё — и поле оказалось бы под клавиатурой. Сколько она
+// заняла, видно по visualViewport: на столько поле и поднимаем
+function watchKeyboard() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const update = () => {
+    const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    document.documentElement.style.setProperty('--kb', kb + 'px');
+    document.body.classList.toggle('kb-open', kb > 80);
+  };
+  vv.addEventListener('resize', update);
+  vv.addEventListener('scroll', update);
+  update();
+}
+watchKeyboard();
+
 captureInvite();
 tutInit();
-initScaleBox();
 document.getElementById('langSwitcher').value = currentLang;
 document.getElementById('winsNeeded').value = '3';
 applyTranslations();
