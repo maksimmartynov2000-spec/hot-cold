@@ -7252,7 +7252,7 @@ async function testKeyPage(browser) {
   const browser = await chromium.launch(launchOptions());
   let crashed = null;
   try {
-    await testUxPass(browser);
+    await testAudit(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

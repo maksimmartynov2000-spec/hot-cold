@@ -16,22 +16,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <link rel="stylesheet" href="styles.css" />
-  <!-- Тема ставится до первой отрисовки: из скрипта в конце страницы светлая
-       успела бы мигнуть тёмной. «auto» — как в телефоне, и следит за ним -->
-  <script>
-    function themeChoice() {
-      try { return localStorage.getItem('hc_theme') || 'auto'; } catch (e) { return 'auto'; }
-    }
-    function applyTheme() {
-      var c = themeChoice();
-      var light = c === 'light' || (c === 'auto' && window.matchMedia('(prefers-color-scheme: light)').matches);
-      document.documentElement.dataset.theme = light ? 'light' : 'dark';
-      var meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.content = light ? '#fff7ee' : '#140f33';
-    }
-    applyTheme();
-    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme);
-  </script>
+  <!-- Тема ставится до первой отрисовки: из скриптов в конце страницы
+       светлая успела бы мигнуть тёмной -->
+  <script src="js/theme.js"></script>
 </head>
 <body>
 <div class="card" id="card">

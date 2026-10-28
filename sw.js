@@ -11,6 +11,7 @@ const CORE = [
   './',
   './index.html',
   './styles.css',
+  './js/theme.js',
   './js/i18n.js',
   './js/art.js',
   './js/game.js',
