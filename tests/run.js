@@ -460,7 +460,9 @@ async function testPauseAndGiveUp(browser) {
   const s = await page.evaluate(() => window.__run.secret);
   await page.fill('#guessInput', String(s));
   await page.click('#tSubmitGuess');
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(400);
+  await page.click('#rsGo');
+  await page.waitForTimeout(300);
   await liftCurtainIfShown(page);
   const scoreBefore = await page.evaluate(() => RUN.totalScore);
   check('забег живёт на сервере, а не в браузере',
