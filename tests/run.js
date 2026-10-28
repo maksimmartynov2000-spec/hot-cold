@@ -182,16 +182,17 @@ async function testScoringAndSubmit(browser) {
   const afterWin = await page.evaluate(() => ({ score: RUN.totalScore, locked: RUN.locked }));
   check('за угаданный раунд начисляются очки', afterWin.score > 0, String(afterWin.score));
 
-  // повторный ввод того же числа в паузе не должен давать очки снова
-  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
-  await page.click('#tSubmitGuess');
+  // повторный ход в паузе между раундами не должен давать очки снова: поля
+  // ввода нет, а прямой вызов отбивает замок
+  check('в паузе между раундами поля ввода нет', !(await page.locator('#guessInput').isVisible()));
+  await page.evaluate(() => { document.getElementById('guessInput').value = String(window.__run.secret); return runGuess(); });
   await page.waitForTimeout(100);
-  await liftCurtainIfShown(page);
   check('в паузе между раундами очки не накручиваются',
     (await page.evaluate(() => RUN.totalScore)) === afterWin.score);
 
   // сливаем раунд -> игра заканчивается и результат уходит на сервер
-  await page.waitForTimeout(900);
+  await page.click('#rsGo');
+  await page.waitForTimeout(300);
   const s2 = await page.evaluate(() => ({ secret: window.__run.secret, RANGE_MAX, MAX_GUESSES }));
   for (let i = 0; i < s2.MAX_GUESSES; i++) {
     let wrong = ((s2.secret + i) % s2.RANGE_MAX) + 1;
