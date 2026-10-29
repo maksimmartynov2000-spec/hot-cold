@@ -203,9 +203,22 @@ async function testScoringAndSubmit(browser) {
     await liftCurtainIfShown(page);
   }
   await page.waitForTimeout(500);
-  check('после проигрыша возвращаемся в хаб', await page.locator('#screenRunHub').isVisible());
-  const msg = (await page.locator('#runHubMessage').textContent()).replace(/\s+/g, ' ');
-  check('в итогах показано загаданное число', msg.includes('Загаданное число'));
+  // Итог остаётся на доске: карточка с числом и счётом, а не молчаливый уход в хаб
+  const over = await page.evaluate(() => ({
+    card: !document.getElementById('runStage').classList.contains('hidden') &&
+      document.getElementById('runStage').classList.contains('over'),
+    text: document.getElementById('runStage').textContent, secret: window.__run.secret,
+    input: !document.getElementById('guessSection').classList.contains('hidden') }));
+  check('после проигрыша — карточка итога на доске', over.card && !over.input, JSON.stringify(over).slice(0, 200));
+  check('в итогах — почему кончилось, число и счёт',
+    /Испытание окончено/.test(over.text) && /кончились попытки/.test(over.text) &&
+    over.text.includes('Загаданное число') && /Раундов пройдено/.test(over.text), over.text);
+  check('загаданное число отмечено на прямой',
+    await page.evaluate(() => [...document.querySelectorAll('#numLineSvg text')].some(t => t.getAttribute('fill') === '#4ADE80')));
+  check('кнопка в строке статуса — уже не «Пауза»', (await page.locator('#tMenu').textContent()) === '☰');
+  await page.click('#rgHub');
+  await page.waitForTimeout(400);
+  check('«К Испытанию» ведёт в хаб', await page.locator('#screenRunHub').isVisible());
   // Отправлять результат больше нечего: его считал и записал сервер. Проверяем,
   // что игра шла через него и что забег на сервере закрыт
   const calls = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'run_guess'));
@@ -406,6 +419,8 @@ async function testSoundAndShare(browser) {
   await page.waitForTimeout(200);
   await page.click('#tPauseGiveUp');
   await page.waitForTimeout(600);
+  await page.click('#rgHub');
+  await page.waitForTimeout(300);
   await page.click('#tRunStart');
   await page.waitForTimeout(250);
   const s2 = await page.evaluate(() => ({ secret: window.__run.secret, RANGE_MAX, MAX_GUESSES }));
@@ -530,6 +545,9 @@ async function testPauseAndGiveUp(browser) {
   check('и забег там закрыт', await page.evaluate(() => window.__run.active === false));
   check('в браузере забег не хранится',
     !(await page.evaluate(() => localStorage.getItem('hc_run_state'))));
+  check('после «сдаться» — итог на доске', await page.locator('#runStage.over').isVisible());
+  await page.click('#rgHub');
+  await page.waitForTimeout(400);
   check('после «сдаться» снова можно начать игру', await page.locator('#tRunStart').isVisible());
 
   await done(page);
@@ -6410,6 +6428,22 @@ async function testRunStage(browser) {
   const after = await page.evaluate(() => ({ round: RUN.round, stage: !document.getElementById('runStage').classList.contains('hidden'),
     input: !document.getElementById('guessSection').classList.contains('hidden'), locked: RUN.locked }));
   check('«Раунд 2 →» начинает следующий раунд', after.round === 2 && !after.stage && after.input && !after.locked, JSON.stringify(after));
+
+  // Сдался — итог тот же, но причина другая и без «последней догадки»
+  await page.click('#tMenu');
+  await page.waitForTimeout(200);
+  await page.click('#tPauseGiveUp');
+  await page.waitForTimeout(500);
+  const quit = await page.evaluate(() => document.getElementById('runStage').textContent);
+  check('сдался — «Вы сдались в раунде 2», очки по раундам', /Вы сдались в раунде 2/.test(quit) &&
+    !/последняя догадка/.test(quit) && /Очки по раундам/.test(quit), quit);
+  await page.click('#rgAgain');
+  await page.waitForTimeout(400);
+  const again = await page.evaluate(() => ({ round: RUN && RUN.round, over: !!(RUN && RUN.over),
+    card: !document.getElementById('runStage').classList.contains('hidden'),
+    input: !document.getElementById('guessSection').classList.contains('hidden') }));
+  check('«Ещё раз» — сразу новое Испытание с первого раунда', again.round === 1 && !again.over && !again.card && again.input,
+    JSON.stringify(again));
   await done(page);
 }
 

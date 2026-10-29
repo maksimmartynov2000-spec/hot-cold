@@ -433,7 +433,9 @@ function applyTranslations() {
   menuBtn.textContent = '☰';
   menuBtn.title = L.menu;
   menuBtn.setAttribute('aria-label', L.menu);
-  menuBtn.classList.toggle('icon', mode !== 'run');
+  // Итог Испытания на доске: ставить на паузу нечего — обычное «Меню»
+  const runPause = mode === 'run' && !(RUN && RUN.over);
+  menuBtn.classList.toggle('icon', !runPause);
   document.getElementById('tFinalWarning').textContent = L.finalWarning;
   document.getElementById('tFinalSubmit').textContent = L.finalSubmit;
   document.getElementById('tSubmitGuess').textContent = L.submitGuess;
@@ -535,7 +537,7 @@ function applyTranslations() {
   document.getElementById('tRunTopWeek').textContent = L.run.topWeek;
   document.getElementById('tRunTopAll').textContent = L.run.topAll;
   document.getElementById('tRunToMenu').textContent = L.run.toMenu;
-  if (mode === 'run') {
+  if (runPause) {
     document.getElementById('tMenu').textContent = L.run.pause;
     document.getElementById('tMenu').title = L.run.pause;
     document.getElementById('tMenu').setAttribute('aria-label', L.run.pause);
@@ -623,7 +625,7 @@ function leaveGame() {
   // Из рейтинговой игры так просто не выйти: сначала вопрос
   if (online && online.ranked && !D.matchOver) return openResign();
   if (online) return backToOnline();
-  if (mode === 'run') { openPause(); return; }
+  if (mode === 'run') { if (RUN && RUN.over) runToHub(); else openPause(); return; }
   if (hasProgress()) return openQuit();
   quitToMenu();
 }
@@ -1317,7 +1319,7 @@ function renderForcedTurn() {
 
 // Испытание между раундами: висит карточка «раунд пройден», ходить нельзя
 function runStaged() {
-  return mode === 'run' && !!RUN && !!RUN.stage;
+  return mode === 'run' && !!RUN && (!!RUN.stage || !!RUN.over);
 }
 
 function renderFeedback() {
@@ -1346,7 +1348,7 @@ function renderThermo() {
   // На итогах градусник только повторяет карточку («в точку!»), а ответ и
   // так отмечен на прямой — убираем его, чтобы итог и история попыток
   // поместились на экран
-  const hide = !showThermo || (mode !== 'run' && roundOver());
+  const hide = !showThermo || roundOver();
   wrap.classList.toggle('hidden', hide);
   // Градусник слева от слова — карточка в две колонки; без него слово по центру
   document.getElementById('feedbackPanel').classList.toggle('with-thermo', !hide);
