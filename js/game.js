@@ -440,7 +440,6 @@ function applyTranslations() {
   document.getElementById('tFinalSubmit').textContent = L.finalSubmit;
   document.getElementById('tSubmitGuess').textContent = L.submitGuess;
   document.getElementById('tHistoryTitle').textContent = L.historyTitle;
-  document.getElementById('tLegendTitle').textContent = L.legendTitle;
 
   document.getElementById('tModeSolo').textContent = L.modeSolo;
   // На плитке меню — коротко: «Игра с другом» в три слова не влезало в треть ширины
@@ -448,7 +447,6 @@ function applyTranslations() {
   document.getElementById('tModeBot').textContent = L.tileBot;
   document.getElementById('tNavPlay').textContent = L.navPlay;
   document.getElementById('tNavFriends').textContent = L.navFriends;
-  document.getElementById('tScaleDone').textContent = L.run.done;
   document.getElementById('tSoundLabel').textContent = L.run.sound;
   document.getElementById('tLblBot').textContent = L.lblBot;
   // У каждого экрана своё название — с тем же значком, что в меню
@@ -476,6 +474,7 @@ function applyTranslations() {
   document.getElementById('tBonusHint').textContent = L.bonusHint;
   document.getElementById('bonusSetup').checked = bonusMode;
   document.getElementById('tLblBonusCount').textContent = L.lblBonusCount;
+  document.getElementById('tBonusGuide').textContent = L.bgLink;
   buildBonusCountOptions();
   renderBonusSetup();
   document.getElementById('tFrostRun').textContent = L.frostLabel;
@@ -590,7 +589,6 @@ function showScreen(name) {
   document.body.classList.add('on-' + name);
   document.getElementById('navPlay').classList.toggle('on', name === 'mode');
   document.getElementById('friendsBtn').classList.toggle('on', name === 'friends' || name === 'chat');
-  if (name !== 'game') closeScale();
   updateAccountChip();
   // Вернулся в меню — задания могли продвинуться: партия или Испытание
   if (name === 'mode') { loadProgress(); loadLadder().then(renderModeInfo); }
@@ -1210,6 +1208,7 @@ function renderAll() {
   renderStatus();
   renderResult();
   renderRunStage();
+  renderScaleStrip();
   renderHistory();
   renderBonusLine();
   renderForcedTurn();
@@ -3389,34 +3388,58 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// Шкала расстояний — окном по кнопке «?». Под доской она занимала полэкрана,
-// а нужна редко: у новичка в тренировке пояс и так подписан в карточке ответа
-function openScale() {
-  document.getElementById('scaleModal').classList.remove('hidden');
-}
-function closeScale() {
-  document.getElementById('scaleModal').classList.add('hidden');
+// Шкала расстояний — полоска поясов под карточкой ответа: от холода слева к
+// лаве справа, пояс последнего хода подсвечен. Нажатие раскрывает её с
+// числами; раскрыта она или нет — помним
+let scaleOpen = false;
+try { scaleOpen = localStorage.getItem('hc_scale_strip') === '1'; } catch (e) {}
+
+function toggleScaleStrip() {
+  scaleOpen = !scaleOpen;
+  try { localStorage.setItem('hc_scale_strip', scaleOpen ? '1' : '0'); } catch (e) {}
+  renderScaleStrip();
 }
 
 function buildLegend() {
   const grid = document.getElementById('legendGrid');
-  const bar = document.getElementById('legendBar');
+  const bar = document.getElementById('ssBar');
   grid.innerHTML = '';
   bar.innerHTML = '';
   const labels = t().labels;
-  // От лавы к холоду, а не наоборот: ближняя подсказка — самая частая и самая
-  // нужная, ей место в начале списка, а не в самом низу
+  // Подробно — от лавы к холоду: ближняя подсказка самая нужная, ей место наверху
   FEEDBACK_META.slice(0, 8).reverse().forEach(meta => {
     const item = document.createElement('div');
     item.className = 'legend-item';
+    item.dataset.tier = meta.labelIndex;
     item.innerHTML = '<span class="l-label" style="color:' + meta.color + '">' + labels[meta.labelIndex] +
                      '</span><span class="l-range">' + meta.rangeSign + '</span>';
     grid.appendChild(item);
-
+  });
+  // Полоска — слева направо от холода к лаве, как градусник лёжа
+  FEEDBACK_META.slice(0, 8).forEach(meta => {
     const seg = document.createElement('span');
-    seg.style.background = meta.color;
+    seg.className = 'ss-seg';
+    seg.dataset.tier = meta.labelIndex;
+    seg.style.setProperty('--c', meta.color);
+    seg.textContent = labels[meta.labelIndex].split(' ')[0];
+    seg.title = labels[meta.labelIndex] + ' · ' + meta.rangeSign;
     bar.appendChild(seg);
   });
+  const chev = document.createElement('span');
+  chev.className = 'ss-chev';
+  chev.textContent = '›';
+  bar.appendChild(chev);
+  renderScaleStrip();
+}
+
+function renderScaleStrip() {
+  const box = document.getElementById('scaleStrip');
+  if (!box) return;
+  box.classList.toggle('open', scaleOpen);
+  box.setAttribute('aria-expanded', scaleOpen ? 'true' : 'false');
+  const last = currentMove();
+  const tier = last ? last.meta.labelIndex : null;
+  box.querySelectorAll('[data-tier]').forEach(el => el.classList.toggle('on', +el.dataset.tier === tier));
 }
 
 // ================= ЗВУК И ВИБРАЦИЯ =================

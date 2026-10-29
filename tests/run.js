@@ -811,19 +811,19 @@ async function testNumberLine(browser) {
     guessSize + ' против ' + tickMax);
 
   // шкалу расстояний читают те же дети
-  await page.click('#scaleBtn');
+  await page.click('#scaleStrip');
   await page.waitForTimeout(150);
   const legend = await page.evaluate(() => {
     const px = sel => parseFloat(getComputedStyle(document.querySelector(sel)).fontSize);
     return { item: px('.legend-item .l-label'), range: px('.legend-item .l-range'),
-             title: px('#tLegendTitle'),
+             title: px('#scaleStrip .ss-seg'),
              wrapped: [...document.querySelectorAll('.legend-item')]
                .filter(i => i.getBoundingClientRect().height > 24).length };
   });
   check('шкала расстояний не мельче 14 пикселей',
     legend.item >= 14 && legend.range >= 14 && legend.title >= 14, JSON.stringify(legend));
   check('строки шкалы не переносятся', legend.wrapped === 0, 'перенесено строк: ' + legend.wrapped);
-  await page.click('#tScaleDone');
+  await page.click('#scaleStrip');
 
   // на широком диапазоне подписи редеют, но не наезжают друг на друга
   await page.evaluate(() => { frostMode = false; applyBounds(1000); history = []; secret = 640; renderAll(); });
@@ -1876,25 +1876,37 @@ async function testEndOfRound(browser) {
   await done(page);
 }
 
-// Шкала расстояний — окном по кнопке «?» в строке статуса
+// Шкала расстояний — полоска поясов под ответом: текущий подсвечен, по
+// нажатию раскрывается с числами, и это помнится
 async function testScaleMemory(browser) {
-  console.log('\nШкала расстояний по кнопке');
+  console.log('\nШкала расстояний: полоска под ответом');
   const page = await gameWithStorage(browser, { user: 'Максим' }, { hc_scale_open: '1', hc_games_done: '3' });
   check('старые записи о шкале убраны',
     await page.evaluate(() => localStorage.getItem('hc_scale_open') === null && localStorage.getItem('hc_games_done') === null));
   await page.click('#tModeSolo');
   await page.click('#tStartMatch');
   await page.waitForTimeout(300);
-  check('в партии шкала не занимает место', !(await page.locator('#legendGrid').isVisible()));
-  await page.click('#scaleBtn');
-  await page.waitForTimeout(200);
-  check('«?» открывает шкалу', await page.locator('#scaleModal').isVisible() &&
+  check('полоска из 8 поясов видна сразу', await page.locator('#scaleStrip').isVisible() &&
+    await page.locator('#ssBar .ss-seg').count() === 8);
+  check('числа шкалы свёрнуты', !(await page.locator('#legendGrid').isVisible()));
+  const far = await page.evaluate(() => secret > (RANGE_MIN + RANGE_MAX) / 2 ? RANGE_MIN : RANGE_MAX);
+  await page.fill('#guessInput', String(far));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const lit = await page.evaluate(() => ({
+    on: [...document.querySelectorAll('#ssBar .ss-seg.on')].map(e => +e.dataset.tier),
+    want: currentMove().meta.labelIndex }));
+  check('подсвечен пояс последнего хода', lit.on.length === 1 && lit.on[0] === lit.want, JSON.stringify(lit));
+  await page.click('#scaleStrip');
+  await page.waitForTimeout(150);
+  check('нажатие раскрывает шкалу с числами', await page.locator('#legendGrid').isVisible() &&
     await page.locator('#legendGrid .legend-item').count() === 8);
-  await page.click('#tScaleDone');
-  check('«Готово» закрывает её', !(await page.locator('#scaleModal').isVisible()));
-  await page.click('#scaleBtn');
-  await page.evaluate(() => quitToMenu());
-  check('уход из партии закрывает шкалу', !(await page.locator('#scaleModal').isVisible()));
+  check('и в списке подсвечен тот же пояс',
+    await page.evaluate(() => +document.querySelector('#legendGrid .legend-item.on').dataset.tier === currentMove().meta.labelIndex));
+  check('выбор запоминается', await page.evaluate(() => localStorage.getItem('hc_scale_strip')) === '1');
+  await page.click('#scaleStrip');
+  await page.waitForTimeout(150);
+  check('повторное нажатие сворачивает', !(await page.locator('#legendGrid').isVisible()));
   await done(page);
 
   // Кнопки-значки объясняют себя при первом нажатии
@@ -6447,6 +6459,33 @@ async function testRunStage(browser) {
   await done(page);
 }
 
+// Список бонусов: из настройки игры, с описанием каждого, на всех языках
+async function testBonusGuide(browser) {
+  console.log('\nСписок бонусов и ловушек');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.click('.mode-btn.duel');
+  await page.waitForTimeout(200);
+  check('в настройке есть «Что за бонусы?»', await page.locator('#tBonusGuide').isVisible() &&
+    (await page.locator('#tBonusGuide').textContent()).includes('Что за бонусы'));
+  for (const lang of ['ru', 'en', 'fr', 'de']) {
+    await page.evaluate(l => { currentLang = l; applyTranslations(); }, lang);
+    await page.click('#tBonusGuide');
+    await page.waitForTimeout(150);
+    const g = await page.evaluate(() => ({
+      shown: !document.getElementById('bonusGuide').classList.contains('hidden'),
+      heads: document.querySelectorAll('#bgList .bg-head').length,
+      rows: [...document.querySelectorAll('#bgList .bg-row')].map(r => r.textContent.trim()) }));
+    check(lang + ': в списке 4 помощи и 3 ловушки, у каждой название и описание',
+      g.shown && g.heads === 2 && g.rows.length === 7 && g.rows.every(r => r.length > 25 && !/undefined/.test(r)),
+      JSON.stringify(g).slice(0, 300));
+    await page.click('#bgOk');
+    await page.waitForTimeout(100);
+  }
+  await page.evaluate(() => { currentLang = 'ru'; applyTranslations(); });
+  check('«Понятно» закрывает список', !(await page.locator('#bonusGuide').isVisible()));
+  await done(page);
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -7365,6 +7404,7 @@ async function testKeyPage(browser) {
     await testAudit(browser);
     await testRedesign(browser);
     await testRunStage(browser);
+    await testBonusGuide(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

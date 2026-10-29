@@ -117,10 +117,11 @@ function avatarLetter(name) {
 // приложения — лишний риск, а набор проверяет сама база
 // Цвета фона на выбор. Вторая копия — в базе (avatar_colors), сверяются
 // тестом. Первые восемь — те же, что считаются из имени: кто цвет не
-// выбирал, у того он и остаётся прежним
-const AVATAR_BG = ['#fbbf24', '#34d399', '#60a5fa', '#f472b6', '#a78bfa',
-                   '#fb923c', '#2dd4bf', '#a3e635', '#f87171', '#e2e8f0'];
-const AVATAR_CHOICES = ['🦊', '🐼', '🐯', '🦁', '🐨', '🐸', '🐵', '🐧', '🦉', '🐙', '🦄', '🐊', '🐶', '🐱', '🐰', '🐻', '🦙', '🐹', '🐥', '🐢', '🦋', '🐝', '🐬', '🦈'];
+// выбирал, у того он и остаётся прежним. Последние четыре — градиенты: в
+// базе они записаны словом, как рисовать — в js/art.js (AVATAR_GRAD)
+const AVATAR_BG = ['#fbbf24', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#fb923c', '#2dd4bf', '#a3e635', '#f87171', '#e2e8f0', '#fde047', '#fda4af', '#93c5fd', '#c4b5fd', '#86efac', '#1e293b', 'grad-sunset', 'grad-ocean', 'grad-candy', 'grad-forest'];
+// Пять тем по восемь: лес, джунгли и саванна, море, дом и ферма, сказка
+const AVATAR_CHOICES = ['🦊', '🐻', '🦉', '🦔', '🦝', '🦌', '🐸', '🦋', '🦁', '🐯', '🐵', '🐘', '🦒', '🦓', '🐼', '🐨', '🐬', '🐙', '🦈', '🐢', '🐧', '🦀', '🦭', '🐊', '🐶', '🐱', '🐰', '🐹', '🐥', '🦙', '🐝', '🐴', '🦄', '👽', '👻', '🧚', '🎃', '⛄', '🦕', '👾'];
 
 // Иконки других игроков: имя → { icon, color }; пустые — буква и цвет из
 // имени. Заполняется по мере того, как имена появляются в списках, заново —
@@ -222,7 +223,7 @@ function updateAccountChip() {
   const face = document.getElementById('accountChipName');
   if (auth) {
     paintAvatar(face, auth.username);
-    box.style.background = colorOf(auth.username);
+    box.style.background = avatarBgCss(colorOf(auth.username));
     chip.title = auth.username;
   } else {
     face.textContent = '⚙';
@@ -395,7 +396,13 @@ function renderAvatarGrid() {
   const tutIcon = profileInfo && 'tutorialDone' in profileInfo ? [TUTORIAL_ICON] : [];
   // Иконки за серию заданий — когда сервер знает задания (миграция 041)
   const questIcons = progressInfo ? QUEST_ICONS.map(q => q.icon) : [];
-  ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons].forEach(icon => {
+  ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons].forEach((icon, i) => {
+    // Награды — отдельным блоком после обычных: их не выбирают, а заслуживают
+    if (i === AVATAR_CHOICES.length + 1) {
+      const sep = document.createElement('div');
+      sep.className = 'av-sep';
+      grid.appendChild(sep);
+    }
     const b = document.createElement('button');
     const locked = icon === TUTORIAL_ICON ? !tutorialIconOpen()
       : questIconDays(icon) ? !questIconOpen(icon)
@@ -1867,7 +1874,7 @@ function renderLessonResult() {
 }
 
 // ---------- Карточки бонусов ----------
-const BONUS_ICON = { extra: '⚡', fog: '🙈', blind: '🌫️', lava: '🌋', skip: '⏭', gift: '🎁', memory: '🧠', near: '❓' };
+const BONUS_ICON = { extra: '⚡', fog: '🙈', blind: '🌫️', rush: '⏳', lava: '🌋', skip: '⏭', gift: '🎁', memory: '🧠', near: '❓' };
 let bonusCardFor = null;
 function seenBonuses() {
   try { return JSON.parse(localStorage.getItem(SEEN_BONUS_KEY)) || []; } catch (e) { return []; }
@@ -1887,8 +1894,27 @@ function checkBonusCard() {
     : T.bcTitle.replace('{name}', t().bonusNames[kind]);
   document.getElementById('bcDesc').textContent = T.bcDesc[kind];
   document.getElementById('bcOk').textContent = T.bcOk;
+  document.getElementById('bcAll').textContent = t().bgAll;
   document.getElementById('bonusCard').classList.remove('hidden');
 }
+// Список всех бонусов: что помогает, что мешает. focus — какой подсветить
+// (тот, что только что сработал)
+function openBonusGuide(focus) {
+  const L = t();
+  document.getElementById('bgTitle').textContent = L.bgTitle;
+  document.getElementById('bgHow').textContent = L.bgHow;
+  document.getElementById('bgOk').textContent = L.tut.bcOk;
+  const group = (head, kinds) => '<div class="bg-head">' + head + '</div>' + kinds.map(k =>
+    '<div class="bg-row' + (k === focus ? ' on' : '') + '"><span class="bg-ic">' + BONUS_ICON[k] + '</span>' +
+    '<span class="bg-txt"><b>' + L.bonusNames[k] + '</b><span>' + L.tut.bcDesc[k] + '</span></span></div>').join('');
+  document.getElementById('bgList').innerHTML = group(L.bgGood, ['extra', 'fog', 'blind', 'rush']) +
+    group(L.bgBad, ['skip', 'gift', 'memory']);
+  document.getElementById('bonusGuide').classList.remove('hidden');
+}
+function closeBonusGuide() {
+  document.getElementById('bonusGuide').classList.add('hidden');
+}
+
 function closeBonusCard() {
   bonusCardFor = null;
   document.getElementById('bonusCard').classList.add('hidden');

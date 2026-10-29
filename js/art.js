@@ -6,19 +6,28 @@
 // В базе иконка по-прежнему записана своим эмодзи (🦊, 👑, …), фон — цветом
 // (#eab308, …): меняется только то, как их рисует игра.
 
-// Наградные фоны: металл и камень вместо плоского цвета. Ключ — цвет из базы
+// Наградные фоны: металл и камень вместо плоского цвета. Ключ — цвет из базы.
+// Сверху — блик: металл без отражения выглядит пластиком
+const SHEEN = 'radial-gradient(circle at 30% 22%, rgba(255,255,255,0.75) 0, rgba(255,255,255,0) 38%), ';
 const REWARD_BG = {
-  '#94a3b8': 'linear-gradient(135deg, #f8fafc 0%, #94a3b8 42%, #e2e8f0 58%, #64748b 100%)',          // Серебро
-  '#eab308': 'linear-gradient(135deg, #fef9c3 0%, #eab308 40%, #fde047 58%, #a16207 100%)',          // Золото
-  '#14b8a6': 'linear-gradient(135deg, #ccfbf1 0%, #14b8a6 40%, #5eead4 58%, #0f766e 100%)',          // Платина
-  '#0ea5e9': 'linear-gradient(135deg, #e0f2fe 0%, #38bdf8 30%, #0ea5e9 48%, #bae6fd 62%, #0369a1 100%)', // Алмаз
-  '#d946ef': 'linear-gradient(135deg, #fae8ff 0%, #d946ef 35%, #8b5cf6 65%, #f0abfc 100%)'           // Легенда
+  '#94a3b8': SHEEN + 'linear-gradient(135deg, #ffffff 0%, #cbd5e1 25%, #64748b 50%, #e2e8f0 72%, #475569 100%)',   // Серебро
+  '#eab308': SHEEN + 'linear-gradient(135deg, #fff7c2 0%, #facc15 25%, #b45309 50%, #fde047 72%, #92400e 100%)',   // Золото
+  '#14b8a6': SHEEN + 'linear-gradient(135deg, #f0fdfa 0%, #5eead4 25%, #0f766e 50%, #99f6e4 72%, #115e59 100%)',   // Платина
+  '#0ea5e9': SHEEN + 'conic-gradient(from 200deg, #e0f2fe, #38bdf8, #0369a1, #bae6fd, #0ea5e9, #e0f2fe)',          // Алмаз
+  '#d946ef': SHEEN + 'conic-gradient(from 160deg, #fae8ff, #d946ef, #6d28d9, #f0abfc, #22d3ee, #fae8ff)'           // Легенда
+};
+// Градиенты из обычного набора: в базе они записаны словом
+const AVATAR_GRAD = {
+  'grad-sunset': 'linear-gradient(135deg, #ffd166 0%, #ff8a3d 45%, #ff4d6d 100%)',
+  'grad-ocean': 'linear-gradient(135deg, #a5f3fc 0%, #42c8ff 40%, #4f46e5 100%)',
+  'grad-candy': 'linear-gradient(135deg, #fbcfe8 0%, #f472b6 45%, #a78bfa 100%)',
+  'grad-forest': 'linear-gradient(135deg, #d9f99d 0%, #4ade80 45%, #0f766e 100%)'
 };
 // С каким фоном кружок ещё и переливается
 const SHINY_BG = ['#0ea5e9', '#d946ef'];
 
 function avatarBgCss(color) {
-  return REWARD_BG[color] || color || '';
+  return REWARD_BG[color] || AVATAR_GRAD[color] || color || '';
 }
 
 function isShinyBg(color) {
@@ -28,11 +37,12 @@ function isShinyBg(color) {
 // Иконки, у которых есть рисунок. Файл — icons/<код символа>.webp: 🦊 → 1f98a.webp.
 // Список нужен и чтобы не просить у сервера картинку, которой нет
 const ICON_ART = new Set([
-  '🦊', '🐼', '🐯', '🦁', '🐨', '🐸', '🐵', '🐧',
-  '🦉', '🐙', '🦄', '🐊', '🐶', '🐱', '🐰', '🐻',
-  '🦙', '🐹', '🐥', '🐢', '🦋', '🐝', '🐬', '🦈',
-  '🦅', '🐺', '🦚', '🐉', '🦩', '🐳', '🦖', '🦜',
-  '👑', '🌟', '🔥', '🚀', '🌋', '🌈', '🎓'
+  '🦊', '🐻', '🦉', '🦔', '🦝', '🦌', '🐸', '🦋', '🦁', '🐯',
+  '🐵', '🐘', '🦒', '🦓', '🐼', '🐨', '🐬', '🐙', '🦈', '🐢',
+  '🐧', '🦀', '🦭', '🐊', '🐶', '🐱', '🐰', '🐹', '🐥', '🦙',
+  '🐝', '🐴', '🦄', '👽', '👻', '🧚', '🎃', '⛄', '🦕', '👾',
+  '🦅', '🐺', '🦚', '🐉', '🦩', '🐳', '🦖', '🦜', '👑', '🌟',
+  '🔥', '🚀', '🌋', '🌈', '🎓', '🧙', '🦍', '🦑', '🐲', '🛸'
 ]);
 function iconFile(code) {
   return 'icons/' + [...code].filter(c => c !== '\ufe0f').map(c => c.codePointAt(0).toString(16)).join('-') + '.webp';

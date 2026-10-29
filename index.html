@@ -130,6 +130,7 @@
         <input type="checkbox" id="bonusSetup" onchange="setBonusMode(this.checked)" />
         <span class="fr-text"><span id="tBonusSetup"></span><small class="row-hint" id="tBonusHint"></small></span>
       </label>
+      <button class="link-btn" id="tBonusGuide" onclick="openBonusGuide()"></button>
 
       <div class="setup-field hidden" id="bonusCountField">
         <label id="tLblBonusCount">Bonuses</label>
@@ -180,7 +181,7 @@
         <div class="p-name" id="pname0"></div>
         <div class="p-pips" id="ppips0"></div>
         <button class="token-btn" id="ptoken0" onclick="useToken(0)"></button>
-        <div class="p-effects" id="peff0"></div>
+        <div class="p-effects" id="peff0" onclick="event.stopPropagation(); openBonusGuide()"></div>
       </div>
 
       <div class="pcard pc1" id="pcard1">
@@ -188,7 +189,7 @@
         <div class="p-name" id="pname1"></div>
         <div class="p-pips" id="ppips1"></div>
         <button class="token-btn" id="ptoken1" onclick="useToken(1)"></button>
-        <div class="p-effects" id="peff1"></div>
+        <div class="p-effects" id="peff1" onclick="event.stopPropagation(); openBonusGuide()"></div>
       </div>
 
       <div class="center">
@@ -201,8 +202,6 @@
             <button class="mini-toggle" id="toggleLineBtn" onclick="toggleLine()">📏</button>
             <button class="mini-toggle" id="toggleHintBtn" onclick="toggleHint()">💡</button>
             <button class="mini-toggle hidden" id="sayBtn" onclick="toggleSayPad()">💬</button>
-            <!-- Шкала расстояний — по кнопке: под доской она занимала полэкрана -->
-            <button class="mini-toggle scale-btn" id="scaleBtn" onclick="openScale()">?</button>
             <button class="btn-reset" onclick="leaveGame()" id="tMenu">Menu</button>
           </span>
           <!-- Что сделала кнопка-значок. Показывается при первом нажатии на
@@ -253,7 +252,17 @@
           <div class="fb-band hidden" id="feedbackBand"></div>
         </div>
 
-        <div class="bonus-line hidden" id="bonusLine"></div>
+        <!-- Шкала расстояний — полоской из поясов прямо под ответом: видно, где
+             сейчас ход и сколько до «лавы». Нажал — раскрылась с числами на месте.
+             Раньше она была окном по «?»: чтобы свериться, надо было открыть и закрыть -->
+        <div class="scale-strip" id="scaleStrip" role="button" aria-expanded="false" onclick="toggleScaleStrip()">
+          <div class="ss-bar" id="ssBar"></div>
+          <div class="ss-body">
+            <div class="legend-grid" id="legendGrid"></div>
+          </div>
+        </div>
+
+        <div class="bonus-line hidden" id="bonusLine" role="button" onclick="openBonusGuide(D.lastBonus)"></div>
 
         <div class="numline hidden" id="numLine"><svg id="numLineSvg" width="100%" height="48"></svg></div>
 
@@ -568,18 +577,6 @@
   </div>
 </div>
 
-<!-- Шкала расстояний: открывается кнопкой «?» в строке статуса -->
-<div class="modal-backdrop hidden" id="scaleModal" onclick="if (event.target === this) closeScale()">
-  <div class="modal-card legend">
-    <div class="legend-title" id="tLegendTitle">Distance Scale</div>
-    <div class="legend-body">
-      <div class="legend-bar" id="legendBar"></div>
-      <div class="legend-grid" id="legendGrid"></div>
-    </div>
-    <button class="btn btn-block" style="margin-top:14px" id="tScaleDone" onclick="closeScale()"></button>
-  </div>
-</div>
-
 <!-- Выход из начатой партии без интернета: она нигде не хранится, и случайное
      нажатие на ☰ не должно стирать её молча -->
 <div class="modal-backdrop hidden" id="quitModal">
@@ -761,6 +758,19 @@
     <div class="bc-title" id="bcTitle"></div>
     <div class="modal-text" id="bcDesc"></div>
     <button class="btn btn-block" style="margin-top:14px" id="bcOk" onclick="closeBonusCard()"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="bcAll" onclick="closeBonusCard(); openBonusGuide()"></button>
+  </div>
+</div>
+
+<!-- Все бонусы и ловушки разом: открывается из настройки игры, по нажатию на
+     строку бонуса и на значки на плашке игрока. Раньше узнать, что делает
+     бонус, можно было, только наступив на него -->
+<div class="modal-backdrop hidden" id="bonusGuide" onclick="if (event.target === this) closeBonusGuide()">
+  <div class="modal-card bonus-guide">
+    <div class="bc-title" id="bgTitle"></div>
+    <div class="modal-text bg-how" id="bgHow"></div>
+    <div id="bgList"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="bgOk" onclick="closeBonusGuide()"></button>
   </div>
 </div>
 

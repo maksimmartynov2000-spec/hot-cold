@@ -141,7 +141,7 @@ do $$ begin
     raise exception 'ОШИБКА: убранная иконка принята';
   exception when sqlstate 'P0001' then if sqlerrm not like '%invalid_avatar%' then raise; end if;
   end;
-  if array_length(avatar_choices(), 1) <> 24 or avatar_choices() && array['🐲','🐮','🐷','🐔'] then
+  if array_length(avatar_choices(), 1) <> 40 or avatar_choices() && array['🐲','🐮','🐷','🐔'] then
     raise exception 'ОШИБКА: набор %', avatar_choices();
   end if;
 end $$;

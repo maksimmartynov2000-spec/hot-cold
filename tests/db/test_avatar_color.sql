@@ -109,7 +109,7 @@ begin
   select array_agg(color order by color) into js from js_colors;
   select array_agg(c order by c) into db from unnest(avatar_colors()) c;
   if js is distinct from db then raise exception 'ОШИБКА: цвета разошлись: игра % / база %', js, db; end if;
-  if array_length(db, 1) <> 10 then raise exception 'ОШИБКА: цветов %', array_length(db, 1); end if;
+  if array_length(db, 1) <> 20 then raise exception 'ОШИБКА: цветов %', array_length(db, 1); end if;
 end $$;
 \echo ok
 
