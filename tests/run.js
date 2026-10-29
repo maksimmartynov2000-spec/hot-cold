@@ -4215,8 +4215,9 @@ async function testAvatarColor(browser) {
     colors: [...document.querySelectorAll('#avGrid .av-color')].map(b => b.dataset.color),
     rows: new Set([...document.querySelectorAll('#avGrid .av-color')].map(b => Math.round(b.getBoundingClientRect().top))).size,
     tiles: document.querySelectorAll('#avGrid .av-tile').length }));
-  check('в выборе десять цветов двумя рядами', pick.colors.length === 10 && pick.rows === 2, JSON.stringify(pick));
-  check('и по-прежнему буква и 24 иконки', pick.tiles === 25, String(pick.tiles));
+  check('в выборе двадцать цветов четырьмя рядами, последние — градиенты',
+    pick.colors.length === 20 && pick.rows === 4 && pick.colors.slice(-4).every(c => /^grad-/.test(c)), JSON.stringify(pick));
+  check('и по-прежнему буква и 40 иконок', pick.tiles === 41, String(pick.tiles));
 
   await page.click('#avGrid .av-color[data-color="#a78bfa"]');
   await page.waitForTimeout(300);
@@ -4263,7 +4264,7 @@ async function testAvatarColor(browser) {
     tiles: document.querySelectorAll('#avGrid .av-tile').length,
     label: document.getElementById('tAvatarStart').textContent }));
   check('без миграции цвета выбора цвета нет, иконки на месте',
-    old.colors === 0 && old.tiles === 25 && old.label === 'Сменить иконку', JSON.stringify(old));
+    old.colors === 0 && old.tiles === 41 && old.label === 'Сменить иконку', JSON.stringify(old));
   await done(page);
 }
 
@@ -5115,7 +5116,7 @@ async function testLeagues(browser) {
     locked: [...document.querySelectorAll('#avGrid .av-tile.locked')].map(e => e.dataset.icon).join(''),
     colorsLocked: [...document.querySelectorAll('#avGrid .av-color.locked')].map(e => e.dataset.color).join(',') }));
   check('награды видны все, закрыты — лиги выше достигнутой',
-    grid.icons === 25 + 10 && grid.locked === '🦩🐳🦖🦜👑🌟' && grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
+    grid.icons === 41 + 10 && grid.locked === '🦩🐳🦖🦜👑🌟' && grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
     JSON.stringify(grid));
   const before = await page.evaluate(() => window.__profile.calls.length);
   await page.click('.av-tile[data-icon="🦖"]');
@@ -5143,7 +5144,7 @@ async function testLeagues(browser) {
   await page.click('#tAvatarStart');
   await page.waitForTimeout(150);
   check('сервер без лиг: сетка как раньше, лиги в профиле нет', await page.evaluate(() =>
-    document.querySelectorAll('#avGrid .av-tile').length === 25 &&
+    document.querySelectorAll('#avGrid .av-tile').length === 41 &&
     document.getElementById('pfLeague').classList.contains('hidden')));
   await done(page);
 }
@@ -6800,10 +6801,10 @@ async function testLeagueShow(browser) {
     return { text: el.textContent, svg: !!el.querySelector('svg'), shine: el.classList.contains('shine') }; });
   check('обычная иконка — тоже рисунком, без перелива', plain.text === '🦊' && plain.svg && !plain.shine, JSON.stringify(plain));
   // Иконка, которой в наборе уже нет (у друга, пока база не обновлена), — эмодзи
-  const gone = await page.evaluate(() => { avatarCache['Старый'] = { icon: '🐲', color: '' };
+  const gone = await page.evaluate(() => { avatarCache['Старый'] = { icon: '🐮', color: '' };
     const el = document.createElement('span'); paintAvatar(el, 'Старый');
     return { text: el.textContent, svg: !!el.querySelector('svg') }; });
-  check('иконка не из набора — эмодзи вместо рисунка', gone.text === '🐲' && !gone.svg, JSON.stringify(gone));
+  check('иконка не из набора — эмодзи вместо рисунка', gone.text === '🐮' && !gone.svg, JSON.stringify(gone));
   // Все иконки, которые можно выбрать, нарисованы
   const drawn = await page.evaluate(() => AVATAR_CHOICES.concat(LEAGUE_REWARDS.filter(r => r.kind === 'icon').map(r => r.value),
     QUEST_ICONS.map(q => q.icon), [TUTORIAL_ICON]).filter(i => !iconArt(i, 0)));
@@ -7000,7 +7001,7 @@ async function testProfile(browser) {
   const byFaceAgain = await page.locator('#avGrid').isVisible();
   check('кружок открывает и закрывает выбор', byFace && !byFaceAgain, byFace + ' ' + byFaceAgain);
 
-  // Выбор иконки: буква и 24 животных, выбранная отмечена
+  // Выбор иконки: буква и 40 иконок, выбранная отмечена
   await page.click('#tAvatarStart');
   await page.waitForTimeout(150);
   const grid = await page.evaluate(() => {
@@ -7008,7 +7009,7 @@ async function testProfile(browser) {
     return { n: tiles.length, first: tiles[0].textContent, firstLetter: tiles[0].classList.contains('letter'),
              sel: tiles.filter(t => t.classList.contains('sel')).map(t => t.dataset.icon) };
   });
-  check('в профиле буква и 24 иконки', grid.n === 25 && grid.firstLetter && grid.first === 'М',
+  check('в профиле буква и 40 иконок', grid.n === 41 && grid.firstLetter && grid.first === 'М',
     JSON.stringify(grid));
   check('выбранная иконка отмечена', grid.sel.join() === '🦊', grid.sel.join());
 
@@ -7041,7 +7042,7 @@ async function testProfile(browser) {
     const tops = new Set([...document.querySelectorAll('#avGrid .av-tile')].map(t => Math.round(t.getBoundingClientRect().top)));
     return { w: r.width, h: r.height, rows: tops.size };
   });
-  check('клетки иконок крупные и сетка ровная 5×5', tile.w >= 44 && tile.h >= 44 && tile.rows === 5,
+  check('клетки иконок крупные, по пять в ряд', tile.w >= 44 && tile.h >= 44 && tile.rows === Math.ceil(41 / 5),
     JSON.stringify(tile));
 
   // Закрыл профиль с раскрытой сеткой — в следующий раз она снова свёрнута
