@@ -137,7 +137,7 @@ end $$;
 do $$ begin
   if set_avatar('Лев', '1234', '🐊') is distinct from '🐊' then raise exception 'ОШИБКА: 🐊 не встал'; end if;
   begin
-    perform set_avatar('Лев', '1234', '🐲');
+    perform set_avatar('Лев', '1234', '🐮');
     raise exception 'ОШИБКА: убранная иконка принята';
   exception when sqlstate 'P0001' then if sqlerrm not like '%invalid_avatar%' then raise; end if;
   end;

@@ -1,0 +1,90 @@
+-- Приключение: пять миров по десять соперников. Применять в Supabase:
+-- SQL Editor → вставить целиком → Run. Применить ДО мёржа.
+--
+-- Игра с соперником идёт в телефоне, база помнит только, сколько соперников
+-- обыграно подряд (0…50): так прогресс переезжает на другой телефон, а база
+-- знает, какие иконки боссов открыты. Прошёл мир — иконка его босса
+-- (🧙 🦍 🦑 🐲 🛸) открыта для кружка
+
+-- 1. Сколько пройдено
+alter table students add column if not exists adventure int not null default 0;
+alter table students drop constraint if exists student_adventure_range;
+alter table students add constraint student_adventure_range check (adventure between 0 and 50);
+
+-- 2. Иконки боссов по мирам. Копия — в js/adventure.js (ADV_ICONS), сверяется тестом
+create or replace function adventure_icons()
+returns text[]
+language sql
+immutable
+as $$
+  select array['🧙','🦍','🦑','🐲','🛸'];
+$$;
+
+-- 3. Записать пройденное и вернуть то, что помнит база. Меньше, чем было, не
+--    станет: второй телефон с прошлогодним прогрессом не сотрёт новый
+create or replace function adventure_save(p_username text, p_pin text, p_done int)
+returns int
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; r int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  update students
+     set adventure = greatest(adventure, least(50, greatest(0, coalesce(p_done, 0))))
+   where username = me
+  returning adventure into r;
+  return r;
+end;
+$$;
+
+-- 4. Иконка босса — в кружок, только если его мир пройден
+alter table students drop constraint if exists student_avatar_allowed;
+alter table students add constraint student_avatar_allowed
+  check (avatar is null or avatar = any (avatar_choices() || reward_icons() || tutorial_icon() || quest_icons() || adventure_icons()));
+
+create or replace function set_avatar(p_username text, p_pin text, p_avatar text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; need int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  -- Иконка за обучение — тому, кто его прошёл
+  if p_avatar = tutorial_icon() then
+    if not coalesce((select tutorial_done from students where username = me), false) then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка за серию заданий — тому, у кого была такая серия
+  elsif p_avatar = any (quest_icons()) then
+    select days into need from quest_rewards() where icon = p_avatar;
+    if coalesce((select quest_best from player_stats where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка босса Приключения — тому, кто прошёл его мир
+  elsif p_avatar = any (adventure_icons()) then
+    need := array_position(adventure_icons(), p_avatar) * 10;
+    if coalesce((select adventure from students where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  elsif p_avatar is not null and not (p_avatar = any (avatar_choices())) then
+    select league into need from league_rewards() where kind = 'icon' and value = p_avatar;
+    if need is null then raise exception 'invalid_avatar'; end if;
+    if coalesce((select peak from ladder where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  end if;
+  update students set avatar = p_avatar where username = me;
+  return p_avatar;
+end;
+$$;
+
+revoke all on function adventure_save(text, text, int) from public;
+grant execute on function adventure_save(text, text, int) to anon;
+grant execute on function adventure_icons() to anon;
+grant execute on function set_avatar(text, text, text) to anon;

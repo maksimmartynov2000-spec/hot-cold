@@ -15,3 +15,9 @@ if (!c) throw new Error('не нашёл AVATAR_BG в коде игры');
 const colors = JSON.parse(c[1].replace(/'/g, '"'));
 fs.writeFileSync(path.join(__dirname, 'avatar_colors_js.csv'), ['color'].concat(colors).join('\n') + '\n');
 console.log('цветов фона из кода игры:', colors.length);
+
+// Иконки боссов Приключения — копия в базе (adventure_icons)
+const adv = [...html.matchAll(/color: '[^']+', boss: '([^']+)'/g)].map(m => m[1]);
+if (adv.length !== 5) throw new Error('не нашёл иконки боссов Приключения в коде игры');
+fs.writeFileSync(path.join(__dirname, 'adventure_icons_js.csv'), ['icon'].concat(adv).join('\n') + '\n');
+console.log('иконок боссов из кода игры:', adv.length);
