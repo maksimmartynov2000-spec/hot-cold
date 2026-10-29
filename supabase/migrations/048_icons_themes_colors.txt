@@ -1,0 +1,45 @@
+-- Новый набор иконок и цветов. Применять в Supabase: SQL Editor → вставить
+-- целиком → Run. Применить ДО мёржа.
+--
+-- Иконок было 24, стало 40 — пять тем по восемь: лес, джунгли, море, дом и
+-- сказка. Все 24 прежних остались, поэтому ни у кого иконка не пропадёт.
+-- Цветов фона было 10, стало 20: 16 однотонных и 4 градиента. Градиент в
+-- базе записан словом (grad-sunset…), как его рисовать — знает игра
+
+-- 1. Иконки. Копия — в js/online.js (AVATAR_CHOICES), сверяется тестом
+create or replace function avatar_choices()
+returns text[]
+language sql
+immutable
+as $$
+  select array['🦊','🐻','🦉','🦔','🦝','🦌','🐸','🦋',
+               '🦁','🐯','🐵','🐘','🦒','🦓','🐼','🐨',
+               '🐬','🐙','🦈','🐢','🐧','🦀','🦭','🐊',
+               '🐶','🐱','🐰','🐹','🐥','🦙','🐝','🐴',
+               '🦄','👽','👻','🧚','🎃','⛄','🦕','👾'];
+$$;
+
+-- 2. Цвета фона. Копия — в js/online.js (AVATAR_BG), сверяется тестом.
+--    Первые десять — прежние: у кого цвет выбран, тот и остаётся
+create or replace function avatar_colors()
+returns text[]
+language sql
+immutable
+as $$
+  select array['#fbbf24', '#34d399', '#60a5fa', '#f472b6', '#a78bfa',
+               '#fb923c', '#2dd4bf', '#a3e635', '#f87171', '#e2e8f0',
+               '#fde047', '#fda4af', '#93c5fd', '#c4b5fd', '#86efac', '#1e293b',
+               'grad-sunset', 'grad-ocean', 'grad-candy', 'grad-forest'];
+$$;
+
+-- Проверки столбцов зовут эти функции при каждой записи — пересоздавать их
+-- не нужно, но пересоздаём, чтобы база проверила, что старые значения подходят
+alter table students drop constraint if exists student_avatar_allowed;
+alter table students add constraint student_avatar_allowed
+  check (avatar is null or avatar = any (avatar_choices() || reward_icons() || tutorial_icon() || quest_icons()));
+alter table students drop constraint if exists student_avatar_color_allowed;
+alter table students add constraint student_avatar_color_allowed
+  check (avatar_color is null or avatar_color = any (avatar_colors() || reward_colors()));
+
+grant execute on function avatar_choices() to anon;
+grant execute on function avatar_colors() to anon;

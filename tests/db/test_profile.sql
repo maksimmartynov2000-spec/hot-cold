@@ -312,7 +312,7 @@ begin
   select array_agg(avatar order by avatar) into js from js_avatars;
   select array_agg(a order by a) into db from unnest(avatar_choices()) a;
   if js is distinct from db then raise exception 'ОШИБКА: наборы разошлись: браузер %, база %', js, db; end if;
-  if array_length(db, 1) <> 24 then raise exception 'ОШИБКА: в наборе % иконок, а не 24', array_length(db, 1); end if;
+  if array_length(db, 1) <> 40 then raise exception 'ОШИБКА: в наборе % иконок, а не 40', array_length(db, 1); end if;
 end $$;
 \echo ok
 

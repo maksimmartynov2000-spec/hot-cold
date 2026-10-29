@@ -811,19 +811,19 @@ async function testNumberLine(browser) {
     guessSize + ' против ' + tickMax);
 
   // шкалу расстояний читают те же дети
-  await page.click('#scaleBtn');
+  await page.click('#scaleStrip');
   await page.waitForTimeout(150);
   const legend = await page.evaluate(() => {
     const px = sel => parseFloat(getComputedStyle(document.querySelector(sel)).fontSize);
     return { item: px('.legend-item .l-label'), range: px('.legend-item .l-range'),
-             title: px('#tLegendTitle'),
+             title: px('#scaleStrip .ss-seg'),
              wrapped: [...document.querySelectorAll('.legend-item')]
                .filter(i => i.getBoundingClientRect().height > 24).length };
   });
   check('шкала расстояний не мельче 14 пикселей',
     legend.item >= 14 && legend.range >= 14 && legend.title >= 14, JSON.stringify(legend));
   check('строки шкалы не переносятся', legend.wrapped === 0, 'перенесено строк: ' + legend.wrapped);
-  await page.click('#tScaleDone');
+  await page.click('#scaleStrip');
 
   // на широком диапазоне подписи редеют, но не наезжают друг на друга
   await page.evaluate(() => { frostMode = false; applyBounds(1000); history = []; secret = 640; renderAll(); });
@@ -1876,25 +1876,37 @@ async function testEndOfRound(browser) {
   await done(page);
 }
 
-// Шкала расстояний — окном по кнопке «?» в строке статуса
+// Шкала расстояний — полоска поясов под ответом: текущий подсвечен, по
+// нажатию раскрывается с числами, и это помнится
 async function testScaleMemory(browser) {
-  console.log('\nШкала расстояний по кнопке');
+  console.log('\nШкала расстояний: полоска под ответом');
   const page = await gameWithStorage(browser, { user: 'Максим' }, { hc_scale_open: '1', hc_games_done: '3' });
   check('старые записи о шкале убраны',
     await page.evaluate(() => localStorage.getItem('hc_scale_open') === null && localStorage.getItem('hc_games_done') === null));
   await page.click('#tModeSolo');
   await page.click('#tStartMatch');
   await page.waitForTimeout(300);
-  check('в партии шкала не занимает место', !(await page.locator('#legendGrid').isVisible()));
-  await page.click('#scaleBtn');
-  await page.waitForTimeout(200);
-  check('«?» открывает шкалу', await page.locator('#scaleModal').isVisible() &&
+  check('полоска из 8 поясов видна сразу', await page.locator('#scaleStrip').isVisible() &&
+    await page.locator('#ssBar .ss-seg').count() === 8);
+  check('числа шкалы свёрнуты', !(await page.locator('#legendGrid').isVisible()));
+  const far = await page.evaluate(() => secret > (RANGE_MIN + RANGE_MAX) / 2 ? RANGE_MIN : RANGE_MAX);
+  await page.fill('#guessInput', String(far));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(250);
+  const lit = await page.evaluate(() => ({
+    on: [...document.querySelectorAll('#ssBar .ss-seg.on')].map(e => +e.dataset.tier),
+    want: currentMove().meta.labelIndex }));
+  check('подсвечен пояс последнего хода', lit.on.length === 1 && lit.on[0] === lit.want, JSON.stringify(lit));
+  await page.click('#scaleStrip');
+  await page.waitForTimeout(150);
+  check('нажатие раскрывает шкалу с числами', await page.locator('#legendGrid').isVisible() &&
     await page.locator('#legendGrid .legend-item').count() === 8);
-  await page.click('#tScaleDone');
-  check('«Готово» закрывает её', !(await page.locator('#scaleModal').isVisible()));
-  await page.click('#scaleBtn');
-  await page.evaluate(() => quitToMenu());
-  check('уход из партии закрывает шкалу', !(await page.locator('#scaleModal').isVisible()));
+  check('и в списке подсвечен тот же пояс',
+    await page.evaluate(() => +document.querySelector('#legendGrid .legend-item.on').dataset.tier === currentMove().meta.labelIndex));
+  check('выбор запоминается', await page.evaluate(() => localStorage.getItem('hc_scale_strip')) === '1');
+  await page.click('#scaleStrip');
+  await page.waitForTimeout(150);
+  check('повторное нажатие сворачивает', !(await page.locator('#legendGrid').isVisible()));
   await done(page);
 
   // Кнопки-значки объясняют себя при первом нажатии
@@ -4203,8 +4215,9 @@ async function testAvatarColor(browser) {
     colors: [...document.querySelectorAll('#avGrid .av-color')].map(b => b.dataset.color),
     rows: new Set([...document.querySelectorAll('#avGrid .av-color')].map(b => Math.round(b.getBoundingClientRect().top))).size,
     tiles: document.querySelectorAll('#avGrid .av-tile').length }));
-  check('в выборе десять цветов двумя рядами', pick.colors.length === 10 && pick.rows === 2, JSON.stringify(pick));
-  check('и по-прежнему буква и 24 иконки', pick.tiles === 25, String(pick.tiles));
+  check('в выборе двадцать цветов четырьмя рядами, последние — градиенты',
+    pick.colors.length === 20 && pick.rows === 4 && pick.colors.slice(-4).every(c => /^grad-/.test(c)), JSON.stringify(pick));
+  check('и по-прежнему буква и 40 иконок', pick.tiles === 41, String(pick.tiles));
 
   await page.click('#avGrid .av-color[data-color="#a78bfa"]');
   await page.waitForTimeout(300);
@@ -4251,7 +4264,7 @@ async function testAvatarColor(browser) {
     tiles: document.querySelectorAll('#avGrid .av-tile').length,
     label: document.getElementById('tAvatarStart').textContent }));
   check('без миграции цвета выбора цвета нет, иконки на месте',
-    old.colors === 0 && old.tiles === 25 && old.label === 'Сменить иконку', JSON.stringify(old));
+    old.colors === 0 && old.tiles === 41 && old.label === 'Сменить иконку', JSON.stringify(old));
   await done(page);
 }
 
@@ -5103,7 +5116,7 @@ async function testLeagues(browser) {
     locked: [...document.querySelectorAll('#avGrid .av-tile.locked')].map(e => e.dataset.icon).join(''),
     colorsLocked: [...document.querySelectorAll('#avGrid .av-color.locked')].map(e => e.dataset.color).join(',') }));
   check('награды видны все, закрыты — лиги выше достигнутой',
-    grid.icons === 25 + 10 && grid.locked === '🦩🐳🦖🦜👑🌟' && grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
+    grid.icons === 41 + 10 && grid.locked === '🦩🐳🦖🦜👑🌟' && grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
     JSON.stringify(grid));
   const before = await page.evaluate(() => window.__profile.calls.length);
   await page.click('.av-tile[data-icon="🦖"]');
@@ -5131,7 +5144,7 @@ async function testLeagues(browser) {
   await page.click('#tAvatarStart');
   await page.waitForTimeout(150);
   check('сервер без лиг: сетка как раньше, лиги в профиле нет', await page.evaluate(() =>
-    document.querySelectorAll('#avGrid .av-tile').length === 25 &&
+    document.querySelectorAll('#avGrid .av-tile').length === 41 &&
     document.getElementById('pfLeague').classList.contains('hidden')));
   await done(page);
 }
@@ -6447,6 +6460,33 @@ async function testRunStage(browser) {
   await done(page);
 }
 
+// Список бонусов: из настройки игры, с описанием каждого, на всех языках
+async function testBonusGuide(browser) {
+  console.log('\nСписок бонусов и ловушек');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.click('.mode-btn.duel');
+  await page.waitForTimeout(200);
+  check('в настройке есть «Что за бонусы?»', await page.locator('#tBonusGuide').isVisible() &&
+    (await page.locator('#tBonusGuide').textContent()).includes('Что за бонусы'));
+  for (const lang of ['ru', 'en', 'fr', 'de']) {
+    await page.evaluate(l => { currentLang = l; applyTranslations(); }, lang);
+    await page.click('#tBonusGuide');
+    await page.waitForTimeout(150);
+    const g = await page.evaluate(() => ({
+      shown: !document.getElementById('bonusGuide').classList.contains('hidden'),
+      heads: document.querySelectorAll('#bgList .bg-head').length,
+      rows: [...document.querySelectorAll('#bgList .bg-row')].map(r => r.textContent.trim()) }));
+    check(lang + ': в списке 4 помощи и 3 ловушки, у каждой название и описание',
+      g.shown && g.heads === 2 && g.rows.length === 7 && g.rows.every(r => r.length > 25 && !/undefined/.test(r)),
+      JSON.stringify(g).slice(0, 300));
+    await page.click('#bgOk');
+    await page.waitForTimeout(100);
+  }
+  await page.evaluate(() => { currentLang = 'ru'; applyTranslations(); });
+  check('«Понятно» закрывает список', !(await page.locator('#bonusGuide').isVisible()));
+  await done(page);
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -6761,10 +6801,10 @@ async function testLeagueShow(browser) {
     return { text: el.textContent, svg: !!el.querySelector('svg'), shine: el.classList.contains('shine') }; });
   check('обычная иконка — тоже рисунком, без перелива', plain.text === '🦊' && plain.svg && !plain.shine, JSON.stringify(plain));
   // Иконка, которой в наборе уже нет (у друга, пока база не обновлена), — эмодзи
-  const gone = await page.evaluate(() => { avatarCache['Старый'] = { icon: '🐲', color: '' };
+  const gone = await page.evaluate(() => { avatarCache['Старый'] = { icon: '🐮', color: '' };
     const el = document.createElement('span'); paintAvatar(el, 'Старый');
     return { text: el.textContent, svg: !!el.querySelector('svg') }; });
-  check('иконка не из набора — эмодзи вместо рисунка', gone.text === '🐲' && !gone.svg, JSON.stringify(gone));
+  check('иконка не из набора — эмодзи вместо рисунка', gone.text === '🐮' && !gone.svg, JSON.stringify(gone));
   // Все иконки, которые можно выбрать, нарисованы
   const drawn = await page.evaluate(() => AVATAR_CHOICES.concat(LEAGUE_REWARDS.filter(r => r.kind === 'icon').map(r => r.value),
     QUEST_ICONS.map(q => q.icon), [TUTORIAL_ICON]).filter(i => !iconArt(i, 0)));
@@ -6961,7 +7001,7 @@ async function testProfile(browser) {
   const byFaceAgain = await page.locator('#avGrid').isVisible();
   check('кружок открывает и закрывает выбор', byFace && !byFaceAgain, byFace + ' ' + byFaceAgain);
 
-  // Выбор иконки: буква и 24 животных, выбранная отмечена
+  // Выбор иконки: буква и 40 иконок, выбранная отмечена
   await page.click('#tAvatarStart');
   await page.waitForTimeout(150);
   const grid = await page.evaluate(() => {
@@ -6969,7 +7009,7 @@ async function testProfile(browser) {
     return { n: tiles.length, first: tiles[0].textContent, firstLetter: tiles[0].classList.contains('letter'),
              sel: tiles.filter(t => t.classList.contains('sel')).map(t => t.dataset.icon) };
   });
-  check('в профиле буква и 24 иконки', grid.n === 25 && grid.firstLetter && grid.first === 'М',
+  check('в профиле буква и 40 иконок', grid.n === 41 && grid.firstLetter && grid.first === 'М',
     JSON.stringify(grid));
   check('выбранная иконка отмечена', grid.sel.join() === '🦊', grid.sel.join());
 
@@ -7002,7 +7042,7 @@ async function testProfile(browser) {
     const tops = new Set([...document.querySelectorAll('#avGrid .av-tile')].map(t => Math.round(t.getBoundingClientRect().top)));
     return { w: r.width, h: r.height, rows: tops.size };
   });
-  check('клетки иконок крупные и сетка ровная 5×5', tile.w >= 44 && tile.h >= 44 && tile.rows === 5,
+  check('клетки иконок крупные, по пять в ряд', tile.w >= 44 && tile.h >= 44 && tile.rows === Math.ceil(41 / 5),
     JSON.stringify(tile));
 
   // Закрыл профиль с раскрытой сеткой — в следующий раз она снова свёрнута
@@ -7365,6 +7405,7 @@ async function testKeyPage(browser) {
     await testAudit(browser);
     await testRedesign(browser);
     await testRunStage(browser);
+    await testBonusGuide(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
