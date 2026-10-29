@@ -2072,3 +2072,102 @@ body.on-game #guessInput, body.on-game #tSubmitGuess { min-height: 56px; }
 .adv-card .btn:disabled { opacity: 0.5; }
 .adv-line { color: var(--gold); font-weight: 800; }
 .adv-line .icon-art { vertical-align: middle; }
+
+/* ---- Выбор кнопками вместо списка ---- */
+select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { all: unset; box-sizing: border-box; min-width: 52px; padding: 11px 14px; border-radius: 14px; text-align: center;
+  font-weight: 900; font-size: 16px; color: var(--text); background: rgb(var(--ink) / 0.10); cursor: pointer;
+  box-shadow: 0 3px 0 var(--depth-soft); transition: transform 0.08s; -webkit-tap-highlight-color: transparent; }
+.chip:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--depth-soft); }
+.chip.on { background: var(--accent); color: #fff; box-shadow: 0 3px 0 var(--accent-depth); }
+/* Диапазон — по три в ряд, попытки и «играем до» — все в одну строку */
+.chips-rangeMax, .chips-chRange { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.chips-attemptsCount, .chips-winsNeeded, .chips-chWins { display: grid; grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); }
+.chips-attemptsCount .chip, .chips-winsNeeded .chip, .chips-chWins .chip { min-width: 0; padding: 11px 2px; }
+.chips-handicap { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.chips-handicap .chip { min-width: 0; padding: 10px 6px; font-size: 14px; line-height: 1.25; }
+/* «Играем до» и «Фора» — друг под другом: кнопкам нужна вся ширина */
+.setup-pair:has(#winsNeeded) { display: block; }
+.setup-pair:has(#winsNeeded) > .setup-field + .setup-field { margin-top: 14px; }
+
+/* ---- Переключатели вместо галочек; пояснение — по «?» ---- */
+.frost-row { align-items: center !important; padding: 12px 14px; border-radius: 16px; background: rgb(var(--ink) / 0.07);
+  margin: 0 0 14px; font-size: 16px; font-weight: 800; cursor: pointer; }
+.frost-row .fr-text { flex: 1; min-width: 0; }
+.frost-row .row-hint { display: none; font-weight: 600; font-size: 13px; margin-top: 4px; }
+.frost-row.show-hint .row-hint { display: block; }
+.frost-row input { order: 3; width: 50px !important; height: 30px !important; border-radius: 15px !important; margin: 0 !important;
+  border: none !important; background: rgb(var(--ink) / 0.2) !important; transition: background 0.2s; }
+.frost-row input::after { content: '' !important; position: absolute; left: 3px !important; top: 3px !important;
+  width: 24px !important; height: 24px !important; border: none !important; border-radius: 50%; background: #fff;
+  transform: none !important; transition: left 0.2s; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); }
+.frost-row input:checked { background: #2bd18f !important; }
+.frost-row input:checked::after { left: 23px !important; }
+.hint-q { all: unset; order: 2; flex: 0 0 26px; height: 26px; border-radius: 50%; text-align: center; line-height: 26px;
+  font-weight: 900; font-size: 14px; color: var(--muted); background: rgb(var(--ink) / 0.12); cursor: pointer; }
+.frost-row.show-hint .hint-q { background: #8ea2ff; color: #fff; }
+/* «Назад» на настройке не нужен: есть «Играть» внизу */
+#screenSetup #tBack { display: none; }
+#screenSetup .setup-row .btn { flex: 1; }
+/* Подписи «Нужен интернет / Без интернета» убраны: значки и цвета и так разводят режимы */
+#screenMode .mode-group { display: none; }
+#screenMode .mode-btn.tile .m-sub { font-size: 12px; margin-top: 2px; }
+
+/* ---- Меню «вид»: градусник, прямая, подсказка, звук ---- */
+.mini-toggle.viz-btn { opacity: 1; }
+.mini-toggle.viz-btn.on { background: #8ea2ff; }
+.viz-panel { position: absolute; top: calc(100% + 8px); right: 8px; z-index: 30; width: min(280px, calc(100vw - 48px));
+  padding: 6px; border-radius: 18px; background: var(--surface); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgb(var(--ink) / 0.12); animation: pop 0.18s ease; }
+.viz-row { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px;
+  border-radius: 12px; cursor: pointer; font-weight: 800; font-size: 15px; color: var(--text); }
+.viz-row:active { background: rgb(var(--ink) / 0.08); }
+.viz-row .vr-ic { font-size: 20px; width: 26px; text-align: center; }
+.viz-row .vr-name { flex: 1; }
+.viz-row .vr-sw { position: relative; flex: 0 0 42px; height: 24px; border-radius: 12px; background: rgb(var(--ink) / 0.2);
+  transition: background 0.2s; }
+.viz-row .vr-sw::after { content: ''; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; transition: left 0.2s; }
+.viz-row.on .vr-sw { background: #2bd18f; }
+.viz-row.on .vr-sw::after { left: 21px; }
+/* Новый рекорд — ярко: это главная радость партии */
+.result-box .r-newrec { display: inline-block; margin: 8px auto 4px; padding: 6px 16px; border-radius: 999px;
+  font-size: 18px; font-weight: 900; color: #3b2300; background: linear-gradient(135deg, #ffe08a, #ffb020);
+  box-shadow: 0 4px 0 #b36b00, 0 0 22px rgba(255, 196, 0, 0.55); }
+.pcard .p-pips { font-size: 14px; font-weight: 900; letter-spacing: 0; opacity: 1; }
+/* История: порядок и так виден, заголовок и номера ходов убраны */
+#tHistoryTitle { display: none; }
+.history-item .h-num { display: none; }
+.history-list { margin-top: 12px; }
+/* Профиль: выбор иконки — по нажатию на сам кружок с карандашом */
+#tAvatarStart { display: none; }
+.pf-warn { all: unset; box-sizing: border-box; display: block; width: 100%; margin: 0 0 10px; padding: 10px 14px; border-radius: 14px;
+  background: rgba(255, 194, 51, 0.16); border: 2px solid rgba(255, 194, 51, 0.55); color: #ffd166;
+  font-size: 14px; font-weight: 800; line-height: 1.35; text-align: left; cursor: pointer; }
+.pf-warn::after { content: ' ›'; }
+/* Онлайн: разновидности — одной строкой-переключателем; диапазон — у выбранной */
+#screenOnline #rkModes { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px;
+  border-radius: 16px; background: rgb(var(--ink) / 0.08); margin: 0 0 6px; }
+#screenOnline #rkModes .rk-mode { border: none; box-shadow: none; background: transparent; padding: 8px 2px; border-radius: 12px; }
+#screenOnline #rkModes .rm-name { font-size: 12px; white-space: normal; line-height: 1.2; color: var(--muted); }
+#screenOnline #rkModes .rm-range { display: none; }
+#screenOnline #rkModes .rk-mode.active { background: var(--accent); box-shadow: 0 3px 0 var(--accent-depth); }
+#screenOnline #rkModes .rk-mode.active .rm-name { color: #fff; }
+#screenOnline #rkModes .rk-mode.active .rm-range { display: block; color: #fff; opacity: 0.85; font-size: 11px; }
+
+/* ---- Мягкие анимации ---- */
+@keyframes screenIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes itemIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
+#screenMode:not(.hidden), #screenSetup:not(.hidden), #screenAdventure:not(.hidden), #screenOnline:not(.hidden),
+#screenFriends:not(.hidden), #screenRunHub:not(.hidden) { animation: screenIn 0.25s ease-out; }
+.history-list .history-item:first-child { animation: itemIn 0.3s ease-out; }
+.mode-btn, .chip, .adv-tile, .tab { transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s; }
+.mode-btn:active, .adv-tile:active { transform: scale(0.96); }
+.tab:active .tab-ic { transform: scale(0.88); }
+.tab .tab-ic { transition: transform 0.12s; }
+.modal-card { animation: pop 0.22s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  #screenMode, #screenSetup, #screenAdventure, #screenOnline, #screenFriends, #screenRunHub,
+  .history-list .history-item:first-child, .modal-card { animation: none !important; }
+}

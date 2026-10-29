@@ -355,6 +355,12 @@ function openLogoutModal() {
   document.getElementById('logoutModal').classList.remove('hidden');
 }
 
+function openPinFromWarn() {
+  document.getElementById('pfEditFold').open = true;
+  openPinChange(true);
+  document.getElementById('pinBox').scrollIntoView({ block: 'center' });
+}
+
 function showAvatarPicker(show) {
   document.getElementById('avGrid').classList.toggle('hidden', !show);
 }
@@ -1420,6 +1426,7 @@ function openChallenge(name) {
   renderChallengeBonuses();
   document.getElementById('challengeTitle').textContent =
     t().online.chTitle.replace('{name}', name);
+  refreshChips();
   box.classList.remove('hidden');
   // Окно вызова стоит над списком: друг мог быть внизу, прокручиваем к окну
   if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -1754,6 +1761,11 @@ function renderModeInfo() {
   const lg = runAuth() && ladderInfo;
   on.textContent = lg ? [leagueLabel(ladderInfo.stars), starsLine(ladderInfo.stars)].filter(Boolean).join(' · ') : '';
   on.classList.toggle('hidden', locked || !lg);
+  // Приключение: сколько соперников из 50 уже обыграно
+  const ad = document.getElementById('tAdvInfo');
+  const done = typeof advDone === 'function' ? advDone() : 0;
+  ad.textContent = done + '/' + ADV_TOTAL;
+  ad.classList.toggle('hidden', done === 0);
 }
 
 function openLessonGate() {

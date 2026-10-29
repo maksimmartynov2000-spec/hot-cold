@@ -142,8 +142,34 @@ let distanceHint = localStorage.getItem('hc_hint') !== '0';
 let showThermo = localStorage.getItem('hc_show_thermo') !== '0';
 let showLine = localStorage.getItem('hc_show_line') !== '0';
 
+function toggleVizPanel(e) {
+  if (e) e.stopPropagation();
+  const p = document.getElementById('vizPanel');
+  if (p.classList.contains('hidden')) openVizPanel(); else closeVizPanel();
+}
+function openVizPanel() {
+  renderVizToggles();
+  document.getElementById('vizPanel').classList.remove('hidden');
+  document.getElementById('vizBtn').classList.add('on');
+}
+function closeVizPanel() {
+  const p = document.getElementById('vizPanel');
+  if (!p) return;
+  p.classList.add('hidden');
+  document.getElementById('vizBtn').classList.remove('on');
+}
+// Нажатие мимо меню закрывает его
+document.addEventListener('click', () => closeVizPanel());
+
 function renderVizToggles() {
   const L = t();
+  document.getElementById('tVizThermo').textContent = L.vizThermo;
+  document.getElementById('tVizLine').textContent = L.vizLine;
+  document.getElementById('tVizHint').textContent = L.hintLabel;
+  document.getElementById('tVizSound').textContent = L.run.sound;
+  const snd = document.getElementById('vizSound');
+  snd.classList.toggle('on', soundOn);
+  snd.querySelector('.vr-ic').textContent = soundOn ? '🔊' : '🔇';
   [['toggleThermoBtn', showThermo, L.vizThermo], ['toggleLineBtn', showLine, L.vizLine],
    ['toggleHintBtn', distanceHint, L.hintLabel]]
     .forEach(([id, on, title]) => {
@@ -160,21 +186,18 @@ function toggleThermo() {
   showThermo = !showThermo;
   try { localStorage.setItem('hc_show_thermo', showThermo ? '1' : '0'); } catch (e) {}
   renderAll();
-  firstTimeTip('thermo', 'toggleThermoBtn', '🌡️', showThermo);
 }
 
 function toggleLine() {
   showLine = !showLine;
   try { localStorage.setItem('hc_show_line', showLine ? '1' : '0'); } catch (e) {}
   renderAll();
-  firstTimeTip('line', 'toggleLineBtn', '📏', showLine);
 }
 
 function toggleHint() {
   distanceHint = !distanceHint;
   try { localStorage.setItem('hc_hint', distanceHint ? '1' : '0'); } catch (e) {}
   renderAll();
-  firstTimeTip('hint', 'toggleHintBtn', '💡', distanceHint);
 }
 
 // Значок без подписи понятен, только когда уже знаешь, что он делает. Поэтому
@@ -450,8 +473,8 @@ function applyTranslations() {
   document.getElementById('tSoundLabel').textContent = L.run.sound;
   document.getElementById('tLblBot').textContent = L.lblBot;
   // У каждого экрана своё название — с тем же значком, что в меню
-  document.getElementById('tSetupScreen').textContent =
-    mode === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo;
+  setTitle('tSetupScreen',
+    mode === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo);
 
   document.getElementById('tLblP1').textContent = L.lblP1;
   document.getElementById('tLblP2').textContent = L.lblP2;
@@ -474,7 +497,7 @@ function applyTranslations() {
   document.getElementById('tBonusHint').textContent = L.bonusHint;
   document.getElementById('bonusSetup').checked = bonusMode;
   document.getElementById('tLblBonusCount').textContent = L.lblBonusCount;
-  document.getElementById('tBonusGuide').textContent = L.bgLink;
+  document.getElementById('tBonusGuide').title = L.bgLink;
   buildBonusCountOptions();
   renderBonusSetup();
   document.getElementById('tFrostRun').textContent = L.frostLabel;
@@ -482,7 +505,7 @@ function applyTranslations() {
 
   // экраны режима на рейтинг
   document.getElementById('tModeRun').textContent = L.run.mode;
-  document.getElementById('tRunScreen').textContent = '🏆 ' + L.run.mode;
+  setTitle('tRunScreen', '🏆 ' + L.run.mode);
   document.getElementById('tGroupOffline').textContent = L.groupOffline;
   document.getElementById('tGroupOnline').textContent = L.groupOnline;
   document.getElementById('tModeOnline').textContent = L.online.mode;
@@ -495,7 +518,7 @@ function applyTranslations() {
   document.getElementById('tOnlineBack').textContent = L.online.back;
   document.getElementById('tGamesTitle').textContent = L.online.games;
   document.getElementById('tFriendsBack').textContent = L.online.back;
-  document.getElementById('tFriendsScreen').textContent = L.online.menuFriends;
+  setTitle('tFriendsScreen', L.online.menuFriends);
   document.getElementById('tInviteBtn').textContent = L.inv.invBtn;
   document.getElementById('tDeleteAccount').textContent = L.online.deleteAccount;
   document.getElementById('tChatInvite').textContent = L.online.chatInvite;
@@ -508,7 +531,7 @@ function applyTranslations() {
   document.getElementById('tRkPlay').textContent = L.online.rkPlay;
   document.getElementById('tRkCancel').textContent = L.online.rkCancel;
   document.getElementById('tRkTop').textContent = L.online.rkTop;
-  document.getElementById('tOnlineScreen').textContent = '🌐 ' + L.online.mode;
+  setTitle('tOnlineScreen', '🌐 ' + L.online.mode);
   document.getElementById('tRkGames').textContent = L.online.rkGames;
   document.getElementById('tChRange').textContent = L.online.chRange;
   document.getElementById('tChFrost').textContent = L.frostLabel;
@@ -592,9 +615,10 @@ function showScreen(name) {
   document.getElementById('friendsBtn').classList.toggle('on', name === 'friends' || name === 'chat');
   updateAccountChip();
   // Вернулся в меню — задания могли продвинуться: партия или Испытание
-  if (name === 'mode') { loadProgress(); loadLadder().then(renderModeInfo); }
+  if (name === 'mode') { renderModeInfo(); loadProgress(); loadLadder().then(renderModeInfo); }
   // Ушёл с доски — праздник звёзд и салют закрываются: они про только что сыгранную партию
   if (name !== 'game') {
+    closeVizPanel();
     closeStarsShowNow();
     document.querySelectorAll('.confetti').forEach(el => el.remove());
   }
@@ -672,13 +696,65 @@ function openSetup(m, bot) {
   document.getElementById('namesPair').classList.toggle('hidden', setupBot);
   document.getElementById('handicapField').classList.toggle('hidden', setupBot);
   document.getElementById('tStartMatch').textContent = (m === 'duel') ? L.startMatch : L.startGame;
-  document.getElementById('tSetupScreen').textContent =
-    setupBot ? '🤖 ' + L.modeBot : m === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo;
+  setTitle('tSetupScreen',
+    setupBot ? '🤖 ' + L.modeBot : m === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo);
   buildRangeOptions();
   if (m === 'duel') buildHandicapOptions();
   if (setupBot) renderBotPick();
   renderBonusSetup();
+  refreshChips();
   showScreen('setup');
+}
+
+// Выбор из короткого списка — кнопками в ряд, а не системным колесом iPhone:
+// всё видно сразу, нажал — выбрал. Сам <select> остаётся (его читает и
+// пишет остальной код), просто спрятан: кнопки рисуются по его вариантам и
+// перерисовываются, когда варианты или значение меняются
+const CHIP_SELECTS = ['rangeMax', 'attemptsCount', 'winsNeeded', 'handicap', 'chRange', 'chWins'];
+function renderChips(sel) {
+  const box = sel.nextElementSibling;
+  if (!box || !box.classList.contains('chips')) return;
+  box.replaceChildren(...[...sel.options].map(o => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip' + (o.value === sel.value ? ' on' : '');
+    b.dataset.value = o.value;
+    b.textContent = o.textContent;
+    b.onclick = () => {
+      if (sel.value === o.value) return;
+      sel.value = o.value;
+      sel.dispatchEvent(new Event('change'));
+      renderChips(sel);
+    };
+    return b;
+  }));
+}
+function initChips() {
+  CHIP_SELECTS.forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel || sel.classList.contains('chipped')) return;
+    sel.classList.add('chipped');
+    const box = document.createElement('div');
+    box.className = 'chips chips-' + id;
+    sel.after(box);
+    sel.addEventListener('change', () => renderChips(sel));
+    // Варианты пересобираются (сменился диапазон, имена для форы) — и кнопки за ними
+    new MutationObserver(() => renderChips(sel)).observe(sel, { childList: true });
+    renderChips(sel);
+  });
+}
+function refreshChips() {
+  CHIP_SELECTS.forEach(id => { const sel = document.getElementById(id); if (sel) renderChips(sel); });
+}
+
+// Заголовок экрана — значок рисунком, как на главном, а не эмодзи
+const TITLE_ART = { '🎯': 'm-solo', '🤝': 'm-duel', '🤖': 'm-adventure', '🏆': 'm-run', '🌐': 'm-online', '👥': 'm-friends' };
+function setTitle(id, text) {
+  const el = document.getElementById(id);
+  const sp = text.indexOf(' ');
+  const em = sp > 0 ? text.slice(0, sp) : '';
+  el.innerHTML = TITLE_ART[em] ? artSpan('icons/' + TITLE_ART[em] + '.webp', em) + escapeHtml(text.slice(sp))
+                               : escapeHtml(text);
 }
 
 function buildRangeOptions() {
@@ -1869,7 +1945,7 @@ function renderResult() {
 
     if (gameOverType === 'win' && lastWinIsRecord) {
       const rec = document.createElement('div');
-      rec.className = 'r-secret r-newrec r-pop';
+      rec.className = 'r-newrec r-pop';
       rec.textContent = L.newRecord;
       box.appendChild(rec);
     }
@@ -1918,10 +1994,9 @@ function renderPlayers() {
       : '<span class="p-dot" style="background:' + P_COLORS[p] + ';color:' + P_COLORS[p] + '"></span>';
     nameEl.innerHTML = mark + escapeHtml(D.names[p]);
 
-    let pips = '';
-    for (let i = 0; i < D.winsNeeded; i++) pips += (i < D.wins[p] ? '●' : '○');
+    // Счёт побед — числом «1/3» с кубком: кружочки ○○○ читались как непонятный узор
     const pipsEl = document.getElementById('ppips' + p);
-    pipsEl.textContent = pips;
+    pipsEl.textContent = '🏆 ' + D.wins[p] + '/' + D.winsNeeded;
     pipsEl.style.color = P_COLORS[p];
 
     const btn = document.getElementById('ptoken' + p);
@@ -3477,6 +3552,7 @@ function toggleSound() {
   soundOn = !soundOn;
   try { localStorage.setItem('hc_sound', soundOn ? '1' : '0'); } catch (e) {}
   renderSoundBtn();
+  renderVizToggles();
   if (soundOn) playTone(660, 0.12);
 }
 

@@ -85,6 +85,7 @@
         <span class="m-icon">🤖</span>
         <span class="m-text">
           <span class="m-title" id="tModeBot">Play the bot</span>
+          <span class="m-sub hidden" id="tAdvInfo"></span>
         </span>
       </button>
       <!-- Задания дня — только у вошедшего: засчитывает их база.
@@ -123,6 +124,7 @@
     <label class="frost-row">
       <input type="checkbox" id="frostSetup" onchange="setFrostMode(this.checked)" />
       <span class="fr-text"><span id="tFrostSetup"></span><small class="row-hint" id="tFrostHint"></small></span>
+      <button type="button" class="hint-q" onclick="event.preventDefault(); this.closest('.frost-row').classList.toggle('show-hint')" aria-label="?">?</button>
     </label>
 
     <div class="setup-field" id="attemptsField">
@@ -139,8 +141,9 @@
       <label class="frost-row">
         <input type="checkbox" id="bonusSetup" onchange="setBonusMode(this.checked)" />
         <span class="fr-text"><span id="tBonusSetup"></span><small class="row-hint" id="tBonusHint"></small></span>
+        <!-- «?» у бонусов — сразу список: что каждый делает -->
+        <button type="button" class="hint-q" id="tBonusGuide" onclick="event.preventDefault(); openBonusGuide()" aria-label="?">?</button>
       </label>
-      <button class="link-btn" id="tBonusGuide" onclick="openBonusGuide()"></button>
 
       <div class="setup-field hidden" id="bonusCountField">
         <label id="tLblBonusCount">Bonuses</label>
@@ -176,6 +179,7 @@
       </div>
     </div>
 
+    <!-- «Назад» — нижнее меню «Играть»; здесь только «Начать» на всю ширину -->
     <div class="setup-row">
       <button class="btn-ghost" onclick="showScreen('mode')" id="tBack">Back</button>
       <button class="btn btn-block" onclick="startFromSetup()" id="tStartMatch">Start match</button>
@@ -208,15 +212,21 @@
           <span class="confirmed" id="tConfirmed"></span>
           <span class="attempts" id="attemptsLabel"></span>
           <span class="bar-actions">
-            <button class="mini-toggle" id="toggleThermoBtn" onclick="toggleThermo()">🌡️</button>
-            <button class="mini-toggle" id="toggleLineBtn" onclick="toggleLine()">📏</button>
-            <button class="mini-toggle" id="toggleHintBtn" onclick="toggleHint()">💡</button>
+            <!-- Градусник, прямая, подсказка и звук — в одном меню «вид»: три
+                 значка подряд были непонятны, а нужны редко -->
+            <button class="mini-toggle viz-btn" id="vizBtn" onclick="toggleVizPanel(event)" aria-haspopup="true">👁️</button>
             <button class="mini-toggle hidden" id="sayBtn" onclick="toggleSayPad()">💬</button>
             <button class="btn-reset" onclick="leaveGame()" id="tMenu">Menu</button>
           </span>
           <!-- Что сделала кнопка-значок. Показывается при первом нажатии на
                каждую: без подписи 🌡️ 📏 💡 непонятны, а место под слова нет -->
           <div class="bar-tip hidden" id="barTip" role="status"></div>
+          <div class="viz-panel hidden" id="vizPanel" onclick="event.stopPropagation()">
+            <button class="viz-row" id="toggleThermoBtn" onclick="toggleThermo()"><span class="vr-ic">🌡️</span><span class="vr-name" id="tVizThermo"></span><span class="vr-sw"></span></button>
+            <button class="viz-row" id="toggleLineBtn" onclick="toggleLine()"><span class="vr-ic">📏</span><span class="vr-name" id="tVizLine"></span><span class="vr-sw"></span></button>
+            <button class="viz-row" id="toggleHintBtn" onclick="toggleHint()"><span class="vr-ic">💡</span><span class="vr-name" id="tVizHint"></span><span class="vr-sw"></span></button>
+            <button class="viz-row" id="vizSound" onclick="toggleSound()"><span class="vr-ic">🔊</span><span class="vr-name" id="tVizSound"></span><span class="vr-sw"></span></button>
+          </div>
           <!-- Сколько попыток потрачено — полосой: её видно краем глаза -->
           <div class="att-bar hidden" id="attBar"><span id="attFill"></span></div>
         </div>
@@ -527,6 +537,7 @@
     <label class="frost-row">
       <input type="checkbox" id="frostRun" onchange="setFrostMode(this.checked)" />
       <span class="fr-text"><span id="tFrostRun"></span><small class="row-hint" id="tFrostRunHint"></small></span>
+      <button type="button" class="hint-q" onclick="event.preventDefault(); this.closest('.frost-row').classList.toggle('show-hint')" aria-label="?">?</button>
     </label>
     <button class="btn btn-block" id="tRunStart" onclick="startRun()"></button>
     <div class="lb-wrap">
@@ -644,7 +655,8 @@
               onclick="togglePush()"></button>
       <div class="fr-note hidden" id="pushNote"></div>
 
-      <div class="fr-note hidden" id="pfPinShort" style="margin-bottom:8px"></div>
+      <!-- Короткий PIN — плашка-кнопка: нажал, и сразу открылась смена PIN -->
+      <button class="pf-warn hidden" id="pfPinShort" onclick="openPinFromWarn()"></button>
       <!-- PIN, имя и их смена — под одной строкой: заходят сюда редко,
            а «Показать PIN» дети ищут именно рядом со словом PIN -->
       <details class="fold pf-fold" id="pfEditFold">
@@ -709,21 +721,21 @@
         </details>
         <button class="btn-ghost btn-block" id="tTutReplay"
                 onclick="closeLogoutModal(); startLesson(1)"></button>
+        <!-- «Выйти» — здесь, а не рядом с «Готово»: туда легко попасть случайно -->
+        <div id="pfLogout">
+          <button class="btn-ghost btn-block" id="tLogoutStart" style="margin-top:14px"
+                  onclick="askLogout(true)"></button>
+          <div class="pf-confirm hidden" id="logoutConfirmBox">
+            <div class="modal-text" id="tLogoutAsk"></div>
+            <div class="setup-row">
+              <button class="btn-ghost btn-block" id="tLogoutCancel" onclick="askLogout(false)"></button>
+              <button class="btn btn-block" id="tLogoutConfirm" onclick="confirmLogout()"></button>
+            </div>
+          </div>
+        </div>
         <button class="link-danger danger" id="tDeleteAccount" onclick="openDeleteModal()"></button>
       </div>
     </details>
-
-    <div id="pfLogout">
-      <button class="btn-ghost btn-block" id="tLogoutStart" style="margin-top:14px"
-              onclick="askLogout(true)"></button>
-      <div class="pf-confirm hidden" id="logoutConfirmBox">
-        <div class="modal-text" id="tLogoutAsk"></div>
-        <div class="setup-row">
-          <button class="btn-ghost btn-block" id="tLogoutCancel" onclick="askLogout(false)"></button>
-          <button class="btn btn-block" id="tLogoutConfirm" onclick="confirmLogout()"></button>
-        </div>
-      </div>
-    </div>
 
     <button class="btn btn-block" id="tProfileDone" style="margin-top:14px"
             onclick="closeLogoutModal()"></button>
