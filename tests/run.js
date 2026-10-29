@@ -4723,7 +4723,7 @@ async function testBots(browser) {
 
   // ---- Игра с ботом без интернета
   page = await newGame(browser);
-  await page.click('.mode-btn.bot');
+  await page.evaluate(() => openSetup('duel', true));
   await page.waitForTimeout(150);
   const setup = await page.evaluate(() => ({
     title: document.getElementById('tSetupScreen').textContent,
@@ -5266,7 +5266,7 @@ async function testQuitConfirm(browser) {
   check('дуэль сыграна: ☰ выходит сразу', s.menu && !s.modal, JSON.stringify(s));
 
   // С ботом: вопрос тот же, после выхода бот не ходит
-  await page.click('.mode-btn.bot');
+  await page.evaluate(() => openSetup('duel', true));
   await page.waitForTimeout(150);
   await page.selectOption('#rangeMax', '100');
   await page.evaluate(() => { BOT_SPEED = 0; });
@@ -5295,7 +5295,7 @@ async function testQuitConfirm(browser) {
 async function testFogWholeRound(browser) {
   console.log('\nПомехи с ботом — весь раунд');
   const page = await newGame(browser);
-  await page.click('.mode-btn.bot');
+  await page.evaluate(() => openSetup('duel', true));
   await page.waitForTimeout(150);
   await page.selectOption('#rangeMax', '100');
   await page.evaluate(() => { BOT_SPEED = 1000; });   // бот сам не ходит: его ходы делает тест
@@ -5785,7 +5785,7 @@ async function testCurtain(browser) {
 
   // С ботом и онлайн шторки не бывает: экран у каждого свой
   const p2 = await newGame(browser);
-  await p2.click('.mode-btn.bot');
+  await p2.evaluate(() => openSetup('duel', true));
   await p2.waitForTimeout(150);
   await p2.evaluate(() => { BOT_SPEED = 1000; });
   await p2.click('#tStartMatch');
@@ -6487,6 +6487,127 @@ async function testBonusGuide(browser) {
   await done(page);
 }
 
+// Приключение: карта из 50 соперников, особенности, сложность, прогресс,
+// иконки боссов
+async function testAdventure(browser) {
+  console.log('\nПриключение');
+  let page = await newGame(browser, { user: 'Максим' });
+  check('плитка в меню называется «Приключение»', (await page.locator('#tModeBot').textContent()) === 'Приключение');
+  await page.click('.mode-btn.bot');
+  await page.waitForTimeout(300);
+  const map = await page.evaluate(() => ({
+    shown: !document.getElementById('screenAdventure').classList.contains('hidden'),
+    worlds: document.querySelectorAll('#advMap .adv-world').length,
+    tiles: document.querySelectorAll('#advMap .adv-tile').length,
+    next: [...document.querySelectorAll('#advMap .adv-tile.next')].map(e => +e.dataset.n),
+    locked: document.querySelectorAll('#advMap .adv-tile.locked').length,
+    bosses: [...document.querySelectorAll('#advMap .adv-tile.boss')].map(e => +e.dataset.n),
+    art: document.querySelectorAll('#advMap .adv-tile svg.icon-art').length,
+    diff: (document.querySelector('#advDiff .ad-btn.on') || {}).dataset.diff }));
+  check('карта: 5 миров по 10 соперников, у каждого портрет', map.shown && map.worlds === 5 && map.tiles === 50 && map.art === 50,
+    JSON.stringify(map));
+  check('открыт только первый, остальные под замком', map.next.join() === '0' && map.locked === 49, JSON.stringify(map));
+  check('десятый в каждом мире — босс', map.bosses.join() === '9,19,29,39,49', map.bosses.join());
+  check('сложность по умолчанию — нормальная', map.diff === 'normal');
+
+  // Закрытый соперник: карточка есть, а в бой нельзя
+  await page.click('.adv-tile[data-n="5"]');
+  await page.waitForTimeout(150);
+  check('закрытого — посмотреть можно, сыграть нельзя', await page.locator('#acGo').isDisabled() &&
+    /Сначала обыграйте/.test(await page.locator('#acGo').textContent()));
+  await page.click('#acBack');
+
+  // Первый — карточка и партия
+  await page.click('.adv-tile[data-n="0"]');
+  await page.waitForTimeout(150);
+  const card = await page.evaluate(() => ({ name: document.getElementById('acName').textContent,
+    quirk: document.getElementById('acQuirk').textContent, facts: document.getElementById('acFacts').textContent }));
+  check('карточка: имя, особенность, числа', card.name === 'Ёжик Яблочко' && /Простак/.test(card.quirk) &&
+    /от 1 до 20/.test(card.facts), JSON.stringify(card));
+  await page.evaluate(() => { BOT_SPEED = 1000; });
+  await page.click('#acGo');
+  await page.waitForTimeout(300);
+  const game = await page.evaluate(() => ({ adv: vsBot && vsBot.adv && vsBot.adv.n, name: D.names[1], max: RANGE_MAX,
+    wins: D.winsNeeded, art: !!document.querySelector('#pname1 .p-bot svg.icon-art') }));
+  check('партия с Ёжиком: числа до 20, до одной победы, портрет у плашки',
+    game.adv === 0 && game.name === 'Ёжик Яблочко' && game.max === 20 && game.wins === 1 && game.art, JSON.stringify(game));
+  await page.evaluate(() => { stopBot(); D.cur = 0; duelPlay(secret); });
+  await page.waitForTimeout(300);
+  const won = await page.evaluate(() => ({ done: advDone(), server: window.__adventure,
+    btn: (document.querySelector('#resultBox .r-actions .btn') || {}).textContent }));
+  check('победа: прогресс записан и в телефоне, и в базе', won.done === 1 && won.server === 1, JSON.stringify(won));
+  check('после победы — «Дальше: следующий»', won.btn === 'Дальше: Белка Жёлудь →', won.btn);
+  await page.click('#resultBox .r-actions .btn');
+  await page.waitForTimeout(300);
+  check('«Дальше» — карта и карточка следующего', await page.locator('#screenAdventure').isVisible() &&
+    (await page.locator('#acName').textContent()) === 'Белка Жёлудь' && !(await page.locator('#acGo').isDisabled()));
+  await page.click('#acBack');
+
+  // Сложность влияет на силу и запоминается
+  await page.click('.ad-btn[data-diff="hard"]');
+  check('сложность запоминается', await page.evaluate(() => localStorage.getItem('hc_adv_diff')) === 'hard');
+  const lv = await page.evaluate(() => [advLevel(advChar(3), 'easy'), advLevel(advChar(3), 'normal'), advLevel(advChar(3), 'hard')]);
+  check('легко < нормально < трудно', lv[0] < lv[1] && lv[1] < lv[2], lv.join(' '));
+  const grow = await page.evaluate(() => [0, 10, 20, 30, 40].map(n => advLevel(advChar(n), 'normal')));
+  check('от мира к миру соперники сильнее', grow.every((v, i) => !i || v > grow[i - 1]), grow.join(' '));
+
+  // Особенности: у каждого мира все девять, у босса — две победы
+  const quirks = await page.evaluate(() => [0, 1, 2, 3, 4].map(w =>
+    [...new Set(Array.from({ length: 9 }, (_, i) => advChar(w * 10 + i).quirk))].length));
+  check('в каждом мире все девять особенностей', quirks.every(n => n === 9), quirks.join());
+
+  // Босс первого мира: до двух побед, за него — иконка 🧙
+  await page.evaluate(() => { localStorage.setItem(advKey(), '9'); renderAdventure(); });
+  await page.click('.adv-tile[data-n="9"]');
+  await page.waitForTimeout(150);
+  await page.evaluate(() => { BOT_SPEED = 1000; });
+  await page.click('#acGo');
+  await page.waitForTimeout(300);
+  check('с боссом — до двух побед', await page.evaluate(() => D.winsNeeded === 2));
+  await page.evaluate(() => { stopBot(); D.cur = 0; duelPlay(secret); });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { nextRound(); stopBot(); D.cur = 0; duelPlay(secret); });
+  await page.waitForTimeout(300);
+  const boss = await page.evaluate(() => ({ done: advDone(), line: (document.querySelector('#resultBox .adv-line') || {}).textContent }));
+  check('мир пройден — сказано, что новая иконка в профиле', boss.done === 10 && /Волшебный лес/.test(boss.line || ''), JSON.stringify(boss));
+  await page.evaluate(() => quitToMenu());
+  await page.waitForTimeout(200);
+  check('выход из партии Приключения — на карту', await page.locator('#screenAdventure').isVisible());
+  await page.click('#accountChip');
+  await page.waitForTimeout(400);
+  await page.click('#tAvatarStart');
+  await page.waitForTimeout(150);
+  const icons = await page.evaluate(() => ['🧙', '🦍'].map(i => {
+    const el = document.querySelector('#avGrid .av-tile[data-icon="' + i + '"]');
+    return el ? (el.classList.contains('locked') ? 'locked' : 'open') : 'none'; }));
+  check('в выборе иконки: 🧙 открыт, 🦍 ещё закрыт', icons.join() === 'open,locked', icons.join());
+  await page.click('.av-tile[data-icon="🦍"]');
+  await page.waitForTimeout(150);
+  check('закрытая иконка босса — где откроется', /Джунгли/.test(await page.locator('#avNote').textContent()));
+  await done(page);
+
+  // Переводы: у всех 50 имена, у всех особенностей описания, на всех языках
+  page = await newGame(browser);
+  const tr = await page.evaluate(() => ['ru', 'en', 'fr', 'de'].map(l => {
+    const A = i18n[l].adv;
+    const bad = [];
+    if (!A || A.names.length !== 50 || A.names.some(n => !n)) bad.push('names');
+    if (A.worlds.length !== 5) bad.push('worlds');
+    ['plain', 'fast', 'forget', 'first', 'gambler', 'tokens', 'slow', 'bonus', 'frost', 'boss']
+      .forEach(q => { if (!A.quirks[q] || !A.quirks[q][0] || !A.quirks[q][1]) bad.push(q); });
+    return l + ':' + (bad.join(',') || 'ok');
+  }));
+  check('Приключение переведено на 4 языка', tr.every(x => /:ok$/.test(x)), tr.join(' '));
+  // На узком телефоне и на немецком карта и карточка не вылезают за экран
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.evaluate(() => { currentLang = 'de'; applyTranslations(); openAdventure(); openAdvCard(0); });
+  await page.waitForTimeout(300);
+  const fit = await page.evaluate(() => ({ over: document.documentElement.scrollWidth - innerWidth,
+    card: document.querySelector('.adv-card').getBoundingClientRect().right <= innerWidth }));
+  check('360px, немецкий: без горизонтальной прокрутки', fit.over <= 0 && fit.card, JSON.stringify(fit));
+  await done(page);
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -6604,7 +6725,7 @@ async function testAudit(browser) {
 
   // Боты нарисованы, как иконки игроков; в имени — без эмодзи зверя
   page = await newGame(browser);
-  await page.click('#tModeBot');
+  await page.evaluate(() => openSetup('duel', true));
   await page.waitForTimeout(200);
   const bots = await page.evaluate(() => ({
     drawn: document.querySelectorAll('#botPick .bt-icon svg.icon-art').length,
@@ -6922,7 +7043,7 @@ async function testPolish(browser) {
 
   // С ботом: салют только за свою победу
   page = await newGame(browser);
-  await page.click('.mode-btn.bot');
+  await page.evaluate(() => openSetup('duel', true));
   await page.waitForTimeout(150);
   await page.selectOption('#rangeMax', '100');
   await page.evaluate(() => { BOT_SPEED = 1000; });
@@ -7406,6 +7527,7 @@ async function testKeyPage(browser) {
     await testRedesign(browser);
     await testRunStage(browser);
     await testBonusGuide(browser);
+    await testAdventure(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

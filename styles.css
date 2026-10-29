@@ -1846,7 +1846,7 @@ body.on-game .tabbar { display: none; }
 .mode-btn.tile { flex-direction: column; justify-content: center; text-align: center; gap: 8px; padding: 16px 4px 14px; }
 .mode-btn.tile .m-icon { width: 56px; height: 56px; font-size: 32px; }
 .mode-btn.tile .m-text { align-items: center; }
-.mode-btn.tile .m-title { font-size: 15px; line-height: 1.15; margin: 0; overflow-wrap: anywhere; }
+.mode-btn.tile .m-title { font-size: clamp(12px, 3.4vw, 15px); line-height: 1.15; margin: 0; }
 
 /* Задания: строка со счётом и полосой, по нажатию — сами задания */
 .quest-card { border-radius: 22px; border: 2px solid rgba(255, 194, 51, 0.5); cursor: pointer;
@@ -1998,3 +1998,77 @@ body.on-game #guessInput, body.on-game #tSubmitGuess { min-height: 56px; }
 .bonus-guide .bg-txt b { font-size: 15px; }
 .bonus-line { cursor: pointer; }
 .p-effects { cursor: pointer; }
+
+/* Эмодзи в тексте — рисунком: сам эмодзи внутри, но невидим */
+.em-art { display: inline-block; width: 1.25em; height: 1.25em; vertical-align: -0.28em; line-height: 1.25em;
+  background: center / contain no-repeat; text-align: center; overflow: hidden; }
+.em-art > span { opacity: 0; }
+.ss-seg .em-art { width: 24px; height: 24px; }
+.bg-ic .em-art, .bc-icon .em-art { width: 100%; height: 100%; }
+.bc-icon .em-art { width: 64px; height: 64px; }
+/* Значки режимов и меню — рисунками */
+.mode-btn .m-icon { background-position: center; background-repeat: no-repeat; background-size: 86%; }
+.mode-btn.solo .m-icon, .mode-btn.duel .m-icon, .mode-btn.bot .m-icon, .mode-btn.run .m-icon,
+.mode-btn.online .m-icon, .mode-btn.tut .m-icon { font-size: 0; }
+.mode-btn.solo .m-icon { background-image: url(icons/m-solo.webp); }
+.mode-btn.duel .m-icon { background-image: url(icons/m-duel.webp); }
+.mode-btn.bot .m-icon { background-image: url(icons/m-adventure.webp); }
+.mode-btn.run .m-icon { background-image: url(icons/m-run.webp); }
+.mode-btn.online .m-icon { background-image: url(icons/m-online.webp); }
+.mode-btn.tut .m-icon { background-image: url(icons/1f393.webp); }
+#navPlay .tab-ic, #friendsBtn .tab-ic { width: 30px; font-size: 0; background: center / contain no-repeat; }
+#navPlay .tab-ic { background-image: url(icons/m-play.webp); }
+#friendsBtn .tab-ic { background-image: url(icons/m-friends.webp); }
+#accountFace.guest { background: none !important; border: none; }
+#accountFace.guest #accountChipName { font-size: 0; width: 100%; height: 100%;
+  background: url(icons/m-settings.webp) center / contain no-repeat; }
+
+/* ================= ПРИКЛЮЧЕНИЕ ================= */
+.adv-hint { font-size: 14px; color: var(--muted); margin: -4px 0 12px; line-height: 1.4; }
+.adv-diff { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 4px; border-radius: 16px;
+  background: rgb(var(--ink) / 0.08); }
+.ad-btn { all: unset; text-align: center; padding: 10px 4px; border-radius: 12px; font-weight: 900; font-size: 15px;
+  color: var(--muted); cursor: pointer; }
+.ad-btn.on { background: var(--accent); color: #fff; box-shadow: 0 3px 0 var(--accent-depth); }
+.adv-diff-hint { font-size: 13px; color: var(--muted); text-align: center; margin: 6px 0 14px; }
+.adv-world { margin-bottom: 16px; padding: 12px; border-radius: 22px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--wc) 22%, transparent), rgb(var(--ink) / 0.04));
+  border: 2px solid color-mix(in srgb, var(--wc) 55%, transparent); }
+.adv-world.locked { opacity: 0.55; }
+.aw-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.aw-name { font-size: 18px; font-weight: 900; }
+.aw-count { margin-left: auto; font-size: 14px; font-weight: 800; color: var(--muted); }
+.aw-reward { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: rgb(var(--ink) / 0.1); filter: grayscale(1) opacity(0.6); }
+.aw-reward.got { filter: none; background: color-mix(in srgb, var(--wc) 40%, transparent); box-shadow: 0 0 12px var(--wc); }
+.aw-reward .icon-art { width: 30px; height: 30px; }
+.aw-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.adv-tile { all: unset; position: relative; aspect-ratio: 1; border-radius: 50%; cursor: pointer;
+  background: color-mix(in srgb, var(--wc) 45%, #1d1650); box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3); }
+.adv-tile .icon-art { display: block; width: 100%; height: 100%; }
+.adv-tile.locked .icon-art { filter: grayscale(1) brightness(0.6); }
+.adv-tile.next { box-shadow: 0 0 0 3px #fff, 0 0 18px var(--wc); }
+/* Пульсирует кольцо вокруг, а не сама клетка: клетка стоит на месте, и в неё легко попасть */
+.adv-tile.next::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 3px solid var(--wc);
+  animation: advPulse 1.6s ease-in-out infinite; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .adv-tile.next::after { animation: none; } }
+.adv-tile.boss { box-shadow: 0 0 0 3px #ffd166, 0 4px 0 rgba(0, 0, 0, 0.3); }
+.adv-tile.boss.next { box-shadow: 0 0 0 3px #ffd166, 0 0 20px #ffd166; }
+@keyframes advPulse { 0%, 100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 0.2; } }
+.at-quirk { position: absolute; left: -4px; bottom: -4px; font-size: 14px; line-height: 20px; width: 20px; height: 20px;
+  text-align: center; border-radius: 50%; background: #1d1650; }
+.at-mark { position: absolute; right: -4px; top: -4px; font-size: 12px; font-weight: 900; line-height: 20px;
+  width: 20px; height: 20px; text-align: center; border-radius: 50%; background: #2bd18f; color: #fff; }
+.adv-tile.locked .at-mark { background: #1d1650; }
+.adv-card .ac-face { width: 120px; height: 120px; margin: 0 auto 10px; border-radius: 50%; box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3); }
+.adv-card .ac-face .icon-art { width: 100%; height: 100%; display: block; }
+.adv-card .ac-world { font-size: 13px; font-weight: 800; color: var(--muted); }
+.adv-card .ac-name { font-size: 24px; font-weight: 900; margin: 2px 0 10px; }
+.adv-card .ac-quirk { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 14px;
+  background: rgb(var(--ink) / 0.08); font-size: 14px; }
+.adv-card .ac-quirk b { font-size: 16px; }
+.adv-card .ac-facts { display: flex; justify-content: center; gap: 16px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+.adv-card .ac-facts b { color: var(--text); }
+.adv-card .btn:disabled { opacity: 0.5; }
+.adv-line { color: var(--gold); font-weight: 800; }
+.adv-line .icon-art { vertical-align: middle; }

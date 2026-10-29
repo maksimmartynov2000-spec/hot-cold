@@ -91,6 +91,8 @@ async function syncProfile() {
   if ('tutorialDone' in data && !data.tutorialDone && tutorialComplete()) {
     friendRpc('tutorial_finished', {}).then(() => { if (profileInfo) profileInfo.tutorialDone = true; }).catch(() => {});
   }
+  // Приключение: пройденное в телефоне и в базе сводим к большему
+  advSync();
   updateAccountChip();
   return data;
 }
@@ -396,7 +398,9 @@ function renderAvatarGrid() {
   const tutIcon = profileInfo && 'tutorialDone' in profileInfo ? [TUTORIAL_ICON] : [];
   // Иконки за серию заданий — когда сервер знает задания (миграция 041)
   const questIcons = progressInfo ? QUEST_ICONS.map(q => q.icon) : [];
-  ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons].forEach((icon, i) => {
+  // Иконки боссов Приключения — когда база о них знает (миграция 049)
+  const advIcons = advServer ? ADV_ICONS : [];
+  ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons, ...advIcons].forEach((icon, i) => {
     // Награды — отдельным блоком после обычных: их не выбирают, а заслуживают
     if (i === AVATAR_CHOICES.length + 1) {
       const sep = document.createElement('div');
@@ -406,6 +410,7 @@ function renderAvatarGrid() {
     const b = document.createElement('button');
     const locked = icon === TUTORIAL_ICON ? !tutorialIconOpen()
       : questIconDays(icon) ? !questIconOpen(icon)
+      : ADV_ICONS.indexOf(icon) >= 0 ? !advIconOpen(icon)
       : rewardLeague('icon', icon) > 0 && !rewardOpen('icon', icon);
     b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '') + (locked ? ' locked' : '');
     b.dataset.icon = icon;
@@ -458,6 +463,9 @@ async function chooseAvatar(icon) {
   if (lockedNote('icon', icon)) return;
   if (questIconDays(icon) && !questIconOpen(icon)) {
     return setNote('avNote', t().prog.streakLocked.replace('{n}', questIconDays(icon)), true);
+  }
+  if (ADV_ICONS.indexOf(icon) >= 0 && !advIconOpen(icon)) {
+    return setNote('avNote', t().adv.iconLocked.replace('{w}', t().adv.worlds[ADV_ICONS.indexOf(icon)]), true);
   }
   if (icon === TUTORIAL_ICON) {
     if (!tutorialIconOpen()) return setNote('avNote', t().tut.tutIconLocked, true);
@@ -1889,7 +1897,7 @@ function checkBonusCard() {
   try { localStorage.setItem(SEEN_BONUS_KEY, JSON.stringify(seen)); } catch (e) {}
   const T = t().tut;
   bonusCardFor = kind;
-  document.getElementById('bcIcon').textContent = BONUS_ICON[kind];
+  document.getElementById('bcIcon').innerHTML = bonusArtHtml(kind, BONUS_ICON[kind]);
   document.getElementById('bcTitle').textContent = kind === 'near' ? T.bcNear
     : T.bcTitle.replace('{name}', t().bonusNames[kind]);
   document.getElementById('bcDesc').textContent = T.bcDesc[kind];
@@ -1905,7 +1913,7 @@ function openBonusGuide(focus) {
   document.getElementById('bgHow').textContent = L.bgHow;
   document.getElementById('bgOk').textContent = L.tut.bcOk;
   const group = (head, kinds) => '<div class="bg-head">' + head + '</div>' + kinds.map(k =>
-    '<div class="bg-row' + (k === focus ? ' on' : '') + '"><span class="bg-ic">' + BONUS_ICON[k] + '</span>' +
+    '<div class="bg-row' + (k === focus ? ' on' : '') + '"><span class="bg-ic">' + bonusArtHtml(k, BONUS_ICON[k]) + '</span>' +
     '<span class="bg-txt"><b>' + L.bonusNames[k] + '</b><span>' + L.tut.bcDesc[k] + '</span></span></div>').join('');
   document.getElementById('bgList').innerHTML = group(L.bgGood, ['extra', 'fog', 'blind', 'rush']) +
     group(L.bgBad, ['skip', 'gift', 'memory']);

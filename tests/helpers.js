@@ -111,6 +111,13 @@ function stubSupabase(opts) {
           // конкретного вызова тест подкладывает через window.__rpcError.
           // unsupported — сервер без миграции профиля: функций нет вовсе
           // noColor — сервер с профилем, но ещё без цвета (своя миграция не применена)
+          // Приключение: база помнит большее из присланного и своего.
+          // window.__adventure = null — сервер без миграции 049
+          if (name === 'adventure_save') {
+            if (window.__adventure === null) return { data: null, error: { message: 'Could not find the function public.adventure_save' } };
+            window.__adventure = Math.max(window.__adventure || 0, Math.min(50, args.p_done || 0));
+            return { data: window.__adventure, error: null };
+          }
           if (name === 'tutorial_finished') {
             window.__tutorialFinished = (window.__tutorialFinished || 0) + 1;
             if (window.__profile) window.__profile.tutorialDone = true;

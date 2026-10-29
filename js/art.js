@@ -44,17 +44,43 @@ const ICON_ART = new Set([
   '🦅', '🐺', '🦚', '🐉', '🦩', '🐳', '🦖', '🦜', '👑', '🌟',
   '🔥', '🚀', '🌋', '🌈', '🎓', '🧙', '🦍', '🦑', '🐲', '🛸'
 ]);
+// Остальные картинки — по имени, а не по эмодзи: соперники Приключения
+// (adv-01…adv-50), значки режимов (m-…), поясов подсказки (t-0…t-8) и бонусов (b-…)
+const NAMED_ART = ['m-solo', 'm-duel', 'm-adventure', 'm-run', 'm-online', 'm-play', 'm-friends', 'm-settings',
+  't-0', 't-1', 't-2', 't-3', 't-4', 't-5', 't-6', 't-7', 't-8',
+  'b-extra', 'b-fog', 'b-blind', 'b-rush', 'b-skip', 'b-gift', 'b-memory', 'b-token']
+  .concat(Array.from({ length: 50 }, (_, i) => 'adv-' + String(i + 1).padStart(2, '0')));
+function isNamedArt(code) { return NAMED_ART.indexOf(code) >= 0; }
+
 function iconFile(code) {
+  if (isNamedArt(code)) return 'icons/' + code + '.webp';
   return 'icons/' + [...code].filter(c => c !== '\ufe0f').map(c => c.codePointAt(0).toString(16)).join('-') + '.webp';
+}
+
+// Эмодзи в тексте — рисунком. Сам эмодзи остаётся внутри (невидимым): так
+// текст строки прежний — его прочтёт диктор, найдёт поиск и тесты
+function artSpan(file, emoji) {
+  return '<span class="em-art" style="background-image:url(' + file + ')"><span>' + emoji + '</span></span>';
+}
+// Подпись пояса («🔥 Горячо») — с рисунком вместо эмодзи
+function tierLabelHtml(idx, text) {
+  const sp = text.indexOf(' ');
+  if (sp < 0) return escapeHtml(text);
+  return artSpan('icons/t-' + idx + '.webp', text.slice(0, sp)) + escapeHtml(text.slice(sp));
+}
+// Значок бонуса рисунком; у кого рисунка нет (лава, «рядом что-то есть») — эмодзи
+const BONUS_ART = ['extra', 'fog', 'blind', 'rush', 'skip', 'gift', 'memory'];
+function bonusArtHtml(kind, emoji) {
+  return BONUS_ART.indexOf(kind) >= 0 ? artSpan('icons/b-' + kind + '.webp', emoji) : emoji;
 }
 
 // Рисунок иконки или '' — если такой иконки нет в наборе.
 // size — в пикселях; 0 — по размеру кружка
 function iconArt(code, size) {
-  if (!ICON_ART.has(code)) return '';
+  if (!ICON_ART.has(code) && !isNamedArt(code)) return '';
   const wh = size ? ' width="' + size + '" height="' + size + '"' : ' width="100%" height="100%"';
   // Название — эмодзи в <title>: его прочтёт экранный диктор, и текст кружка
   // остаётся тем же эмодзи, что и в базе
-  return '<svg class="icon-art" viewBox="0 0 100 100"' + wh + ' role="img"><title>' + code + '</title>' +
+  return '<svg class="icon-art" viewBox="0 0 100 100"' + wh + ' role="img">' + (isNamedArt(code) ? '' : '<title>' + code + '</title>') +
     '<image href="' + iconFile(code) + '" width="100" height="100"/></svg>';
 }

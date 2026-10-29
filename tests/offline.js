@@ -134,12 +134,15 @@ function serve() {
   check('без сети тренировка доигрывается до победы',
     (await page.locator('#resultBox').textContent()).includes('Победа'));
 
-  // Игра с ботом — тоже целиком без сети: бот думает в браузере
+  // Приключение — тоже целиком без сети: соперник думает в браузере
   await page.evaluate(() => quitToMenu());
   await page.click('.mode-btn.bot');
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(300);
+  check('без сети карта Приключения открывается', await page.locator('#advMap .adv-tile').count() === 50);
+  await page.click('.adv-tile[data-n="0"]');
+  await page.waitForTimeout(150);
   await page.evaluate(() => { BOT_SPEED = 0; });
-  await page.click('#tStartMatch');
+  await page.click('#acGo');
   await page.waitForTimeout(300);
   const miss = await page.evaluate(() => secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN);
   await page.fill('#guessInput', String(miss));

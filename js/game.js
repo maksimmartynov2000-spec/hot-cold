@@ -577,6 +577,7 @@ function showScreen(name) {
   document.getElementById('screenOnline').classList.toggle('hidden', name !== 'online');
   document.getElementById('screenFriends').classList.toggle('hidden', name !== 'friends');
   document.getElementById('screenChat').classList.toggle('hidden', name !== 'chat');
+  document.getElementById('screenAdventure').classList.toggle('hidden', name !== 'adventure');
   if (name !== 'chat') stopChatPoll();
   if (name !== 'friends') stopFriendsPoll();
   if (name !== 'online') { stopRankedPoll(); stopOnlinePoll(); }
@@ -600,6 +601,9 @@ function showScreen(name) {
 }
 
 function quitToMenu() {
+  // Из партии Приключения — обратно на карту, а не в главное меню
+  const toMap = !!adv && screen === 'game';
+  endAdventureMode();
   setGuessNote('');
   endLessonMode();
   liftCurtain();
@@ -615,6 +619,7 @@ function quitToMenu() {
   gameOverType = null;
   applyTranslations();
   showScreen('mode');
+  if (toMap) openAdventure();
 }
 
 // Выход с игрового экрана: в режиме на рейтинг это отказ от текущей игры —
@@ -657,6 +662,7 @@ function closeQuit() {
 let setupBot = false;
 function openSetup(m, bot) {
   endLessonMode();
+  endAdventureMode();
   mode = m;
   setupBot = !!bot && m === 'duel';
   const L = t();
@@ -1189,6 +1195,7 @@ function getFeedback(distance) {
   return FEEDBACK_META.find(f => distance >= f.min && distance <= f.max) || FEEDBACK_META[0];
 }
 function getFbText(meta) { return t().labels[meta.labelIndex]; }
+function getFbHtml(meta) { return tierLabelHtml(meta.labelIndex, getFbText(meta)); }
 
 function renderAll() {
   if (screen !== 'game' && mode === null) return;
@@ -1330,7 +1337,7 @@ function renderFeedback() {
   panel.style.border = '1px solid ' + last.meta.color;
   panel.classList.remove('hidden');
   const label = document.getElementById('feedbackLabel');
-  label.textContent = getFbText(last.meta);
+  label.innerHTML = getFbHtml(last.meta);
   // Пояс — помощь для тренировки: там учатся. В игре с другом и в рейтинге его
   // нет, иначе это преимущество, а не учёба
   const band = document.getElementById('feedbackBand');
@@ -1798,7 +1805,10 @@ function renderResult() {
 
     const actions = document.createElement('div');
     actions.className = 'r-actions';
-    if (D.matchOver) {
+    if (D.matchOver && vsBot && vsBot.adv) {
+      // Приключение: дальше по карте, ещё раз или на карту
+      actions.innerHTML = advActionsHtml();
+    } else if (D.matchOver) {
       // Онлайн-матч переиграть на месте нельзя: новый — это новый вызов
       // Реванш зовёт того же соперника на тех же условиях. Пока приглашение
       // не отправлено — кнопка; после — строка о том, что оно ушло
@@ -1834,6 +1844,8 @@ function renderResult() {
     }
 
     box.appendChild(title);
+    const advLine = (D.matchOver && vsBot && vsBot.adv) ? advResultLine() : null;
+    if (advLine) box.appendChild(advLine);
     if (forfeitLine) box.appendChild(forfeitLine);
     box.appendChild(score);
     box.appendChild(secretLine);
@@ -1924,13 +1936,13 @@ function renderPlayers() {
                       : (D.tokens[p] === 0 ? L.tokenSpent : L.tokenBtn + count);
 
     // Что на игроке висит — значками, с полными названиями по наведению
-    const flags = [[D.fog[p], '🙈', L.bonusNames.fog],
-                   [D.blind[p], '🌫️', L.bonusNames.blind],
+    const flags = [[D.fog[p], bonusArtHtml('fog', '🙈'), L.bonusNames.fog],
+                   [D.blind[p], bonusArtHtml('blind', '🌫️'), L.bonusNames.blind],
                    [D.autoLava[p], '🌋', L.bonusNames.lava],
-                   [D.skip[p], '⏭', L.bonusNames.skip],
-                   [D.shortMemory[p], '🧠', L.bonusNames.memory]].filter(f => f[0]);
+                   [D.skip[p], bonusArtHtml('skip', '⏭'), L.bonusNames.skip],
+                   [D.shortMemory[p], bonusArtHtml('memory', '🧠'), L.bonusNames.memory]].filter(f => f[0]);
     const eff = document.getElementById('peff' + p);
-    eff.textContent = flags.map(f => f[1]).join('');
+    eff.innerHTML = flags.map(f => f[1]).join('');
     eff.title = flags.map(f => f[2]).join(', ');
   }
 }
@@ -1967,7 +1979,7 @@ function renderHistory() {
         '<span class="h-guess h-masked">•••</span><span class="h-label h-masked">🙈</span>'
       : '<span class="h-num">#' + realIndex + '</span>' + who +
         '<span class="h-guess">' + h.guess + '</span>' +
-        '<span class="h-label" style="color:' + h.meta.color + '">' + getFbText(h.meta) + '</span>';
+        '<span class="h-label" style="color:' + h.meta.color + '">' + getFbHtml(h.meta) + '</span>';
     list.appendChild(item);
   });
 }
@@ -3368,8 +3380,9 @@ function botMove() {
   if (!vsBot || online || mode !== 'duel' || screen !== 'game') return;
   if (D.roundOver || D.matchOver || D.cur !== 1) return;
   if (localForced()) return doForcedTurn(true);
+  const quirk = vsBot.adv ? vsBot.adv.quirk : null;
   const moves = history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex, p: h.p, timeout: !!h.timeout }));
-  const flags = { fog: D.fog[1], blind: D.blind[1], shortMemory: D.shortMemory[1],
+  const flags = { fog: D.fog[1], blind: D.blind[1], shortMemory: D.shortMemory[1] || quirk === 'forget',
                   fogFrom: D.fogFrom[1], blindFrom: D.blindFrom[1] };
   const level = vsBot.bot.level;
   // Жетон: когда осталось два числа, два хода подряд выигрывают наверняка
@@ -3379,6 +3392,12 @@ function botMove() {
       D.tokens[1]--;
       D.armed = true;
     }
+  }
+  // Азартный соперник иногда бьёт наугад — по любому ещё возможному числу
+  if (quirk === 'gambler' && Math.random() < 0.3) {
+    const cand = botCandidates(moves, 1, flags, false), left = [];
+    for (let i = 0; i < cand.length; i++) if (cand[i]) left.push(i + RANGE_MIN);
+    return duelPlay(left[Math.floor(Math.random() * left.length)]);
   }
   duelPlay(botPick(moves, 1, flags, level));
 }
@@ -3411,7 +3430,7 @@ function buildLegend() {
     const item = document.createElement('div');
     item.className = 'legend-item';
     item.dataset.tier = meta.labelIndex;
-    item.innerHTML = '<span class="l-label" style="color:' + meta.color + '">' + labels[meta.labelIndex] +
+    item.innerHTML = '<span class="l-label" style="color:' + meta.color + '">' + tierLabelHtml(meta.labelIndex, labels[meta.labelIndex]) +
                      '</span><span class="l-range">' + meta.rangeSign + '</span>';
     grid.appendChild(item);
   });
@@ -3421,7 +3440,7 @@ function buildLegend() {
     seg.className = 'ss-seg';
     seg.dataset.tier = meta.labelIndex;
     seg.style.setProperty('--c', meta.color);
-    seg.textContent = labels[meta.labelIndex].split(' ')[0];
+    seg.innerHTML = artSpan('icons/t-' + meta.labelIndex + '.webp', labels[meta.labelIndex].split(' ')[0]);
     seg.title = labels[meta.labelIndex] + ' · ' + meta.rangeSign;
     bar.appendChild(seg);
   });

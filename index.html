@@ -81,7 +81,7 @@
           <span class="m-title" id="tModeDuel">Play with a friend</span>
         </span>
       </button>
-      <button class="mode-btn bot tile" onclick="openSetup('duel', true)">
+      <button class="mode-btn bot tile" onclick="openAdventure()">
         <span class="m-icon">🤖</span>
         <span class="m-text">
           <span class="m-title" id="tModeBot">Play the bot</span>
@@ -100,6 +100,16 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- ЭКРАН: Приключение — пять миров по десять соперников. Сложность —
+       переключателем сверху, а не выбором бота: соперник на пути один -->
+  <div id="screenAdventure" class="hidden">
+    <div class="screen-title" id="tAdvTitle"></div>
+    <div class="adv-hint" id="tAdvHint"></div>
+    <div class="adv-diff" id="advDiff"></div>
+    <div class="adv-diff-hint" id="advDiffHint"></div>
+    <div id="advMap"></div>
   </div>
 
   <!-- ЭКРАН 2: настройка -->
@@ -577,6 +587,19 @@
   </div>
 </div>
 
+<!-- Соперник Приключения: кто он, чем опасен, и «В бой!» -->
+<div class="modal-backdrop hidden" id="advCard" onclick="if (event.target === this) closeAdvCard()">
+  <div class="modal-card adv-card">
+    <div class="ac-face" id="acFace"></div>
+    <div class="ac-world" id="acWorld"></div>
+    <div class="ac-name" id="acName"></div>
+    <div class="ac-quirk" id="acQuirk"></div>
+    <div class="ac-facts" id="acFacts"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="acGo"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="acBack" onclick="closeAdvCard()"></button>
+  </div>
+</div>
+
 <!-- Выход из начатой партии без интернета: она нигде не хранится, и случайное
      нажатие на ☰ не должно стирать её молча -->
 <div class="modal-backdrop hidden" id="quitModal">
@@ -885,6 +908,7 @@
 <script src="js/art.js"></script>
 <script src="js/game.js"></script>
 <script src="js/online.js"></script>
+<script src="js/adventure.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
