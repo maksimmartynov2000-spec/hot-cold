@@ -3214,7 +3214,7 @@ async function giveUpRun() {
   closePause();
   try {
     const res = await friendRpc('run_give_up');
-    await endRun({ score: res.score, rounds: res.rounds, secret: res.secret });
+    finishRun({ score: res.score, rounds: res.rounds, secret: res.secret }, true);
   } catch (e) {
     setMatchNote(friendErrorText(e.message));
   }
@@ -3284,7 +3284,7 @@ async function startRun(fresh) {
   try {
     const st = await friendRpc('run_start',
       { p_frost: !!frostMode, p_fresh: !!fresh });
-    RUN = { round: 1, totalScore: 0, locked: false };
+    RUN = { round: 1, totalScore: 0, locked: false, log: [] };
     mode = 'run';
     applyRunSnapshot(st);
     applyTranslations();
@@ -3344,18 +3344,14 @@ async function runGuess() {
   history.push({ guess: guess, distance: null, meta: meta, p: null });
   soundForGuess(meta);
 
-  if (res.over) {
-    gameOver = true;
-    soundGameOver();
-    renderAll();
-    return endRun(res);
-  }
+  if (res.over) return finishRun(res, false);
 
   if (res.roundWon) {
     // Раунд пройден: следующий не начинается сам. Сначала карточка — сколько
     // набрал и что меняется, — и игрок сам нажимает «дальше». Ходить, пока она
     // висит, нельзя: RUN.locked снимет только следующий раунд
     RUN.totalScore = res.state.score;
+    RUN.log.push({ round: RUN.round, points: res.points });
     RUN.stage = {
       round: RUN.round, points: res.points, moves: history.length, total: res.state.score,
       from: { min: RANGE_MIN, max: RANGE_MAX, tries: MAX_GUESSES },
@@ -3375,8 +3371,11 @@ async function runGuess() {
 
 function renderRunStage() {
   const box = document.getElementById('runStage');
+  const O = mode === 'run' && RUN && RUN.over;
   const S = mode === 'run' && RUN && RUN.stage;
-  box.classList.toggle('hidden', !S);
+  box.classList.toggle('hidden', !S && !O);
+  box.classList.toggle('over', !!O);
+  if (O) { box.innerHTML = runOverHtml(O); return; }
   if (!S) return;
   const L = t();
   const n = S.next;
@@ -3400,6 +3399,32 @@ function renderRunStage() {
     '<button class="btn btn-block" id="rsGo" onclick="runNextRound()">' + L.rsGo.replace('{n}', n.round) + '</button>';
 }
 
+// Итог Испытания: почему кончилось, какое было число, сколько набрано, как это
+// против рекорда и откуда взялись очки — по раундам
+function runOverHtml(O) {
+  const L = t();
+  const pts = n => withPlural(n, L.run.pointForms);
+  let h = '<div class="rs-title">' + L.rgTitle + '</div>' +
+    '<div class="rg-why">' + (O.quit ? L.rgWhyQuit : L.rgWhy).replace('{n}', O.round) + '</div>';
+  if (O.secret !== null) {
+    h += '<div class="rg-secret"><span>' + L.rgSecret + '</span><b>' + formatNum(O.secret) + '</b></div>';
+    if (O.last !== null) h += '<div class="rg-last">' + L.rgLast.replace('{g}', formatNum(O.last))
+      .replace('{d}', formatNum(Math.abs(O.last - O.secret))) + '</div>';
+  }
+  h += '<div class="rg-stats"><div><b>' + formatNum(O.rounds) + '</b><span>' + L.rgRounds + '</span></div>' +
+    '<div><b>' + formatNum(O.score) + '</b><span>' + L.rgScore + '</span></div></div>';
+  if (O.score > 0 && O.score > O.bestBefore) h += '<div class="rg-best">' + L.run.newBest + '</div>';
+  else if (O.bestBefore > O.score) h += '<div class="rg-tobest">' + L.rgToBest.replace('{b}', formatNum(O.bestBefore))
+    .replace('{d}', pts(O.bestBefore - O.score)) + '</div>';
+  if (O.log.length) h += '<div class="rs-next">' + L.rgByRound + '</div><div class="rg-chips">' +
+    O.log.map(r => '<span><i>' + r.round + '</i>+' + formatNum(r.points) + '</span>').join('') + '</div>';
+  h += '<button class="btn btn-block" id="rgAgain" onclick="runAgain()">' + L.rgAgain + '</button>' +
+    '<div class="setup-row"><button class="btn-ghost btn-block" id="shareBtn" onclick="shareRunResult(' +
+    O.score + ',' + O.rounds + ')">' + L.run.share + '</button>' +
+    '<button class="btn-ghost btn-block" id="rgHub" onclick="runToHub()">' + L.rgHub + '</button></div>';
+  return h;
+}
+
 function runNextRound() {
   if (!RUN || !RUN.stage) return;
   const next = RUN.stage.next;
@@ -3409,7 +3434,47 @@ function runNextRound() {
   renderAll();
 }
 
+// Испытание кончилось. Раньше игрок сразу оказывался в хабе — «вы проиграли»,
+// и всё. Теперь итог остаётся на доске: загаданное число отмечено на прямой,
+// видно свои ходы, и карточка рассказывает, чем кончилось и сколько набрано.
 // Результат уже записан сервером: отправлять нечего, остаётся показать
+function finishRun(res, quit) {
+  // Испытание кончилось — могли продвинуться задания и открыться «Испытание: 10»
+  setTimeout(() => { if (runAuth()) loadProgress(); }, 2000);
+  const score = typeof res.score === 'number' ? res.score : RUN.totalScore;
+  const rounds = typeof res.rounds === 'number' ? res.rounds : RUN.round - 1;
+  const bestBefore = runBest();
+  if (score > bestBefore) rememberRunBest(score);
+  const last = history.length ? history[history.length - 1].guess : null;
+  if (typeof res.secret === 'number') secret = res.secret;
+  RUN.locked = true;
+  RUN.stage = null;
+  RUN.over = {
+    quit: quit, round: RUN.round, score: score, rounds: rounds,
+    secret: typeof res.secret === 'number' ? res.secret : null,
+    last: quit ? null : last, bestBefore: bestBefore, log: RUN.log || []
+  };
+  gameOver = true;
+  gameOverType = 'lose';
+  movesUsed = history.length;
+  if (!quit) soundGameOver();
+  applyTranslations();
+  renderAll();
+}
+
+// Из итогов — в хаб Испытания или сразу в новое
+function leaveRun() {
+  RUN = null;
+  mode = null;
+  gameOver = false;
+  gameOverType = null;
+  applyTranslations();
+}
+function runToHub() { leaveRun(); openRunHub(); }
+function runAgain() { leaveRun(); startRun(); }
+
+// Итог забега, закрытого из хаба («Завершить» у незаконченного): доски нет,
+// поэтому итог — строками в самом хабе
 async function endRun(res) {
   // Испытание кончилось — то же: могло открыться «Испытание: 10»
   setTimeout(() => { if (runAuth()) loadProgress(); }, 2000);
