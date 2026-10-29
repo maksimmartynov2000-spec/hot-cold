@@ -4217,7 +4217,7 @@ async function testAvatarColor(browser) {
     tiles: document.querySelectorAll('#avGrid .av-tile').length }));
   check('в выборе двадцать цветов четырьмя рядами, последние — градиенты',
     pick.colors.length === 20 && pick.rows === 4 && pick.colors.slice(-4).every(c => /^grad-/.test(c)), JSON.stringify(pick));
-  check('и по-прежнему буква и 40 иконок', pick.tiles === 41, String(pick.tiles));
+  check('и по-прежнему буква, 40 иконок и 5 боссов', pick.tiles === 46, String(pick.tiles));
 
   await page.click('#avGrid .av-color[data-color="#a78bfa"]');
   await page.waitForTimeout(300);
@@ -4264,7 +4264,7 @@ async function testAvatarColor(browser) {
     tiles: document.querySelectorAll('#avGrid .av-tile').length,
     label: document.getElementById('tAvatarStart').textContent }));
   check('без миграции цвета выбора цвета нет, иконки на месте',
-    old.colors === 0 && old.tiles === 41 && old.label === 'Сменить иконку', JSON.stringify(old));
+    old.colors === 0 && old.tiles === 46 && old.label === 'Сменить иконку', JSON.stringify(old));
   await done(page);
 }
 
@@ -4733,7 +4733,7 @@ async function testBots(browser) {
     names: !document.getElementById('namesPair').classList.contains('hidden'),
     hc: !document.getElementById('handicapField').classList.contains('hidden') }));
   check('игра с ботом: пять персонажей, сначала выбрана 🐼',
-    setup.tiles.join() === 'turtle,panda,dolphin,fox,owl' && setup.active === 'panda' && /бот/.test(setup.title),
+    setup.tiles.join() === 'turtle,panda,dolphin,fox,owl' && setup.active === 'panda' && /Приключение/.test(setup.title),
     JSON.stringify(setup));
   check('сила персонажей — точками от одной до пяти', setup.power.join() === '1,2,3,4,5', setup.power.join());
   check('имён игроков и форы в игре с ботом нет', !setup.names && !setup.hc);
@@ -5116,7 +5116,7 @@ async function testLeagues(browser) {
     locked: [...document.querySelectorAll('#avGrid .av-tile.locked')].map(e => e.dataset.icon).join(''),
     colorsLocked: [...document.querySelectorAll('#avGrid .av-color.locked')].map(e => e.dataset.color).join(',') }));
   check('награды видны все, закрыты — лиги выше достигнутой',
-    grid.icons === 41 + 10 && grid.locked === '🦩🐳🦖🦜👑🌟' && grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
+    grid.icons === 46 + 10 && grid.locked === '🦩🐳🦖🦜👑🌟🧙🦍🦑🐲🛸' && grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
     JSON.stringify(grid));
   const before = await page.evaluate(() => window.__profile.calls.length);
   await page.click('.av-tile[data-icon="🦖"]');
@@ -5144,7 +5144,7 @@ async function testLeagues(browser) {
   await page.click('#tAvatarStart');
   await page.waitForTimeout(150);
   check('сервер без лиг: сетка как раньше, лиги в профиле нет', await page.evaluate(() =>
-    document.querySelectorAll('#avGrid .av-tile').length === 41 &&
+    document.querySelectorAll('#avGrid .av-tile').length === 46 &&
     document.getElementById('pfLeague').classList.contains('hidden')));
   await done(page);
 }
@@ -7130,7 +7130,7 @@ async function testProfile(browser) {
     return { n: tiles.length, first: tiles[0].textContent, firstLetter: tiles[0].classList.contains('letter'),
              sel: tiles.filter(t => t.classList.contains('sel')).map(t => t.dataset.icon) };
   });
-  check('в профиле буква и 40 иконок', grid.n === 41 && grid.firstLetter && grid.first === 'М',
+  check('в профиле буква, 40 иконок и 5 иконок боссов', grid.n === 46 && grid.firstLetter && grid.first === 'М',
     JSON.stringify(grid));
   check('выбранная иконка отмечена', grid.sel.join() === '🦊', grid.sel.join());
 
@@ -7163,7 +7163,7 @@ async function testProfile(browser) {
     const tops = new Set([...document.querySelectorAll('#avGrid .av-tile')].map(t => Math.round(t.getBoundingClientRect().top)));
     return { w: r.width, h: r.height, rows: tops.size };
   });
-  check('клетки иконок крупные, по пять в ряд', tile.w >= 44 && tile.h >= 44 && tile.rows === Math.ceil(41 / 5),
+  check('клетки иконок крупные, по пять в ряд', tile.w >= 44 && tile.h >= 44 && tile.rows === Math.ceil(46 / 5),
     JSON.stringify(tile));
 
   // Закрыл профиль с раскрытой сеткой — в следующий раз она снова свёрнута
