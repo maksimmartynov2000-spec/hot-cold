@@ -396,12 +396,12 @@ async function registerPlayer(p, name, pin) {
 
   await A.page.click('#accountChip');
   await A.page.waitForTimeout(700);
-  await A.page.click('#tAvatarStart');
+  await A.page.click('#pfAvatar');
   await A.page.click('#avGrid .av-tile[data-icon="🦊"]');
   await A.page.waitForTimeout(500);
   check('иконка записана в базу',
     (await db.query("select avatar from students where username = 'Тимур'")).rows[0].avatar === '🦊');
-  await A.page.click('#tAvatarStart');
+  await A.page.click('#pfAvatar');
   await A.page.click('#avGrid .av-color[data-color="#2dd4bf"]');
   await A.page.waitForTimeout(600);
   check('цвет фона записан в базу',

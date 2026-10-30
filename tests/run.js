@@ -955,19 +955,19 @@ async function testSetupSpacing(browser) {
 
   const gaps = await page.evaluate(() => {
     const r = sel => document.querySelector(sel).getBoundingClientRect();
-    const range = r('#rangeMax'), frost = r('.frost-row'), attempts = r('#attemptsField');
+    const range = r('.chips-rangeMax'), frost = r('.frost-row'), attempts = r('#attemptsField');
     return { above: +(frost.top - range.bottom).toFixed(0),
              below: +(attempts.top - frost.bottom).toFixed(0) };
   });
   // Галочка относится к диапазону, значит держится за него, а не висит посередине
-  check('галочка ближе к своему полю, чем к следующему', gaps.below > gaps.above + 6,
+  check('переключатель — сразу под диапазоном, к которому относится', gaps.above >= 6 && gaps.above <= 24,
     'сверху ' + gaps.above + 'px, снизу ' + gaps.below + 'px');
-  check('зазоры не слипшиеся', gaps.above >= 6 && gaps.below >= 16, JSON.stringify(gaps));
+  check('зазоры не слипшиеся', gaps.above >= 6 && gaps.below >= 12, JSON.stringify(gaps));
 
   // Экран настройки должен помещаться целиком — и в дуэли, где полей вдвое больше
   check('настройка тренировки помещается без прокрутки', await page.evaluate(() =>
     document.documentElement.scrollHeight <= window.innerHeight + 1));
-  await page.click('#tBack');
+  await page.click('#navPlay');
   await page.waitForTimeout(150);
   await page.click('#tModeDuel');
   await page.waitForTimeout(250);
@@ -1757,7 +1757,7 @@ async function testPinHelp(browser) {
   await page4.waitForTimeout(150);
   check('свой PIN показывается по нажатию',
     (await page4.locator('#tShowPin').textContent()).includes('1234'));
-  check('выход из аккаунта остался на месте', await page4.locator('#tLogoutStart').isVisible());
+  check('выход из аккаунта остался на месте — под «Ещё»', await page4.evaluate(() => !!document.querySelector('#pfMoreFold #tLogoutStart')));
   // Повторное нажатие на PIN прячет его
   await page4.evaluate(() => { document.getElementById('pfEditFold').open = true; });
   await page4.click('#tShowPin');
@@ -1937,38 +1937,26 @@ async function testScaleMemory(browser) {
 
 // Галочки нарисованы свои: системный чекбокс — белый квадрат на тёмном экране
 async function testCheckboxLook(browser) {
-  console.log('\nВид галочек');
+  console.log('\nВид переключателей');
   const page = await newGame(browser);
   await page.click('#tModeSolo');
   await page.waitForTimeout(250);
-
-  const box = await page.evaluate(() => {
+  const look = () => page.evaluate(() => {
     const el = document.getElementById('frostSetup');
-    const cs = getComputedStyle(el);
-    const rgb = cs.backgroundColor.match(/[\d.]+/g).map(Number);
-    return { appearance: cs.appearance || cs.webkitAppearance, bg: cs.backgroundColor,
-             radius: parseFloat(cs.borderRadius), light: (rgb[0] + rgb[1] + rgb[2]) / 3,
-             alpha: rgb.length > 3 ? rgb[3] : 1 };
+    const cs = getComputedStyle(el), knob = getComputedStyle(el, '::after');
+    return { appearance: cs.appearance || cs.webkitAppearance, w: parseFloat(cs.width), h: parseFloat(cs.height),
+             bg: cs.backgroundColor, knob: parseFloat(knob.left) };
   });
-  check('галочка не системная', box.appearance === 'none', box.appearance);
-  check('в покое галочка не светится белым', box.light < 200 || box.alpha < 0.2, JSON.stringify(box));
-  check('у галочки скруглённый край', box.radius >= 3, box.radius + 'px');
-
+  const off = await look();
+  check('переключатель свой, а не системная галочка', off.appearance === 'none' && off.w > off.h * 1.4, JSON.stringify(off));
   await page.check('#frostSetup');
   await page.waitForTimeout(400);
-  const on = await page.evaluate(() => {
-    const el = document.getElementById('frostSetup');
-    const tick = getComputedStyle(el, '::after');
-    return { rgb: getComputedStyle(el).backgroundColor.match(/[\d.]+/g).map(Number),
-             content: tick.content, side: parseFloat(tick.borderBottomWidth),
-             turn: tick.transform };
-  });
-  check('включённая галочка синяя',
-    Math.abs(on.rgb[0] - 99) < 6 && Math.abs(on.rgb[1] - 102) < 6 && Math.abs(on.rgb[2] - 241) < 6,
-    on.rgb.join(','));
-  // Галка — это две стороны рамки, повёрнутые на 45°: проверяем и то и другое
-  check('и в ней есть галка',
-    on.content !== 'none' && on.side >= 1.5 && /matrix/.test(on.turn), JSON.stringify(on));
+  const on = await look();
+  check('включённый — зелёный, бегунок справа', /43, 209, 143/.test(on.bg) && on.knob > off.knob + 10, JSON.stringify(on));
+  check('пояснение спрятано за «?»', !(await page.locator('#tFrostHint').isVisible()));
+  await page.click('.frost-row .hint-q');
+  check('«?» показывает пояснение и не трогает переключатель',
+    await page.locator('#tFrostHint').isVisible() && await page.isChecked('#frostSetup'));
   await done(page);
 }
 
@@ -2141,7 +2129,7 @@ async function testResultPlacement(browser) {
       const b = e.getBoundingClientRect();
       return { top: Math.round(b.top), bottom: Math.round(b.bottom) }; };
     return { card: r('#resultBox'), bar: r('.info-bar'), thermo: r('#thermoWrap'),
-             line: r('#numLine'), histTitle: r('.history-title'),
+             line: r('#numLine'), histTitle: r('#historyList'),
              view: innerHeight };
   });
 
@@ -6923,14 +6911,15 @@ async function testPolish(browser) {
   await page.click('.mode-btn.duel');
   await page.waitForTimeout(150);
   const setup = await page.evaluate(() => {
-    const w = document.getElementById('winsNeeded').getBoundingClientRect();
-    const h = document.getElementById('handicap').getBoundingClientRect();
+    const w = document.querySelector('.chips-winsNeeded').getBoundingClientRect();
+    const h = document.querySelector('.chips-handicap').getBoundingClientRect();
     return { frost: document.getElementById('tFrostHint').textContent, bonus: document.getElementById('tBonusHint').textContent,
-             wins: document.getElementById('tLblWins').textContent, sameRow: Math.abs(w.top - h.top) < 2 && h.left > w.right };
+             wins: document.getElementById('tLblWins').textContent, stacked: h.top > w.bottom && w.width > 300 };
   });
   check('у «Мороза» и «Бонусов» — пояснение одной строкой',
     /отрицательные/.test(setup.frost) && /сюрпризы/.test(setup.bonus), JSON.stringify(setup));
-  check('«Играем до» и «Фора» — в одну строку', setup.sameRow && setup.wins === 'Играем до', JSON.stringify(setup));
+  // Кнопкам нужна вся ширина: «Играем до» и «Фора» — друг под другом
+  check('«Играем до» и «Фора» — друг под другом, кнопками на всю ширину', setup.stacked && setup.wins === 'Играем до', JSON.stringify(setup));
   await page.evaluate(() => quitToMenu());
 
   // Тренировка: надписи над полем нет, история не обрезается
