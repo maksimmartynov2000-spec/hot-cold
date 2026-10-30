@@ -258,6 +258,10 @@ function fillProfile() {
   const L = t();
   const face = document.getElementById('pfAvatar');
   face.classList.toggle('guest', !auth);
+  // Рамка кружка — цвета лиги: бронза, серебро, золото, платина, алмаз,
+  // легенда. Ещё не играл на звёзды — фирменная, золотая с оранжевым
+  const FRAMES = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'legend'];
+  face.dataset.frame = auth ? (ladderInfo ? FRAMES[ladderPos(ladderInfo.stars).league] : 'base') : '';
   if (auth) {
     paintAvatar(face, auth.username);
   } else {
