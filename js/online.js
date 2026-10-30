@@ -1894,7 +1894,8 @@ function renderLessonResult() {
 }
 
 // ---------- Карточки бонусов ----------
-const BONUS_ICON = { extra: '⚡', fog: '🙈', blind: '🌫️', rush: '⏳', lava: '🌋', skip: '⏭', gift: '🎁', memory: '🧠', near: '❓' };
+const BONUS_ICON = { extra: '⚡', fog: '🙈', blind: '🌫️', rush: '⏳', lava: '🌋', skip: '⏭', gift: '🎁', memory: '🧠', near: '❓',
+                     xray: '🩻', half: '🌗', shield: '🛡️', freeze: '🧊' };
 let bonusCardFor = null;
 function seenBonuses() {
   try { return JSON.parse(localStorage.getItem(SEEN_BONUS_KEY)) || []; } catch (e) { return []; }
@@ -1928,7 +1929,8 @@ function openBonusGuide(focus) {
     '<div class="bg-row' + (k === focus ? ' on' : '') + '"><span class="bg-ic">' + bonusArtHtml(k, BONUS_ICON[k]) + '</span>' +
     '<span class="bg-txt"><b>' + L.bonusNames[k] + '</b><span>' + L.tut.bcDesc[k] + '</span></span></div>').join('');
   document.getElementById('bgList').innerHTML = group(L.bgGood, ['extra', 'fog', 'blind', 'rush']) +
-    group(L.bgBad, ['skip', 'gift', 'memory']);
+    group(L.bgBad, ['skip', 'gift', 'memory']) +
+    group(L.bgAdv, BONUS_ADV);
   document.getElementById('bonusGuide').classList.remove('hidden');
 }
 function closeBonusGuide() {
@@ -2930,6 +2932,7 @@ function applyMatchState(st) {
     meta: (mv.tier === null || mv.tier === undefined) ? FEEDBACK_META[0] : FEEDBACK_META[mv.tier]
   }));
   secret = (st.secret === null || st.secret === undefined) ? 0 : st.secret;
+  applyRematch(st.rematch);
   applyRangeToInputs();
   renderAll();
   // Ключ меняется с каждым ходом, поэтому один ход окликает ровно один раз
@@ -3065,11 +3068,29 @@ async function offerRematch() {
   } catch (e) {
     return setMatchNote(onlineMatchError(e.message));
   }
-  // Бот согласия не ждёт: новая партия уже идёт
-  if (online.botSeat !== null && newId) { stopMatchPoll(); return openMatch(newId); }
+  // Старый бот согласия не ждёт, а позвавший соперник уже согласен: новая
+  // партия уже идёт
+  if ((online.botSeat !== null || online.rematchOffer) && newId) { stopMatchPoll(); return openMatch(newId); }
   online.rematchSent = other;
   setMatchNote('');
   renderAll();
+}
+
+// Реванш после законченной партии: база говорит, позвал ли кто-то и чем
+// кончилось. Позвал соперник — на итоге кнопка «Принять». Согласились —
+// новая партия открывается сама у обоих
+function applyRematch(rm) {
+  if (!online) return;
+  online.rematchOffer = !!(rm && rm.status === 'invited' && !rm.mine);
+  online.rematchDeclined = !!(rm && rm.status === 'declined' && rm.mine);
+  if (rm && rm.mine && rm.status === 'invited' && !online.rematchSent) {
+    online.rematchSent = D.names[1 - online.seat];
+  }
+  if (rm && rm.status === 'active' && online.rematchSent && !online.rematchOpening) {
+    online.rematchOpening = true;
+    stopMatchPoll();
+    setTimeout(() => { if (online && online.rematchOpening) openMatch(rm.id); }, 0);
+  }
 }
 
 // ================= ГОТОВЫЕ ФРАЗЫ =================

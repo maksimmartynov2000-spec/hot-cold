@@ -5844,7 +5844,7 @@ async function testProgress(browser) {
   const dbAch = achMig.match(/select array\[('first_win'[^\]]*)\]/)[1].replace(/\s/g, '').split(',').map(x => x.replace(/'/g, ''));
   const dbIcons = [...mig.match(/values \(3, '🔥'\)[^;]*;/)[0].matchAll(/\((\d+), '([^']+)'\)/g)].map(m => m[1] + m[2]);
   const dbQuests = [...mig.match(/create or replace function quest_pool\(\)[\s\S]*?\$\$;/)[0].matchAll(/'([a-z_0-9]+)'/g)].map(m => m[1]);
-  check('достижения: 50 кодов лестницами, те же, что в базе, в том же порядке', js.ach.length === 50 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
+  check('достижения: 58 кодов лестницами, те же, что в базе, в том же порядке', js.ach.length === 58 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
   check('иконки за серию — те же, что в базе', js.icons.join() === dbIcons.join(), js.icons.join() + ' / ' + dbIcons.join());
   check('у каждого задания из базы есть текст', dbQuests.length === 7 && dbQuests.every(c => js.q.includes(c)), dbQuests.join());
   check('тексты заданий и достижений есть на всех 4 языках', js.langs.every(Boolean), JSON.stringify(js.langs));
@@ -5880,8 +5880,8 @@ async function testProgress(browser) {
     rows: [...document.querySelectorAll('#pfAchGrid .lad-row')].map(x => x.dataset.ladder + ':' + x.dataset.tier),
     wins: (document.querySelector('#pfAchGrid .lad-row[data-ladder="wins"]') || {}).textContent || '' }));
   check('профиль: серия заданий и лучшая', pf.streakShown && pf.streak === '📅 Серия заданий: 3 дн. · лучшая 4', pf.streak);
-  check('профиль: «🏅 Достижения: 2 из 50», по строке на лестницу со ступенью',
-    pf.head === '🏅 Достижения: 2 из 50' && pf.rows.join() === 'wins:1,games:0,streak:0,firstTry:0,modes:0,league:0,quests:0,run:0,friends:0,rivals:0,tutorial:1',
+  check('профиль: «🏅 Достижения: 2 из 58», по строке на лестницу со ступенью',
+    pf.head === '🏅 Достижения: 2 из 58' && pf.rows.join() === 'wins:1,games:0,streak:0,firstTry:0,modes:0,league:0,quests:0,run:0,friends:0,rivals:0,tutorial:1,advStars:0,advWorlds:0',
     JSON.stringify(pf));
   check('у лестницы — что открыто и что дальше', /Первая победа/.test(pf.wins) && /Дальше: 5 побед/.test(pf.wins), pf.wins);
   // Новые лестницы и верх старых: сколько до следующей ступени
@@ -6411,8 +6411,8 @@ async function testBonusGuide(browser) {
       shown: !document.getElementById('bonusGuide').classList.contains('hidden'),
       heads: document.querySelectorAll('#bgList .bg-head').length,
       rows: [...document.querySelectorAll('#bgList .bg-row')].map(r => r.textContent.trim()) }));
-    check(lang + ': в списке 4 помощи и 3 ловушки, у каждой название и описание',
-      g.shown && g.heads === 2 && g.rows.length === 7 && g.rows.every(r => r.length > 25 && !/undefined/.test(r)),
+    check(lang + ': в списке 4 помощи, 3 ловушки и 5 бонусов Приключения, у каждой название и описание',
+      g.shown && g.heads === 3 && g.rows.length === 12 && g.rows.every(r => r.length > 25 && !/undefined/.test(r)),
       JSON.stringify(g).slice(0, 300));
     await page.click('#bgOk');
     await page.waitForTimeout(100);
@@ -6472,6 +6472,10 @@ async function testAdventure(browser) {
     btn: (document.querySelector('#resultBox .r-actions .btn') || {}).textContent }));
   check('победа: прогресс записан и в телефоне, и в базе', won.done === 1 && won.server === 1, JSON.stringify(won));
   check('после победы — «Дальше: следующий»', won.btn === 'Дальше: Белка Жёлудь →', won.btn);
+  const st = await page.evaluate(() => ({ local: advStars(), res: window.__advResults,
+    line: (document.querySelector('#resultBox .adv-line') || {}).textContent }));
+  check('победа на «Нормально»: две звезды — в телефоне, в базе и в итоге',
+    st.local === '2' && JSON.stringify(st.res) === '[[0,2]]' && /\+2/.test(st.line) && /★★☆/.test(st.line), JSON.stringify(st));
   await page.click('#resultBox .r-actions .btn');
   await page.waitForTimeout(300);
   check('«Дальше» — карта и карточка следующего', await page.locator('#screenAdventure').isVisible() &&
@@ -6541,6 +6545,173 @@ async function testAdventure(browser) {
     card: document.querySelector('.adv-card').getBoundingClientRect().right <= innerWidth }));
   check('360px, немецкий: без горизонтальной прокрутки', fit.over <= 0 && fit.card, JSON.stringify(fit));
   await done(page);
+}
+
+// Приключение: бонус мира, ловушки у босса, новые бонусы, звёзды по сложности
+async function testAdventureBonus(browser) {
+  console.log('\nПриключение: бонусы и звёзды');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => { localStorage.setItem('hc_adv_максим', '50'); BOT_SPEED = 1000; });
+  const worlds = await page.evaluate(() => [0, 10, 20, 30, 40].map(n => {
+    startAdventure(n); stopBot();
+    const kinds = D.bonuses.map(b => b.type);
+    const r = { n, bonus: bonusMode, first: advChar(n).world.bonus, has: kinds.includes(advChar(n).world.bonus),
+                traps: kinds.filter(k => BONUS_TRAP.includes(k)).length, setTraps: bonusSet.trap.length };
+    quitToMenu();
+    return r;
+  }));
+  check('в каждом мире бонусы включены и бонус мира на поле',
+    worlds.every(w => w.bonus && w.has), JSON.stringify(worlds));
+  check('бонусы миров: щит, половина, рентген, лава, заморозка',
+    worlds.map(w => w.first).join() === 'shield,half,xray,lava,freeze', worlds.map(w => w.first).join());
+  check('у обычных соперников ловушек нет', worlds.every(w => w.setTraps === 0 && w.traps === 0), JSON.stringify(worlds));
+  const boss = await page.evaluate(() => {
+    startAdventure(9); stopBot();
+    const r = { traps: bonusSet.trap.length, wins: D.winsNeeded };
+    quitToMenu();
+    return r;
+  });
+  check('босс играет с ловушками', boss.traps === 3 && boss.wins === 2, JSON.stringify(boss));
+  const magic = await page.evaluate(() => {
+    const n = [...Array(50).keys()].find(i => advChar(i).quirk === 'bonus' && advChar(i).w === 2);
+    startAdventure(n); stopBot();
+    const r = { n, count: D.bonuses.length, auto: autoBonusCountFor(rangeCount()), traps: bonusSet.trap.length };
+    quitToMenu();
+    return r;
+  });
+  check('у Фокусника бонусов вдвое больше и есть ловушки', magic.count === 2 * magic.auto && magic.traps === 3, JSON.stringify(magic));
+  const after = await page.evaluate(() => ({ set: bonusSet, adv: !!adv }));
+  check('после Приключения обычный набор бонусов вернулся', after.set === null && !after.adv, JSON.stringify(after));
+
+  // Новые бонусы на настоящей доске
+  const eff = await page.evaluate(() => {
+    startAdventure(20); stopBot();
+    D.cur = 0;
+    const out = {};
+    applyBonus('xray', 0);
+    out.xray = D.know[0].parity === Math.abs(secret) % 2;
+    applyBonus('half', 0);
+    out.half = D.know[0].half === (secret <= halfMark() ? 'low' : 'high');
+    renderAll();
+    out.chip = document.getElementById('peff0').textContent;
+    out.rivalChip = document.getElementById('peff1').textContent;
+    // Бот тоже пользуется знанием: все его возможные числа той же чётности
+    D.know[1] = { parity: Math.abs(secret) % 2 };
+    const cand = botCandidates([], 1, { know: D.know[1] }, false);
+    out.botParity = [...cand].every((c, i) => !c || Math.abs(i + RANGE_MIN) % 2 === D.know[1].parity);
+    // Щит отбивает ловушку
+    applyBonus('shield', 0);
+    const v = secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN;
+    D.bonuses = [{ value: v, type: 'skip', taken: false }];
+    duelPlay(v);
+    out.shield = !D.skip[0] && D.lastBonus === 'shieldUsed' && !D.shield[0];
+    out.line = document.getElementById('bonusLine').textContent;
+    // Заморозка — соперник пропускает ход
+    D.cur = 0;
+    applyBonus('freeze', 0);
+    out.freeze = D.skip[1] && D.frozen[1];
+    D.cur = 1;
+    renderAll();
+    out.frozenFlag = document.getElementById('peff1').textContent.includes('🧊');
+    quitToMenu();
+    return out;
+  });
+  check('рентген: чётность загаданного', eff.xray, JSON.stringify(eff));
+  check('половина: в какой половине прямой', eff.half, JSON.stringify(eff));
+  check('знание видно у своего имени словами, у соперника — нет', /чётное|нечётное/.test(eff.chip) && /больше/.test(eff.chip) &&
+    !/чётное/.test(eff.rivalChip), eff.chip + ' / ' + eff.rivalChip);
+  check('бот с рентгеном ищет только среди чисел нужной чётности', eff.botParity);
+  check('щит отбил ловушку — и об этом сказано', eff.shield && /щит отбил ловушку «Пропуск хода»/.test(eff.line), eff.line);
+  check('заморозка: соперник пропускает ход, у него значок 🧊', eff.freeze && eff.frozenFlag, JSON.stringify(eff));
+
+  // Лава в Огненных горах: соперник бросает в лаву
+  const lava = await page.evaluate(() => {
+    startAdventure(30); stopBot();
+    const r = { has: D.bonuses.some(b => b.type === 'lava') };
+    applyBonus('lava', 1);
+    D.cur = 0;
+    renderAll();
+    r.forced = forcedTurn();
+    r.btn = document.getElementById('forcedBtn').textContent;
+    quitToMenu();
+    return r;
+  });
+  check('в Огненных горах лава: ход в лаву у игрока', lava.has && lava.forced === 'lava' && lava.btn === 'В лаву', JSON.stringify(lava));
+
+  // Звёзды по сложности и лучший результат
+  const stars = await page.evaluate(async () => {
+    localStorage.setItem('hc_adv_максим', '3');
+    localStorage.removeItem('hc_advs_максим');
+    window.__adventure = 3;
+    window.__advStars = '';
+    advFillStars();
+    const before = advStars();
+    const won = async (n, diff) => {
+      setAdvDiff(diff);
+      startAdventure(n); stopBot();
+      D.cur = 0; duelPlay(secret);
+      const line = (document.querySelector('#resultBox .adv-line') || {}).textContent;
+      const again = [...document.querySelectorAll('#resultBox .r-actions button')].map(b => b.textContent);
+      quitToMenu();
+      return { line, again, stars: advStars() };
+    };
+    const a = await won(3, 'easy');
+    const b = await won(3, 'hard');
+    const c = await won(3, 'normal');
+    openAdventure();
+    const tile = document.querySelector('#advMap .adv-tile[data-n="3"] .at-stars').textContent;
+    const total = document.getElementById('advStarsTotal').textContent;
+    const world = document.querySelector('#advMap .adv-world .aw-stars').textContent;
+    openAdvCard(3);
+    const best = document.querySelector('#acFacts .ac-best').textContent;
+    closeAdvCard();
+    return { before, a, b, c, tile, total, world, best };
+  });
+  check('пройденным раньше — по звезде', stars.before === '111', stars.before);
+  check('легко — ★, и подсказка «Больше звёзд — на «Нормально»»', stars.a.stars === '1111' && /Больше звёзд — на «Нормально»/.test(stars.a.line),
+    JSON.stringify(stars.a));
+  check('не все звёзды — в итоге есть «Ещё раз»', stars.a.again.includes('Ещё раз'), stars.a.again.join());
+  check('трудно — ★★★, +2', stars.b.stars === '1113' && /\+2/.test(stars.b.line) && !stars.b.again.includes('Ещё раз'),
+    JSON.stringify(stars.b));
+  check('хуже лучшего — звёзды не убавились', stars.c.stars === '1113' && /Лучший результат/.test(stars.c.line), JSON.stringify(stars.c));
+  check('на карте: у соперника ★★★, в мире и всего — 6', stars.tile === '★★★' && /⭐ 6/.test(stars.total) && /⭐ 6\/30/.test(stars.world),
+    JSON.stringify(stars));
+  check('в карточке — лучший результат', /★★★/.test(stars.best), stars.best);
+  const diffBtns = await page.evaluate(() => [...document.querySelectorAll('#advDiff .ad-btn')].map(b => b.textContent));
+  check('у кнопок сложности — сколько звёзд', diffBtns.join() === 'Легко★,Нормально★★,Трудно★★★', diffBtns.join());
+
+  // База: звёзды уходят и сливаются
+  const sync = await page.evaluate(async () => {
+    window.__advStars = '0003000003';
+    await advSync();
+    return { local: advStars(), server: window.__advStars };
+  });
+  check('синхронизация: на каждом месте лучшее из телефона и базы', sync.local === '1113000003' && sync.server === '1113000003',
+    JSON.stringify(sync));
+
+  // Профиль и друзья
+  const pf = await page.evaluate(async () => {
+    window.__friendAdv = { done: 12, stars: '2', total: 21 };
+    await openFriendAch('Кира');
+    const friend = document.getElementById('achAdv').textContent;
+    closeFriendAch();
+    return { friend };
+  });
+  check('у друга видны звёзды и миры Приключения', pf.friend === '🗺️ Приключение: ⭐ 21 из 150 · миров 1 из 5', pf.friend);
+
+  // Переводы
+  for (const lang of ['en', 'fr', 'de']) {
+    const tx = await page.evaluate(l => {
+      currentLang = l; applyTranslations();
+      const T = t();
+      return BONUS_ADV.every(k => T.bonusNames[k] && T.tut.bcDesc[k] && (k === 'lava' || T.bonusDesc[k])) &&
+        T.forced.freeze && T.bonusKnow.even && T.adv.winStars && T.adv.pfLine && T.prog.q.adv_win2 &&
+        T.prog.q.adv_stars3 && T.prog.lad.advStars.forms && T.prog.lad.advWorlds.forms && T.online.rematchAsk;
+    }, lang);
+    check(lang + ': бонусы, звёзды, задания и реванш переведены', !!tx);
+  }
+  await page.evaluate(() => { currentLang = 'ru'; applyTranslations(); });
+  await page.context().close();
 }
 
 async function testAudit(browser) {
@@ -7464,6 +7635,7 @@ async function testKeyPage(browser) {
     await testRunStage(browser);
     await testBonusGuide(browser);
     await testAdventure(browser);
+    await testAdventureBonus(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

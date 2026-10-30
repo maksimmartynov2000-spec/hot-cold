@@ -108,6 +108,7 @@
   <div id="screenAdventure" class="hidden">
     <div class="screen-title" id="tAdvTitle"></div>
     <div class="adv-hint" id="tAdvHint"></div>
+    <div class="adv-stars" id="advStarsTotal"></div>
     <div class="adv-diff" id="advDiff"></div>
     <div class="adv-diff-hint" id="advDiffHint"></div>
     <div id="advMap"></div>
@@ -634,6 +635,7 @@
     <!-- Лига и значки прошлых сезонов: одна строка под именем -->
     <div class="pf-league hidden" id="pfLeague" onclick="if (ladderInfo) { closeLogoutModal(); openPath(); }"></div>
     <div class="pf-streak hidden" id="pfStreak"></div>
+    <div class="pf-streak hidden" id="pfAdv"></div>
 
     <div id="pfAccount">
       <!-- Своя иконка вместо буквы. Прячется, пока сервер не умеет профиль
@@ -859,6 +861,7 @@
 <div class="modal-backdrop hidden" id="achModal" onclick="if (event.target === this) closeFriendAch()">
   <div class="modal-card">
     <div class="modal-text" id="achTitle"></div>
+    <div class="pf-streak hidden" id="achAdv"></div>
     <div class="ach-grid" id="achGrid"></div>
     <div class="fr-note hidden" id="achNote"></div>
     <button class="btn btn-block" style="margin-top:14px" id="achClose" onclick="closeFriendAch()"></button>
