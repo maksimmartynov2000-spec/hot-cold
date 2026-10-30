@@ -2342,3 +2342,8 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .pf-avatar[data-frame="platinum"] { --fr: conic-gradient(from 20deg, #2dd4bf, #e0fffa, #5eead4, #e0fffa, #2dd4bf); --fr-glow: rgba(94, 234, 212, 0.65); }
 .pf-avatar[data-frame="diamond"] { --fr: conic-gradient(from 20deg, #93c5fd, #ffffff, #c4b5fd, #ffffff, #60a5fa, #93c5fd); --fr-glow: rgba(147, 197, 253, 0.8); }
 .pf-avatar[data-frame="legend"] { --fr: conic-gradient(#ff6b6b, #ffd166, #6ee7b7, #60a5fa, #c084fc, #ff6b6b); --fr-glow: rgba(192, 132, 252, 0.8); }
+.aw-goal { margin-top: 10px; font-size: 12px; font-weight: 800; color: var(--muted); text-align: center; }
+.aw-goal.got { color: var(--gold); }
+.adv-card .ac-gold { flex-basis: 100%; font-size: 12px; color: var(--muted); line-height: 1.35; }
+.av-head { grid-column: 1 / -1; text-align: left; font-size: 13px; font-weight: 900; margin: 8px 0 0; color: var(--gold); }
+.av-tile.adv-icon { padding: 3px !important; }

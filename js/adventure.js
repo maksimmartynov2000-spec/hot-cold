@@ -169,6 +169,19 @@ function advReport(n, k) {
     .catch(() => advSync());
 }
 function advWorldDone(w) { return advDone() >= (w + 1) * ADV_PER_WORLD; }
+
+// Иконки соперников — в кружок, когда весь их мир пройден на ★★★. Копия
+// списка — в базе (adventure_char_icons)
+const ADV_CHAR_ICONS = Array.from({ length: ADV_TOTAL }, (_, i) => 'adv-' + String(i + 1).padStart(2, '0'));
+function advWorldThree(w) {
+  return [...advStars().slice(w * ADV_PER_WORLD, (w + 1) * ADV_PER_WORLD)].filter(c => c === '3').length;
+}
+function advWorldGold(w) { return advWorldThree(w) === ADV_PER_WORLD; }
+function advGoldCount() { return ADV_WORLDS.filter((W, w) => advWorldGold(w)).length; }
+function advCharIconOpen(icon) {
+  const n = ADV_CHAR_ICONS.indexOf(icon);
+  return n >= 0 && advWorldGold(Math.floor(n / ADV_PER_WORLD));
+}
 function advIconOpen(icon) {
   const w = ADV_ICONS.indexOf(icon);
   return w >= 0 && advWorldDone(w);
@@ -231,7 +244,11 @@ function renderAdventure() {
       b.onclick = () => openAdvCard(n);
       grid.appendChild(b);
     }
-    sec.append(head, grid);
+    // Цель мира: ★★★ у всех — их иконки в профиль
+    const goal = document.createElement('div');
+    goal.className = 'aw-goal' + (advWorldGold(w) ? ' got' : '');
+    goal.textContent = advWorldGold(w) ? A.goldDone : A.goldGoal.replace('{n}', advWorldThree(w));
+    sec.append(head, grid, goal);
     return sec;
   }));
   const next = document.querySelector('#advMap .adv-tile.next');
@@ -262,7 +279,8 @@ function openAdvCard(n) {
     '<span class="ac-best">' + escapeHtml(A.best) + ': <b class="s' + best + '">' + advStarRow(best) + '</b></span>' +
     '<button type="button" class="ac-bonus" onclick="openBonusGuide(\'' + bk + '\')">' + escapeHtml(A.worldBonus) + ': <b>' +
       bonusArtHtml(bk, BONUS_ICON[bk]) + ' ' + escapeHtml(L.bonusNames[bk]) + '</b>' +
-      (c.boss || c.quirk === 'bonus' ? ' · ' + escapeHtml(A.traps) : '') + '</button>';
+      (c.boss || c.quirk === 'bonus' ? ' · ' + escapeHtml(A.traps) : '') + '</button>' +
+    '<span class="ac-gold">' + escapeHtml(advWorldGold(c.w) ? A.goldDone : A.cardGold.replace('{n}', advWorldThree(c.w))) + '</span>';
   const go = document.getElementById('acGo');
   const open = n <= done;
   go.textContent = open ? A.fight : A.locked;

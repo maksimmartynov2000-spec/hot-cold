@@ -5786,7 +5786,7 @@ async function testProgress(browser) {
   const dbAch = achMig.match(/select array\[('first_win'[^\]]*)\]/)[1].replace(/\s/g, '').split(',').map(x => x.replace(/'/g, ''));
   const dbIcons = [...mig.match(/values \(3, '🔥'\)[^;]*;/)[0].matchAll(/\((\d+), '([^']+)'\)/g)].map(m => m[1] + m[2]);
   const dbQuests = [...mig.match(/create or replace function quest_pool\(\)[\s\S]*?\$\$;/)[0].matchAll(/'([a-z_0-9]+)'/g)].map(m => m[1]);
-  check('достижения: 58 кодов лестницами, те же, что в базе, в том же порядке', js.ach.length === 58 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
+  check('достижения: 61 код лестницами, те же, что в базе, в том же порядке', js.ach.length === 61 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
   check('иконки за серию — те же, что в базе', js.icons.join() === dbIcons.join(), js.icons.join() + ' / ' + dbIcons.join());
   check('у каждого задания из базы есть текст', dbQuests.length === 7 && dbQuests.every(c => js.q.includes(c)), dbQuests.join());
   check('тексты заданий и достижений есть на всех 4 языках', js.langs.every(Boolean), JSON.stringify(js.langs));
@@ -5822,8 +5822,8 @@ async function testProgress(browser) {
     rows: [...document.querySelectorAll('#pfAchGrid .lad-row')].map(x => x.dataset.ladder + ':' + x.dataset.tier),
     wins: (document.querySelector('#pfAchGrid .lad-row[data-ladder="wins"]') || {}).textContent || '' }));
   check('профиль: серия заданий и лучшая', pf.streakShown && pf.streak === '📅 Серия заданий: 3 дн. · лучшая 4', pf.streak);
-  check('профиль: «🏅 Достижения: 2 из 58», по строке на лестницу со ступенью',
-    pf.head === '🏅 Достижения: 2 из 58' && pf.rows.join() === 'wins:1,games:0,streak:0,firstTry:0,modes:0,league:0,quests:0,run:0,friends:0,rivals:0,tutorial:1,advStars:0,advWorlds:0',
+  check('профиль: «🏅 Достижения: 2 из 61», по строке на лестницу со ступенью',
+    pf.head === '🏅 Достижения: 2 из 61' && pf.rows.join() === 'wins:1,games:0,streak:0,firstTry:0,modes:0,league:0,quests:0,run:0,friends:0,rivals:0,tutorial:1,advStars:0,advWorlds:0,advGold:0',
     JSON.stringify(pf));
   check('у лестницы — что открыто и что дальше', /Первая победа/.test(pf.wins) && /Дальше: 5 побед/.test(pf.wins), pf.wins);
   // Новые лестницы и верх старых: сколько до следующей ступени
@@ -6646,6 +6646,28 @@ async function testAdventureBonus(browser) {
   });
   check('синхронизация: на каждом месте лучшее из телефона и базы', sync.local === '1113000003' && sync.server === '1113000003',
     JSON.stringify(sync));
+
+  // Иконки соперников: мир на ★★★ — все десять в кружок
+  const icons = await page.evaluate(() => {
+    localStorage.setItem('hc_advs_максим', '3333333333' + '3333332111');
+    progressInfo = Object.assign({ quests: [], achievements: [] }, progressInfo || {}, { stats: { advGold: 1 } });
+    openAdventure();
+    const goals = [...document.querySelectorAll('#advMap .aw-goal')].map(e => e.textContent);
+    openLogoutModal(); showAvatarPicker(true); renderAvatarGrid();
+    const tiles = [...document.querySelectorAll('#avGrid .av-tile.adv-icon')];
+    const r = { goals, n: tiles.length, open: tiles.filter(x => !x.classList.contains('locked')).map(x => x.dataset.icon),
+                head: (document.querySelector('#avGrid .av-head') || {}).textContent };
+    chooseAvatar('adv-15');
+    r.note = document.getElementById('avNote').textContent;
+    r.pf = document.getElementById('pfAdv').textContent;
+    closeLogoutModal();
+    return r;
+  });
+  check('в выборе — 50 иконок Приключения, открыт только мир на ★★★', icons.n === 50 && icons.open.length === 10 &&
+    icons.open[0] === 'adv-01' && icons.open[9] === 'adv-10' && /10 из 50/.test(icons.head), JSON.stringify(icons).slice(0, 300));
+  check('закрытая иконка говорит, что нужно', /Джунгли/.test(icons.note) && /6 из 10/.test(icons.note), icons.note);
+  check('на карте — цель мира: открыто или сколько из 10', /в профиле/.test(icons.goals[0]) && /6\/10/.test(icons.goals[1]), icons.goals.join(' | '));
+  check('в профиле — счётчик иконок', /иконок 10 из 50/.test(icons.pf), icons.pf);
 
   // Профиль и друзья
   const pf = await page.evaluate(async () => {
