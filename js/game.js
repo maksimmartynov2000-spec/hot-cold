@@ -616,6 +616,11 @@ function showScreen(name) {
   if (name !== 'chat') stopChatPoll();
   if (name !== 'friends') stopFriendsPoll();
   if (name !== 'online') { stopRankedPoll(); stopOnlinePoll(); }
+  // Ход бота планируется при отрисовке доски, но партия рисуется раньше, чем
+  // открывается экран. Если первым ходит соперник, его ход так и не
+  // назначался — бот молчал, пока игрок что-нибудь не нажмёт. Доска открыта —
+  // спросить бота ещё раз
+  if (name === 'game') botTick();
   document.getElementById('card').classList.toggle('wide', name === 'game' && mode === 'duel');
   document.getElementById('card').classList.toggle('solo-game', name === 'game' && mode !== 'duel');
   document.querySelector('.header').classList.toggle('compact', name === 'game');
