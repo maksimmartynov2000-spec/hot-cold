@@ -147,7 +147,7 @@ declare r jsonb; mid bigint; m matches; rv jsonb;
 begin
   delete from ladder where username = 'Максим';
   perform join_ranked_queue('Максим', '1111', 0);
-  update ranked_queue set joined_at = now() - interval '16 seconds' where username = 'Максим';
+  update ranked_queue set joined_at = now() - interval '26 seconds' where username = 'Максим';
   r := ranked_status('Максим', '1111', 0);
   mid := (r->>'matchId')::bigint;
   select * into m from matches where id = mid;

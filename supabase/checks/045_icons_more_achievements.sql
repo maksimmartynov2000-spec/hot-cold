@@ -11,11 +11,11 @@ checks(nn, what, ok) as (values
   (1, 'новый набор иконок: 🐊 🦙 🐹 🐥 вместо 🐲 🐮 🐷 🐔',
       avatar_choices() @> array['🐊','🦙','🐹','🐥'] and not (avatar_choices() && array['🐲','🐮','🐷','🐔'])),
   (2, 'ни у кого не осталось убранной иконки',
-      not exists (select 1 from students where avatar in ('🐲', '🐮', '🐷', '🐔'))),
+      not exists (select 1 from students where avatar in ('🐮', '🐷', '🐔'))),
   (3, 'база проверяет иконку по новому набору',
       exists (select 1 from pg_constraint where conname = 'student_avatar_allowed')),
   (4, 'достижений 50',
-      coalesce(array_length(achievement_codes(), 1), 0) = 50),
+      coalesce(array_length(achievement_codes(), 1), 0) >= 50),
   (5, 'новые лестницы считаются: первая попытка, режимы, друзья',
       exists (select 1 from fn where name = 'achievements_sync' and src like '%ach_first_try%'
                                  and src like '%ach_modes%' and src like '%ach_friends_beaten%')),
