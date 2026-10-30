@@ -167,11 +167,14 @@ function renderVizToggles() {
   document.getElementById('tVizLine').textContent = L.vizLine;
   document.getElementById('tVizHint').textContent = L.hintLabel;
   document.getElementById('tVizSound').textContent = L.run.sound;
+  document.getElementById('tVizKnown').textContent = L.train.knownToggle;
+  // «Где может быть число» — только в тренировке
+  document.getElementById('toggleKnownBtn').classList.toggle('hidden', mode !== 'solo');
   const snd = document.getElementById('vizSound');
   snd.classList.toggle('on', soundOn);
   snd.querySelector('.vr-ic').textContent = soundOn ? '🔊' : '🔇';
   [['toggleThermoBtn', showThermo, L.vizThermo], ['toggleLineBtn', showLine, L.vizLine],
-   ['toggleHintBtn', distanceHint, L.hintLabel]]
+   ['toggleHintBtn', distanceHint, L.hintLabel], ['toggleKnownBtn', knownOn, L.train.knownToggle]]
     .forEach(([id, on, title]) => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -232,6 +235,8 @@ function rangeCount() { return RANGE_MAX - RANGE_MIN + 1; }
 // «короткая память» режет это вдвое — и в списке, и на прямой, иначе прямая
 // показывала бы то, что из истории убрали
 function historyVisible() {
+  // Туман в Испытании — видно только два последних хода
+  if (mode === 'run' && RUN && RUN.mod === 'fog' && !gameOver) return 2;
   return (mode === 'duel' && !D.roundOver && D.shortMemory[viewerSeat()])
     ? HISTORY_SHORT : HISTORY_VISIBLE;
 }
@@ -274,6 +279,7 @@ function setFrostMode(on) {
   try { localStorage.setItem('hc_frost', frostMode ? '1' : '0'); } catch (e) {}
   buildRangeOptions();
   renderFrostToggles();
+  renderTrainPanel();
 }
 const P_COLORS = ["#6366f1", "#fbbf24"];
 
@@ -564,10 +570,6 @@ function applyTranslations() {
   document.getElementById('tRunPin').textContent = runAuthMode === 'register' ? L.run.pin : L.run.pinLogin;
   document.getElementById('runUsername').placeholder = L.run.namePh;
   document.getElementById('tRunStart').textContent = L.run.start;
-  document.getElementById('tRunTop').textContent = L.run.top;
-  document.getElementById('tRunTopDay').textContent = L.run.topDay;
-  document.getElementById('tRunTopWeek').textContent = L.run.topWeek;
-  document.getElementById('tRunTopAll').textContent = L.run.topAll;
   document.getElementById('tRunToMenu').textContent = L.run.toMenu;
   if (runPause) {
     document.getElementById('tMenu').textContent = L.run.pause;
@@ -638,6 +640,7 @@ function quitToMenu() {
   // Из партии Приключения — обратно на карту, а не в главное меню
   const toMap = !!adv && screen === 'game';
   endAdventureMode();
+  endDrill();
   setGuessNote('');
   endLessonMode();
   liftCurtain();
@@ -697,6 +700,7 @@ let setupBot = false;
 function openSetup(m, bot) {
   endLessonMode();
   endAdventureMode();
+  endDrill();
   mode = m;
   setupBot = !!bot && m === 'duel';
   const L = t();
@@ -713,6 +717,7 @@ function openSetup(m, bot) {
   if (setupBot) renderBotPick();
   renderBonusSetup();
   refreshChips();
+  renderTrainPanel();
   showScreen('setup');
 }
 
@@ -789,6 +794,7 @@ function onRangeChange() {
   buildAttemptsOptions();
   buildBonusCountOptions();
   saveSetupChoice();
+  renderTrainPanel();
 }
 
 // Диапазон и попытки запоминаются: ребёнок выбрал удобное — в следующий раз
@@ -970,6 +976,7 @@ function handleGuess() {
     gameOverType = 'win';
     movesUsed = history.length;
     lastWinIsRecord = maybeSaveRecord(RANGE_MAX, history.length);
+    trainLogAdd(true, movesUsed);
   } else if (history.length >= MAX_GUESSES) {
     gameOver = true;
     gameOverType = 'lose_waiting';
@@ -987,6 +994,7 @@ function submitFinal() {
   // Последняя догадка в историю не идёт, но ходом она была — считаем её
   movesUsed = history.length + 1;
   lastWinIsRecord = win ? maybeSaveRecord(RANGE_MAX, history.length + 1) : false;
+  trainLogAdd(win, movesUsed);
   renderAll();
 }
 
@@ -1313,8 +1321,11 @@ function isHit(h) { return !!(h && h.meta && h.meta.labelIndex === 8); }
 function getFeedback(distance) {
   return FEEDBACK_META.find(f => distance >= f.min && distance <= f.max) || FEEDBACK_META[0];
 }
-function getFbText(meta) { return t().labels[meta.labelIndex]; }
-function getFbHtml(meta) { return tierLabelHtml(meta.labelIndex, getFbText(meta)); }
+// «Теплее / холоднее» в Испытании — не пояс, а сравнение с прошлым ходом
+function getFbText(meta) { return meta.custom ? t().trial.rel[meta.custom] : t().labels[meta.labelIndex]; }
+function getFbHtml(meta) {
+  return meta.custom ? meta.icon + ' ' + escapeHtml(getFbText(meta)) : tierLabelHtml(meta.labelIndex, getFbText(meta));
+}
 
 function renderAll() {
   if (screen !== 'game' && mode === null) return;
@@ -1331,6 +1342,8 @@ function renderAll() {
   renderVizToggles();
   renderThermo();
   renderNumberLine();
+  renderKnownLine();
+  renderDrillCoach();
   renderStatus();
   renderResult();
   renderRunStage();
@@ -1346,6 +1359,7 @@ function renderAll() {
   // Сначала итог урока: он отмечает урок пройденным, и подсказка гаснет
   renderLessonResult();
   renderCoach();
+  checkBonusFx();
   checkBonusCard();
   botTick();
 }
@@ -1463,7 +1477,7 @@ function renderFeedback() {
   // Пояс — помощь для тренировки: там учатся. В игре с другом и в рейтинге его
   // нет, иначе это преимущество, а не учёба
   const band = document.getElementById('feedbackBand');
-  const showBand = distanceHint && !isHit(last);
+  const showBand = distanceHint && !isHit(last) && !last.meta.custom;
   band.classList.toggle('hidden', !showBand);
   band.textContent = showBand ? t().fbBand.replace('{r}', last.meta.rangeSign) : '';
   band.style.color = last.meta.color;
@@ -1476,7 +1490,8 @@ function renderThermo() {
   // На итогах градусник только повторяет карточку («в точку!»), а ответ и
   // так отмечен на прямой — убираем его, чтобы итог и история попыток
   // поместились на экран
-  const hide = !showThermo || roundOver();
+  const lastMv = currentMove();
+  const hide = !showThermo || roundOver() || !!(lastMv && lastMv.meta.custom);
   wrap.classList.toggle('hidden', hide);
   // Градусник слева от слова — карточка в две колонки; без него слово по центру
   document.getElementById('feedbackPanel').classList.toggle('with-thermo', !hide);
@@ -1699,6 +1714,31 @@ function renderNumberLine() {
                            : label.replace('</text>', nlSlide('x', from, p) + '</text>');
   }
 
+  // Тренировка: где ещё может быть число — подсвеченные отрезки на прямой
+  const known = knownCandidates();
+  if (known && !revealed) {
+    knownRuns(known).forEach(([a, b]) => {
+      const x1 = nlPos(a), x2 = nlPos(b);
+      out += '<rect class="nl-known" x="' + (x1 - 0.6) + '%" y="' + (NL.axisY - 4) + '" width="' + Math.max(1.2, x2 - x1 + 1.2) +
+             '%" height="8" rx="4" />';
+    });
+  }
+
+  // Бонусы на прямой: взятые — значком на своём числе, «рядом что-то есть» —
+  // мерцающий участок вокруг хода
+  if (mode === 'duel' && bonusMode && !revealed) {
+    if (D.nearBonus && last) {
+      const r = bonusNearRadius();
+      const x1 = nlPos(Math.max(RANGE_MIN, last.guess - r)), x2 = nlPos(Math.min(RANGE_MAX, last.guess + r));
+      out += '<rect class="nl-near" x="' + x1 + '%" y="' + (NL.axisY - 6) + '" width="' + Math.max(1, x2 - x1) +
+             '%" height="12" rx="6" />';
+    }
+    (D.bonuses || []).filter(b => b.taken).forEach(b => {
+      out += '<text class="nl-bonus" x="' + nlPos(b.value) + '%" y="' + (NL.axisY - 8) + '" text-anchor="middle" font-size="11">' +
+             (BONUS_ICON[b.type] || '🎁') + '</text>';
+    });
+  }
+
   if (revealed) {
     const p = nlPos(secret);
     const color = BULLSEYE_TIER.color;
@@ -1716,6 +1756,47 @@ function renderNumberLine() {
   nlDrawn = still;
   svg.innerHTML = out;
   nlPlay(svg);
+}
+
+// ---------- что известно (тренировка) ----------
+// Числа, которые ещё сходятся со всеми подсказками. Только в тренировке: в
+// игре против соперника это было бы подсказкой за него
+let knownOn = false;
+try { knownOn = localStorage.getItem('hc_known') === '1'; } catch (e) {}
+function toggleKnown() {
+  knownOn = !knownOn;
+  try { localStorage.setItem('hc_known', knownOn ? '1' : '0'); } catch (e) {}
+  renderAll();
+}
+function knownCandidates() {
+  if (mode !== 'solo' || (!knownOn && !(drill && drill.known)) || !history.length) return null;
+  const bands = reviewBands(FEEDBACK_META);
+  const cand = new Uint8Array(RANGE_MAX - RANGE_MIN + 1).fill(1);
+  history.forEach(h => narrow(cand, RANGE_MIN, bands, h.guess, h.meta.labelIndex));
+  return cand;
+}
+function knownRuns(cand) {
+  const runs = [];
+  let a = null;
+  for (let i = 0; i <= cand.length; i++) {
+    if (i < cand.length && cand[i]) { if (a === null) a = i; }
+    else if (a !== null) { runs.push([a + RANGE_MIN, i - 1 + RANGE_MIN]); a = null; }
+  }
+  return runs;
+}
+function renderKnownLine() {
+  const el = document.getElementById('knownLine');
+  if (!el) return;
+  const cand = knownCandidates();
+  const show = !!cand && !gameOver;
+  el.classList.toggle('hidden', !show);
+  if (!show) return;
+  const n = cand.reduce((a, c) => a + c, 0);
+  const runs = knownRuns(cand);
+  const T = t().train;
+  const parts = runs.slice(0, 3).map(([a, b]) => a === b ? formatNum(a) : formatNum(a) + '…' + formatNum(b));
+  el.innerHTML = '🔍 ' + escapeHtml(T.left.replace('{n}', withPlural(n, T.numForms))) +
+    (n > 1 ? ': <b>' + escapeHtml(parts.join(T.or)) + (runs.length > 3 ? '…' : '') + '</b>' : '');
 }
 
 // Партия с человеком ещё не началась: ждём соперника или идёт отсчёт 3-2-1.
@@ -2064,7 +2145,7 @@ function renderPlayers() {
     // Что на игроке висит — значками, с полными названиями по наведению
     const flags = [[D.fog[p], bonusArtHtml('fog', '🙈'), L.bonusNames.fog],
                    [D.blind[p], bonusArtHtml('blind', '🌫️'), L.bonusNames.blind],
-                   [D.autoLava[p], '🌋', L.bonusNames.lava],
+                   [D.autoLava[p], '💫', L.bonusNames.lava],
                    [D.skip[p] && !(D.frozen && D.frozen[p]), bonusArtHtml('skip', '⏭'), L.bonusNames.skip],
                    [D.frozen && D.frozen[p], '🧊', L.bonusNames.freeze],
                    [D.shortMemory[p], bonusArtHtml('memory', '🧠'), L.bonusNames.memory],
@@ -2255,9 +2336,10 @@ function analyseGame(moves, min, max, meta, final) {
         grade = gradeOf(r, out.length === 0, scan.total, scan.H(mid) / scan.hBest, g === mid);
       }
       const score = (grade === 'hit' || grade === 'brilliant' || grade === 'best') ? 100 : movePct(r);
-      res = { guess: g, final: false, grade, score, best, ratio: r };
+      res = { guess: g, final: false, grade, score, best, ratio: r, before: scan.total };
       // Ответ отсекает всё, что с ним не сходится
       narrow(cand, min, bands, g, step.labelIndex);
+      res.after = cand.reduce((a, c) => a + c, 0);
     }
     out.push(res);
   }
@@ -2685,6 +2767,8 @@ function currentReview() {
   if (finalGuessValue !== null && finalGuessValue === secret && data.moves.length) {
     data.moves[data.moves.length - 1].grade = 'hit';
   }
+  // Сколько ходов хватило бы, если каждый раз ходить лучшим ходом
+  data.strong = bestPathLength(secret, RANGE_MIN, RANGE_MAX);
   reviewCache = { key, data };
   return data;
 }
@@ -2738,6 +2822,9 @@ function openReview() {
     accBox.textContent = rv.accuracy + '%';
   }
   document.getElementById('tRvAcc').textContent = L.review.accuracy;
+  const strong = document.getElementById('rvStrong');
+  strong.classList.toggle('hidden', rv.duel || !rv.strong);
+  if (!rv.duel && rv.strong) strong.textContent = t().train.strong.replace('{n}', withPlural(rv.strong, t().train.moveForms));
   document.getElementById('tReviewClose').textContent = L.run.done;
   // Сводка: сколько ходов какого класса — только те, что были
   const sum = document.getElementById('rvSum');
@@ -2785,6 +2872,14 @@ function openReview() {
     guess.className = 'rv-guess';
     guess.textContent = m.guess;
     row.append(num, guess, gradeLine(m, 'rv-grade'));
+    // Тренировка: сколько чисел было и сколько осталось после хода. Каким
+    // был лучший ход, разбор не говорит: это оценка, а не готовый ответ
+    if (!rv.duel && !m.final && m.before) {
+      const info = document.createElement('span');
+      info.className = 'rv-left';
+      info.textContent = t().train.leftShort.replace('{a}', formatNum(m.before)).replace('{b}', formatNum(m.after));
+      row.appendChild(info);
+    }
     if (m.final) {
       const note = document.createElement('span');
       note.className = 'rv-final';
@@ -3620,6 +3715,8 @@ function buildLegend() {
 function renderScaleStrip() {
   const box = document.getElementById('scaleStrip');
   if (!box) return;
+  // В раунде «теплее / холоднее» поясов нет — и шкала не нужна
+  box.classList.toggle('hidden', mode === 'run' && !!RUN && RUN.mod === 'warmer');
   box.classList.toggle('open', scaleOpen);
   box.setAttribute('aria-expanded', scaleOpen ? 'true' : 'false');
   const last = currentMove();
@@ -3647,7 +3744,7 @@ function toggleSound() {
   if (soundOn) playTone(660, 0.12);
 }
 
-function playTone(freq, seconds, delay) {
+function playTone(freq, seconds, delay, type, slideTo) {
   if (!soundOn) return;
   try {
     // Контекст создаём при первом касании: iOS не даёт звучать без действия игрока
@@ -3656,8 +3753,9 @@ function playTone(freq, seconds, delay) {
     const start = audioCtx.currentTime + (delay || 0);
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc.type = 'sine';
+    osc.type = type || 'sine';
     osc.frequency.setValueAtTime(freq, start);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, start + seconds);
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(0.18, start + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + seconds);
@@ -3685,6 +3783,65 @@ function soundForGuess(meta) {
   } else {
     playTone(TIER_NOTES[meta.labelIndex] || 220, 0.14);
   }
+}
+
+// Свой звук у каждого бонуса: помощь — вверх и светло, ловушка — вниз и глухо
+const BONUS_SOUNDS = {
+  extra: [[523, 0.09], [659, 0.09, 0.08], [784, 0.16, 0.16]],
+  fog: [[392, 0.5, 0, 'triangle', 262]],
+  blind: [[330, 0.45, 0, 'triangle', 196]],
+  rush: [[880, 0.06], [880, 0.06, 0.1], [880, 0.06, 0.2]],
+  lava: [[220, 0.25, 0, 'sawtooth', 660], [988, 0.12, 0.25]],
+  xray: [[1047, 0.08, 0, 'square'], [1319, 0.14, 0.09, 'square']],
+  half: [[440, 0.12], [660, 0.18, 0.12]],
+  shield: [[392, 0.12], [523, 0.12, 0.1], [784, 0.3, 0.2, 'triangle']],
+  freeze: [[1568, 0.4, 0, 'triangle', 784], [2093, 0.15, 0.05]],
+  skip: [[294, 0.18, 0, 'square', 147]],
+  gift: [[659, 0.12], [494, 0.2, 0.12, 'triangle']],
+  memory: [[392, 0.12, 0, 'triangle'], [330, 0.12, 0.12, 'triangle'], [262, 0.2, 0.24, 'triangle']],
+  shieldUsed: [[784, 0.08, 0, 'square'], [1175, 0.25, 0.07, 'triangle']]
+};
+function soundForBonus(kind) {
+  (BONUS_SOUNDS[kind] || []).forEach(([f, s, d, type, to]) => playTone(f, s, (d || 0) + 0.12, type, to));
+  buzz(BONUS_TRAP.indexOf(kind) >= 0 ? [60, 40, 60] : 30);
+}
+
+// Вспышка бонуса: крупная карточка на секунду и эффект на весь экран —
+// туман клубится, лёд трескается, щит светится. Сработавший впервые бонус
+// вместо вспышки объясняет себя карточкой — её и так видно крупно
+let bonusFxKey = null;
+let bonusFxTimer = null;
+function checkBonusFx() {
+  if (mode !== 'duel' || screen !== 'game' || !D.lastBonus) return;
+  const key = (online ? online.id : 'l') + '|' + D.round + '|' + history.length + '|' + D.lastBonus;
+  if (key === bonusFxKey) return;
+  // Открыли идущую партию онлайн — старый бонус не вспыхивает заново
+  const stale = online && !online.fxSeen;
+  if (online) online.fxSeen = true;
+  bonusFxKey = key;
+  if (stale) return;
+  soundForBonus(D.lastBonus);
+  let seen = [];
+  try { seen = JSON.parse(localStorage.getItem('hc_seen_bonus')) || []; } catch (e) {}
+  if (seen.indexOf(D.lastBonus) < 0 && BONUS_ICON[D.lastBonus]) return;
+  showBonusFlash(D.lastBonus, D.lastBonusBy);
+}
+function showBonusFlash(kind, by) {
+  const box = document.getElementById('bonusFlash');
+  if (!box) return;
+  const L = t();
+  const trap = BONUS_TRAP.indexOf(kind) >= 0;
+  box.className = 'bonus-flash ' + (trap ? 'trap' : 'good') + ' k-' + kind;
+  document.getElementById('bfIcon').innerHTML = bonusArtHtml(kind === 'shieldUsed' ? 'shield' : kind,
+    BONUS_ICON[kind === 'shieldUsed' ? 'shield' : kind] || '🎁');
+  document.getElementById('bfName').textContent = L.bonusNames[kind] || '';
+  document.getElementById('bfWho').textContent = (L.bonusDesc[kind] || '')
+    .replace('{a}', D.names[by] || '').replace('{b}', D.names[1 - by] || '')
+    .replace('{t}', L.bonusNames[D.shieldedTrap] || '');
+  void box.offsetWidth;
+  box.classList.add('show');
+  clearTimeout(bonusFxTimer);
+  bonusFxTimer = setTimeout(() => box.classList.remove('show'), 1700);
 }
 
 // Фанфары: рекорд, выигранная партия, новая лига
@@ -3728,3 +3885,205 @@ function soundGameOver() {
   buzz([60, 50, 120]);
 }
 
+
+
+// ================= ТРЕНИРОВКА: УРОКИ, ПРОГРЕСС, ЛУЧШИЙ ПУТЬ =================
+// Сколько ходов уйдёт, если каждый раз ходить лучшим ходом (тем, что в
+// среднем оставляет меньше всего вариантов). Это мерка «сильного игрока»
+function bestPathLength(target, min, max) {
+  const bands = reviewBands(FEEDBACK_META);
+  const cand = new Uint8Array(max - min + 1).fill(1);
+  let g = Math.round((min + max) / 2);
+  for (let n = 1; n <= 40; n++) {
+    const scan = infoScan(cand, min, max, bands);
+    g = scan.pickBest(g);
+    if (g === target) return n;
+    narrow(cand, min, bands, g, bandOf(Math.abs(g - target), bands));
+  }
+  return null;
+}
+
+// В среднем у сильного игрока на этом диапазоне — по равномерной выборке
+// загаданных. Считается один раз на диапазон
+const strongCache = {};
+function strongAverage() {
+  const key = RANGE_MIN + ':' + RANGE_MAX;
+  if (strongCache[key]) return strongCache[key];
+  const n = rangeCount(), samples = Math.min(n, 24);
+  let sum = 0, cnt = 0;
+  for (let i = 0; i < samples; i++) {
+    const v = RANGE_MIN + Math.floor((i + 0.5) * n / samples);
+    const k = bestPathLength(v, RANGE_MIN, RANGE_MAX);
+    if (k) { sum += k; cnt++; }
+  }
+  strongCache[key] = cnt ? sum / cnt : null;
+  return strongCache[key];
+}
+
+// Журнал тренировок: диапазон, ходы, победа. Только в телефоне
+const TRAIN_LOG = 'hc_train_log';
+function trainLog() {
+  try { const v = JSON.parse(localStorage.getItem(TRAIN_LOG)); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+}
+function trainKey() { return RANGE_MIN + '..' + RANGE_MAX; }
+function trainLogAdd(win, moves) {
+  if (mode !== 'solo') return;
+  const log = trainLog();
+  log.push({ r: trainKey(), m: moves, w: !!win, t: Date.now() });
+  try { localStorage.setItem(TRAIN_LOG, JSON.stringify(log.slice(-300))); } catch (e) {}
+  if (drill && win) drillDone(drill.key);
+}
+
+// ---------- уроки-приёмы ----------
+// Каждый урок — короткая игра с объяснением, почему приём работает, и
+// подсказкой учителя после каждого хода
+const DRILLS = [
+  { key: 'bands', range: 20, frost: false, icon: '📏' },
+  { key: 'best', range: 100, frost: false, icon: '🧠' },
+  { key: 'two', range: 100, frost: false, icon: '🔍', known: true },
+  { key: 'minus', range: 50, frost: true, icon: '➖' }
+];
+let drill = null;
+function drillsDone() {
+  try { const v = JSON.parse(localStorage.getItem('hc_drills')); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+}
+function drillDone(key) {
+  const d = drillsDone();
+  if (d.indexOf(key) >= 0) return;
+  d.push(key);
+  try { localStorage.setItem('hc_drills', JSON.stringify(d)); } catch (e) {}
+}
+function openDrill(key) {
+  const d = DRILLS.find(x => x.key === key);
+  if (!d) return;
+  const T = t().train.drills[key];
+  document.getElementById('drIcon').textContent = d.icon;
+  document.getElementById('drTitle').textContent = T.title;
+  document.getElementById('drWhy').textContent = T.why;
+  document.getElementById('drGo').textContent = t().train.start;
+  document.getElementById('drGo').onclick = () => { closeDrillCard(); startDrill(key); };
+  document.getElementById('drBack').textContent = t().back;
+  document.getElementById('drillCard').classList.remove('hidden');
+}
+function closeDrillCard() { document.getElementById('drillCard').classList.add('hidden'); }
+function startDrill(key) {
+  const d = DRILLS.find(x => x.key === key);
+  if (!drill) drill = { prevFrost: frostMode };
+  Object.assign(drill, d);
+  mode = 'solo';
+  frostMode = d.frost;
+  applyBounds(d.range);
+  // Попыток с запасом: урок про приём, а не про то, чтобы уложиться
+  MAX_GUESSES = minAttempts(rangeCount()) + 4;
+  applyRangeToInputs();
+  startSolo();
+}
+function endDrill() {
+  if (!drill) return;
+  frostMode = drill.prevFrost;
+  drill = null;
+}
+
+// Подсказка учителя после хода — по сделанным ходам, с причиной
+function drillCoachText() {
+  if (!drill || mode !== 'solo') return '';
+  const T = t().train.drills[drill.key];
+  if (gameOver) return gameOverType === 'win' ? t().train.drillWin : '';
+  const last = history[history.length - 1];
+  if (!last) return T.first;
+  const L = t().train;
+  if (drill.key === 'bands' || drill.key === 'minus') {
+    const m = last.meta;
+    if (m.labelIndex === 8) return '';
+    const hi = m.labelIndex === 0 ? rangeCount() : m.max;
+    const zones = [];
+    const left = [Math.max(RANGE_MIN, last.guess - hi), last.guess - m.min];
+    const right = [last.guess + m.min, Math.min(RANGE_MAX, last.guess + hi)];
+    const zone = ([a, b]) => a === b ? formatNum(a) : formatNum(a) + '…' + formatNum(b);
+    if (left[1] >= left[0] && left[1] >= RANGE_MIN) zones.push(zone(left));
+    if (right[0] <= right[1] && right[0] <= RANGE_MAX) zones.push(zone(right));
+    const dist = m.labelIndex === 0 ? L.distMore.replace('{a}', formatNum(m.min))
+      : m.min === m.max ? L.distOne.replace('{a}', formatNum(m.min))
+      : L.distRange.replace('{a}', formatNum(m.min)).replace('{b}', formatNum(m.max));
+    return (zones.length > 1 ? L.twoPlaces : L.onePlace).replace('{d}', dist).replace('{z}', zones.join(L.or)) +
+      (drill.key === 'minus' ? ' ' + L.minusNote : '');
+  }
+  if (drill.key === 'best' || drill.key === 'two') {
+    const rv = analyseGame(history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex })),
+                           RANGE_MIN, RANGE_MAX, FEEDBACK_META, null);
+    const m = rv.moves[rv.moves.length - 1];
+    if (!m || m.grade === 'hit') return '';
+    const left = L.leftNow.replace('{n}', withPlural(m.after, L.numForms));
+    if (drill.key === 'two') return left + ' ' + L.twoNote;
+    return left + ' ' + (['best', 'brilliant'].indexOf(m.grade) >= 0 ? L.wasBest
+      : L.bestWas.replace('{n}', formatNum(m.best)));
+  }
+  return '';
+}
+function renderDrillCoach() {
+  const el = document.getElementById('drillCoach');
+  if (!el) return;
+  const text = drillCoachText();
+  el.classList.toggle('hidden', !text);
+  if (!text) return;
+  el.innerHTML = '<b>' + drill.icon + ' ' + escapeHtml(t().train.drills[drill.key].title) + '</b><span>' + escapeHtml(text) + '</span>';
+}
+
+// ---------- панель тренировки на экране настройки ----------
+function renderTrainPanel() {
+  const box = document.getElementById('trainPanel');
+  if (!box) return;
+  box.classList.toggle('hidden', mode !== 'solo');
+  if (mode !== 'solo') return;
+  const T = t().train;
+  const done = drillsDone();
+  document.getElementById('tTrainDrills').textContent = T.drillsHead;
+  document.getElementById('trainDrills').replaceChildren(...DRILLS.map(d => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'drill-chip' + (done.indexOf(d.key) >= 0 ? ' done' : '');
+    b.dataset.drill = d.key;
+    b.innerHTML = '<span class="dc-ic">' + d.icon + '</span><span class="dc-name">' + escapeHtml(T.drills[d.key].title) +
+      '</span>' + (done.indexOf(d.key) >= 0 ? '<span class="dc-ok">✓</span>' : '');
+    b.onclick = () => openDrill(d.key);
+    return b;
+  }));
+  // Прогресс на выбранном диапазоне
+  const sel = document.getElementById('rangeMax');
+  const max = parseInt(sel && sel.value) || RANGE_MAX;
+  const prevMin = RANGE_MIN, prevMax = RANGE_MAX, prevMeta = FEEDBACK_META;
+  applyBounds(max);
+  const key = trainKey();
+  const games = trainLog().filter(g => g.r === key);
+  const wins = games.filter(g => g.w);
+  const avg = wins.length ? wins.reduce((a, g) => a + g.m, 0) / wins.length : null;
+  const best = wins.length ? Math.min(...wins.map(g => g.m)) : null;
+  const strong = strongAverage();
+  const goal = strong ? Math.ceil(strong) + 1 : null;
+  const label = L_range();
+  RANGE_MIN = prevMin; RANGE_MAX = prevMax; FEEDBACK_META = prevMeta;
+  document.getElementById('tTrainProg').textContent = T.progHead.replace('{r}', label);
+  const stats = document.getElementById('trainStats');
+  const fmt = v => (Math.round(v * 10) / 10).toLocaleString(currentLang === 'en' ? 'en-US' : currentLang);
+  stats.innerHTML = games.length
+    ? '<span><b>' + games.length + '</b>' + escapeHtml(T.games) + '</span>' +
+      '<span><b>' + (avg === null ? '—' : fmt(avg)) + '</b>' + escapeHtml(T.avg) + '</span>' +
+      '<span><b>' + (best === null ? '—' : best) + '</b>' + escapeHtml(T.best) + '</span>'
+    : '<small>' + escapeHtml(T.noGames) + '</small>';
+  const bars = document.getElementById('trainBars');
+  const last = games.slice(-12);
+  const top = Math.max(goal || 1, ...last.map(g => g.m));
+  bars.innerHTML = last.map(g => '<span class="tb ' + (g.w ? (goal && g.m <= goal ? 'ok' : 'win') : 'lose') +
+    '" style="height:' + Math.max(12, Math.round(100 * g.m / top)) + '%" title="' + g.m + '"></span>').join('') +
+    (goal ? '<i class="tb-goal" style="bottom:' + Math.round(100 * goal / top) + '%"></i>' : '');
+  bars.classList.toggle('hidden', !last.length);
+  const reached = wins.filter(g => goal && g.m <= goal).length;
+  document.getElementById('trainGoal').textContent = goal
+    ? T.goal.replace('{n}', withPlural(goal, T.moveForms)).replace('{s}', fmt(strong)) + (reached ? ' · ' + T.goalHit.replace('{n}', reached) : '')
+    : '';
+}
+function L_range() {
+  return t().placeholderTpl.replace('{a}', formatNum(RANGE_MIN)).replace('{b}', formatNum(RANGE_MAX));
+}

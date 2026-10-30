@@ -1,0 +1,46 @@
+-- Испытание считается в телефоне. Применять в Supabase: SQL Editor →
+-- вставить целиком → Run. Применить ДО мёржа.
+--
+-- Соревнования в Испытании больше нет (таблицы рекордов из игры убраны),
+-- поэтому прятать счёт на сервере незачем: играть можно без входа и без сети.
+-- У вошедшего игра присылает итог — раунды и очки. Дальше всё как раньше:
+-- запись в runs, личный рекорд, задания дня и достижения (через ту же
+-- строку run_sessions и её триггер).
+-- Старые функции run_start / run_guess остаются: ими доигрывают те, у кого
+-- открыта прежняя версия игры.
+
+create or replace function run_report(p_username text, p_pin text, p_rounds int, p_score int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; r run_sessions; best int; best_rounds int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_rounds is null or p_rounds < 0 or p_rounds > 60 then raise exception 'bad_result'; end if;
+  -- Больше, чем за 60 раундов лучшей игры, набрать нельзя: очки за раунд n —
+  -- не больше 100·n·14, с риском и подарком ×4
+  if p_score is null or p_score < 0 or p_score > 5600 * p_rounds * (p_rounds + 1) / 2 + 1 then
+    raise exception 'bad_result';
+  end if;
+  select * into r from run_sessions where username = me;
+  -- Не чаще раза в 5 секунд: итог присылается один раз на заход
+  if r.username is not null and r.status = 'finished' and r.updated_at > now() - interval '5 seconds' then
+    raise exception 'too_fast';
+  end if;
+  insert into run_sessions(username, status, round, score, range_min, range_max, allowed, secret, moves, frost)
+  values (me, 'active', p_rounds + 1, p_score, 1, 10, 1, 1, 0, false)
+  on conflict (username) do update
+    set status = 'active', round = p_rounds + 1, score = p_score, range_min = 1, range_max = 10,
+        allowed = 1, secret = 1, moves = 0, frost = false, updated_at = now();
+  -- run_finish пишет runs и рекорд и закрывает строку — на этом срабатывает
+  -- триггер заданий и достижений
+  perform run_finish(me);
+  select best_run_score, best_run_rounds into best, best_rounds from students where username = me;
+  return jsonb_build_object('best', coalesce(best, 0), 'bestRounds', coalesce(best_rounds, 0));
+end;
+$$;
+
+grant execute on function run_report(text, text, int, int) to anon;

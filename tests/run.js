@@ -5,6 +5,11 @@ const { GAME_URL, launchOptions, applyStub, check, report } = require('./helpers
 const PHONE = { width: 430, height: 850 };
 
 // Свой контекст на каждый тест: иначе страницы делят localStorage и влияют друг на друга
+// Экран входа: теперь его открывает онлайн (Испытание входа не просит)
+async function openAuth(page) {
+  await page.evaluate(() => { tutSave({ done: [1, 2, 3], skipped: true, veteran: true }); openOnlineEntry(); });
+}
+
 async function newGame(browser, opts) {
   const context = await browser.newContext({ viewport: PHONE });
   const page = await context.newPage();
@@ -109,31 +114,20 @@ async function testModes(browser) {
 }
 
 async function testRating(browser) {
-  console.log('\nРежим на рейтинг');
+  console.log('\nИспытание: хаб');
   const page = await newGame(browser, { user: 'Максим' });
 
   await page.click('#tModeRun');
   await page.waitForTimeout(300);
   check('вход по сохранённому аккаунту ведёт сразу в хаб', await page.locator('#screenRunHub').isVisible());
   check('чип с именем виден в хабе', await page.locator('#accountChip').isVisible());
-  check('топ за сегодня выбран по умолчанию',
-    await page.locator('#tRunTopDay').evaluate(e => e.classList.contains('active')));
-
-  // Каждая вкладка тянет свой срез: за день, за неделю и за всё время
-  for (const [id, rpc] of [['#tRunTopDay', 'run_leaderboard_daily'],
-                           ['#tRunTopAll', 'run_leaderboard'],
-                           ['#tRunTopWeek', 'run_leaderboard_weekly']]) {
-    await page.evaluate(() => { window.__rpcCalls.length = 0; });
-    await page.click(id);
-    await page.waitForTimeout(200);
-    const last = await page.evaluate(() => (window.__rpcCalls.pop() || {}).name);
-    check('вкладка ' + id.slice(8) + ' запрашивает ' + rpc, last === rpc, 'запрошено ' + last);
-    check('вкладка ' + id.slice(8) + ' подсвечена',
-      await page.locator(id).evaluate(e => e.classList.contains('active')));
-    const others = await page.evaluate(sel => [...document.querySelectorAll('.lb-tab')]
-      .filter(e => !e.matches(sel) && e.classList.contains('active')).length, id);
-    check('вкладка ' + id.slice(8) + ': остальные погашены', others === 0);
-  }
+  check('таблиц рекордов больше нет — соревноваться не с кем',
+    (await page.locator('#tRunTopDay').count()) === 0 && (await page.locator('#runLeaderboardList').count()) === 0);
+  const hub = await page.evaluate(() => ({ best: document.getElementById('trialBest').textContent,
+    medals: document.querySelectorAll('#trialBest .tr-medal').length, daily: document.getElementById('trialDaily').textContent }));
+  check('в хабе — личный рекорд и три медали', /Личный рекорд/.test(hub.best) && hub.medals === 3, hub.best);
+  check('в хабе — Испытание дня с правилом и кнопкой', /Испытание дня/.test(hub.daily) && /Сегодня во всех раундах/.test(hub.daily) &&
+    /Играть Испытание дня/.test(hub.daily), hub.daily);
 
   await page.click('#tRunStart');
   await page.waitForTimeout(250);
@@ -164,50 +158,73 @@ async function testRating(browser) {
     curve[8].a + ' -> ' + curve[13].a);
 
   await done(page);
+
+  // Без входа Испытание тоже играется: счёт в телефоне
+  const guest = await newGame(browser, {});
+  await guest.evaluate(() => { try { localStorage.setItem('hc_tut', JSON.stringify({ done: [1, 2], skipped: true })); } catch (e) {} });
+  await guest.click('#tModeRun');
+  await guest.waitForTimeout(300);
+  check('гость попадает в хаб Испытания, без входа', await guest.locator('#screenRunHub').isVisible());
+  await guest.click('#tRunStart');
+  await guest.waitForTimeout(250);
+  check('гость играет Испытание', await guest.evaluate(() => mode === 'run' && !!RUN && RUN.round === 1));
+  await done(guest);
 }
 
 async function testScoringAndSubmit(browser) {
-  console.log('\nОчки и отправка результата');
+  console.log('\nОчки и итог Испытания');
   const page = await newGame(browser, { user: 'Максим' });
   await page.click('#tModeRun');
   await page.waitForTimeout(300);
   await page.click('#tRunStart');
   await page.waitForTimeout(250);
 
-  const s = await page.evaluate(() => ({ secret: window.__run.secret, RANGE_MAX, MAX_GUESSES }));
-  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
+  await page.fill('#guessInput', String(await page.evaluate(() => secret)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(150);
-  await liftCurtainIfShown(page);
   const afterWin = await page.evaluate(() => ({ score: RUN.totalScore, locked: RUN.locked }));
   check('за угаданный раунд начисляются очки', afterWin.score > 0, String(afterWin.score));
-
-  // повторный ход в паузе между раундами не должен давать очки снова: поля
-  // ввода нет, а прямой вызов отбивает замок
   check('в паузе между раундами поля ввода нет', !(await page.locator('#guessInput').isVisible()));
-  await page.evaluate(() => { document.getElementById('guessInput').value = String(window.__run.secret); return runGuess(); });
+  await page.evaluate(() => { document.getElementById('guessInput').value = String(secret); return runGuess(); });
   await page.waitForTimeout(100);
   check('в паузе между раундами очки не накручиваются',
     (await page.evaluate(() => RUN.totalScore)) === afterWin.score);
+  const doors = await page.evaluate(() => [...document.querySelectorAll('#runStage .rs-door')].map(b => b.textContent));
+  check('после раунда — две двери: риск и запас', doors.length === 2 && /Риск/.test(doors[0]) && /Запас/.test(doors[1]), doors.join(' | '));
 
-  // сливаем раунд -> игра заканчивается и результат уходит на сервер
-  await page.click('#rsGo');
-  await page.waitForTimeout(300);
-  const s2 = await page.evaluate(() => ({ secret: window.__run.secret, RANGE_MAX, MAX_GUESSES }));
+  // Риск: очки ×2 и на попытку меньше
+  const before = await page.evaluate(() => ({ tries: runAttemptsForRound(2, runRangeForRound(2)), mod: RUN.stage.nextMod }));
+  await page.evaluate(() => { RUN.stage.nextMod = null; renderAll(); });
+  await page.click('#rsRisk');
+  await page.waitForTimeout(200);
+  const risk = await page.evaluate(() => ({ mult: RUN.mult, tries: MAX_GUESSES, round: RUN.round }));
+  check('риск: очки ×2, на попытку меньше', risk.mult === 2 && risk.tries === before.tries - 1 && risk.round === 2, JSON.stringify(risk));
+  const p0 = await page.evaluate(() => RUN.totalScore);
+  await page.evaluate(() => { document.getElementById('guessInput').value = String(secret); handleGuess(); });
+  const got = await page.evaluate(() => RUN.log[1].points);
+  const expect = await page.evaluate(() => Math.round(100 * 2 * (minAttempts(rangeCount()) / 1)) * 2);
+  check('очки за раунд с риском удвоены', got === expect, got + ' / ' + expect);
+  await page.evaluate(() => { RUN.stage.nextMod = null; RUN.stage.reward = 'tries'; renderAll(); });
+  await page.click('#rsSafe');
+  await page.waitForTimeout(200);
+  const safe = await page.evaluate(() => ({ tries: MAX_GUESSES, base: runAttemptsForRound(3, runRangeForRound(3)) }));
+  check('запас «+2 попытки»', safe.tries === safe.base + 2, JSON.stringify(safe));
+
+  // сливаем раунд -> игра заканчивается и итог уходит в базу
+  await page.evaluate(() => { window.__rpcCalls.length = 0; });
+  const s2 = await page.evaluate(() => ({ secret, RANGE_MIN, RANGE_MAX, MAX_GUESSES }));
   for (let i = 0; i < s2.MAX_GUESSES; i++) {
-    let wrong = ((s2.secret + i) % s2.RANGE_MAX) + 1;
-    if (wrong === s2.secret) wrong = (wrong % s2.RANGE_MAX) + 1;
+    let wrong = s2.RANGE_MIN + ((s2.secret - s2.RANGE_MIN + 1 + i) % (s2.RANGE_MAX - s2.RANGE_MIN + 1));
+    if (wrong === s2.secret) wrong = wrong === s2.RANGE_MAX ? s2.RANGE_MIN : wrong + 1;
     await page.fill('#guessInput', String(wrong));
     await page.click('#tSubmitGuess');
-    await page.waitForTimeout(60);
-    await liftCurtainIfShown(page);
+    await page.waitForTimeout(40);
   }
   await page.waitForTimeout(500);
-  // Итог остаётся на доске: карточка с числом и счётом, а не молчаливый уход в хаб
   const over = await page.evaluate(() => ({
     card: !document.getElementById('runStage').classList.contains('hidden') &&
       document.getElementById('runStage').classList.contains('over'),
-    text: document.getElementById('runStage').textContent, secret: window.__run.secret,
+    text: document.getElementById('runStage').textContent,
     input: !document.getElementById('guessSection').classList.contains('hidden') }));
   check('после проигрыша — карточка итога на доске', over.card && !over.input, JSON.stringify(over).slice(0, 200));
   check('в итогах — почему кончилось, число и счёт',
@@ -216,17 +233,13 @@ async function testScoringAndSubmit(browser) {
   check('загаданное число отмечено на прямой',
     await page.evaluate(() => [...document.querySelectorAll('#numLineSvg text')].some(t => t.getAttribute('fill') === '#4ADE80')));
   check('кнопка в строке статуса — уже не «Пауза»', (await page.locator('#tMenu').textContent()) === '☰');
+  const rep = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'run_report').map(c => c.args));
+  check('итог ушёл в базу один раз: раунды и очки', rep.length === 1 && rep[0].p_rounds === 2 && rep[0].p_score > 0, JSON.stringify(rep));
   await page.click('#rgHub');
   await page.waitForTimeout(400);
   check('«К Испытанию» ведёт в хаб', await page.locator('#screenRunHub').isVisible());
-  // Отправлять результат больше нечего: его считал и записал сервер. Проверяем,
-  // что игра шла через него и что забег на сервере закрыт
-  const calls = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'run_guess'));
-  check('ходы шли через сервер', calls.length > 1, String(calls.length));
-  check('клиент не отправляет итог сам',
-    await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'submit_run_score').length) === 0);
-  check('забег на сервере закрыт',
-    await page.evaluate(() => window.__run.active === false));
+  const st = await page.evaluate(() => trialStats());
+  check('рекорд раундов записан в телефоне', st.bestRounds === 2 && st.best > 0, JSON.stringify(st));
 
   await done(page);
 }
@@ -235,9 +248,13 @@ async function testAuth(browser) {
   console.log('\nВход и регистрация');
   const page = await newGame(browser);
 
+  // Испытание входа не просит: счёт в телефоне. Вход нужен онлайну
   await page.click('#tModeRun');
   await page.waitForTimeout(250);
-  check('без аккаунта показывается выбор вход/регистрация', await page.locator('#screenAuthChoice').isVisible());
+  check('Испытание без аккаунта открывается сразу', await page.locator('#screenRunHub').isVisible());
+  await page.evaluate(() => { tutSave({ done: [1, 2, 3], skipped: true, veteran: true }); openOnlineEntry(); });
+  await page.waitForTimeout(250);
+  check('без аккаунта онлайн показывает выбор вход/регистрация', await page.locator('#screenAuthChoice').isVisible());
 
   await page.click('#screenAuthChoice >> text=Зарегистрироваться');
   await page.waitForTimeout(150);
@@ -315,7 +332,7 @@ async function testTranslations(browser) {
     await setLang(page, lang);
     await page.waitForTimeout(150);
     const empty = await page.evaluate(() => {
-      const ids = ['tModeSolo', 'tModeDuel', 'tModeRun', 'tRunStart', 'tRunTop', 'tRunTopDay', 'tRunTopWeek', 'tRunTopAll'];
+      const ids = ['tModeSolo', 'tModeDuel', 'tModeRun', 'tRunStart'];
       return ids.filter(id => !(document.getElementById(id).textContent || '').trim());
     });
     check('язык ' + lang + ': все подписи заполнены', empty.length === 0, empty.join(', '));
@@ -408,7 +425,7 @@ async function testSoundAndShare(browser) {
 
   // Личный рекорд в строке статуса
   await page.evaluate(() => localStorage.setItem(runBestKey(), '4200'));
-  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
+  await page.fill('#guessInput', String(await page.evaluate(() => secret)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(1200);
   await liftCurtainIfShown(page);
@@ -426,7 +443,7 @@ async function testSoundAndShare(browser) {
   await page.waitForTimeout(300);
   await page.click('#tRunStart');
   await page.waitForTimeout(250);
-  const s2 = await page.evaluate(() => ({ secret: window.__run.secret, RANGE_MAX, MAX_GUESSES }));
+  const s2 = await page.evaluate(() => ({ secret: secret, RANGE_MAX, MAX_GUESSES }));
   for (let i = 0; i < s2.MAX_GUESSES; i++) {
     let w = ((s2.secret + i) % s2.RANGE_MAX) + 1;
     if (w === s2.secret) w = (w % s2.RANGE_MAX) + 1;
@@ -474,20 +491,16 @@ async function testPauseAndGiveUp(browser) {
   await page.click('#tRunStart');
   await page.waitForTimeout(250);
 
-  // выигрываем раунд, чтобы было что сохранять
-  const s = await page.evaluate(() => window.__run.secret);
-  await page.fill('#guessInput', String(s));
+  await page.fill('#guessInput', String(await page.evaluate(() => secret)));
   await page.click('#tSubmitGuess');
-  await page.waitForTimeout(400);
-  await page.click('#rsGo');
   await page.waitForTimeout(300);
-  await liftCurtainIfShown(page);
+  await page.evaluate(() => { RUN.stage.nextMod = null; });
+  await page.click('#rsSafe');
+  await page.waitForTimeout(300);
   const scoreBefore = await page.evaluate(() => RUN.totalScore);
-  check('забег живёт на сервере, а не в браузере',
-    await page.evaluate(() => window.__run.active === true && window.__run.round === 2),
-    await page.evaluate(() => JSON.stringify({ active: window.__run.active, round: window.__run.round })));
+  check('незаконченная игра записана в телефоне', await page.evaluate(() => {
+    const v = JSON.parse(localStorage.getItem('hc_trial_state') || 'null'); return !!v && v.RUN.round === 2; }));
 
-  // кнопка в игре открывает паузу, а не выбрасывает молча
   await page.click('#tMenu');
   await page.waitForTimeout(200);
   check('кнопка в игре открывает паузу', await page.locator('#pauseModal').isVisible());
@@ -496,58 +509,34 @@ async function testPauseAndGiveUp(browser) {
   check('«Продолжить» возвращает в игру',
     !(await page.locator('#pauseModal').isVisible()) && await page.locator('#guessInput').isVisible());
 
-  // выход с сохранением -> в хабе предлагают продолжить
   await page.click('#tMenu');
   await page.waitForTimeout(200);
   await page.click('#tPauseExit');
   await page.waitForTimeout(300);
-  check('после выхода хаб предлагает незаконченную игру',
-    await page.locator('#unfinishedBox').isVisible());
-  check('пока игра не закончена, новую начать не предлагают',
-    !(await page.locator('#tRunStart').isVisible()));
+  check('после выхода хаб предлагает незаконченную игру', await page.locator('#unfinishedBox').isVisible());
+  check('пока игра не закончена, новую начать не предлагают', !(await page.locator('#tRunStart').isVisible()));
   const info = await page.locator('#unfinishedInfo').textContent();
   check('в карточке видно раунд и очки', /Раунд\s*2/.test(info), info.trim());
 
-  // полная перезагрузка страницы — игра должна пережить закрытие приложения.
-  // Заглушка держит «сервер» в хранилище страницы, а Chromium по file:// под
-  // нагрузкой изредка стирает его при перезагрузке (пойманный случай: забег
-  // был в хранилище до перезагрузки и пропал после, уцелели только ключи,
-  // которые заглушка пишет заново). Настоящий сервер так данных не теряет,
-  // поэтому стёртый «сервер» возвращаем и перезагружаем снова — игра о
-  // подмене не знает, и проверяется по-прежнему она, а не заглушка
-  const serverRun = await page.evaluate(() => localStorage.getItem('__stub_run'));
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await page.reload();
-    await page.waitForTimeout(400);
-    const kept = await page.evaluate(() => !!localStorage.getItem('__stub_run'));
-    if (kept) break;
-    await page.evaluate(v => localStorage.setItem('__stub_run', v), serverRun);
-  }
+  await page.reload();
+  await page.waitForTimeout(400);
   await page.click('#tModeRun');
-  // Ждём саму карточку, а не фиксированные полсекунды: под нагрузкой ответ
-  // сервера приходил позже, и проверка падала на ровном месте
-  const survived = await page.locator('#unfinishedBox')
-    .waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+  const survived = await page.locator('#unfinishedBox').waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
   check('игра переживает перезагрузку страницы', survived);
-
   if (survived) await page.click('#tUnfinishedResume');
   await page.waitForTimeout(300);
   const resumed = await page.evaluate(() => ({ score: RUN.totalScore, round: RUN.round }));
-  check('продолжение восстанавливает счёт и раунд',
-    resumed.score === scoreBefore && resumed.round === 2,
+  check('продолжение восстанавливает счёт и раунд', resumed.score === scoreBefore && resumed.round === 2,
     'очки ' + resumed.score + ', раунд ' + resumed.round);
 
-  // сдаться -> результат уходит на сервер, сохранение чистится
   await page.evaluate(() => { window.__rpcCalls.length = 0; });
   await page.click('#tMenu');
   await page.waitForTimeout(200);
   await page.click('#tPauseGiveUp');
   await page.waitForTimeout(600);
-  const sent = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'run_give_up'));
-  check('«сдаться» уходит на сервер', sent.length === 1, String(sent.length));
-  check('и забег там закрыт', await page.evaluate(() => window.__run.active === false));
-  check('в браузере забег не хранится',
-    !(await page.evaluate(() => localStorage.getItem('hc_run_state'))));
+  const sent = await page.evaluate(() => window.__rpcCalls.filter(c => c.name === 'run_report'));
+  check('«сдаться» — итог уходит в базу', sent.length === 1 && sent[0].args.p_rounds === 1, JSON.stringify(sent));
+  check('незаконченной игры больше нет', !(await page.evaluate(() => localStorage.getItem('hc_trial_state'))));
   check('после «сдаться» — итог на доске', await page.locator('#runStage.over').isVisible());
   await page.click('#rgHub');
   await page.waitForTimeout(400);
@@ -558,41 +547,26 @@ async function testPauseAndGiveUp(browser) {
 
 
 async function testBestPerAccount(browser) {
-  console.log('\nЛичный рекорд принадлежит аккаунту');
+  console.log('\nЛичный рекорд и незаконченная игра принадлежат игроку');
   const page = await newGame(browser, { user: 'Аня' });
-
-  // Ане записался рекорд — она в общем топе
-  await page.click('#tModeRun');
-  await page.waitForTimeout(350);
-  await page.click('#tRunTopAll');
-  await page.waitForTimeout(300);
-  const anyaBest = await page.evaluate(() => runBest());
-  check('рекорд подтянулся из общего топа', anyaBest === 5200, String(anyaBest));
-
-  // тот же телефон, другой ученик
-  const maksimBest = await page.evaluate(() => {
+  const r = await page.evaluate(() => {
+    localStorage.setItem('hc_trial_stats_аня', JSON.stringify({ best: 5200, bestRounds: 8, daily: {} }));
+    const anya = runBest();
     localStorage.setItem('hc_run_user', 'Максим');
-    return runBest();
-  });
-  check('новому ученику чужой рекорд не достался', maksimBest === 0, String(maksimBest));
-
-  // а Ане её рекорд остался
-  const back = await page.evaluate(() => {
+    const maksim = runBest();
     localStorage.setItem('hc_run_user', 'Аня');
-    return runBest();
-  });
-  check('свой рекорд у Ани остался', back === 5200, String(back));
-
-  // без входа рекорда нет вовсе
-  const anon = await page.evaluate(() => {
+    const back = runBest();
     localStorage.removeItem('hc_run_user');
-    return runBest();
+    const guest = runBest();
+    localStorage.setItem('hc_run_user', 'Аня');
+    return { anya, maksim, back, guest };
   });
-  check('без входа рекорд не показывается', anon === 0, String(anon));
-
+  check('свой рекорд у Ани', r.anya === 5200, String(r.anya));
+  check('новому ученику чужой рекорд не достался', r.maksim === 0, String(r.maksim));
+  check('свой рекорд у Ани остался', r.back === 5200, String(r.back));
+  check('у гостя свой рекорд, не Анин', r.guest === 0, String(r.guest));
   await done(page);
 
-  // Ключ прежней версии был общим на всё устройство — он не должен достаться никому
   const page2 = await newGame(browser, { user: 'Новичок' });
   await page2.evaluate(() => localStorage.setItem('hc_run_best', '99999'));
   await page2.reload();
@@ -600,40 +574,20 @@ async function testBestPerAccount(browser) {
   const legacy = await page2.evaluate(() => ({ best: runBest(), old: localStorage.getItem('hc_run_best') }));
   check('старый общий ключ убирается', legacy.old === null, String(legacy.old));
   check('из старого ключа рекорд не подставляется', legacy.best === 0, String(legacy.best));
-
   await done(page2);
 
-  // Незаконченный забег приезжает с сервера, а не лежит в браузере. Кому он
-  // принадлежит, решает тот же check_student_pin, что и всё остальное, —
-  // и регистр имени там уже проверен сценариями в базе
+  // Незаконченная игра Ани не достаётся Максиму на том же телефоне
   const page3 = await newGame(browser, { user: 'Аня' });
-  await page3.evaluate(() => {
-    window.__run.active = true;
-    window.__run.round = 3;
-    window.__run.score = 700;
-    window.__runSave();
-  });
   await page3.click('#tModeRun');
-  await page3.waitForTimeout(500);
-  check('незаконченный забег предлагают продолжить',
-    await page3.locator('#tUnfinishedResume').isVisible());
-  check('его состояние спрошено у сервера',
-    await page3.evaluate(() => window.__rpcCalls.filter(c => c.name === 'run_state').length) > 0);
-  check('в браузере забег не хранится',
-    !(await page3.evaluate(() => localStorage.getItem('hc_run_state'))));
-  const card = await page3.locator('#unfinishedInfo').textContent();
-  check('в карточке видны раунд и очки с сервера',
-    /Раунд\s*3/.test(card) && /700/.test(card), card.trim());
-
-  // Закрываем забег на сервере и заходим заново: из хаба в меню не выйти
-  await page3.evaluate(() => { window.__run.active = false; window.__runSave(); });
-  await page3.reload();
-  await page3.waitForTimeout(400);
-  await page3.click('#tModeRun');
-  await page3.waitForTimeout(500);
-  check('законченный забег продолжать не предлагают',
-    !(await page3.locator('#tUnfinishedResume').isVisible()));
-
+  await page3.waitForTimeout(300);
+  await page3.click('#tRunStart');
+  await page3.waitForTimeout(200);
+  await page3.evaluate(() => { pauseAndLeave(); localStorage.setItem('hc_run_user', 'Максим'); openRunHub(); });
+  await page3.waitForTimeout(200);
+  check('чужую незаконченную игру не предлагают', !(await page3.locator('#tUnfinishedResume').isVisible()));
+  await page3.evaluate(() => { localStorage.setItem('hc_run_user', 'Аня'); openRunHub(); });
+  await page3.waitForTimeout(200);
+  check('свою — предлагают', await page3.locator('#tUnfinishedResume').isVisible());
   await done(page3);
 }
 
@@ -1056,11 +1010,8 @@ async function testShortHistory(browser) {
       await page.waitForTimeout(350);
       await page.click('#tRunStart');
       await page.waitForTimeout(300);
-      // Раунд в рейтинге короткий, а его длину теперь задаёт сервер — правим
-      // там же, где он живёт, и оттуда же берём загаданное число
-      await page.evaluate(() => {
-        window.__run.allowed = 20; window.__run.secret = 10; window.__runSave();
-      });
+      // Раунд в Испытании короткий — даём попыток с запасом и прячем число
+      await page.evaluate(() => { MAX_GUESSES = 20; secret = 10; RUN.mod = null; renderAll(); });
     } else {
       await page.click(kind === 'solo' ? '#tModeSolo' : '#tModeDuel');
       await page.waitForTimeout(200);
@@ -1309,8 +1260,8 @@ async function testBonusMode(browser) {
   check('вместо поля ввода — панель с кнопкой', waiting.panel && !waiting.input,
     JSON.stringify(waiting));
   check('в панели сказано, что ход сделается сам',
-    waiting.text.indexOf('лаву') >= 0 && waiting.text.indexOf('сам') >= 0, waiting.text);
-  check('кнопка называется «В лаву»', waiting.btn === 'В лаву', waiting.btn);
+    waiting.text.indexOf('Шальной бросок') >= 0 && waiting.text.indexOf('сам') >= 0, waiting.text);
+  check('кнопка называется «Бросить»', waiting.btn === 'Бросить', waiting.btn);
   check('жетон на отнятом ходе взвести можно', waiting.token === false);
   check('и об этом сказано прямо в панели',
     waiting.hint.indexOf('жетон') >= 0, waiting.hint);
@@ -1681,7 +1632,7 @@ async function testPinHelp(browser) {
   const page = await newGame(browser);
 
   // При регистрации есть поле подсказки, при входе — кнопка «Забыли PIN?»
-  await page.click('#tModeRun');
+  await openAuth(page);
   await page.waitForTimeout(250);
   await page.click('#screenAuthChoice >> text=Зарегистрироваться');
   await page.waitForTimeout(150);
@@ -1710,7 +1661,7 @@ async function testPinHelp(browser) {
 
   // На экране входа подсказку можно запросить по имени
   const page2 = await newGame(browser);
-  await page2.click('#tModeRun');
+  await openAuth(page2);
   await page2.waitForTimeout(250);
   await page2.click('#screenAuthChoice >> text=Войти');
   await page2.waitForTimeout(150);
@@ -1731,7 +1682,7 @@ async function testPinHelp(browser) {
 
   // Если подсказки нет — честно об этом говорим
   const page3 = await newGame(browser, { hint: null });
-  await page3.click('#tModeRun');
+  await openAuth(page3);
   await page3.waitForTimeout(250);
   await page3.click('#screenAuthChoice >> text=Войти');
   await page3.waitForTimeout(150);
@@ -1921,7 +1872,8 @@ async function testScaleMemory(browser) {
     !(await tp.locator('#toggleThermoBtn').isVisible()) && await tp.locator('#vizBtn').isVisible());
   await tp.click('#vizBtn');
   const rows = await tp.evaluate(() => [...document.querySelectorAll('#vizPanel .viz-row')].map(r => r.textContent.trim()));
-  check('в меню — четыре подписанных переключателя', rows.length === 4 && rows.every(r => r.length > 3), rows.join(' | '));
+  // В тренировке пятый — «Где может быть число»
+  check('в меню — пять подписанных переключателей', rows.length === 5 && rows.every(r => r.length > 3), rows.join(' | '));
   await tp.click('#toggleThermoBtn');
   check('меню не закрывается от переключения', await tp.locator('#vizPanel').isVisible() &&
     !(await tp.evaluate(() => showThermo)));
@@ -4023,21 +3975,10 @@ async function testCalmScreens(browser) {
     await ctx.close();
   }
 
-  // В «Испытании» на этом месте — «Пауза» словом, а топ оформлен как рейтинговый
+  // В «Испытании» на этом месте — «Пауза» словом
   page = await newGame(browser, { user: 'Лев' });
   await page.click('#tModeRun');
   await page.waitForTimeout(500);
-  const runTop = await page.evaluate(async () => {
-    // Два запроса подряд — как при быстром переключении вкладок
-    await Promise.all([renderRunLeaderboard(), renderRunLeaderboard()]);
-    return [...document.querySelectorAll('#runLeaderboardList .rk-top-row')].map(r => ({
-      place: r.querySelector('.rk-place').textContent, face: !!r.querySelector('.avatar'),
-      name: r.querySelector('.rk-who').textContent, me: r.classList.contains('me') }));
-  });
-  check('топ «Испытания»: место цифрой, у каждого кружок',
-    runTop.length > 0 && runTop[0].place === '1' && runTop.every(r => r.face), JSON.stringify(runTop));
-  check('два запроса подряд не задваивают строки',
-    new Set(runTop.map(r => r.name)).size === runTop.length, JSON.stringify(runTop));
   await page.click('#tRunStart');
   await page.waitForTimeout(400);
   check('в «Испытании» кнопка называется «Пауза»',
@@ -4355,7 +4296,7 @@ async function testReview(browser) {
   await page.waitForTimeout(300);
   await page.click('#tRunStart');
   await page.waitForTimeout(250);
-  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret > RANGE_MIN + 30 ? RANGE_MIN : RANGE_MAX)));
+  await page.fill('#guessInput', String(await page.evaluate(() => secret > RANGE_MIN + 30 ? RANGE_MIN : RANGE_MAX)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(200);
   await liftCurtainIfShown(page);
@@ -5492,13 +5433,14 @@ async function testTutorial(browser) {
   const menu = () => page.evaluate(() => ({
     card: !document.getElementById('tutCard').classList.contains('hidden'),
     title: document.getElementById('tTutTitle').textContent, sub: document.getElementById('tTutSub').textContent,
-    runLocked: document.querySelector('.mode-btn.run').classList.contains('locked'),
+    runLocked: document.querySelector('.mode-btn.online').classList.contains('locked'),
+    trialLocked: document.querySelector('.mode-btn.run').classList.contains('locked'),
     lockText: document.getElementById('tOnlineLock').classList.contains('hidden') ? '' : document.getElementById('tOnlineLock').textContent
   }));
   let m = await menu();
   check('новичку — карточка «Обучение · урок 1 из 3»', m.card && m.title === 'Обучение · урок 1 из 3' && m.sub === 'Как читать подсказки',
     JSON.stringify(m));
-  check('онлайн и «Испытание» закрыты до уроков 1–2', m.runLocked && m.lockText === '🔒 после уроков 1–2', JSON.stringify(m));
+  check('онлайн закрыт до уроков 1–2, Испытание открыто сразу', m.runLocked && !m.trialLocked && m.lockText === '🔒 после уроков 1–2', JSON.stringify(m));
   await page.click('.mode-btn.online');
   await page.waitForTimeout(150);
   const gate = await page.evaluate(() => ({
@@ -5596,7 +5538,7 @@ async function testTutorial(browser) {
   // Пропустить
   page = await newGame(browser, { newbie: true });
   await page.evaluate(() => { currentLang = 'ru'; applyTranslations(); });
-  await page.click('.mode-btn.run');
+  await page.click('.mode-btn.online');
   await page.waitForTimeout(150);
   await page.click('#gateSkip');
   await page.waitForTimeout(150);
@@ -6176,8 +6118,8 @@ async function testUxPass(browser) {
   await page.waitForTimeout(500);
   let rules = await page.evaluate(() => ({ open: document.getElementById('runRules').open,
     head: document.getElementById('tRunRulesHead').textContent, n: document.querySelectorAll('#runRulesList li').length }));
-  check('Испытание: «❓ Как играть» раскрыто до первой игры, 4 правила',
-    rules.open && rules.head === '❓ Как играть' && rules.n === 4, JSON.stringify(rules));
+  check('Испытание: «❓ Как играть» раскрыто до первой игры, 5 правил',
+    rules.open && rules.head === '❓ Как играть' && rules.n === 5, JSON.stringify(rules));
   await page.click('#tRunStart');
   await page.waitForTimeout(400);
   await page.evaluate(() => openRunHub());
@@ -6359,7 +6301,7 @@ async function testRunStage(browser) {
   await page.click('#tRunStart');
   await page.waitForTimeout(300);
   const before = await page.evaluate(() => ({ round: RUN.round, max: RANGE_MAX, tries: MAX_GUESSES }));
-  await page.fill('#guessInput', String(await page.evaluate(() => window.__run.secret)));
+  await page.fill('#guessInput', String(await page.evaluate(() => secret)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(1500);
   const st = await page.evaluate(() => ({
@@ -6371,7 +6313,7 @@ async function testRunStage(browser) {
   check('в карточке: какой раунд пройден и сколько очков', /Раунд 1 пройден!/.test(st.text) && /\+\d+ очк/.test(st.text), st.text);
   check('в карточке: что будет дальше — числа и попытки', /Дальше — раунд 2/.test(st.text) && /Числа/.test(st.text) && /Попыток/.test(st.text), st.text);
   check('пока карточка висит, ходить нельзя', !st.input);
-  await page.click('#rsGo');
+  await page.click('#rsSafe');
   await page.waitForTimeout(300);
   const after = await page.evaluate(() => ({ round: RUN.round, stage: !document.getElementById('runStage').classList.contains('hidden'),
     input: !document.getElementById('guessSection').classList.contains('hidden'), locked: RUN.locked }));
@@ -6636,7 +6578,7 @@ async function testAdventureBonus(browser) {
     quitToMenu();
     return r;
   });
-  check('в Огненных горах лава: ход в лаву у игрока', lava.has && lava.forced === 'lava' && lava.btn === 'В лаву', JSON.stringify(lava));
+  check('в Огненных горах лава: ход в лаву у игрока', lava.has && lava.forced === 'lava' && lava.btn === 'Бросить', JSON.stringify(lava));
 
   // Звёзды по сложности и лучший результат
   const stars = await page.evaluate(async () => {
@@ -6711,6 +6653,194 @@ async function testAdventureBonus(browser) {
     check(lang + ': бонусы, звёзды, задания и реванш переведены', !!tx);
   }
   await page.evaluate(() => { currentLang = 'ru'; applyTranslations(); });
+  await page.context().close();
+}
+
+// Часть 1 переработки: шальной бросок, вспышка и звук бонуса, метки на
+// прямой, уроки-приёмы, «где может быть число», разбор и прогресс тренировки
+async function testTrainBonusFx(browser) {
+  console.log('\nТренировка и бонусы: вспышка, метки, уроки, прогресс');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => {
+    localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'rush', 'lava', 'skip', 'gift', 'memory', 'near', 'half', 'shield', 'freeze', 'xray']));
+    localStorage.setItem('hc_adv_максим', '50');
+  });
+  const names = await page.evaluate(() => ['ru', 'en', 'fr', 'de'].map(l => i18n[l].bonusNames.lava));
+  check('«Бросок в лаву» переименован на 4 языках', names.join() === 'Шальной бросок,Wild throw,Lancer fou,Wilder Wurf', names.join());
+  const fx = await page.evaluate(() => {
+    const tones = [];
+    const orig = playTone;
+    window.playTone = (...a) => { tones.push(a[0]); };
+    startAdventure(41); stopBot(); D.cur = 0;
+    const v = secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN;
+    D.bonuses = [{ value: v, type: 'freeze', taken: false }];
+    duelPlay(v);
+    const box = document.getElementById('bonusFlash');
+    const r = { show: box.classList.contains('show'), cls: box.className, name: document.getElementById('bfName').textContent,
+                tones: tones.length, mark: !!document.querySelector('#numLineSvg .nl-bonus') };
+    window.playTone = orig;
+    quitToMenu();
+    return r;
+  });
+  check('бонус сработал — крупная вспышка с эффектом и названием', fx.show && /k-freeze/.test(fx.cls) && fx.name === 'Заморозка', JSON.stringify(fx));
+  check('у бонуса свой звук', fx.tones >= 2, String(fx.tones));
+  check('взятый бонус остаётся значком на прямой', fx.mark);
+  const first = await page.evaluate(() => {
+    localStorage.setItem('hc_seen_bonus', '[]');
+    startAdventure(41); stopBot(); D.cur = 0;
+    const v = secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN;
+    D.bonuses = [{ value: v, type: 'freeze', taken: false }];
+    document.getElementById('bonusFlash').classList.remove('show');
+    duelPlay(v);
+    const r = { flash: document.getElementById('bonusFlash').classList.contains('show'),
+                card: !document.getElementById('bonusCard').classList.contains('hidden') };
+    closeBonusCard(); quitToMenu();
+    return r;
+  });
+  check('впервые — вместо вспышки карточка с объяснением', !first.flash && first.card, JSON.stringify(first));
+
+  // Тренировка: панель на настройке
+  await page.evaluate(() => openSetup('solo'));
+  await page.waitForTimeout(300);
+  const panel = await page.evaluate(() => ({ shown: !document.getElementById('trainPanel').classList.contains('hidden'),
+    drills: document.querySelectorAll('#trainDrills .drill-chip').length, goal: document.getElementById('trainGoal').textContent }));
+  check('в настройке тренировки — 4 урока и цель', panel.shown && panel.drills === 4 && /Цель/.test(panel.goal), JSON.stringify(panel));
+  await page.click('#trainDrills .drill-chip[data-drill="bands"]');
+  await page.waitForTimeout(200);
+  const card = await page.evaluate(() => document.getElementById('drWhy').textContent);
+  check('урок объясняет, почему приём работает', /не говорит, в какую сторону/.test(card), card.slice(0, 80));
+  await page.click('#drGo');
+  await page.waitForTimeout(300);
+  const coach = await page.evaluate(() => {
+    const before = document.getElementById('drillCoach').textContent;
+    const g = secret <= 10 ? 15 : 5;
+    document.getElementById('guessInput').value = g; handleGuess();
+    return { before, after: document.getElementById('drillCoach').textContent, max: RANGE_MAX };
+  });
+  check('урок «Расстояние»: 1–20 и подсказка учителя после хода', coach.max === 20 && /Назовите любое/.test(coach.before) &&
+    /разница/.test(coach.after), JSON.stringify(coach));
+  const win = await page.evaluate(() => { document.getElementById('guessInput').value = secret; handleGuess();
+    return { done: JSON.parse(localStorage.getItem('hc_drills') || '[]'), log: JSON.parse(localStorage.getItem('hc_train_log') || '[]').length }; });
+  check('победа в уроке — урок отмечен пройденным, игра в журнале', win.done.includes('bands') && win.log === 1, JSON.stringify(win));
+  const rv = await page.evaluate(() => { openReview(); const r = { strong: document.getElementById('rvStrong').textContent,
+    left: [...document.querySelectorAll('#rvList .rv-left')].map(e => e.textContent) }; closeReview(); return r; });
+  check('разбор: сколько хватило бы лучшими ходами и «было → осталось»', /Лучшими ходами — за/.test(rv.strong) && rv.left.length >= 1 &&
+    /было \d+ → осталось \d+/.test(rv.left[0]), JSON.stringify(rv));
+  // «Где может быть число» в обычной тренировке
+  const known = await page.evaluate(() => {
+    quitToMenu(); openSetup('solo'); startFromSetup();
+    knownOn = false; toggleKnown();
+    const g = secret === 50 ? 51 : 50;
+    document.getElementById('guessInput').value = g; handleGuess();
+    const r = { line: document.getElementById('knownLine').textContent, rects: document.querySelectorAll('#numLineSvg .nl-known').length,
+                btn: !document.getElementById('toggleKnownBtn').classList.contains('hidden') };
+    toggleKnown();
+    return r;
+  });
+  check('«Где может быть число»: строка и отрезки на прямой', /Ещё возможно/.test(known.line) && known.rects >= 1 && known.btn, JSON.stringify(known));
+  const duelKnown = await page.evaluate(() => { quitToMenu(); startAdventure(0); stopBot(); renderAll();
+    const r = document.getElementById('toggleKnownBtn').classList.contains('hidden'); quitToMenu(); return r; });
+  check('в игре против соперника «где может быть» нет', duelKnown);
+  for (const lang of ['en', 'fr', 'de']) {
+    const ok = await page.evaluate(l => { const T = i18n[l].train;
+      return ['bands', 'best', 'two', 'minus'].every(k => T.drills[k].title && T.drills[k].why && T.drills[k].first) &&
+        T.goal && T.strong && T.left && T.distOne; }, lang);
+    check(lang + ': уроки и прогресс переведены', ok);
+  }
+  await page.context().close();
+}
+
+// Испытание в телефоне: сюрпризы, двери, запасная жизнь, Испытание дня, медали
+async function testTrialSurprises(browser) {
+  console.log('\nИспытание: сюрпризы, Испытание дня, медали');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => openRunEntry());
+  await page.waitForTimeout(200);
+  const mods = await page.evaluate(() => {
+    startRun(true);
+    const out = {};
+    trialDeal(5, 'warmer', null);
+    const max = RANGE_MAX, tries = MAX_GUESSES;
+    const g1 = secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN;
+    document.getElementById('guessInput').value = g1; handleGuess();
+    const g2 = secret === RANGE_MAX ? RANGE_MAX - 1 : RANGE_MAX;
+    document.getElementById('guessInput').value = g2; handleGuess();
+    out.warmer = { max, tries, first: history[0].meta.custom, second: history[1].meta.custom,
+      label: document.getElementById('feedbackLabel').textContent, thermo: document.getElementById('thermoWrap').classList.contains('hidden'),
+      strip: document.getElementById('scaleStrip').classList.contains('hidden') };
+    trialDeal(5, 'frost', null);
+    out.frost = { min: RANGE_MIN, max: RANGE_MAX };
+    trialDeal(5, 'fog', null);
+    [1, 2, 3, 4].forEach(k => { const g = RANGE_MIN + k; if (g !== secret) { document.getElementById('guessInput').value = g; handleGuess(); } });
+    renderAll();
+    out.fog = { cards: document.querySelectorAll('#historyList .h-card, #historyList > *').length, extra: MAX_GUESSES - runAttemptsForRound(5, rangeCount()) };
+    trialDeal(5, 'timed', null);
+    renderAll();
+    out.timed = { deadline: !!RUN.deadline, banner: document.getElementById('runMod').textContent, extra: MAX_GUESSES - runAttemptsForRound(5, rangeCount()) };
+    trialDeal(5, 'gift', null);
+    out.gift = { mult: RUN.mult, max: RANGE_MAX, base: runRangeForRound(5) };
+    return out;
+  });
+  check('«теплее / холоднее»: первый ход — без сравнения, дальше — теплее или холоднее',
+    mods.warmer.first === 'first' && ['warmer', 'colder', 'same'].includes(mods.warmer.second) &&
+    /Теплее|Холоднее|Так же/.test(mods.warmer.label), JSON.stringify(mods.warmer));
+  check('«теплее / холоднее»: до 100 и попыток с запасом, градусника и шкалы нет',
+    mods.warmer.max <= 100 && mods.warmer.tries === Math.ceil(Math.log2(mods.warmer.max)) + 3 && mods.warmer.thermo && mods.warmer.strip,
+    JSON.stringify(mods.warmer));
+  check('мороз: отрицательные числа', mods.frost.min < 0 && mods.frost.max === -mods.frost.min, JSON.stringify(mods.frost));
+  check('туман: +1 попытка', mods.fog.extra === 1, JSON.stringify(mods.fog));
+  check('на время: часы и +1 попытка, сказано в полоске', mods.timed.deadline && mods.timed.extra === 1 && /На время/.test(mods.timed.banner),
+    JSON.stringify(mods.timed));
+  check('подарок: диапазон поменьше и очки ×2', mods.gift.mult === 2 && mods.gift.max < mods.gift.base, JSON.stringify(mods.gift));
+  const timeout = await page.evaluate(async () => {
+    trialDeal(3, 'timed', null);
+    RUN.lives = 1;
+    RUN.deadline = Date.now() - 1;
+    await new Promise(r => setTimeout(r, 500));
+    const afterLife = { round: RUN.round, lives: RUN.lives, over: !!RUN.over, banner: document.getElementById('runMod').textContent };
+    RUN.deadline = Date.now() - 1;
+    await new Promise(r => setTimeout(r, 500));
+    return { afterLife, over: !!RUN.over, why: RUN.over && RUN.over.why, text: document.getElementById('runStage').textContent };
+  });
+  check('кончилось время — запасная жизнь даёт раунд заново', timeout.afterLife.round === 3 && timeout.afterLife.lives === 0 &&
+    !timeout.afterLife.over && /Запасная жизнь спасла/.test(timeout.afterLife.banner), JSON.stringify(timeout.afterLife));
+  check('без жизни — конец, «кончилось время»', timeout.over && timeout.why === 'time' && /кончилось время/.test(timeout.text), timeout.text.slice(0, 120));
+
+  // Испытание дня: одно правило на день и одни и те же числа
+  const daily = await page.evaluate(() => {
+    leaveRun();
+    startRun(true, true);
+    const a = { secret, mod: RUN.dailyMod };
+    leaveRun();
+    startRun(true, true);
+    const b = { secret };
+    document.getElementById('guessInput').value = secret; handleGuess();
+    const nextMod = RUN.stage.nextMod;
+    giveUpRun();
+    return { a, b, nextMod, st: trialStats() };
+  });
+  check('Испытание дня: числа одинаковые у всех и при повторе', daily.a.secret === daily.b.secret, JSON.stringify(daily));
+  check('Испытание дня: правило дня во всех раундах', daily.nextMod === daily.a.mod, JSON.stringify(daily));
+  check('Испытание дня: результат дня записан отдельно', Object.values(daily.st.daily).includes(1) && daily.st.bestRounds !== 1, JSON.stringify(daily.st));
+  const medals = await page.evaluate(() => {
+    const st = trialStats(); st.bestRounds = 11; trialSaveStats(st);
+    openRunHub();
+    return [...document.querySelectorAll('#trialBest .tr-medal')].map(m => m.classList.contains('got'));
+  });
+  check('медали: за 11 раундов — бронза и серебро, золото — нет', medals.join() === 'true,true,false', medals.join());
+  const over = await page.evaluate(() => {
+    startRun(true);
+    RUN.round = 11; RUN.totalScore = 5000;
+    finishRun({}, true);
+    return document.getElementById('runStage').textContent;
+  });
+  check('в итоге — медаль за раунды', /Медаль: серебро/.test(over), over.slice(0, 200));
+  for (const lang of ['en', 'fr', 'de']) {
+    const ok = await page.evaluate(l => { const T = i18n[l].trial;
+      return TRIAL_MODS.concat(['gift']).every(k => T.mods[k] && T.mods[k][0] && T.mods[k][1]) &&
+        TRIAL_REWARDS.every(k => T.rewards[k]) && T.rules.length === 5 && T.rel.warmer && T.dailyTitle && T.medals.gold; }, lang);
+    check(lang + ': Испытание переведено', ok);
+  }
   await page.context().close();
 }
 
@@ -7637,6 +7767,8 @@ async function testKeyPage(browser) {
     await testBonusGuide(browser);
     await testAdventure(browser);
     await testAdventureBonus(browser);
+    await testTrainBonusFx(browser);
+    await testTrialSurprises(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

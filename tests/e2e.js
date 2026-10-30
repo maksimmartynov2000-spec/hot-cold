@@ -571,6 +571,13 @@ async function registerPlayer(p, name, pin) {
   check('друг отметился «я здесь» — у второго зелёная точка', presence.includes('Артур:true'), presence.join());
   await B.page.evaluate(() => quitToMenu());
 
+  // Испытание считается в телефоне, итог уходит в базу (миграция 051)
+  await B.page.evaluate(() => { openRunEntry(); startRun(true); RUN.round = 4; RUN.totalScore = 1300; finishRun({}, true); });
+  await B.page.waitForTimeout(1500);
+  const rr = (await db.query("select score, rounds from runs where username = 'Лада' order by id desc limit 1")).rows[0];
+  check('итог Испытания из телефона записан в базу', rr && rr.score === 1300 && rr.rounds === 3, JSON.stringify(rr));
+  await B.page.evaluate(() => leaveRun());
+
   check('у бота рейтинга нет',
     (await db.query("select count(*) from elo_ratings e join students s on s.username = e.username where s.is_bot")).rows[0].count === '0');
 

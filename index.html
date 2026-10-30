@@ -117,6 +117,15 @@
   <!-- ЭКРАН 2: настройка -->
   <div id="screenSetup" class="hidden">
     <div class="screen-title" id="tSetupScreen"></div>
+    <!-- Тренировка: уроки-приёмы и прогресс на выбранном диапазоне -->
+    <div class="train-panel hidden" id="trainPanel">
+      <div class="tp-head" id="tTrainDrills"></div>
+      <div class="train-drills" id="trainDrills"></div>
+      <div class="tp-head" id="tTrainProg"></div>
+      <div class="train-stats" id="trainStats"></div>
+      <div class="train-bars hidden" id="trainBars"></div>
+      <div class="train-goal" id="trainGoal"></div>
+    </div>
     <div class="setup-field tight">
       <label id="tLblRange">Range</label>
       <select class="field" id="rangeMax" onchange="onRangeChange()"></select>
@@ -226,6 +235,7 @@
             <button class="viz-row" id="toggleThermoBtn" onclick="toggleThermo()"><span class="vr-ic">🌡️</span><span class="vr-name" id="tVizThermo"></span><span class="vr-sw"></span></button>
             <button class="viz-row" id="toggleLineBtn" onclick="toggleLine()"><span class="vr-ic">📏</span><span class="vr-name" id="tVizLine"></span><span class="vr-sw"></span></button>
             <button class="viz-row" id="toggleHintBtn" onclick="toggleHint()"><span class="vr-ic">💡</span><span class="vr-name" id="tVizHint"></span><span class="vr-sw"></span></button>
+            <button class="viz-row" id="toggleKnownBtn" onclick="toggleKnown()"><span class="vr-ic">🔍</span><span class="vr-name" id="tVizKnown"></span><span class="vr-sw"></span></button>
             <button class="viz-row" id="vizSound" onclick="toggleSound()"><span class="vr-ic">🔊</span><span class="vr-name" id="tVizSound"></span><span class="vr-sw"></span></button>
           </div>
           <!-- Сколько попыток потрачено — полосой: её видно краем глаза -->
@@ -234,6 +244,8 @@
 
         <!-- Подсказка учителя во время урока -->
         <div class="coach hidden" id="coach" role="status"></div>
+        <div class="run-mod hidden" id="runMod" role="status"></div>
+        <div class="drill-coach hidden" id="drillCoach" role="status"></div>
 
         <div class="turn-banner hidden" id="turnBanner"></div>
 
@@ -286,6 +298,7 @@
         <div class="bonus-line hidden" id="bonusLine" role="button" onclick="openBonusGuide(D.lastBonus)"></div>
 
         <div class="numline hidden" id="numLine"><svg id="numLineSvg" width="100%" height="48"></svg></div>
+        <div class="known-line hidden" id="knownLine"></div>
 
         <div class="final-box hidden" id="finalBox">
           <p id="tFinalWarning">Attempts used — last chance!</p>
@@ -530,6 +543,8 @@
       <button class="btn btn-block" style="margin-top:14px" id="tUnfinishedResume" onclick="resumeSavedRun()"></button>
       <button class="btn-ghost btn-block" style="margin-top:8px" id="tUnfinishedFinish" onclick="finishSavedRun()"></button>
     </div>
+    <div class="trial-best" id="trialBest"></div>
+    <div class="trial-daily" id="trialDaily"></div>
     <!-- Правила: пока человек ни разу не играл — раскрыты, потом свёрнуты -->
     <details class="fold run-rules" id="runRules">
       <summary class="fold-head" id="tRunRulesHead"></summary>
@@ -541,17 +556,6 @@
       <button type="button" class="hint-q" onclick="event.preventDefault(); this.closest('.frost-row').classList.toggle('show-hint')" aria-label="?">?</button>
     </label>
     <button class="btn btn-block" id="tRunStart" onclick="startRun()"></button>
-    <div class="lb-wrap">
-      <div class="lb-head">
-        <div class="lb-title" id="tRunTop"></div>
-        <div class="lb-tabs">
-          <button class="lb-tab" id="tRunTopDay" onclick="setLeaderboardScope('day')"></button>
-          <button class="lb-tab" id="tRunTopWeek" onclick="setLeaderboardScope('week')"></button>
-          <button class="lb-tab" id="tRunTopAll" onclick="setLeaderboardScope('all')"></button>
-        </div>
-      </div>
-      <div id="runLeaderboardList" class="lb-list"></div>
-    </div>
     <div class="run-hub-actions">
       <button class="btn-ghost btn-block" id="tRunToMenu" onclick="showScreen('mode')"></button>
     </div>
@@ -575,6 +579,7 @@
   <div class="modal-card review-card">
     <div class="rv-title" id="tReviewTitle"></div>
     <div class="rv-acc"><span class="rv-acc-num" id="rvAcc"></span><span class="rv-acc-label" id="tRvAcc"></span></div>
+    <div class="rv-strong hidden" id="rvStrong"></div>
     <div class="rv-sum" id="rvSum"></div>
     <div class="rv-list" id="rvList"></div>
     <button class="btn btn-block" id="tReviewClose" onclick="closeReview()"></button>
@@ -600,6 +605,21 @@
 </div>
 
 <!-- Соперник Приключения: кто он, чем опасен, и «В бой!» -->
+<div class="modal-backdrop hidden" id="drillCard" onclick="if (event.target === this) closeDrillCard()">
+  <div class="modal-card drill-card">
+    <div class="dr-icon" id="drIcon"></div>
+    <div class="dr-title" id="drTitle"></div>
+    <div class="dr-why" id="drWhy"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="drGo"></button>
+    <button class="btn-ghost btn-block" style="margin-top:8px" id="drBack" onclick="closeDrillCard()"></button>
+  </div>
+</div>
+
+<!-- Вспышка бонуса: поверх доски на секунду, нажатиям не мешает -->
+<div class="bonus-flash" id="bonusFlash" aria-live="polite">
+  <div class="bf-card"><span class="bf-ic" id="bfIcon"></span><b class="bf-name" id="bfName"></b><span class="bf-who" id="bfWho"></span></div>
+</div>
+
 <div class="modal-backdrop hidden" id="advCard" onclick="if (event.target === this) closeAdvCard()">
   <div class="modal-card adv-card">
     <div class="ac-face" id="acFace"></div>
@@ -924,6 +944,7 @@
 <script src="js/game.js"></script>
 <script src="js/online.js"></script>
 <script src="js/adventure.js"></script>
+<script src="js/trial.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
