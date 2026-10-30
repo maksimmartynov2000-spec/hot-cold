@@ -1,0 +1,337 @@
+-- Онлайн, часть 3в: таблица турнира, рамка турнира на каждый месяц, задания
+-- про режим дня и уведомления турнира. Применять в Supabase: SQL Editor →
+-- вставить целиком → Run. Применить ДО мёржа.
+--
+-- • Таблица турнира: друзья и десятка лучших по победам за выходные.
+--   Соперники-«люди» в ней тоже есть — как в очереди и в лигах.
+-- • Рамка за 5 побед — своя у каждого месяца (12 штук), прежние остаются
+--   коллекцией. Если рамка этого месяца уже есть — большой сундук.
+-- • Задания дня: «Сыграть 2 партии в режиме дня», «Выиграть в режиме дня».
+-- • Уведомления: в субботу днём — «Турнир начался», в воскресенье ближе к
+--   вечеру — «До награды N побед». По местному времени игрока, только тем,
+--   кто играл онлайн последние две недели. Ставит их отправитель
+--   уведомлений (push/index.ts) раз в минуту — его нужно обновить.
+
+-- ============ 1. Рамка месяца ============
+-- Копия — в js/pass.js (PASS_FRAMES), сверяется тестом
+create or replace function pass_frames() returns text[] language sql immutable as
+$$ select array['fire', 'ice', 'space', 'champion', 'streak', 'tourney']
+          || array(select 'cup-' || lpad(i::text, 2, '0') from generate_series(1, 12) i); $$;
+
+-- Суббота тех выходных, что сейчас «свои» (идущие или прошедшие)
+create or replace function weekend_sat()
+returns date language sql stable as $$
+  select (date_trunc('week', (hc_now() at time zone 'UTC') - case when weekend_on() then interval '0' else interval '7 days' end)
+          + interval '5 days')::date;
+$$;
+-- Рамка за 5 побед этих выходных: по месяцу субботы
+create or replace function cup_frame_code()
+returns text language sql stable as $$
+  select 'cup-' || to_char(weekend_sat(), 'MM');
+$$;
+
+create or replace function weekend_claim(p_username text, p_pin text, p_goal int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; c weekend_cup; xp int; sur record; got jsonb := null; frame boolean := false; res jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_goal not in (3, 5) then raise exception 'bad_goal'; end if;
+  select * into c from weekend_cup where username = me and week = weekend_row_key() for update;
+  if c.username is null or c.wins < p_goal then raise exception 'cup_locked'; end if;
+  if p_goal = 3 and c.claim3 is not null then return c.claim3 || jsonb_build_object('already', true); end if;
+  if p_goal = 5 and c.claim5 is not null then return c.claim5 || jsonb_build_object('already', true); end if;
+
+  if p_goal = 5 and cosmetic_grant(me, 'frame', cup_frame_code(), 'cup:' || c.week) then
+    frame := true;
+    xp := 50;
+  else
+    xp := case when p_goal = 3 then 50 else 100 end;
+    -- Сундук за 3 победы — сюрприз всегда, если ещё есть что дать; большой — через раз
+    if p_goal = 3 or random() < 0.5 then
+      select x.* into sur from chest_surprises() x where not cosmetic_has(me, x.kind, x.code) order by random() limit 1;
+      if sur.kind is not null and cosmetic_grant(me, sur.kind, sur.code, 'cup:' || c.week) then
+        got := jsonb_build_object('kind', sur.kind, 'code', sur.code);
+      end if;
+    end if;
+  end if;
+  perform season_xp(me, xp);
+  res := jsonb_build_object('goal', p_goal, 'xp', xp, 'surprise', got,
+                            'frame', case when frame then cup_frame_code() end);
+  if p_goal = 3 then update weekend_cup set claim3 = res where username = me and week = c.week;
+  else update weekend_cup set claim5 = res where username = me and week = c.week; end if;
+  return res;
+end;
+$$;
+
+
+-- ============ 2. Таблица турнира ============
+-- Соперники-«люди» играют выходные «сами»: у каждого третьего — своя цель
+-- побед, к концу выходных набирается целиком. Хранить нечего — считается
+create or replace function cup_bot_wins(p_username text, p_week text)
+returns int language sql stable as $$
+  select case when abs(hashtext(p_username || ':cup:' || p_week)) % 3 <> 0 then 0
+    else floor((1 + abs(hashtext(p_username || ':cupw:' || p_week)) % 9)
+               * case when weekend_on() then least(1.0, greatest(0.0,
+                   extract(epoch from (hc_now() - (weekend_sat()::timestamp at time zone 'UTC'))) / 172800.0))
+                 else 1.0 end)::int end;
+$$;
+
+create or replace function cup_top(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; wk text; top jsonb; fr jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  wk := weekend_row_key();
+  with everyone as (
+    select c.username, c.wins from weekend_cup c where c.week = wk and c.wins > 0
+    union all
+    select b.username, cup_bot_wins(b.username, wk) from bot_people b
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('username', e.username, 'wins', e.wins) order by e.wins desc, e.username), '[]'::jsonb)
+    into top
+  from (select * from everyone where wins > 0 order by wins desc, username limit 10) e;
+  select coalesce(jsonb_agg(jsonb_build_object('username', f.u, 'wins', coalesce(c.wins, 0)) order by coalesce(c.wins, 0) desc, f.u), '[]'::jsonb)
+    into fr
+  from (select me as u
+        union select case when requester = me then addressee else requester end
+              from friendships where status = 'accepted' and me in (requester, addressee)) f
+  left join weekend_cup c on c.username = f.u and c.week = wk;
+  return jsonb_build_object('week', wk, 'on', weekend_on(), 'top', top, 'friends', fr);
+end;
+$$;
+
+-- ============ 3. Задания дня про режим дня ============
+-- Копия — в js/i18n.js (prog.q), сверяется тестом
+create or replace function quest_pool()
+returns table(slot int, ord int, code text, goal int)
+language sql
+immutable
+as $$
+  values (1, 1, 'play2', 2), (1, 2, 'play3', 3), (1, 3, 'ladder2', 2), (1, 4, 'adv_win2', 2), (1, 5, 'daily2', 2),
+         (2, 1, 'win1', 1), (2, 2, 'daily_win1', 1),
+         (3, 1, 'run1', 1), (3, 2, 'run_rounds5', 5), (3, 3, 'run_best3', 3), (3, 4, 'adv_stars3', 3);
+$$;
+
+create or replace function quest_event(p_username text, p_event text, p_n int)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare d date; was_done boolean; now_done boolean;
+begin
+  if p_username is null or p_username like '#%' or p_username like '@bot:%' then return; end if;
+  if exists (select 1 from students where username = p_username and is_bot) then return; end if;
+  d := quest_ensure(p_username);
+  select bool_and(progress >= goal) into was_done from daily_quests where username = p_username and day = d;
+  update daily_quests q
+  set progress = least(q.goal, case
+      when q.code in ('play2', 'play3') and p_event = 'online' then q.progress + 1
+      when q.code = 'ladder2' and p_event = 'ladder' then q.progress + 1
+      when q.code = 'win1' and p_event = 'win' then q.progress + 1
+      when q.code = 'run1' and p_event = 'run' and p_n > 0 then q.progress + 1
+      when q.code = 'run_rounds5' and p_event = 'run' then q.progress + greatest(0, p_n)
+      when q.code = 'run_best3' and p_event = 'run' then greatest(q.progress, p_n)
+      -- Приключение: победа и новые звёзды
+      when q.code = 'adv_win2' and p_event = 'adv_win' then q.progress + 1
+      when q.code = 'adv_stars3' and p_event = 'adv_star' then q.progress + greatest(0, p_n)
+      -- Режим дня: партия и победа
+      when q.code = 'daily2' and p_event = 'daily' then q.progress + 1
+      when q.code = 'daily_win1' and p_event = 'daily_win' then q.progress + 1
+      else q.progress end)
+  where q.username = p_username and q.day = d;
+  select bool_and(progress >= goal) into now_done from daily_quests where username = p_username and day = d;
+  if now_done and not was_done then
+    insert into player_stats(username) values (p_username) on conflict do nothing;
+    update player_stats
+    set quest_streak = case when quest_last = d - 1 then quest_streak + 1
+                            when quest_last = d then quest_streak else 1 end,
+        quest_last = d
+    where username = p_username;
+    update player_stats set quest_best = greatest(quest_best, quest_streak) where username = p_username;
+  end if;
+end;
+$$;
+
+-- Партия режима дня с исходом — события для заданий
+create or replace function matches_daily_quests()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare seat int; who text; w int;
+begin
+  if coalesce(new.ranked_mode, -1) <> 4 then return null; end if;
+  w := match_winner(new);
+  if w is null then return null; end if;
+  for seat in 0..1 loop
+    if new.bot_seat is not null and new.bot_seat = seat then continue; end if;
+    who := case when seat = 0 then new.p0 else new.p1 end;
+    perform quest_event(who, 'daily', 1);
+    if w = seat then perform quest_event(who, 'daily_win', 1); end if;
+  end loop;
+  return null;
+end;
+$$;
+drop trigger if exists matches_daily_quests on matches;
+create trigger matches_daily_quests after update of status on matches
+  for each row when (new.status = 'finished' and old.status is distinct from 'finished')
+  execute function matches_daily_quests();
+
+-- ============ 4. Уведомления турнира ============
+alter table push_outbox drop constraint if exists push_kind;
+alter table push_outbox add constraint push_kind
+  check (kind in ('friend_request', 'challenge', 'talk', 'accepted', 'season_end', 'invite_joined', 'cup_start', 'cup_left'));
+
+create table if not exists cup_notices (
+  username text not null references students(username) on update cascade on delete cascade,
+  week text not null,
+  kind text not null,
+  primary key (username, week, kind)
+);
+alter table cup_notices enable row level security;
+
+-- Раз в минуту из отправителя. В субботу или воскресенье по местному времени
+-- с 10 до 20 — «Турнир начался»; в воскресенье с 15 до 21 — «До награды N
+-- побед», если до сундука или рамки осталось одна-две победы.
+-- В who — «сколько осталось|за что»: 3 — сундук, 5 — рамка
+create or replace function push_tick()
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare wk text; n1 int := 0; n2 int := 0;
+begin
+  if not weekend_on() then return 0; end if;
+  wk := weekend_key();
+  with cand as (
+    select s.username, (hc_now() at time zone coalesce(s.tz, 'UTC')) as lt
+    from students s
+    where not s.is_bot
+      and exists (select 1 from push_subscriptions p where p.username = s.username)
+      and exists (select 1 from online_days o where o.username = s.username and o.played and o.day >= (hc_now() at time zone 'UTC')::date - 14)
+  ), pick as (
+    select c.username from cand c
+    where extract(isodow from c.lt) in (6, 7) and extract(hour from c.lt) between 10 and 19
+      and not exists (select 1 from cup_notices n where n.username = c.username and n.week = wk and n.kind = 'start')
+  ), ins as (
+    insert into cup_notices(username, week, kind) select username, wk, 'start' from pick
+    on conflict do nothing returning username
+  )
+  insert into push_outbox(username, kind) select username, 'cup_start' from ins;
+  get diagnostics n1 = row_count;
+
+  with cand as (
+    select s.username, (hc_now() at time zone coalesce(s.tz, 'UTC')) as lt, coalesce(c.wins, 0) as wins
+    from students s
+    join weekend_cup c on c.username = s.username and c.week = wk
+    where not s.is_bot
+      and exists (select 1 from push_subscriptions p where p.username = s.username)
+  ), pick as (
+    select c.username, case when c.wins < 3 then 3 else 5 end as goal, c.wins from cand c
+    where extract(isodow from c.lt) = 7 and extract(hour from c.lt) between 15 and 20
+      and c.wins between 1 and 4
+      and not exists (select 1 from cup_notices n where n.username = c.username and n.week = wk and n.kind = 'left')
+  ), ins as (
+    insert into cup_notices(username, week, kind) select username, wk, 'left' from pick
+    on conflict do nothing returning username
+  )
+  insert into push_outbox(username, kind, who)
+  select p.username, 'cup_left', (p.goal - p.wins) || '|' || p.goal from pick p join ins i on i.username = p.username;
+  get diagnostics n2 = row_count;
+  return n1 + n2;
+end;
+$$;
+
+-- ============ 5. Что показать игроку ============
+create or replace function my_online(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; d date; od online_days; st online_streak; se text; xp int; s students; owned jsonb; rew jsonb;
+        wc weekend_cup; utc timestamp; sat timestamp;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  d := player_day(me);
+  select * into od from online_days where username = me and day = d;
+  select * into st from online_streak where username = me;
+  se := ladder_season();
+  select coalesce(p.xp, 0) into xp from (select 1) x left join season_pass p on p.username = me and p.season = se;
+  select * into s from students where username = me;
+  select coalesce(jsonb_agg(jsonb_build_object('kind', c.kind, 'code', c.code) order by c.got_at), '[]'::jsonb)
+    into owned from cosmetics c where c.username = me;
+  select jsonb_agg(jsonb_build_object('level', r.level, 'kind', r.kind, 'code', r.code) order by r.level, r.kind)
+    into rew from season_rewards() r;
+  select * into wc from weekend_cup w where w.username = me and w.week = weekend_row_key();
+  utc := hc_now() at time zone 'UTC';
+  -- Ближайшая суббота 00:00 UTC (на выходных — та, что идёт)
+  sat := date_trunc('week', utc) + interval '5 days';
+  return jsonb_build_object(
+    'day', d,
+    'played', coalesce(od.played, false),
+    'chestOpened', od.chest_at is not null,
+    'chest', od.chest,
+    'streak', case when st.last_day >= d - 1 then st.streak
+                   when st.last_day = d - 2 and coalesce(st.freeze_week, '') <> to_char(d, 'IYYY-IW') then st.streak
+                   else 0 end,
+    'bestStreak', coalesce(st.best, 0),
+    'freezeLeft', coalesce(st.freeze_week, '') <> to_char(d, 'IYYY-IW'),
+    'season', se,
+    'xp', xp,
+    'levelXp', pass_level_xp(),
+    'maxLevel', pass_max_level(),
+    'seasonLeft', greatest(0, floor(extract(epoch from
+        (date_trunc('month', now() at time zone 'UTC') + interval '1 month') - (now() at time zone 'UTC'))))::int,
+    'rewards', rew,
+    'streakRewards', (select jsonb_agg(jsonb_build_object('days', r.days, 'kind', r.kind, 'code', r.code) order by r.days) from streak_rewards() r),
+    'owned', owned,
+    'frame', s.frame,
+    'title', s.title,
+    'daily', jsonb_build_object(
+      'variant', daily_variant(),
+      'next', daily_variant((utc::date) + 1),
+      'endsIn', floor(extract(epoch from (date_trunc('day', utc) + interval '1 day' - utc)))::int),
+    'weekend', jsonb_build_object(
+      'on', weekend_on(),
+      'wins', coalesce(wc.wins, 0),
+      'claim3', wc.claim3,
+      'claim5', wc.claim5,
+      'frame', cup_frame_code(),
+      'startsIn', case when weekend_on() then 0 else floor(extract(epoch from (sat - utc)))::int end,
+      'endsIn', case when weekend_on() then floor(extract(epoch from (sat + interval '2 days' - utc)))::int else 0 end));
+end;
+$$;
+
+-- ============ 6. Права ============
+revoke execute on function push_tick() from public, anon;
+-- Вызывает только отправитель уведомлений (служебная роль Supabase)
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke execute on function push_tick() from authenticated;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function push_tick() to service_role;
+  end if;
+end $$;
+revoke execute on function matches_daily_quests() from public, anon;
+revoke execute on function quest_event(text, text, int) from public, anon;
+revoke execute on function cup_bot_wins(text, text) from public, anon;
+grant execute on function pass_frames() to anon;
+grant execute on function weekend_claim(text, text, int) to anon;
+grant execute on function cup_top(text, text) to anon;
+grant execute on function my_online(text, text) to anon;

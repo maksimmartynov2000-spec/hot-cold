@@ -5,7 +5,9 @@
 // Нет миграции — onlineInfo остаётся null, и ничего этого не видно
 
 // Наборы — копии из базы (pass_frames и т. д.), сверяются тестом
-const PASS_FRAMES = ['fire', 'ice', 'space', 'champion', 'streak', 'tourney'];
+// Рамки турнира: своя у каждого месяца (миграция 055); 'tourney' — первая, до них
+const PASS_FRAMES = ['fire', 'ice', 'space', 'champion', 'streak', 'tourney',
+  'cup-01', 'cup-02', 'cup-03', 'cup-04', 'cup-05', 'cup-06', 'cup-07', 'cup-08', 'cup-09', 'cup-10', 'cup-11', 'cup-12'];
 const PASS_TITLES = ['hunter', 'sniper', 'regular', 'champion'];
 const PASS_PHRASES = ['lava', 'rematch', 'streak', 'oops', 'genius', 'close'];
 const PASS_ICONS = ['🦦', '🐞'];
@@ -40,6 +42,7 @@ function passWhere(kind, code) {
   const s = (onlineInfo.streakRewards || []).find(x => x.kind === kind && x.code === code);
   if (s) return P.whereStreak.replace('{n}', s.days);
   if (kind === 'frame' && code === 'tourney') return P.whereCup;
+  if (kind === 'frame' && /^cup-\d\d$/.test(code)) return P.cup.whereCupM.replace('{m}', seasonMonth('2026-' + code.slice(4)));
   return P.whereChest;
 }
 function passLevel() {
@@ -99,9 +102,12 @@ function cupCardHtml() {
   if (!W) return '';
   const C = t().pass.cup;
   const goal = (n, claimed) => {
-    const got = W.wins >= n, label = n === 3 ? C.g3 : (passOwns('frame', 'tourney') && !(claimed && claimed.frame) ? C.g5b : C.g5);
+    // Рамка за 5 — этого месяца (W.frame, миграция 055); есть уже — большой сундук
+    const fr = W.frame || 'tourney';
+    const big = n === 5 && passOwns('frame', fr) && !(claimed && claimed.frame);
+    const got = W.wins >= n, label = n === 3 ? C.g3 : big ? C.g5b : (W.frame ? passRewardName('frame', fr) : C.g5);
     const art = n === 3 ? '<span class="pr-art pr-emoji">🎁</span>'
-      : (label === C.g5 ? passRewardArt('frame', 'tourney') : '<span class="pr-art pr-emoji">💎</span>');
+      : (big ? '<span class="pr-art pr-emoji">💎</span>' : passRewardArt('frame', fr));
     const state = claimed ? '<i>✅</i>'
       : got ? '<button class="cup-claim" id="cupClaim' + n + '" onclick="claimCup(' + n + ')">' + escapeHtml(C.claim) + '</button>'
       : '<i>🔒</i>';
@@ -120,6 +126,7 @@ function cupCardHtml() {
       escapeHtml(W.on ? C.on.replace('{t}', cupTimeText(W.endsIn)) : C.last) + '</small></div>' +
     '<div class="cup-bar"><span style="width:' + pct + '%"></span><em>' + escapeHtml(C.wins.replace('{n}', Math.min(W.wins, 5) + '/5')) + '</em></div>' +
     '<div class="cup-goals">' + goal(3, W.claim3) + goal(5, W.claim5) + '</div>' +
+    (W.frame ? '<button class="cup-table" onclick="openCupTable()">' + escapeHtml(C.table) + '</button>' : '') +
     '</div>';
 }
 // Больше суток — днями, иначе часами и минутами
@@ -242,7 +249,9 @@ function renderStylePicker() {
   box.classList.toggle('hidden', !onlineInfo);
   if (!onlineInfo) return;
   const P = t().pass;
-  const frames = [null].concat(PASS_FRAMES);
+  // Рамки турнира — коллекция: видны полученные и та, что разыгрывается сейчас
+  const cupNow = onlineInfo.weekend && onlineInfo.weekend.frame;
+  const frames = [null].concat(PASS_FRAMES.filter(f => !(f === 'tourney' || /^cup-/.test(f)) || passOwns('frame', f) || f === cupNow));
   const titles = [null].concat(PASS_TITLES);
   const chip = (cls, sel, locked, html, fn) => {
     const b = document.createElement('button');
@@ -295,3 +304,41 @@ async function chooseStyle(kind, code) {
 function sayCodesFor() {
   return SAY_CODES.concat(PASS_PHRASES.filter(c => passOwns('phrase', c)));
 }
+
+// ---------- таблица турнира (миграция 055) ----------
+// Друзья — всегда, даже с нулём: есть с кем сравниться. Ниже — десятка лучших
+async function openCupTable() {
+  const C = t().pass.cup;
+  const m = document.getElementById('cupModal');
+  document.getElementById('cupTitle').textContent = C.tableTitle;
+  document.getElementById('cupOk').textContent = t().pass.ok;
+  document.getElementById('cupSub').textContent = '';
+  document.getElementById('cupFriends').replaceChildren();
+  document.getElementById('cupTop').replaceChildren();
+  m.classList.remove('hidden');
+  let r;
+  try {
+    r = await friendRpc('cup_top', {});
+  } catch (e) {
+    document.getElementById('cupSub').textContent = friendErrorText(e.message);
+    return;
+  }
+  if (!r) return;
+  const me = (runAuth() || {}).username;
+  const W = onlineInfo && onlineInfo.weekend;
+  document.getElementById('cupSub').textContent = r.on
+    ? C.on.replace('{t}', cupTimeText((W && W.endsIn) || 0)) : C.tableLast;
+  const rows = (list, box) => {
+    box.replaceChildren(...list.map((x, i) => topRow(i, x.username, C.winsShort.replace('{n}', x.wins), x.username === me)));
+  };
+  const head = (id, text) => { document.getElementById(id).textContent = text; };
+  head('tCupFriends', C.friends);
+  head('tCupTop', C.best);
+  const fr = r.friends || [], top = r.top || [];
+  if (fr.length > 1) rows(fr, document.getElementById('cupFriends'));
+  else document.getElementById('cupFriends').innerHTML = '<div class="fr-note">' + escapeHtml(C.noFriends) + '</div>';
+  if (top.length) rows(top, document.getElementById('cupTop'));
+  else document.getElementById('cupTop').innerHTML = '<div class="fr-note">' + escapeHtml(C.empty) + '</div>';
+  fetchAvatars(fr.concat(top).map(x => x.username));
+}
+function closeCupTable() { document.getElementById('cupModal').classList.add('hidden'); }

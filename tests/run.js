@@ -5785,10 +5785,13 @@ async function testProgress(browser) {
     }) }));
   const dbAch = achMig.match(/select array\[('first_win'[^\]]*)\]/)[1].replace(/\s/g, '').split(',').map(x => x.replace(/'/g, ''));
   const dbIcons = [...mig.match(/values \(3, '🔥'\)[^;]*;/)[0].matchAll(/\((\d+), '([^']+)'\)/g)].map(m => m[1] + m[2]);
-  const dbQuests = [...mig.match(/create or replace function quest_pool\(\)[\s\S]*?\$\$;/)[0].matchAll(/'([a-z_0-9]+)'/g)].map(m => m[1]);
+  // Задания — тоже из последней миграции, где менялся их набор
+  const qMig = fs.readdirSync(migDir).sort().reverse().map(f => fs.readFileSync(path.join(migDir, f), 'utf8'))
+    .find(x => /function quest_pool\(\)/.test(x));
+  const dbQuests = [...qMig.match(/create or replace function quest_pool\(\)[\s\S]*?\$\$;/)[0].matchAll(/'([a-z_0-9]+)'/g)].map(m => m[1]);
   check('достижения: 61 код лестницами, те же, что в базе, в том же порядке', js.ach.length === 61 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
   check('иконки за серию — те же, что в базе', js.icons.join() === dbIcons.join(), js.icons.join() + ' / ' + dbIcons.join());
-  check('у каждого задания из базы есть текст', dbQuests.length === 7 && dbQuests.every(c => js.q.includes(c)), dbQuests.join());
+  check('у каждого задания из базы есть текст', dbQuests.length === 11 && dbQuests.every(c => js.q.includes(c)), dbQuests.join());
   check('тексты заданий и достижений есть на всех 4 языках', js.langs.every(Boolean), JSON.stringify(js.langs));
 
   // Карточка в меню
@@ -7025,6 +7028,34 @@ async function testDailyWeekend(browser) {
   check('рамку «Турнир» можно надеть в профиле', fr);
   await page.evaluate(() => closeLogoutModal());
 
+  // Рамка месяца и таблица (миграция 055)
+  await page.evaluate(async () => {
+    Object.assign(window.__online.weekend, { frame: 'cup-11', wins: 5, claim5: null });
+    window.__cupTop = { week: '2026-45', on: true,
+      top: [{ username: 'Тимур', wins: 7 }, { username: 'Максим', wins: 5 }],
+      friends: [{ username: 'Максим', wins: 5 }, { username: 'Кира', wins: 0 }] };
+    await loadOnlineInfo();
+  });
+  const mon = await page.evaluate(() => document.querySelector('.cup-goal[data-goal="5"]').textContent);
+  check('за 5 побед — рамка этого месяца: «Турнир: ноябрь»', /Турнир: ноябрь/.test(mon), mon);
+  await page.evaluate(() => claimCup(5));
+  await page.waitForTimeout(300);
+  check('получена рамка ноября', await page.evaluate(() => passOwns('frame', 'cup-11')));
+  await page.evaluate(async () => { closeChest(); await openCupTable(); });
+  await page.waitForTimeout(300);
+  const tb = await page.evaluate(() => ({ shown: !document.getElementById('cupModal').classList.contains('hidden'),
+    fr: [...document.querySelectorAll('#cupFriends .rk-top-row')].map(r => r.textContent),
+    top: [...document.querySelectorAll('#cupTop .rk-top-row')].map(r => r.textContent),
+    me: document.querySelectorAll('#cupTop .rk-top-row.me').length }));
+  check('таблица: друзья (и с нулём) и лучшие, я отмечен', tb.shown && tb.fr.length === 2 && /Кира0 🏆/.test(tb.fr[1]) &&
+    tb.top.length === 2 && /Тимур7 🏆/.test(tb.top[0]) && tb.me === 1, JSON.stringify(tb));
+  await page.evaluate(() => closeCupTable());
+  await page.evaluate(() => openLogoutModal());
+  await page.waitForTimeout(300);
+  const pick = await page.evaluate(() => [...document.querySelectorAll('#pfFrames [data-frame]')].map(x => x.dataset.frame).filter(f => /^cup-|tourney/.test(f)));
+  check('в профиле из рамок турнира — только полученные и текущая', pick.join() === 'tourney,cup-11', pick.join());
+  await page.evaluate(() => closeLogoutModal());
+
   // Будни: одной строкой — когда начнётся
   await page.evaluate(async () => { Object.assign(window.__online.weekend, { on: false, wins: 0, claim3: null, claim5: null, startsIn: 3 * 86400 + 600, endsIn: 0 });
     await loadOnlineInfo(); });
@@ -7055,7 +7086,8 @@ async function testDailyWeekend(browser) {
   for (const lang of ['en', 'fr', 'de']) {
     const ok = await page.evaluate(l => { const P = i18n[l].pass;
       return DAILY_VARIANTS.every(v => P.daily[v] && P.daily[v + 'D']) && P.daily.perk && P.daily.next && P.cup.title && P.cup.on &&
-        P.cup.off && P.cup.claim && P.cup.starsX2 && P.frames.tourney && P.whereCup; }, lang);
+        P.cup.off && P.cup.claim && P.cup.starsX2 && P.frames.tourney && P.whereCup && P.cup.table && P.cup.whereCupM &&
+        PASS_FRAMES.every(f => P.frames[f]) && i18n[l].prog.q.daily2 && i18n[l].prog.q.daily_win1; }, lang);
     check(lang + ': режим дня и турнир переведены', ok);
   }
   await page.context().close();

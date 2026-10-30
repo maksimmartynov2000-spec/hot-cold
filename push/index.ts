@@ -28,6 +28,7 @@ webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
 // Тексты те же четыре языка, что и в игре. Язык берём из подписки: service
 // worker просыпается без страницы и настроек не знает
+// cup_left: в who — «сколько осталось|за что» (3 — сундук, 5 — рамка)
 const TEXT: Record<string, Record<string, (who: string) => [string, string]>> = {
   en: {
     friend_request: w => ['Hot or Cold', `${w} wants to be friends`],
@@ -35,7 +36,9 @@ const TEXT: Record<string, Record<string, (who: string) => [string, string]>> = 
     talk: w => ['Hot or Cold', `${w} wrote to you`],
     accepted: w => ['Hot or Cold', `${w} accepted — the game is waiting for you`],
     season_end: () => ['Hot or Cold', 'The season ends in 2 days — time to climb!'],
-    invite_joined: w => ['Hot or Cold', `${w} came by your invite — you are friends now`]
+    invite_joined: w => ['Hot or Cold', `${w} came by your invite — you are friends now`],
+    cup_start: () => ['Hot or Cold', 'The weekend tournament has started — stars ×2!'],
+    cup_left: w => { const [n = 1, goal = 3] = w.split('|').map(Number).map(x => x || undefined); return ['Hot or Cold', `${n} ${n === 1 ? 'win' : 'wins'} to the ${goal === 3 ? 'tournament chest' : 'tournament frame'} — the weekend ends soon!`]; }
   },
   // Название игры — по-английски на всех языках, как в самой игре
   ru: {
@@ -44,7 +47,9 @@ const TEXT: Record<string, Record<string, (who: string) => [string, string]>> = 
     talk: w => ['Hot or Cold', `${w} вам написал`],
     accepted: w => ['Hot or Cold', `${w}: вызов принят — партия ждёт вас`],
     season_end: () => ['Hot or Cold', 'Сезон кончается через 2 дня — успейте подняться!'],
-    invite_joined: w => ['Hot or Cold', `${w}: пришли по вашему приглашению — теперь вы друзья`]
+    invite_joined: w => ['Hot or Cold', `${w}: пришли по вашему приглашению — теперь вы друзья`],
+    cup_start: () => ['Hot or Cold', 'Турнир выходных начался — звёзды ×2!'],
+    cup_left: w => { const [n = 1, goal = 3] = w.split('|').map(Number).map(x => x || undefined); return ['Hot or Cold', `До ${goal === 3 ? 'сундука' : 'рамки'} турнира — ${n} ${n === 1 ? 'победа' : 'победы'}. Выходные скоро кончатся!`]; }
   },
   fr: {
     friend_request: w => ['Hot or Cold', `${w} veut être votre ami`],
@@ -52,7 +57,9 @@ const TEXT: Record<string, Record<string, (who: string) => [string, string]>> = 
     talk: w => ['Hot or Cold', `${w} vous a écrit`],
     accepted: w => ['Hot or Cold', `${w} : défi accepté — la partie vous attend`],
     season_end: () => ['Hot or Cold', 'La saison se termine dans 2 jours — c’est le moment de grimper !'],
-    invite_joined: w => ['Hot or Cold', `${w} est venu grâce à votre invitation — vous êtes amis`]
+    invite_joined: w => ['Hot or Cold', `${w} est venu grâce à votre invitation — vous êtes amis`],
+    cup_start: () => ['Hot or Cold', 'Le tournoi du week-end a commencé — étoiles ×2 !'],
+    cup_left: w => { const [n = 1, goal = 3] = w.split('|').map(Number).map(x => x || undefined); return ['Hot or Cold', `Encore ${n} victoire${n === 1 ? '' : 's'} pour ${goal === 3 ? 'le coffre' : 'le cadre'} du tournoi — le week-end se termine bientôt !`]; }
   },
   de: {
     friend_request: w => ['Hot or Cold', `${w} möchte befreundet sein`],
@@ -60,9 +67,12 @@ const TEXT: Record<string, Record<string, (who: string) => [string, string]>> = 
     talk: w => ['Hot or Cold', `${w} hat dir geschrieben`],
     accepted: w => ['Hot or Cold', `${w}: Einladung angenommen — das Spiel wartet auf dich`],
     season_end: () => ['Hot or Cold', 'Die Saison endet in 2 Tagen — jetzt noch aufsteigen!'],
-    invite_joined: w => ['Hot or Cold', `${w} ist über deine Einladung gekommen — ihr seid jetzt Freunde`]
+    invite_joined: w => ['Hot or Cold', `${w} ist über deine Einladung gekommen — ihr seid jetzt Freunde`],
+    cup_start: () => ['Hot or Cold', 'Das Wochenendturnier hat begonnen — Sterne ×2!'],
+    cup_left: w => { const [n = 1, goal = 3] = w.split('|').map(Number).map(x => x || undefined); return ['Hot or Cold', `Noch ${n} ${n === 1 ? 'Sieg' : 'Siege'} bis ${goal === 3 ? 'zur Turniertruhe' : 'zum Turnierrahmen'} — das Wochenende endet bald!`]; }
   }
 };
+
 
 Deno.serve(async (req) => {
   // Молчать при незаданном пропуске нельзя: тогда адрес остался бы открытым
@@ -73,6 +83,10 @@ Deno.serve(async (req) => {
   if (req.headers.get('x-push-secret') !== PUSH_SECRET) {
     return new Response('forbidden', { status: 403 });
   }
+
+  // Уведомления по времени (турнир выходных): база сама решает, кому пора.
+  // Без миграции 055 функции нет — это не ошибка, просто нечего ставить
+  await db.rpc('push_tick');
 
   const { data: rows, error } = await db
     .from('push_outbox')
