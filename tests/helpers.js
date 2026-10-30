@@ -200,6 +200,21 @@ function stubSupabase(opts) {
             if (O.chest.surprise) O.owned.push(O.chest.surprise);
             return { data: O.chest, error: null };
           }
+          // Турнир выходных (миграция 054): weekend в __online
+          if (name === 'weekend_claim') {
+            const W = window.__online && window.__online.weekend;
+            if (!W) return { data: null, error: { message: 'Could not find the function public.weekend_claim' } };
+            const k = 'claim' + args.p_goal;
+            if (W.wins < args.p_goal) return { data: null, error: { message: 'cup_locked' } };
+            if (W[k]) return { data: Object.assign({ already: true }, W[k]), error: null };
+            const O = window.__online, own = O.owned.some(o => o.kind === 'frame' && o.code === 'tourney');
+            W[k] = args.p_goal === 5 && !own ? { goal: 5, xp: 50, frame: 'tourney', surprise: null }
+              : { goal: args.p_goal, xp: args.p_goal === 3 ? 50 : 100, frame: null, surprise: window.__chestSurprise || null };
+            if (W[k].frame) O.owned.push({ kind: 'frame', code: 'tourney' });
+            if (W[k].surprise) O.owned.push(W[k].surprise);
+            O.xp += W[k].xp;
+            return { data: W[k], error: null };
+          }
           if (name === 'set_frame') { window.__online.frame = args.p_frame; return { data: args.p_frame, error: null }; }
           if (name === 'set_title') { window.__online.title = args.p_title; return { data: args.p_title, error: null }; }
           if (name === 'faces_for') {

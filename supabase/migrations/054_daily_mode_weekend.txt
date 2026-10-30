@@ -1,0 +1,472 @@
+-- Онлайн, часть 3б: режим дня и турнир выходных. Применять в Supabase:
+-- SQL Editor → вставить целиком → Run. Применить ДО мёржа.
+--
+-- • Режим дня — пятая кнопка рядом с обычными режимами, своя очередь
+--   (режим 4). Каждый день по кругу: Блиц (10 секунд на ход), Хаос (бонусов
+--   втрое больше), Мини-матч (до одной победы, числа 1–50). Звёзды — как
+--   обычно, очки сезона — вдвое.
+-- • Турнир выходных: в субботу и воскресенье победа в игре на звёзды даёт
+--   вдвое больше звёзд. 3 победы за выходные — сундук, 5 — рамка «Турнир»
+--   (у кого она уже есть — большой сундук).
+-- Сутки и выходные — по UTC: у всех в очереди один и тот же режим.
+
+-- ============ 1. Время ============
+-- Обычно — now(). Тест подставляет своё через set hc.now = '...'
+create or replace function hc_now()
+returns timestamptz language sql stable as $$
+  select coalesce(nullif(current_setting('hc.now', true), '')::timestamptz, now());
+$$;
+
+-- ============ 2. Режим дня ============
+alter table elo_ratings drop constraint if exists elo_mode_range;
+alter table elo_ratings add constraint elo_mode_range check (mode between 0 and 4);
+
+alter table matches add column if not exists variant text;
+alter table matches drop constraint if exists match_variant;
+alter table matches add constraint match_variant check (variant is null or variant in ('blitz', 'chaos', 'mini'));
+
+-- Порядок — копия в js/online.js (DAILY_VARIANTS), сверяется тестом
+create or replace function daily_variants() returns text[] language sql immutable as
+$$ select array['blitz', 'chaos', 'mini']; $$;
+
+create or replace function daily_variant(p_day date default null)
+returns text language sql stable as $$
+  select (daily_variants())[1 + ((coalesce(p_day, (hc_now() at time zone 'UTC')::date) - date '1970-01-01') % 3)];
+$$;
+
+-- Партия режима дня (из очереди, реванш) получает правила этого дня
+create or replace function matches_daily_rules()
+returns trigger
+language plpgsql
+as $$
+begin
+  if coalesce(new.ranked_mode, -1) <> 4 then return new; end if;
+  new.variant := coalesce(new.variant, daily_variant());
+  new.range_min := 1;
+  new.range_max := case when new.variant = 'mini' then 50 else 100 end;
+  new.frost := false;
+  new.wins_needed := case when new.variant = 'mini' then 1 else 3 end;
+  new.bonuses_on := new.variant = 'chaos';
+  new.bonus_count := case when new.variant = 'chaos' then 3 * auto_bonus_count(100) end;
+  return new;
+end;
+$$;
+drop trigger if exists matches_daily_rules on matches;
+create trigger matches_daily_rules before insert on matches
+  for each row execute function matches_daily_rules();
+
+-- Блиц: 10 секунд на ход
+create or replace function turn_seconds(m matches)
+returns int
+language sql
+immutable
+as $$
+  select case when m.variant = 'blitz' then 10 else greatest(10, 30 - m.rush[m.cur + 1]) end;
+$$;
+
+-- Не успел — пропуск хода. Партия кончается, когда человек молчит долго:
+-- обычно это два пропуска подряд (минута), в Блице — три (полминуты)
+create or replace function apply_turn_timeout(p_match_id bigint)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; gone int; rival int;
+begin
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then return false; end if;
+  if m.status <> 'active' or m.round_over or m.match_over then return false; end if;
+  if m.turn_deadline is null or m.turn_deadline > now() then return false; end if;
+  if m.bot_seat is not null and m.cur = m.bot_seat then return false; end if;
+
+  insert into match_moves(match_id, round, seat, guess, tier, kind)
+  values (p_match_id, m.round, m.cur, null, null, 'timeout');
+
+  gone := m.timeouts[m.cur + 1] + 1;
+  rival := 1 - m.cur;
+
+  update matches
+  set skip_turn[m.cur + 1] = false,
+      auto_lava[m.cur + 1] = false,
+      near_bonus = false,
+      last_bonus = null,
+      timeouts[m.cur + 1] = gone
+  where id = p_match_id;
+
+  if gone >= (case when m.variant = 'blitz' then 3 else 2 end) then
+    update matches
+    set round_over = true,
+        round_winner = rival,
+        match_over = true,
+        status = 'finished',
+        forfeit_by = m.cur,
+        turn_deadline = null,
+        updated_at = now()
+    where id = p_match_id;
+    perform apply_elo(p_match_id, rival);
+    return true;
+  end if;
+
+  perform pass_turn(p_match_id, true);
+  return true;
+end;
+$$;
+
+-- Очередь и её состояние: режимов теперь пять
+create or replace function join_ranked_queue(p_username text, p_pin text, p_mode int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; my_elo int; mid bigint; new_id bigint; mine ranked_queue;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_mode is null or p_mode < 0 or p_mode > 4 then raise exception 'bad_mode'; end if;
+
+  perform expire_stale_matches();
+
+  select id into mid from matches
+  where ranked and status = 'active' and (p0 = me or p1 = me)
+  order by id desc limit 1;
+  if mid is not null then
+    delete from ranked_queue where username = me;
+    return jsonb_build_object('matchId', mid);
+  end if;
+
+  select * into mine from ranked_queue where username = me;
+  if mine.match_id is not null then
+    delete from ranked_queue where username = me;
+    return jsonb_build_object('matchId', mine.match_id);
+  end if;
+  -- В очереди можно стоять только в одном режиме: иначе человека затянуло бы
+  -- в две партии сразу, и обе с таймером
+  if mine.username is not null and mine.mode is distinct from p_mode then
+    delete from ranked_queue where username = me;
+    mine := null;
+  end if;
+
+  delete from ranked_queue
+  where username <> me
+    and ((match_id is null and joined_at < now() - interval '5 minutes')
+      or (match_id is not null and joined_at < now() - interval '30 minutes'));
+
+  select coalesce(e.elo, 1000) into my_elo from (select 1) x
+  left join elo_ratings e on e.username = me and e.mode = p_mode;
+  insert into ranked_queue(username, elo, mode) values (me, my_elo, p_mode)
+  on conflict (username) do nothing;
+
+  new_id := ranked_pair(me, p_mode);
+  if new_id is null then
+    return jsonb_build_object('matchId', null, 'waiting', true);
+  end if;
+  return jsonb_build_object('matchId', new_id);
+end;
+$$;
+
+create or replace function ranked_status(p_username text, p_pin text, p_mode int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; mine ranked_queue; mid bigint; waiting int; last_at timestamptz;
+        my_elo int; my_games int; all_r jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_mode is null or p_mode < 0 or p_mode > 4 then raise exception 'bad_mode'; end if;
+
+  perform expire_stale_matches();
+
+  select id into mid from matches
+  where ranked and status = 'active' and (p0 = me or p1 = me)
+  order by id desc limit 1;
+
+  if mid is null then mid := ranked_pair(me, p_mode); end if;
+
+  select * into mine from ranked_queue where username = me;
+  if mid is null and mine.match_id is not null then mid := mine.match_id; end if;
+  if mid is not null then delete from ranked_queue where username = me; end if;
+
+  select count(*) into waiting from ranked_queue
+  where match_id is null and mode = p_mode and joined_at > now() - interval '5 minutes';
+
+  select max(updated_at) into last_at from matches m
+  where m.ranked and coalesce(m.ranked_mode, 0) = p_mode and not match_legacy_bot(m);
+
+  select jsonb_object_agg(g.mode, jsonb_build_object(
+           'elo', coalesce(e.elo, 1000), 'games', coalesce(e.games, 0)))
+    into all_r
+  from generate_series(0, 4) g(mode)
+  left join elo_ratings e on e.username = me and e.mode = g.mode;
+
+  my_elo := coalesce((all_r -> p_mode::text ->> 'elo')::int, 1000);
+  my_games := coalesce((all_r -> p_mode::text ->> 'games')::int, 0);
+
+  return jsonb_build_object(
+    'mode', p_mode,
+    'matchId', mid,
+    'inQueue', mine.username is not null and mine.match_id is null and mid is null
+               and mine.mode = p_mode,
+    'queueMode', case when mine.username is not null and mine.match_id is null and mid is null
+                      then mine.mode else null end,
+    'waited', case when mine.username is null then 0
+                   else floor(extract(epoch from (now() - mine.joined_at)))::int end,
+    'botWait', null,
+    'queue', waiting,
+    'elo', my_elo,
+    'games', my_games,
+    'ratings', all_r,
+    'lastAgo', case when last_at is null then null
+                    else floor(extract(epoch from (now() - last_at)))::int end);
+end;
+$$;
+
+-- Достижение «победы во всех режимах» — про четыре обычных режима
+create or replace function ach_modes(p_username text)
+returns int
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select count(distinct coalesce(m.ranked_mode, 0))::int
+  from matches m
+  where m.ranked and m.status = 'finished' and coalesce(m.ranked_mode, 0) < 4
+    and ((m.p0 = p_username and match_winner(m) = 0) or (m.p1 = p_username and match_winner(m) = 1));
+$$;
+
+-- Очки сезона: в режиме дня — вдвое
+create or replace function matches_pass()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare seat int; who text; w int;
+begin
+  w := match_winner(new);
+  if w is null then return null; end if;
+  for seat in 0..1 loop
+    if new.bot_seat is not null and new.bot_seat = seat then continue; end if;
+    who := case when seat = 0 then new.p0 else new.p1 end;
+    if who like '#%' then continue; end if;
+    perform season_xp(who, (10 + case when w = seat then 10 else 0 end)
+                           * case when new.ranked_mode = 4 then 2 else 1 end);
+    insert into online_days(username, day, played) values (who, player_day(who), true)
+    on conflict (username, day) do update set played = true;
+  end loop;
+  return null;
+end;
+$$;
+
+-- ============ 3. Турнир выходных ============
+create or replace function weekend_on(p_at timestamptz default null)
+returns boolean language sql stable as $$
+  select extract(isodow from (coalesce(p_at, hc_now()) at time zone 'UTC')) in (6, 7);
+$$;
+-- Неделя по ISO: суббота и воскресенье — её конец
+create or replace function weekend_key(p_at timestamptz default null)
+returns text language sql stable as $$
+  select to_char((coalesce(p_at, hc_now()) at time zone 'UTC')::date, 'IYYY-IW');
+$$;
+
+-- На выходных победа — вдвое больше звёзд
+create or replace function ladder_after(p_username text, p_won boolean)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare r ladder; st int; s int;
+begin
+  r := ladder_touch(p_username);
+  if p_won then
+    st := r.streak + 1;
+    s := least(150, r.stars + (case when st >= 3 and r.stars < 150 then 2 else 1 end)
+                              * case when weekend_on() then 2 else 1 end);
+  else
+    st := 0;
+    -- Начало лиги и ранг 5 — ступени, ниже которых не упасть. Легенда — до
+    -- конца сезона
+    s := case when r.stars >= 150 or r.stars % 15 = 0 then r.stars else r.stars - 1 end;
+    -- Ученик: первые 10 партий на звёзды поражение звезду не отнимает
+    if r.career < apprentice_games() then s := r.stars; end if;
+  end if;
+  update ladder
+  set stars = s,
+      legend_at = case when s >= 150 and r.legend_at is null then now() else r.legend_at end,
+      streak = st,
+      best = greatest(r.best, s),
+      games = r.games + 1,
+      wins = r.wins + case when p_won then 1 else 0 end,
+      career = r.career + 1,
+      peak = greatest(r.peak, ladder_league(s)),
+      updated_at = now()
+  where username = p_username;
+  return s - r.stars;
+end;
+$$;
+
+create table if not exists weekend_cup (
+  username text not null references students(username) on update cascade on delete cascade,
+  week text not null,
+  wins int not null default 0,
+  claim3 jsonb,
+  claim5 jsonb,
+  primary key (username, week)
+);
+alter table weekend_cup enable row level security;
+
+-- Победа в игре на звёзды на выходных — в счёт турнира
+create or replace function matches_weekend()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare w int; who text;
+begin
+  if not weekend_on() then return null; end if;
+  w := match_winner(new);
+  if w is null or (new.bot_seat is not null and new.bot_seat = w) then return null; end if;
+  who := case when w = 0 then new.p0 else new.p1 end;
+  if who like '#%' or exists (select 1 from students where username = who and is_bot) then return null; end if;
+  insert into weekend_cup(username, week, wins) values (who, weekend_key(), 1)
+  on conflict (username, week) do update set wins = weekend_cup.wins + 1;
+  return null;
+end;
+$$;
+drop trigger if exists matches_weekend on matches;
+create trigger matches_weekend after update of elo_applied on matches
+  for each row when (new.elo_applied and not old.elo_applied and new.ladder)
+  execute function matches_weekend();
+
+-- Рамка «Турнир» — в набор рамок
+create or replace function pass_frames() returns text[] language sql immutable as
+$$ select array['fire', 'ice', 'space', 'champion', 'streak', 'tourney']; $$;
+
+-- Какие выходные сейчас «свои»: идущие или прошедшие (награду можно забрать
+-- до следующих)
+create or replace function weekend_row_key()
+returns text language sql stable as $$
+  select case when weekend_on() then weekend_key() else weekend_key(hc_now() - interval '7 days') end;
+$$;
+
+-- Забрать награду: p_goal = 3 (сундук) или 5 (рамка или большой сундук)
+create or replace function weekend_claim(p_username text, p_pin text, p_goal int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; c weekend_cup; xp int; sur record; got jsonb := null; frame boolean := false; res jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_goal not in (3, 5) then raise exception 'bad_goal'; end if;
+  select * into c from weekend_cup where username = me and week = weekend_row_key() for update;
+  if c.username is null or c.wins < p_goal then raise exception 'cup_locked'; end if;
+  if p_goal = 3 and c.claim3 is not null then return c.claim3 || jsonb_build_object('already', true); end if;
+  if p_goal = 5 and c.claim5 is not null then return c.claim5 || jsonb_build_object('already', true); end if;
+
+  if p_goal = 5 and cosmetic_grant(me, 'frame', 'tourney', 'cup:' || c.week) then
+    frame := true;
+    xp := 50;
+  else
+    xp := case when p_goal = 3 then 50 else 100 end;
+    -- Сундук за 3 победы — сюрприз всегда, если ещё есть что дать; большой — через раз
+    if p_goal = 3 or random() < 0.5 then
+      select x.* into sur from chest_surprises() x where not cosmetic_has(me, x.kind, x.code) order by random() limit 1;
+      if sur.kind is not null and cosmetic_grant(me, sur.kind, sur.code, 'cup:' || c.week) then
+        got := jsonb_build_object('kind', sur.kind, 'code', sur.code);
+      end if;
+    end if;
+  end if;
+  perform season_xp(me, xp);
+  res := jsonb_build_object('goal', p_goal, 'xp', xp, 'surprise', got,
+                            'frame', case when frame then 'tourney' end);
+  if p_goal = 3 then update weekend_cup set claim3 = res where username = me and week = c.week;
+  else update weekend_cup set claim5 = res where username = me and week = c.week; end if;
+  return res;
+end;
+$$;
+
+-- ============ 4. Что показать игроку ============
+create or replace function my_online(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; d date; od online_days; st online_streak; se text; xp int; s students; owned jsonb; rew jsonb;
+        wc weekend_cup; utc timestamp; sat timestamp;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  d := player_day(me);
+  select * into od from online_days where username = me and day = d;
+  select * into st from online_streak where username = me;
+  se := ladder_season();
+  select coalesce(p.xp, 0) into xp from (select 1) x left join season_pass p on p.username = me and p.season = se;
+  select * into s from students where username = me;
+  select coalesce(jsonb_agg(jsonb_build_object('kind', c.kind, 'code', c.code) order by c.got_at), '[]'::jsonb)
+    into owned from cosmetics c where c.username = me;
+  select jsonb_agg(jsonb_build_object('level', r.level, 'kind', r.kind, 'code', r.code) order by r.level, r.kind)
+    into rew from season_rewards() r;
+  select * into wc from weekend_cup w where w.username = me and w.week = weekend_row_key();
+  utc := hc_now() at time zone 'UTC';
+  -- Ближайшая суббота 00:00 UTC (на выходных — та, что идёт)
+  sat := date_trunc('week', utc) + interval '5 days';
+  return jsonb_build_object(
+    'day', d,
+    'played', coalesce(od.played, false),
+    'chestOpened', od.chest_at is not null,
+    'chest', od.chest,
+    'streak', case when st.last_day >= d - 1 then st.streak
+                   when st.last_day = d - 2 and coalesce(st.freeze_week, '') <> to_char(d, 'IYYY-IW') then st.streak
+                   else 0 end,
+    'bestStreak', coalesce(st.best, 0),
+    'freezeLeft', coalesce(st.freeze_week, '') <> to_char(d, 'IYYY-IW'),
+    'season', se,
+    'xp', xp,
+    'levelXp', pass_level_xp(),
+    'maxLevel', pass_max_level(),
+    'seasonLeft', greatest(0, floor(extract(epoch from
+        (date_trunc('month', now() at time zone 'UTC') + interval '1 month') - (now() at time zone 'UTC'))))::int,
+    'rewards', rew,
+    'streakRewards', (select jsonb_agg(jsonb_build_object('days', r.days, 'kind', r.kind, 'code', r.code) order by r.days) from streak_rewards() r),
+    'owned', owned,
+    'frame', s.frame,
+    'title', s.title,
+    'daily', jsonb_build_object(
+      'variant', daily_variant(),
+      'next', daily_variant((utc::date) + 1),
+      'endsIn', floor(extract(epoch from (date_trunc('day', utc) + interval '1 day' - utc)))::int),
+    'weekend', jsonb_build_object(
+      'on', weekend_on(),
+      'wins', coalesce(wc.wins, 0),
+      'claim3', wc.claim3,
+      'claim5', wc.claim5,
+      'startsIn', case when weekend_on() then 0 else floor(extract(epoch from (sat - utc)))::int end,
+      'endsIn', case when weekend_on() then floor(extract(epoch from (sat + interval '2 days' - utc)))::int else 0 end));
+end;
+$$;
+
+-- ============ 5. Права ============
+revoke execute on function matches_daily_rules() from public, anon;
+revoke execute on function matches_weekend() from public, anon;
+revoke execute on function apply_turn_timeout(bigint) from public, anon;
+revoke execute on function ladder_after(text, boolean) from public, anon;
+revoke execute on function matches_pass() from public, anon;
+revoke execute on function ach_modes(text) from public, anon;
+grant execute on function daily_variants() to anon;
+grant execute on function daily_variant(date) to anon;
+grant execute on function join_ranked_queue(text, text, int) to anon;
+grant execute on function ranked_status(text, text, int) to anon;
+grant execute on function weekend_claim(text, text, int) to anon;
+grant execute on function my_online(text, text) to anon;
+grant execute on function pass_frames() to anon;
