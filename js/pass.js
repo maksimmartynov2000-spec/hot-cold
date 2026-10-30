@@ -5,7 +5,7 @@
 // Нет миграции — onlineInfo остаётся null, и ничего этого не видно
 
 // Наборы — копии из базы (pass_frames и т. д.), сверяются тестом
-const PASS_FRAMES = ['fire', 'ice', 'space', 'champion', 'streak'];
+const PASS_FRAMES = ['fire', 'ice', 'space', 'champion', 'streak', 'tourney'];
 const PASS_TITLES = ['hunter', 'sniper', 'regular', 'champion'];
 const PASS_PHRASES = ['lava', 'rematch', 'streak', 'oops', 'genius', 'close'];
 const PASS_ICONS = ['🦦', '🐞'];
@@ -24,6 +24,7 @@ async function loadOnlineInfo() {
   }
   renderOnlineDaily();
   if (typeof renderModeInfo === 'function') renderModeInfo();
+  if (typeof renderRankedModes === 'function') renderRankedModes();
   return onlineInfo;
 }
 
@@ -38,6 +39,7 @@ function passWhere(kind, code) {
   if (r) return P.whereLevel.replace('{n}', r.level);
   const s = (onlineInfo.streakRewards || []).find(x => x.kind === kind && x.code === code);
   if (s) return P.whereStreak.replace('{n}', s.days);
+  if (kind === 'frame' && code === 'tourney') return P.whereCup;
   return P.whereChest;
 }
 function passLevel() {
@@ -85,7 +87,77 @@ function renderOnlineDaily() {
       '<span class="od-bar"><span style="width:' + Math.round(100 * inLevel / I.levelXp) + '%"></span>' +
         '<em>' + escapeHtml(P.pathTitle) + ' · ' + inLevel + '/' + I.levelXp + '</em></span>' +
       (next ? '<span class="od-next">' + passRewardArt(next.kind, next.code) + '<small>' + next.level + '</small></span>' : '<span class="od-next">🏆</span>') +
-    '</button>';
+    '</button>' + cupCardHtml();
+}
+
+// ---------- турнир выходных (миграция 054) ----------
+// Победы в играх на звёзды за субботу и воскресенье: 3 — сундук, 5 — рамка
+// «Турнир» (если она уже есть — большой сундук). В будни видно, когда начало,
+// и награду прошлых выходных ещё можно забрать
+function cupCardHtml() {
+  const W = onlineInfo && onlineInfo.weekend;
+  if (!W) return '';
+  const C = t().pass.cup;
+  const goal = (n, claimed) => {
+    const got = W.wins >= n, label = n === 3 ? C.g3 : (passOwns('frame', 'tourney') && !(claimed && claimed.frame) ? C.g5b : C.g5);
+    const art = n === 3 ? '<span class="pr-art pr-emoji">🎁</span>'
+      : (label === C.g5 ? passRewardArt('frame', 'tourney') : '<span class="pr-art pr-emoji">💎</span>');
+    const state = claimed ? '<i>✅</i>'
+      : got ? '<button class="cup-claim" id="cupClaim' + n + '" onclick="claimCup(' + n + ')">' + escapeHtml(C.claim) + '</button>'
+      : '<i>🔒</i>';
+    return '<div class="cup-goal' + (got ? ' got' : '') + (got && !claimed ? ' ready' : '') + '" data-goal="' + n + '">' + art +
+      '<span><b>' + n + '</b><small>' + escapeHtml(label) + '</small></span>' + state + '</div>';
+  };
+  const pending = (W.wins >= 3 && !W.claim3) || (W.wins >= 5 && !W.claim5);
+  // В будни без невзятой награды — одна строка: когда начало
+  if (!W.on && !pending) {
+    return '<div class="od-cup off" id="odCup"><b>' + escapeHtml(C.title) + '</b><small>' +
+      escapeHtml(C.off.replace('{t}', cupTimeText(W.startsIn))) + '</small></div>';
+  }
+  const pct = Math.min(100, Math.round(100 * W.wins / 5));
+  return '<div class="od-cup' + (W.on ? ' on' : '') + '" id="odCup">' +
+    '<div class="cup-head"><b>' + escapeHtml(C.title) + '</b><small>' +
+      escapeHtml(W.on ? C.on.replace('{t}', cupTimeText(W.endsIn)) : C.last) + '</small></div>' +
+    '<div class="cup-bar"><span style="width:' + pct + '%"></span><em>' + escapeHtml(C.wins.replace('{n}', Math.min(W.wins, 5) + '/5')) + '</em></div>' +
+    '<div class="cup-goals">' + goal(3, W.claim3) + goal(5, W.claim5) + '</div>' +
+    '</div>';
+}
+// Больше суток — днями, иначе часами и минутами
+function cupTimeText(sec) {
+  if (sec >= 2 * 86400) return withPlural(Math.floor(sec / 86400), t().pass.dayForms);
+  return timeLeftText(sec || 0);
+}
+
+async function claimCup(n) {
+  const btn = document.getElementById('cupClaim' + n);
+  if (btn) btn.disabled = true;
+  let r;
+  try {
+    r = await friendRpc('weekend_claim', { p_goal: n });
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    return setNote('rkNote', friendErrorText(e.message), true);
+  }
+  await loadOnlineInfo();
+  showCupChest(r);
+}
+function showCupChest(r) {
+  const P = t().pass, C = P.cup;
+  const items = ['<div class="ch-xp">+' + r.xp + ' <small>' + escapeHtml(P.xp) + '</small></div>'];
+  if (r.frame) items.push('<div class="ch-item gold">' + passRewardArt('frame', r.frame) +
+    '<span><b>' + escapeHtml(C.frame) + '</b>' + escapeHtml(passRewardName('frame', r.frame)) + '</span></div>');
+  if (r.surprise) items.push('<div class="ch-item">' + passRewardArt(r.surprise.kind, r.surprise.code) +
+    '<span><b>' + escapeHtml(P.surprise) + '</b>' + escapeHtml(passRewardName(r.surprise.kind, r.surprise.code)) + '</span></div>');
+  document.getElementById('chestTitle').textContent = r.goal === 3 ? C.chest : r.frame ? C.title : C.big;
+  document.getElementById('chestBody').innerHTML = items.join('');
+  document.getElementById('chestOk').textContent = P.ok;
+  const m = document.getElementById('chestModal');
+  m.classList.add('fresh');
+  m.classList.remove('hidden');
+  if (!r.already) {
+    soundFanfare();
+    celebrate('cup:' + r.goal + ':' + r.xp + ':' + Date.now(), ['🏆', '⭐', '✨'], false);
+  }
 }
 
 // ---------- сундук ----------

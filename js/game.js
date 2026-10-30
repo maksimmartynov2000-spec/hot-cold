@@ -1830,16 +1830,26 @@ function holdText() {
   const other = escapeHtml(D.names[1 - online.seat]);
   const hold = onlineHold();
   if (hold === 'gone') return L.lobbyGone.replace('{name}', other);
-  if (hold === 'count') return L.startsIn.replace('{n}', secsTo(online.startsAt)) +
-    (online.ladder ? '' : '<small class="tb-note">' + escapeHtml(L.noStars) + '</small>');
+  if (hold === 'count') return L.startsIn.replace('{n}', secsTo(online.startsAt)) + holdNotes();
   let text = L.waitFor.replace('{name}', other);
   if (online.lobbyEndsAt) {
     const left = secsTo(online.lobbyEndsAt);
     text += ' · ' + L.lobbyCancel.replace('{t}', Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'));
   }
-  // Реванш и вызов друга звёзд не дают — сказать до начала, а не после
-  if (!online.ladder) text += '<small class="tb-note">' + escapeHtml(L.noStars) + '</small>';
-  return text;
+  return text + holdNotes();
+}
+
+// Под отсчётом и ожиданием: реванш и вызов друга звёзд не дают — сказать до
+// начала, а не после; у режима дня — его правило; на выходных — звёзды ×2
+function holdNotes() {
+  const note = x => '<small class="tb-note">' + escapeHtml(x) + '</small>';
+  const P = t().pass;
+  let out = online.ladder ? '' : note(t().online.noStars);
+  if (online.variant) out += note(P.daily[online.variant] + ' — ' + P.daily[online.variant + 'D']);
+  if (online.ladder && typeof onlineInfo !== 'undefined' && onlineInfo && onlineInfo.weekend && onlineInfo.weekend.on) {
+    out += note(P.cup.starsX2);
+  }
+  return out;
 }
 
 function renderStatus() {

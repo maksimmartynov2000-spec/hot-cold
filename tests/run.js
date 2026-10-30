@@ -6973,6 +6973,94 @@ async function testOnlinePass(browser) {
   await page.context().close();
 }
 
+// Режим дня и турнир выходных (миграция 054)
+async function testDailyWeekend(browser) {
+  console.log('\nОнлайн: режим дня и турнир выходных');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => {
+    window.__online = { day: '2026-11-07', played: true, chestOpened: true, chest: { xp: 30, streak: 1 }, streak: 1, bestStreak: 1, freezeLeft: true,
+      season: '2026-11', xp: 250, levelXp: 100, maxLevel: 30, seasonLeft: 86400 * 20, rewards: [], streakRewards: [], owned: [], frame: null, title: null,
+      daily: { variant: 'blitz', next: 'chaos', endsIn: 3 * 3600 },
+      weekend: { on: true, wins: 2, claim3: null, claim5: null, startsIn: 0, endsIn: 86400 + 3600 } };
+    window.__chestSurprise = { kind: 'phrase', code: 'oops' };
+    tutSave({ done: [1, 2, 3], skipped: true, veteran: true });
+    openOnline();
+  });
+  await page.waitForTimeout(600);
+  const card = await page.evaluate(() => ({ shown: !document.getElementById('rkDaily').classList.contains('hidden'),
+    text: document.getElementById('rkDaily').textContent, modes: document.querySelectorAll('#rkModes .rk-mode').length }));
+  check('карточка режима дня: что сегодня, правило, ×2 и что завтра', card.shown && /Блиц/.test(card.text) && /10 секунд/.test(card.text) &&
+    /×2/.test(card.text) && /Завтра: 🌪️ Хаос/.test(card.text), card.text);
+  check('обычных режимов по-прежнему четыре', card.modes === 4, String(card.modes));
+  await page.click('#rkDaily');
+  await page.waitForTimeout(200);
+  const sel = await page.evaluate(() => ({ mode: rankedMode, active: document.getElementById('rkDaily').classList.contains('active'),
+    seg: document.querySelectorAll('#rkModes .rk-mode.active').length, saved: localStorage.getItem('hc_rkmode') }));
+  check('нажал — выбран режим дня (4), переключатель без выделения', sel.mode === 4 && sel.active && sel.seg === 0 && sel.saved === '4', JSON.stringify(sel));
+  await page.evaluate(() => startRanked());
+  await page.waitForTimeout(200);
+  check('«Играть» встаёт в очередь режима дня', await page.evaluate(() => window.__rankedQ.mode === 4));
+  await page.evaluate(() => cancelRanked());
+
+  // Турнир: 2 победы — обе награды закрыты
+  let cup = await page.evaluate(() => ({ text: document.getElementById('odCup').textContent, claims: document.querySelectorAll('.cup-claim').length }));
+  check('турнир идёт: звёзды ×2, сколько осталось, победы 2/5', /Звёзды ×2/.test(cup.text) && /25 ч/.test(cup.text) && /2\/5/.test(cup.text) && cup.claims === 0, cup.text);
+  await page.evaluate(async () => { window.__online.weekend.wins = 3; await loadOnlineInfo(); });
+  cup = await page.evaluate(() => ({ claims: [...document.querySelectorAll('.cup-claim')].map(b => b.id) }));
+  check('3 победы — «Забрать» у сундука', cup.claims.join() === 'cupClaim3', cup.claims.join());
+  await page.evaluate(() => claimCup(3));
+  await page.waitForTimeout(500);
+  let modal = await page.evaluate(() => ({ title: document.getElementById('chestTitle').textContent, body: document.getElementById('chestBody').textContent,
+    shown: !document.getElementById('chestModal').classList.contains('hidden') }));
+  check('сундук турнира: очки и сюрприз', modal.shown && modal.title === 'Сундук турнира' && /\+50/.test(modal.body) && /Сюрприз/.test(modal.body), JSON.stringify(modal));
+  await page.evaluate(async () => { closeChest(); window.__online.weekend.wins = 5; await loadOnlineInfo(); await claimCup(5); });
+  await page.waitForTimeout(400);
+  modal = await page.evaluate(() => ({ body: document.getElementById('chestBody').textContent, own: passOwns('frame', 'tourney'),
+    checks: document.querySelectorAll('.cup-goal i').length }));
+  check('5 побед — рамка «Турнир», обе награды отмечены', /Новая рамка/.test(modal.body) && /Турнир/.test(modal.body) && modal.own && modal.checks === 2,
+    JSON.stringify(modal));
+  await page.evaluate(async () => { closeChest(); openLogoutModal(); });
+  await page.waitForTimeout(300);
+  const fr = await page.evaluate(() => !!document.querySelector('#pfFrames .st-frame:not(.locked) [data-frame="tourney"]'));
+  check('рамку «Турнир» можно надеть в профиле', fr);
+  await page.evaluate(() => closeLogoutModal());
+
+  // Будни: одной строкой — когда начнётся
+  await page.evaluate(async () => { Object.assign(window.__online.weekend, { on: false, wins: 0, claim3: null, claim5: null, startsIn: 3 * 86400 + 600, endsIn: 0 });
+    await loadOnlineInfo(); });
+  cup = await page.evaluate(() => ({ off: document.getElementById('odCup').classList.contains('off'), text: document.getElementById('odCup').textContent }));
+  check('в будни: «Начнётся в субботу · через 3 дня»', cup.off && /через 3 дня/.test(cup.text), cup.text);
+
+  // В партии режима дня перед стартом сказано правило; на выходных — ×2
+  await page.evaluate(async () => { window.__online.weekend.on = true; await loadOnlineInfo();
+    Object.assign(window.__match, { ranked: true, rankedMode: 4, ladder: true, rangeMin: 1, rangeMax: 100, bonusesOn: false, turnSeconds: 10,
+      lobby: false, lobbyLeft: null, startsIn: 3, present: [true, true] });
+    openMatch(1); });
+  await page.waitForTimeout(500);
+  const banner = await page.evaluate(() => ({ text: document.getElementById('turnBanner').textContent, variant: online.variant }));
+  check('отсчёт Блица: «10 секунд на ход» и «звёзды ×2»', banner.variant === 'blitz' && /10 секунд на ход/.test(banner.text) &&
+    /звёзды ×2/.test(banner.text), JSON.stringify(banner));
+  const v2 = await page.evaluate(() => {
+    const st = { rankedMode: 4, rangeMax: 50, bonusesOn: false }, st2 = { rankedMode: 4, rangeMax: 100, bonusesOn: true };
+    const f = s => s.rankedMode !== DAILY_MODE ? null : s.rangeMax === 50 ? 'mini' : s.bonusesOn ? 'chaos' : 'blitz';
+    return f(st) + '/' + f(st2) + '/' + f({ rankedMode: 2, rangeMax: 100, bonusesOn: true });
+  });
+  check('Мини-матч и Хаос узнаются по правилам партии', v2 === 'mini/chaos/null', v2);
+
+  // Без миграции 054 режима дня и турнира нет, выбор возвращается к обычному
+  const none = await page.evaluate(async () => { localStorage.setItem('hc_rkmode', '4'); rankedMode = 4;
+    delete window.__online.daily; delete window.__online.weekend; await loadOnlineInfo(); openOnline();
+    return { daily: document.getElementById('rkDaily').classList.contains('hidden'), cup: !document.getElementById('odCup'), mode: rankedMode }; });
+  check('без миграции 054 — ни карточки, ни турнира, режим обычный', none.daily && none.cup && none.mode === 0, JSON.stringify(none));
+  for (const lang of ['en', 'fr', 'de']) {
+    const ok = await page.evaluate(l => { const P = i18n[l].pass;
+      return DAILY_VARIANTS.every(v => P.daily[v] && P.daily[v + 'D']) && P.daily.perk && P.daily.next && P.cup.title && P.cup.on &&
+        P.cup.off && P.cup.claim && P.cup.starsX2 && P.frames.tourney && P.whereCup; }, lang);
+    check(lang + ': режим дня и турнир переведены', ok);
+  }
+  await page.context().close();
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -7899,6 +7987,7 @@ async function testKeyPage(browser) {
     await testTrainBonusFx(browser);
     await testTrialSurprises(browser);
     await testOnlinePass(browser);
+    await testDailyWeekend(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

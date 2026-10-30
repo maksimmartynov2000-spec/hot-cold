@@ -185,7 +185,7 @@ end $$;
 \echo === 9. номер режима проверяется
 do $$ begin
   begin
-    perform join_ranked_queue('Лев','1234', 4);
+    perform join_ranked_queue('Лев','1234', 5);  -- 4 — режим дня (миграция 054)
     raise exception 'ОШИБКА: принял несуществующий режим';
   exception when others then
     if sqlerrm is distinct from 'bad_mode' then raise; end if;

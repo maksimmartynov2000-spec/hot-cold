@@ -2515,6 +2515,11 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) clea
 // с тем, во что раздадут играть
 const RANKED_POLL_MS = 3000;
 const RANKED_MODES = [0, 1, 2, 3];
+// Режим дня — пятый, со своей очередью (миграция 054). Правила дня по кругу,
+// сутки по UTC: у всех в очереди один и тот же. Порядок — копия
+// daily_variants() из базы, сверяется тестом
+const DAILY_MODE = 4;
+const DAILY_VARIANTS = ['blitz', 'chaos', 'mini'];
 let rankedTimer = null;
 let onlineTimer = null;
 let rankedBusy = false;
@@ -2523,7 +2528,7 @@ let rankedMatchId = null;
 let rankedMode = (function () {
   try {
     const v = parseInt(localStorage.getItem('hc_rkmode'));
-    return (v >= 0 && v <= 3) ? v : 0;
+    return (v >= 0 && v <= DAILY_MODE) ? v : 0;
   } catch (e) { return 0; }
 })();
 let rankedRatings = null;
@@ -2562,7 +2567,36 @@ function rankedModeBonuses(mode) { return (mode & 2) === 2; }
 // Разновидность словами: «−100…100 · бонусы» ребёнку ничего не говорило.
 // Диапазон — мелкой строкой под названием (rankedModeRange)
 function rankedModeLabel(mode) {
+  if (mode === DAILY_MODE) return t().pass.daily.name + ' · ' + t().pass.daily[dailyVariant()];
   return t().online.rkModeNames[mode] || '';
+}
+
+// Режим дня: что говорит база, а без неё — тот же расчёт по UTC
+function dailyVariant(next) {
+  const d = onlineInfo && onlineInfo.daily;
+  if (d && d.variant) return next ? d.next : d.variant;
+  return DAILY_VARIANTS[(Math.floor(Date.now() / 86400000) + (next ? 1 : 0)) % 3];
+}
+function dailyOpen() {
+  return !!(onlineInfo && onlineInfo.daily);
+}
+
+// Карточка режима дня над переключателем: что сегодня, чем отличается, что завтра
+function renderDailyMode() {
+  const box = document.getElementById('rkDaily');
+  if (!box) return;
+  box.classList.toggle('hidden', !dailyOpen());
+  if (!dailyOpen()) return;
+  const D = t().pass.daily, v = dailyVariant();
+  box.classList.toggle('active', rankedMode === DAILY_MODE);
+  box.dataset.variant = v;
+  box.innerHTML =
+    '<span class="dm-head">' + escapeHtml(D.name) + '</span>' +
+    '<b class="dm-name">' + escapeHtml(D[v]) + '</b>' +
+    '<span class="dm-rule">' + escapeHtml(D[v + 'D']) + '</span>' +
+    '<span class="dm-perk">' + escapeHtml(D.perk) + '</span>' +
+    '<small class="dm-next">' + escapeHtml(D.next.replace('{v}', D[dailyVariant(true)])
+      .replace('{t}', timeLeftText(onlineInfo.daily.endsIn || 0))) + '</small>';
 }
 
 function rankedModeRange(mode) {
@@ -2601,8 +2635,11 @@ async function setRankedMode(mode) {
 function renderRankedModes() {
   const box = document.getElementById('rkModes');
   if (!box) return;
+  // Без миграции 054 режима дня нет — возвращаемся к обычному
+  if (rankedMode === DAILY_MODE && onlineInfo && !onlineInfo.daily) rankedMode = 0;
   box.innerHTML = '';
   RANKED_MODES.forEach(mode => box.appendChild(rankedModeButton(mode, mode === rankedMode, () => setRankedMode(mode))));
+  renderDailyMode();
 }
 
 // Давность в человеческих словах. Меньше полутора минут — «только что»:
@@ -2858,6 +2895,9 @@ function applyMatchState(st) {
   online.ready = (st.ready || [false, false]).slice();
   // Без поля (база до миграции 035) считаем, что звёзды есть: так было
   online.ladder = st.ladder === undefined ? true : !!st.ladder;
+  // Режим дня: правила видны по самой партии (миграция 054 их и ставит)
+  online.variant = st.rankedMode !== DAILY_MODE ? null
+    : st.rangeMax === 50 ? 'mini' : st.bonusesOn ? 'chaos' : 'blitz';
   mode = 'duel';
   RANGE_MIN = st.rangeMin;
   RANGE_MAX = st.rangeMax;
