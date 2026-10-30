@@ -6722,7 +6722,7 @@ async function testTrainBonusFx(browser) {
   });
   check('бонус сработал — крупная вспышка с эффектом и названием', fx.show && /k-freeze/.test(fx.cls) && fx.name === 'Заморозка', JSON.stringify(fx));
   check('у бонуса свой звук', fx.tones >= 2, String(fx.tones));
-  check('взятый бонус остаётся значком на прямой', fx.mark);
+  check('у только что сделанного хода метки нет — о бонусе говорит строка', !fx.mark);
   const first = await page.evaluate(() => {
     localStorage.setItem('hc_seen_bonus', '[]');
     startAdventure(41); stopBot(); D.cur = 0;
@@ -6736,6 +6736,33 @@ async function testTrainBonusFx(browser) {
     return r;
   });
   check('впервые — вместо вспышки карточка с объяснением', !first.flash && first.card, JSON.stringify(first));
+  // Метка бонуса на прямой не выдаёт закрытый ход: соперник наступил на
+  // туман — его ход скрыт, и метки нет; у видимого хода метка — рисунком
+  const marks = await page.evaluate(() => {
+    localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'rush', 'lava', 'skip', 'gift', 'memory', 'near', 'half', 'shield', 'freeze', 'xray']));
+    startAdventure(31); stopBot(); D.cur = 1;
+    const v = secret === RANGE_MAX ? RANGE_MAX - 1 : RANGE_MAX;
+    D.bonuses = [{ value: v, type: 'fog', taken: false }];
+    duelPlay(v); D.cur = 0;
+    duelPlay(secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN); D.cur = 0; renderAll();
+    const hidden = document.querySelectorAll('#numLineSvg .nl-bonus').length;
+    quitToMenu(); startAdventure(31); stopBot(); D.cur = 0;
+    const w = secret === 100 ? 101 : 100;
+    D.bonuses = [{ value: w, type: 'blind', taken: false }];
+    duelPlay(w); D.cur = 0; duelPlay(secret === 150 ? 151 : 150); D.cur = 0; renderAll();
+    const shown = document.querySelector('#numLineSvg .nl-bonus image');
+    const r = { hidden, art: shown ? shown.getAttribute('href') : null, line: document.getElementById('bonusLine').innerHTML };
+    D.lastBonus = 'memory'; renderAll();
+    r.icon = !!document.querySelector('#bonusLine .b-name [style*="b-memory"]');
+    quitToMenu();
+    return r;
+  });
+  check('ход соперника под туманом — без метки на прямой', marks.hidden === 0, JSON.stringify(marks));
+  check('метка у видимого хода — рисунком бонуса', marks.art === 'icons/b-blind.webp', JSON.stringify(marks));
+  check('в строке бонуса — его собственный значок, а не общий 🎁', marks.icon, marks.line);
+  const tok = await page.evaluate(() => { startAdventure(0); stopBot(); D.cur = 0; useToken(0);
+    const r = document.getElementById('ptoken0').textContent; quitToMenu(); return r; });
+  check('взведённый жетон — коротко «⚡ Активен», без переноса', tok === '⚡ Активен', tok);
 
   // Тренировка: панель на настройке
   await page.evaluate(() => openSetup('solo'));

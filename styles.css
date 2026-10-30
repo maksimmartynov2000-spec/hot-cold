@@ -2438,3 +2438,7 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .p-title { display: block; font-size: 11px; font-weight: 800; color: var(--gold); margin-top: 1px; }
 .pl-r { flex-wrap: nowrap; }
 .pl-r em { flex: 1; min-width: 0; }
+
+/* Счёт «0/1» не переносится и не уезжает под значки */
+.board.duel .pcard .p-pips { white-space: nowrap; }
+.board.duel .pcard .token-btn { white-space: nowrap; }

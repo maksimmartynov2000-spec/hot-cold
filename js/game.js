@@ -1388,7 +1388,8 @@ function renderBonusLine() {
   // Рядом может лежать и ловушка, поэтому значок нейтральный: сигнал больше
   // не «иди сюда», а «здесь что-то есть — решай сам»
   box.innerHTML = D.lastBonus
-    ? '<span class="b-name">🎁 ' + L.bonusNames[D.lastBonus] + '</span>' +
+    ? '<span class="b-name">' + bonusArtHtml(D.lastBonus === 'shieldUsed' ? 'shield' : D.lastBonus,
+        BONUS_ICON[D.lastBonus === 'shieldUsed' ? 'shield' : D.lastBonus] || '🎁') + ' ' + L.bonusNames[D.lastBonus] + '</span>' +
       '<span class="b-desc">' + desc + '</span>'
     : '<span class="b-name">❓ ' + L.bonusNear + '</span>';
 }
@@ -1738,9 +1739,17 @@ function renderNumberLine() {
       out += '<rect class="nl-near" x="' + x1 + '%" y="' + (NL.axisY - 6) + '" width="' + Math.max(1, x2 - x1) +
              '%" height="12" rx="6" />';
     }
-    (D.bonuses || []).filter(b => b.taken).forEach(b => {
-      out += '<text class="nl-bonus" x="' + nlPos(b.value) + '%" y="' + (NL.axisY - 8) + '" text-anchor="middle" font-size="11">' +
-             (BONUS_ICON[b.type] || '🎁') + '</text>';
+    // Метка — только у хода, который игрок сейчас видит: под туманом,
+    // слепотой или короткой памятью она выдала бы закрытый ход. У последнего
+    // хода метки нет — о нём говорит строка бонуса, а над точкой подпись числа
+    const seen = new Set(visible.filter(h => h !== last).map(h => h.guess));
+    (D.bonuses || []).filter(b => b.taken && seen.has(b.value)).forEach(b => {
+      const x = nlPos(b.value);
+      out += BONUS_ART.indexOf(b.type) >= 0
+        ? '<svg class="nl-bonus" x="' + x + '%" y="' + (NL.axisY - 19) + '" overflow="visible">' +
+          '<image href="icons/b-' + b.type + '.webp" x="-7" y="0" width="14" height="14" /></svg>'
+        : '<text class="nl-bonus" x="' + x + '%" y="' + (NL.axisY - 8) + '" text-anchor="middle" font-size="11">' +
+          (BONUS_ICON[b.type] || '🎁') + '</text>';
     });
   }
 
@@ -2151,7 +2160,9 @@ function renderPlayers() {
     btn.disabled = !canUse;
     btn.classList.toggle('armed', isArmedByMe);
     const count = D.tokens[p] > 1 ? ' ×' + D.tokens[p] : '';
-    btn.textContent = (D.armed && D.cur === p) ? L.tokenArmed
+    // На кнопке — коротко: длинная подпись переносилась на две строки и
+    // наезжала на счёт и значки помех. Полностью сказано в полосе над доской
+    btn.textContent = (D.armed && D.cur === p) ? L.tokenOn
                       : (D.tokens[p] === 0 ? L.tokenSpent : L.tokenBtn + count);
 
     // Что на игроке висит — значками, с полными названиями по наведению
