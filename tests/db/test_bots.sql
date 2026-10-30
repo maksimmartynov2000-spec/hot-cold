@@ -63,32 +63,30 @@ do $$ begin
 end $$;
 \echo ok
 
-\echo === 3. очередь: до 15 секунд ждём человека, потом — бот
+\echo === 3. очередь: человека ждём 5–25 секунд, потом — соперник-«человек»
 do $$
 declare r jsonb; m matches;
 begin
   r := join_ranked_queue('Лев', '1234', 0);
   if r->>'matchId' is not null then raise exception 'ОШИБКА: бот сразу, без ожидания'; end if;
-  update ranked_queue set joined_at = now() - interval '10 seconds' where username = 'Лев';
+  update ranked_queue set joined_at = now() - interval '4 seconds' where username = 'Лев';
   r := ranked_status('Лев', '1234', 0);
   if r->>'matchId' is not null or not (r->>'inQueue')::boolean then
-    raise exception 'ОШИБКА: бот раньше 15 секунд: %', r;
+    raise exception 'ОШИБКА: бот раньше 5 секунд: %', r;
   end if;
-  if (r->>'botWait')::int <> 15 then raise exception 'ОШИБКА: botWait %', r->>'botWait'; end if;
-  update ranked_queue set joined_at = now() - interval '16 seconds' where username = 'Лев';
+  if r->>'botWait' is not null then raise exception 'ОШИБКА: игра знает, когда придёт бот: %', r->>'botWait'; end if;
+  update ranked_queue set joined_at = now() - interval '26 seconds' where username = 'Лев';
   r := ranked_status('Лев', '1234', 0);
-  if r->>'matchId' is null then raise exception 'ОШИБКА: через 16 секунд бота нет: %', r; end if;
+  if r->>'matchId' is null then raise exception 'ОШИБКА: через 26 секунд соперника нет: %', r; end if;
   select * into m from matches where id = (r->>'matchId')::bigint;
-  if m.p0 <> 'Лев' or m.p1 not like '@bot:%' or m.bot_seat <> 1 or not m.ranked
+  if m.p0 <> 'Лев' or m.p1 not in (select username from bot_people) or m.bot_seat <> 1 or not m.ranked
      or m.ranked_mode <> 0 or m.range_min <> 1 or m.range_max <> 100 or m.status <> 'active'
      or m.starter <> 0 or m.bot_level is null then
     raise exception 'ОШИБКА: партия с ботом собрана неверно: %', row_to_json(m);
   end if;
+  if m.p1 like '@bot:%' then raise exception 'ОШИБКА: старый персонаж вместо «человека»'; end if;
   if exists (select 1 from ranked_queue where username = 'Лев') then raise exception 'ОШИБКА: остался в очереди'; end if;
-  -- Новичку с рейтингом 1000 — бот средне-слабый: 🐼
-  if m.p1 <> '@bot:panda' or abs(m.bot_level - 0.3) > 0.001 then
-    raise exception 'ОШИБКА: первый бот % с силой %', m.p1, m.bot_level;
-  end if;
+  if abs(m.bot_level - 0.3) > 0.001 then raise exception 'ОШИБКА: первый бот с силой %', m.bot_level; end if;
   update matches set status = 'finished' where id = m.id;
 end $$;
 \echo ok
@@ -477,11 +475,12 @@ do $$
 declare r jsonb;
 begin
   insert into matches(p0, p1, ranked, ranked_mode, status) values ('Лев', 'Кира', true, 0, 'finished');
-  update matches set updated_at = now() - interval '3 hours' where ranked and bot_seat is null and ranked_mode = 0;
-  update matches set updated_at = now() where ranked and bot_seat is not null and ranked_mode = 0;
+  update matches set updated_at = now() - interval '3 hours' where ranked and ranked_mode = 0 and not (p0 like '@bot:%' or p1 like '@bot:%');
+  update matches set updated_at = now() where ranked and bot_seat is not null and ranked_mode = 0 and (p0 like '@bot:%' or p1 like '@bot:%');
   r := ranked_status('Лев', '1234', 0);
+  -- Старые персонажи @bot:… не в счёт
   if (r->>'lastAgo') is null or (r->>'lastAgo')::int < 3600 then
-    raise exception 'ОШИБКА: партия с ботом считается игрой людей: %', r->>'lastAgo';
+    raise exception 'ОШИБКА: партия со старым ботом считается игрой людей: %', r->>'lastAgo';
   end if;
 end $$;
 \echo ok

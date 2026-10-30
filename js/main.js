@@ -65,6 +65,7 @@ captureInvite();
 tutInit();
 document.getElementById('langSwitcher').value = currentLang;
 document.getElementById('winsNeeded').value = '3';
+initChips();
 applyTranslations();
 showScreen('mode');
 // Подтянуть свою иконку и проверить, что сохранённый вход ещё наш

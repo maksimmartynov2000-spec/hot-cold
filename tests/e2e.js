@@ -396,12 +396,12 @@ async function registerPlayer(p, name, pin) {
 
   await A.page.click('#accountChip');
   await A.page.waitForTimeout(700);
-  await A.page.click('#tAvatarStart');
+  await A.page.click('#pfAvatar');
   await A.page.click('#avGrid .av-tile[data-icon="🦊"]');
   await A.page.waitForTimeout(500);
   check('иконка записана в базу',
     (await db.query("select avatar from students where username = 'Тимур'")).rows[0].avatar === '🦊');
-  await A.page.click('#tAvatarStart');
+  await A.page.click('#pfAvatar');
   await A.page.click('#avGrid .av-color[data-color="#2dd4bf"]');
   await A.page.waitForTimeout(600);
   check('цвет фона записан в базу',
@@ -475,7 +475,8 @@ async function registerPlayer(p, name, pin) {
     (await A.page.evaluate(() => localStorage.getItem('hc_run_user'))) === 'Артур' &&
     (await A.page.locator('#screenFriends').isVisible()));
 
-  // ---- Бот в рейтинге: никого нет 15 секунд — играет бот
+  // ---- Соперник-«человек» в рейтинге (миграция 050): никого нет 5–25 секунд —
+  // играет бот, но выглядит и ведёт себя как обычный игрок
   await B.page.evaluate(() => { quitToMenu(); });
   await B.page.click('#tModeOnline');
   await B.page.waitForTimeout(700);
@@ -485,30 +486,39 @@ async function registerPlayer(p, name, pin) {
   await B.page.waitForTimeout(900);
   check('с ботом: игрок встал в очередь', await B.page.locator('#rkWaitBox').isVisible());
   const botSoon = await B.page.locator('#rkWaitSub').textContent();
-  check('в очереди сказано, когда будет бот', /сыграете с ботом/.test(botSoon), botSoon);
-  await db.query("update ranked_queue set joined_at = now() - interval '16 seconds' where username = 'Лада'");
+  check('в очереди ни слова про бота', !/бот|🤖/i.test(botSoon), botSoon);
+  await db.query("update ranked_queue set joined_at = now() - interval '26 seconds' where username = 'Лада'");
   await B.page.waitForTimeout(3600);
   const bm = (await db.query("select * from matches where p0 = 'Лада' and bot_seat is not null " +
                              "order by id desc limit 1")).rows[0];
-  check('через 15 секунд создана партия с ботом', bm && bm.status === 'active' && bm.bot_seat === 1 &&
-    /^@bot:/.test(bm.p1) && bm.ranked_mode === 0, JSON.stringify(bm && { p1: bm.p1, s: bm.status }));
-  check('доска с ботом открылась сама', await B.page.locator('#screenGame').isVisible());
+  const isPerson = bm && (await db.query('select 1 from bot_people where username = $1', [bm.p1])).rows.length === 1;
+  check('через 26 секунд — партия с «человеком»', bm && bm.status === 'active' && bm.bot_seat === 1 &&
+    isPerson && !/^@bot:/.test(bm.p1) && bm.ranked_mode === 0, JSON.stringify(bm && { p1: bm.p1, s: bm.status }));
+  check('доска открылась сама', await B.page.locator('#screenGame').isVisible());
   const botLabel = await B.page.locator('#pname1').textContent();
-  check('бот подписан персонажем и 🤖', /🤖/.test(botLabel) && !/@bot/.test(botLabel), botLabel);
+  check('соперник подписан ником, без 🤖', botLabel.trim() === bm.p1 && !/🤖/.test(botLabel), botLabel);
+  const botFlag = await B.page.evaluate(() => online && online.botSeat);
+  check('игра не знает, что это бот', botFlag === null, String(botFlag));
+  // Бот «заходит» через 1–4 секунды, потом 3-2-1. Сдвигаем время в прошлое
+  await db.query("update matches set accepted_at = now() - interval '5 seconds' where id = $1", [bm.id]);
+  await B.page.waitForTimeout(2600);
+  await db.query("update matches set start_at = now() - interval '1 second', turn_deadline = now() + interval '30 seconds' " +
+                 "where id = $1 and not lobby", [bm.id]);
+  await B.page.waitForTimeout(2200);
 
   const miss = bm.secret === 50 ? 51 : 50;
   await B.page.fill('#guessInput', String(miss));
   await B.page.click('#tSubmitGuess');
   await B.page.waitForTimeout(600);
+  const humanMoves = +(await db.query('select count(*) from match_moves where match_id = $1 and seat = 0', [bm.id])).rows[0].count;
+  check('после старта человек сходил', humanMoves === 1, String(humanMoves));
   // Раздумья бота — несколько секунд; сдвигаем начало его хода в прошлое
-  await db.query("update matches set turn_deadline = turn_deadline - interval '20 seconds' where id = $1", [bm.id]);
+  await db.query("update matches set turn_deadline = now() + interval '3 seconds' where id = $1", [bm.id]);
   await B.page.waitForTimeout(2600);
   const botMoves = +(await db.query('select count(*) from match_moves where match_id = $1 and seat = 1', [bm.id])).rows[0].count;
   check('бот походил сам, пока игрок смотрит на доску', botMoves >= 1, String(botMoves));
   const whoRows = await B.page.evaluate(() => [...document.querySelectorAll('#historyList .h-who')].map(e => e.textContent));
-  check('ход бота виден у игрока', whoRows.some(w => /🤖/.test(w)), whoRows.join());
-  check('бот поздоровался в чате партии',
-    +(await db.query('select count(*) from match_chat where match_id = $1 and seat = 1', [bm.id])).rows[0].count >= 1);
+  check('ход соперника виден у игрока под его ником', !whoRows.some(w => /🤖/.test(w)), whoRows.join());
 
   await B.page.evaluate(() => leaveGame());
   await B.page.waitForTimeout(200);
@@ -562,7 +572,7 @@ async function registerPlayer(p, name, pin) {
   await B.page.evaluate(() => quitToMenu());
 
   check('у бота рейтинга нет',
-    (await db.query("select count(*) from elo_ratings where username like '@bot:%'")).rows[0].count === '0');
+    (await db.query("select count(*) from elo_ratings e join students s on s.username = e.username where s.is_bot")).rows[0].count === '0');
 
   const calls = A.log.concat(B.log);
   check('профиль шёл через настоящие функции базы',

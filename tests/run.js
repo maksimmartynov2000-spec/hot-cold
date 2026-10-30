@@ -269,11 +269,14 @@ async function testLogout(browser) {
   await page.waitForTimeout(200);
 
   check('окно профиля открылось', await page.locator('#logoutModal').isVisible());
+  // «Выйти» — под «Ещё»: рядом с «Готово» туда легко попасть случайно
+  check('«Выйти» спрятано под «Ещё»', !(await page.locator('#tLogoutStart').isVisible()));
+  await page.click('#tMoreHead');
   // Раньше вопрос «Выйти?» висел сразу, хотя человек ничего не нажимал
   check('вопрос о выходе не задаётся, пока не нажали «Выйти»',
     !(await page.locator('#tLogoutAsk').isVisible()) && await page.locator('#tLogoutStart').isVisible());
 
-  await page.click('#tLogoutStart');
+  await page.evaluate(() => { document.getElementById('pfMoreFold').open = true; }); await page.click('#tLogoutStart');
   await page.waitForTimeout(150);
   check('после «Выйти» появляется вопрос', await page.locator('#tLogoutAsk').isVisible());
   check('текст в окне читается (не чёрный на тёмном)',
@@ -295,7 +298,7 @@ async function testLogout(browser) {
   check('и прячет вопрос, не закрывая профиль',
     !(await page.locator('#tLogoutAsk').isVisible()) && await page.locator('#logoutModal').isVisible());
 
-  await page.click('#tLogoutStart');
+  await page.evaluate(() => { document.getElementById('pfMoreFold').open = true; }); await page.click('#tLogoutStart');
   await page.waitForTimeout(150);
   await page.click('#tLogoutConfirm');
   await page.waitForTimeout(250);
@@ -869,13 +872,13 @@ async function testDistanceHint(browser) {
     check(kind + ': кнопка подсказки подсвечена', await page.evaluate(() =>
       document.getElementById('toggleHintBtn').classList.contains('on')));
 
-    await page.click('#toggleHintBtn');
+    await page.evaluate(() => openVizPanel()); await page.click('#toggleHintBtn');
     await page.waitForTimeout(250);
     check(kind + ': пояс снимается кнопкой', !(await page.locator('#feedbackBand').isVisible()));
     check(kind + ': кнопка погасла', await page.evaluate(() =>
       !document.getElementById('toggleHintBtn').classList.contains('on')));
 
-    await page.click('#toggleHintBtn');
+    await page.evaluate(() => openVizPanel()); await page.click('#toggleHintBtn');
     await page.waitForTimeout(250);
     check(kind + ': пояс возвращается', await page.locator('#feedbackBand').isVisible());
     check(kind + ': выбор записан в память',
@@ -952,19 +955,19 @@ async function testSetupSpacing(browser) {
 
   const gaps = await page.evaluate(() => {
     const r = sel => document.querySelector(sel).getBoundingClientRect();
-    const range = r('#rangeMax'), frost = r('.frost-row'), attempts = r('#attemptsField');
+    const range = r('.chips-rangeMax'), frost = r('.frost-row'), attempts = r('#attemptsField');
     return { above: +(frost.top - range.bottom).toFixed(0),
              below: +(attempts.top - frost.bottom).toFixed(0) };
   });
   // Галочка относится к диапазону, значит держится за него, а не висит посередине
-  check('галочка ближе к своему полю, чем к следующему', gaps.below > gaps.above + 6,
+  check('переключатель — сразу под диапазоном, к которому относится', gaps.above >= 6 && gaps.above <= 24,
     'сверху ' + gaps.above + 'px, снизу ' + gaps.below + 'px');
-  check('зазоры не слипшиеся', gaps.above >= 6 && gaps.below >= 16, JSON.stringify(gaps));
+  check('зазоры не слипшиеся', gaps.above >= 6 && gaps.below >= 12, JSON.stringify(gaps));
 
   // Экран настройки должен помещаться целиком — и в дуэли, где полей вдвое больше
   check('настройка тренировки помещается без прокрутки', await page.evaluate(() =>
     document.documentElement.scrollHeight <= window.innerHeight + 1));
-  await page.click('#tBack');
+  await page.click('#navPlay');
   await page.waitForTimeout(150);
   await page.click('#tModeDuel');
   await page.waitForTimeout(250);
@@ -1631,14 +1634,14 @@ async function testVizToggles(browser) {
   check('у кнопок есть подпись для наведения',
     (await page.locator('#toggleThermoBtn').getAttribute('title')) === 'Градусник');
 
-  await page.click('#toggleThermoBtn');
+  await page.evaluate(() => openVizPanel()); await page.click('#toggleThermoBtn');
   await page.waitForTimeout(200);
   check('градусник прячется', !(await page.locator('#thermoWrap').isVisible()));
   check('прямая при этом остаётся', await page.locator('#numLine').isVisible());
   check('кнопка градусника погасла', await page.evaluate(() =>
     !document.getElementById('toggleThermoBtn').classList.contains('on')));
 
-  await page.click('#toggleLineBtn');
+  await page.evaluate(() => openVizPanel()); await page.click('#toggleLineBtn');
   await page.waitForTimeout(200);
   check('прямая прячется', !(await page.locator('#numLine').isVisible()));
 
@@ -1649,8 +1652,8 @@ async function testVizToggles(browser) {
     t: localStorage.getItem('hc_show_thermo'), l: localStorage.getItem('hc_show_line') }));
   check('выбор записан в память браузера', saved.t === '0' && saved.l === '0', JSON.stringify(saved));
 
-  await page.click('#toggleThermoBtn');
-  await page.click('#toggleLineBtn');
+  await page.evaluate(() => openVizPanel()); await page.click('#toggleThermoBtn');
+  await page.evaluate(() => openVizPanel()); await page.click('#toggleLineBtn');
   await page.waitForTimeout(250);
   check('обе возвращаются на место',
     (await page.locator('#thermoWrap').isVisible()) && (await page.locator('#numLine').isVisible()));
@@ -1754,7 +1757,7 @@ async function testPinHelp(browser) {
   await page4.waitForTimeout(150);
   check('свой PIN показывается по нажатию',
     (await page4.locator('#tShowPin').textContent()).includes('1234'));
-  check('выход из аккаунта остался на месте', await page4.locator('#tLogoutStart').isVisible());
+  check('выход из аккаунта остался на месте — под «Ещё»', await page4.evaluate(() => !!document.querySelector('#pfMoreFold #tLogoutStart')));
   // Повторное нажатие на PIN прячет его
   await page4.evaluate(() => { document.getElementById('pfEditFold').open = true; });
   await page4.click('#tShowPin');
@@ -1909,120 +1912,51 @@ async function testScaleMemory(browser) {
   check('повторное нажатие сворачивает', !(await page.locator('#legendGrid').isVisible()));
   await done(page);
 
-  // Кнопки-значки объясняют себя при первом нажатии
-  const tp = await newGame(browser, { clock: true });
+  // Градусник, прямая, подсказка и звук — в меню «вид», с подписями
+  const tp = await newGame(browser, {});
   await tp.click('#tModeSolo');
   await tp.click('#tStartMatch');
-  await tp.clock.runFor(300);
-  check('до нажатия подсказки нет', !(await tp.locator('#barTip').isVisible()));
+  await tp.waitForTimeout(300);
+  check('три значка в строке статуса заменены одной кнопкой',
+    !(await tp.locator('#toggleThermoBtn').isVisible()) && await tp.locator('#vizBtn').isVisible());
+  await tp.click('#vizBtn');
+  const rows = await tp.evaluate(() => [...document.querySelectorAll('#vizPanel .viz-row')].map(r => r.textContent.trim()));
+  check('в меню — четыре подписанных переключателя', rows.length === 4 && rows.every(r => r.length > 3), rows.join(' | '));
   await tp.click('#toggleThermoBtn');
-  const tip1 = await tp.evaluate(() => {
-    const tip = document.getElementById('barTip');
-    const b = document.getElementById('toggleThermoBtn').getBoundingClientRect();
-    const arrow = tip.getBoundingClientRect().right - parseFloat(getComputedStyle(tip).getPropertyValue('--arrow-right')) - 6;
-    return { text: tip.textContent, shown: !tip.classList.contains('hidden'),
-             under: arrow >= b.left && arrow <= b.right };
-  });
-  check('первое нажатие на 🌡️ коротко говорит, что скрылось',
-    tip1.shown && tip1.text === '🌡️ Градусник скрыт', JSON.stringify(tip1));
-  check('стрелка подсказки — под нажатой кнопкой', tip1.under, JSON.stringify(tip1));
-  await tp.clock.runFor(3600);
-  check('подсказка гаснет сама', !(await tp.locator('#barTip').isVisible()));
-  await tp.click('#toggleThermoBtn');
-  await tp.clock.runFor(100);
-  check('второй раз та же кнопка не объясняет', !(await tp.locator('#barTip').isVisible()));
-  await tp.click('#toggleLineBtn');
-  check('у другой кнопки своя первая подсказка',
-    (await tp.locator('#barTip').textContent()) === '📏 Прямая скрыта');
+  check('меню не закрывается от переключения', await tp.locator('#vizPanel').isVisible() &&
+    !(await tp.evaluate(() => showThermo)));
+  await tp.click('#feedbackPanel, #numLine', { force: true }).catch(() => {});
+  await tp.mouse.click(10, 700);
+  await tp.waitForTimeout(100);
+  check('нажатие мимо закрывает меню', !(await tp.locator('#vizPanel').isVisible()));
+  await tp.click('#vizBtn');
+  await tp.evaluate(() => quitToMenu());
+  check('уход из партии закрывает меню', await tp.evaluate(() => document.getElementById('vizPanel').classList.contains('hidden')));
   await done(tp);
-
-  // Скрытое раньше — первое нажатие возвращает, и подсказка говорит «показана»
-  const back = await gameWithStorage(browser, {}, { hc_show_line: '0' });
-  await back.click('#tModeSolo');
-  await back.click('#tStartMatch');
-  await back.waitForTimeout(300);
-  await back.click('#toggleLineBtn');
-  check('если прямая была скрыта, подсказка — «показана»',
-    (await back.locator('#barTip').textContent()) === '📏 Прямая показана');
-  await done(back);
-
-  // Все шесть фраз есть на всех языках и каждая — в одну строку на узком экране
-  const ctx360 = await browser.newContext({ viewport: { width: 360, height: 740 } });
-  const nar = await ctx360.newPage();
-  await applyStub(nar, {});
-  await nar.goto(GAME_URL);
-  await nar.waitForTimeout(300);
-  await nar.click('#tModeSolo');
-  await nar.click('#tStartMatch');
-  await nar.waitForTimeout(300);
-  const fits = await nar.evaluate(() => {
-    const bad = [];
-    for (const lang of ['ru', 'en', 'fr', 'de']) {
-      for (const [key, btn] of [['thermo', 'toggleThermoBtn'], ['line', 'toggleLineBtn'], ['hint', 'toggleHintBtn']]) {
-        for (const on of [false, true]) {
-          const phrase = i18n[lang].tips && i18n[lang].tips[key] && i18n[lang].tips[key][on ? 1 : 0];
-          if (!phrase) { bad.push(lang + ' ' + key + ' нет фразы'); continue; }
-          currentLang = lang;
-          localStorage.removeItem('hc_tip_' + key);
-          firstTimeTip(key, btn, '🌡️', on);
-          const tip = document.getElementById('barTip').getBoundingClientRect();
-          const card = document.querySelector('.card').getBoundingClientRect();
-          if (tip.height > 40 || tip.left < card.left || tip.right > card.right) bad.push(lang + ' ' + phrase);
-        }
-      }
-    }
-    return bad;
-  });
-  check('все подсказки есть на четырёх языках и влезают в одну строку', fits.length === 0, fits.join('; '));
-  await ctx360.close();
-
-  const tp2 = await newGame(browser, {});
-  await tp2.click('#tModeSolo');
-  await tp2.click('#tStartMatch');
-  await tp2.waitForTimeout(300);
-  await tp2.click('#toggleThermoBtn');
-  await tp2.evaluate(() => quitToMenu());
-  // Экран игры в меню скрыт целиком — смотрим на саму подсказку: вернись
-  // в игру за эти секунды, она бы ещё висела
-  check('в меню подсказка не висит',
-    await tp2.evaluate(() => document.getElementById('barTip').classList.contains('hidden')));
-  await done(tp2);
 }
 
 // Галочки нарисованы свои: системный чекбокс — белый квадрат на тёмном экране
 async function testCheckboxLook(browser) {
-  console.log('\nВид галочек');
+  console.log('\nВид переключателей');
   const page = await newGame(browser);
   await page.click('#tModeSolo');
   await page.waitForTimeout(250);
-
-  const box = await page.evaluate(() => {
+  const look = () => page.evaluate(() => {
     const el = document.getElementById('frostSetup');
-    const cs = getComputedStyle(el);
-    const rgb = cs.backgroundColor.match(/[\d.]+/g).map(Number);
-    return { appearance: cs.appearance || cs.webkitAppearance, bg: cs.backgroundColor,
-             radius: parseFloat(cs.borderRadius), light: (rgb[0] + rgb[1] + rgb[2]) / 3,
-             alpha: rgb.length > 3 ? rgb[3] : 1 };
+    const cs = getComputedStyle(el), knob = getComputedStyle(el, '::after');
+    return { appearance: cs.appearance || cs.webkitAppearance, w: parseFloat(cs.width), h: parseFloat(cs.height),
+             bg: cs.backgroundColor, knob: parseFloat(knob.left) };
   });
-  check('галочка не системная', box.appearance === 'none', box.appearance);
-  check('в покое галочка не светится белым', box.light < 200 || box.alpha < 0.2, JSON.stringify(box));
-  check('у галочки скруглённый край', box.radius >= 3, box.radius + 'px');
-
+  const off = await look();
+  check('переключатель свой, а не системная галочка', off.appearance === 'none' && off.w > off.h * 1.4, JSON.stringify(off));
   await page.check('#frostSetup');
   await page.waitForTimeout(400);
-  const on = await page.evaluate(() => {
-    const el = document.getElementById('frostSetup');
-    const tick = getComputedStyle(el, '::after');
-    return { rgb: getComputedStyle(el).backgroundColor.match(/[\d.]+/g).map(Number),
-             content: tick.content, side: parseFloat(tick.borderBottomWidth),
-             turn: tick.transform };
-  });
-  check('включённая галочка синяя',
-    Math.abs(on.rgb[0] - 99) < 6 && Math.abs(on.rgb[1] - 102) < 6 && Math.abs(on.rgb[2] - 241) < 6,
-    on.rgb.join(','));
-  // Галка — это две стороны рамки, повёрнутые на 45°: проверяем и то и другое
-  check('и в ней есть галка',
-    on.content !== 'none' && on.side >= 1.5 && /matrix/.test(on.turn), JSON.stringify(on));
+  const on = await look();
+  check('включённый — зелёный, бегунок справа', /43, 209, 143/.test(on.bg) && on.knob > off.knob + 10, JSON.stringify(on));
+  check('пояснение спрятано за «?»', !(await page.locator('#tFrostHint').isVisible()));
+  await page.click('.frost-row .hint-q');
+  check('«?» показывает пояснение и не трогает переключатель',
+    await page.locator('#tFrostHint').isVisible() && await page.isChecked('#frostSetup'));
   await done(page);
 }
 
@@ -2130,7 +2064,7 @@ async function testDotMotion(browser) {
 
   // Перерисовка без хода не должна дёргать прямую
   await page.waitForTimeout(500);
-  await page.click('#toggleThermoBtn');
+  await page.evaluate(() => openVizPanel()); await page.click('#toggleThermoBtn');
   await page.waitForTimeout(200);
   // Прямую при перерисовке без хода не трогают вовсе: закончившееся движение
   // остаётся в разметке, но точка стоит на своём числе и никуда не едет
@@ -2146,7 +2080,7 @@ async function testDotMotion(browser) {
   check('без нового хода точка стоит', idle.a === idle.base && idle.b === idle.base && idle.c === idle.base,
     JSON.stringify(idle));
   check('и остаётся на месте последнего хода', idle.cx === second.cx);
-  await page.click('#toggleThermoBtn');
+  await page.evaluate(() => openVizPanel()); await page.click('#toggleThermoBtn');
 
   // С отключённой анимацией в системе не двигается ничего
   await done(page);
@@ -2195,7 +2129,7 @@ async function testResultPlacement(browser) {
       const b = e.getBoundingClientRect();
       return { top: Math.round(b.top), bottom: Math.round(b.bottom) }; };
     return { card: r('#resultBox'), bar: r('.info-bar'), thermo: r('#thermoWrap'),
-             line: r('#numLine'), histTitle: r('.history-title'),
+             line: r('#numLine'), histTitle: r('#historyList'),
              view: innerHeight };
   });
 
@@ -4196,7 +4130,7 @@ async function testFriendsBoard(browser) {
   page = await newGame(browser, { user: 'Лев' });
   await page.click('#accountChip');
   await page.waitForTimeout(200);
-  await page.click('#tLogoutStart');
+  await page.evaluate(() => { document.getElementById('pfMoreFold').open = true; }); await page.click('#tLogoutStart');
   const ask = await page.locator('#tLogoutAsk').textContent();
   check('при выходе — только вопрос, без лишнего про прогресс и PIN', ask === 'Выйти из аккаунта Лев?', ask);
   await done(page);
@@ -4209,7 +4143,7 @@ async function testAvatarColor(browser) {
   await page.waitForTimeout(300);
   await page.click('#accountChip');
   await page.waitForTimeout(300);
-  await page.click('#tAvatarStart');
+  await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   const pick = await page.evaluate(() => ({
     colors: [...document.querySelectorAll('#avGrid .av-color')].map(b => b.dataset.color),
@@ -4257,7 +4191,7 @@ async function testAvatarColor(browser) {
   page = await newGame(browser, { user: 'Лев', profile: { noColor: true } });
   await page.click('#accountChip');
   await page.waitForTimeout(400);
-  await page.click('#tAvatarStart');
+  await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   const old = await page.evaluate(() => ({
     colors: document.querySelectorAll('#avGrid .av-color').length,
@@ -5109,7 +5043,7 @@ async function testLeagues(browser) {
   await page.waitForTimeout(500);
   const pf = await page.evaluate(() => document.getElementById('pfLeague').textContent);
   check('в профиле — лига и значки прошлых сезонов', pf === '🥇 Золото 9 ★☆☆Сезоны: 🥈 07.2026  🥇 08.2026', pf);
-  await page.click('#tAvatarStart');
+  await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   const grid = await page.evaluate(() => ({
     icons: [...document.querySelectorAll('#avGrid .av-tile')].length,
@@ -5129,7 +5063,7 @@ async function testLeagues(browser) {
   await page.click('.av-tile[data-icon="🐉"]');
   await page.waitForTimeout(200);
   check('открытая награда ставится', await page.evaluate(() => window.__profile.avatar === '🐉'));
-  await page.click('#tAvatarStart');   // выбор иконки сворачивает сетку
+  await page.click('#pfAvatar');   // выбор иконки сворачивает сетку
   await page.waitForTimeout(100);
   await page.click('.av-color[data-color="#0ea5e9"]');
   await page.waitForTimeout(150);
@@ -5141,7 +5075,7 @@ async function testLeagues(browser) {
   page = await newGame(browser, { user: 'Максим', profile: { color: null } });
   await page.click('#accountChip');
   await page.waitForTimeout(400);
-  await page.click('#tAvatarStart');
+  await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   check('сервер без лиг: сетка как раньше, лиги в профиле нет', await page.evaluate(() =>
     document.querySelectorAll('#avGrid .av-tile').length === 46 &&
@@ -5910,7 +5844,7 @@ async function testProgress(browser) {
   const dbAch = achMig.match(/select array\[('first_win'[^\]]*)\]/)[1].replace(/\s/g, '').split(',').map(x => x.replace(/'/g, ''));
   const dbIcons = [...mig.match(/values \(3, '🔥'\)[^;]*;/)[0].matchAll(/\((\d+), '([^']+)'\)/g)].map(m => m[1] + m[2]);
   const dbQuests = [...mig.match(/create or replace function quest_pool\(\)[\s\S]*?\$\$;/)[0].matchAll(/'([a-z_0-9]+)'/g)].map(m => m[1]);
-  check('достижения: 50 кодов лестницами, те же, что в базе, в том же порядке', js.ach.length === 50 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
+  check('достижения: 58 кодов лестницами, те же, что в базе, в том же порядке', js.ach.length === 58 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
   check('иконки за серию — те же, что в базе', js.icons.join() === dbIcons.join(), js.icons.join() + ' / ' + dbIcons.join());
   check('у каждого задания из базы есть текст', dbQuests.length === 7 && dbQuests.every(c => js.q.includes(c)), dbQuests.join());
   check('тексты заданий и достижений есть на всех 4 языках', js.langs.every(Boolean), JSON.stringify(js.langs));
@@ -5946,8 +5880,8 @@ async function testProgress(browser) {
     rows: [...document.querySelectorAll('#pfAchGrid .lad-row')].map(x => x.dataset.ladder + ':' + x.dataset.tier),
     wins: (document.querySelector('#pfAchGrid .lad-row[data-ladder="wins"]') || {}).textContent || '' }));
   check('профиль: серия заданий и лучшая', pf.streakShown && pf.streak === '📅 Серия заданий: 3 дн. · лучшая 4', pf.streak);
-  check('профиль: «🏅 Достижения: 2 из 50», по строке на лестницу со ступенью',
-    pf.head === '🏅 Достижения: 2 из 50' && pf.rows.join() === 'wins:1,games:0,streak:0,firstTry:0,modes:0,league:0,quests:0,run:0,friends:0,rivals:0,tutorial:1',
+  check('профиль: «🏅 Достижения: 2 из 58», по строке на лестницу со ступенью',
+    pf.head === '🏅 Достижения: 2 из 58' && pf.rows.join() === 'wins:1,games:0,streak:0,firstTry:0,modes:0,league:0,quests:0,run:0,friends:0,rivals:0,tutorial:1,advStars:0,advWorlds:0',
     JSON.stringify(pf));
   check('у лестницы — что открыто и что дальше', /Первая победа/.test(pf.wins) && /Дальше: 5 побед/.test(pf.wins), pf.wins);
   // Новые лестницы и верх старых: сколько до следующей ступени
@@ -5966,7 +5900,7 @@ async function testProgress(browser) {
   check('режимы и друзья: «2 режима» → «3 режима», «3 друга» → «10 друзей» 4 / 10',
     /Дальше: 3 режима · 2 \/ 3/.test(lad.modes) && /Победы над друзьями · 3 друга/.test(lad.rivals) && /Дальше: 10 друзей · 4 \/ 10/.test(lad.rivals),
     lad.modes + ' | ' + lad.rivals);
-  await page.click('#tAvatarStart');
+  await page.click('#pfAvatar');
   await page.waitForTimeout(200);
   const tiles = await page.evaluate(() => ['🔥', '🚀'].map(i => {
     const b = document.querySelector('#avGrid .av-tile[data-icon="' + i + '"]');
@@ -5998,7 +5932,7 @@ async function testProgress(browser) {
   const before = await p6.evaluate(() => !document.getElementById('questCard').classList.contains('hidden'));
   await p6.click('#accountChip');
   await p6.waitForTimeout(200);
-  await p6.click('#tLogoutStart');
+  await p6.evaluate(() => { document.getElementById('pfMoreFold').open = true; }); await p6.click('#tLogoutStart');
   await p6.click('#tLogoutConfirm');
   await p6.waitForTimeout(300);
   check('вышел из аккаунта — карточки заданий нет', before && await p6.evaluate(() =>
@@ -6396,7 +6330,8 @@ async function testRedesign(browser) {
   }
   const hist = await page.evaluate(() => [...document.querySelectorAll('.history-item')].map(e => {
     const r = e.getBoundingClientRect(); return Math.round(r.top); }));
-  check('история — по три в ряд', hist.length === 4 && hist[0] === hist[1] && hist[1] === hist[2] && hist[3] > hist[0],
+  const near = (a, b) => Math.abs(a - b) <= 4;   // первая плитка чуть «вплывает» — пара пикселей
+  check('история — по три в ряд', hist.length === 4 && near(hist[0], hist[1]) && near(hist[1], hist[2]) && hist[3] > hist[0] + 20,
     JSON.stringify(hist));
   const dock = await page.evaluate(() => {
     const r = document.getElementById('guessSection').getBoundingClientRect();
@@ -6466,8 +6401,8 @@ async function testBonusGuide(browser) {
   const page = await newGame(browser, { user: 'Максим' });
   await page.click('.mode-btn.duel');
   await page.waitForTimeout(200);
-  check('в настройке есть «Что за бонусы?»', await page.locator('#tBonusGuide').isVisible() &&
-    (await page.locator('#tBonusGuide').textContent()).includes('Что за бонусы'));
+  check('у переключателя бонусов есть «?» — «Что за бонусы?»', await page.locator('#tBonusGuide').isVisible() &&
+    (await page.locator('#tBonusGuide').getAttribute('title')).includes('Что за бонусы'));
   for (const lang of ['ru', 'en', 'fr', 'de']) {
     await page.evaluate(l => { currentLang = l; applyTranslations(); }, lang);
     await page.click('#tBonusGuide');
@@ -6476,8 +6411,8 @@ async function testBonusGuide(browser) {
       shown: !document.getElementById('bonusGuide').classList.contains('hidden'),
       heads: document.querySelectorAll('#bgList .bg-head').length,
       rows: [...document.querySelectorAll('#bgList .bg-row')].map(r => r.textContent.trim()) }));
-    check(lang + ': в списке 4 помощи и 3 ловушки, у каждой название и описание',
-      g.shown && g.heads === 2 && g.rows.length === 7 && g.rows.every(r => r.length > 25 && !/undefined/.test(r)),
+    check(lang + ': в списке 4 помощи, 3 ловушки и 5 бонусов Приключения, у каждой название и описание',
+      g.shown && g.heads === 3 && g.rows.length === 12 && g.rows.every(r => r.length > 25 && !/undefined/.test(r)),
       JSON.stringify(g).slice(0, 300));
     await page.click('#bgOk');
     await page.waitForTimeout(100);
@@ -6537,6 +6472,10 @@ async function testAdventure(browser) {
     btn: (document.querySelector('#resultBox .r-actions .btn') || {}).textContent }));
   check('победа: прогресс записан и в телефоне, и в базе', won.done === 1 && won.server === 1, JSON.stringify(won));
   check('после победы — «Дальше: следующий»', won.btn === 'Дальше: Белка Жёлудь →', won.btn);
+  const st = await page.evaluate(() => ({ local: advStars(), res: window.__advResults,
+    line: (document.querySelector('#resultBox .adv-line') || {}).textContent }));
+  check('победа на «Нормально»: две звезды — в телефоне, в базе и в итоге',
+    st.local === '2' && JSON.stringify(st.res) === '[[0,2]]' && /\+2/.test(st.line) && /★★☆/.test(st.line), JSON.stringify(st));
   await page.click('#resultBox .r-actions .btn');
   await page.waitForTimeout(300);
   check('«Дальше» — карта и карточка следующего', await page.locator('#screenAdventure').isVisible() &&
@@ -6575,7 +6514,7 @@ async function testAdventure(browser) {
   check('выход из партии Приключения — на карту', await page.locator('#screenAdventure').isVisible());
   await page.click('#accountChip');
   await page.waitForTimeout(400);
-  await page.click('#tAvatarStart');
+  await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   const icons = await page.evaluate(() => ['🧙', '🦍'].map(i => {
     const el = document.querySelector('#avGrid .av-tile[data-icon="' + i + '"]');
@@ -6608,6 +6547,173 @@ async function testAdventure(browser) {
   await done(page);
 }
 
+// Приключение: бонус мира, ловушки у босса, новые бонусы, звёзды по сложности
+async function testAdventureBonus(browser) {
+  console.log('\nПриключение: бонусы и звёзды');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => { localStorage.setItem('hc_adv_максим', '50'); BOT_SPEED = 1000; });
+  const worlds = await page.evaluate(() => [0, 10, 20, 30, 40].map(n => {
+    startAdventure(n); stopBot();
+    const kinds = D.bonuses.map(b => b.type);
+    const r = { n, bonus: bonusMode, first: advChar(n).world.bonus, has: kinds.includes(advChar(n).world.bonus),
+                traps: kinds.filter(k => BONUS_TRAP.includes(k)).length, setTraps: bonusSet.trap.length };
+    quitToMenu();
+    return r;
+  }));
+  check('в каждом мире бонусы включены и бонус мира на поле',
+    worlds.every(w => w.bonus && w.has), JSON.stringify(worlds));
+  check('бонусы миров: щит, половина, рентген, лава, заморозка',
+    worlds.map(w => w.first).join() === 'shield,half,xray,lava,freeze', worlds.map(w => w.first).join());
+  check('у обычных соперников ловушек нет', worlds.every(w => w.setTraps === 0 && w.traps === 0), JSON.stringify(worlds));
+  const boss = await page.evaluate(() => {
+    startAdventure(9); stopBot();
+    const r = { traps: bonusSet.trap.length, wins: D.winsNeeded };
+    quitToMenu();
+    return r;
+  });
+  check('босс играет с ловушками', boss.traps === 3 && boss.wins === 2, JSON.stringify(boss));
+  const magic = await page.evaluate(() => {
+    const n = [...Array(50).keys()].find(i => advChar(i).quirk === 'bonus' && advChar(i).w === 2);
+    startAdventure(n); stopBot();
+    const r = { n, count: D.bonuses.length, auto: autoBonusCountFor(rangeCount()), traps: bonusSet.trap.length };
+    quitToMenu();
+    return r;
+  });
+  check('у Фокусника бонусов вдвое больше и есть ловушки', magic.count === 2 * magic.auto && magic.traps === 3, JSON.stringify(magic));
+  const after = await page.evaluate(() => ({ set: bonusSet, adv: !!adv }));
+  check('после Приключения обычный набор бонусов вернулся', after.set === null && !after.adv, JSON.stringify(after));
+
+  // Новые бонусы на настоящей доске
+  const eff = await page.evaluate(() => {
+    startAdventure(20); stopBot();
+    D.cur = 0;
+    const out = {};
+    applyBonus('xray', 0);
+    out.xray = D.know[0].parity === Math.abs(secret) % 2;
+    applyBonus('half', 0);
+    out.half = D.know[0].half === (secret <= halfMark() ? 'low' : 'high');
+    renderAll();
+    out.chip = document.getElementById('peff0').textContent;
+    out.rivalChip = document.getElementById('peff1').textContent;
+    // Бот тоже пользуется знанием: все его возможные числа той же чётности
+    D.know[1] = { parity: Math.abs(secret) % 2 };
+    const cand = botCandidates([], 1, { know: D.know[1] }, false);
+    out.botParity = [...cand].every((c, i) => !c || Math.abs(i + RANGE_MIN) % 2 === D.know[1].parity);
+    // Щит отбивает ловушку
+    applyBonus('shield', 0);
+    const v = secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN;
+    D.bonuses = [{ value: v, type: 'skip', taken: false }];
+    duelPlay(v);
+    out.shield = !D.skip[0] && D.lastBonus === 'shieldUsed' && !D.shield[0];
+    out.line = document.getElementById('bonusLine').textContent;
+    // Заморозка — соперник пропускает ход
+    D.cur = 0;
+    applyBonus('freeze', 0);
+    out.freeze = D.skip[1] && D.frozen[1];
+    D.cur = 1;
+    renderAll();
+    out.frozenFlag = document.getElementById('peff1').textContent.includes('🧊');
+    quitToMenu();
+    return out;
+  });
+  check('рентген: чётность загаданного', eff.xray, JSON.stringify(eff));
+  check('половина: в какой половине прямой', eff.half, JSON.stringify(eff));
+  check('знание видно у своего имени словами, у соперника — нет', /чётное|нечётное/.test(eff.chip) && /больше/.test(eff.chip) &&
+    !/чётное/.test(eff.rivalChip), eff.chip + ' / ' + eff.rivalChip);
+  check('бот с рентгеном ищет только среди чисел нужной чётности', eff.botParity);
+  check('щит отбил ловушку — и об этом сказано', eff.shield && /щит отбил ловушку «Пропуск хода»/.test(eff.line), eff.line);
+  check('заморозка: соперник пропускает ход, у него значок 🧊', eff.freeze && eff.frozenFlag, JSON.stringify(eff));
+
+  // Лава в Огненных горах: соперник бросает в лаву
+  const lava = await page.evaluate(() => {
+    startAdventure(30); stopBot();
+    const r = { has: D.bonuses.some(b => b.type === 'lava') };
+    applyBonus('lava', 1);
+    D.cur = 0;
+    renderAll();
+    r.forced = forcedTurn();
+    r.btn = document.getElementById('forcedBtn').textContent;
+    quitToMenu();
+    return r;
+  });
+  check('в Огненных горах лава: ход в лаву у игрока', lava.has && lava.forced === 'lava' && lava.btn === 'В лаву', JSON.stringify(lava));
+
+  // Звёзды по сложности и лучший результат
+  const stars = await page.evaluate(async () => {
+    localStorage.setItem('hc_adv_максим', '3');
+    localStorage.removeItem('hc_advs_максим');
+    window.__adventure = 3;
+    window.__advStars = '';
+    advFillStars();
+    const before = advStars();
+    const won = async (n, diff) => {
+      setAdvDiff(diff);
+      startAdventure(n); stopBot();
+      D.cur = 0; duelPlay(secret);
+      const line = (document.querySelector('#resultBox .adv-line') || {}).textContent;
+      const again = [...document.querySelectorAll('#resultBox .r-actions button')].map(b => b.textContent);
+      quitToMenu();
+      return { line, again, stars: advStars() };
+    };
+    const a = await won(3, 'easy');
+    const b = await won(3, 'hard');
+    const c = await won(3, 'normal');
+    openAdventure();
+    const tile = document.querySelector('#advMap .adv-tile[data-n="3"] .at-stars').textContent;
+    const total = document.getElementById('advStarsTotal').textContent;
+    const world = document.querySelector('#advMap .adv-world .aw-stars').textContent;
+    openAdvCard(3);
+    const best = document.querySelector('#acFacts .ac-best').textContent;
+    closeAdvCard();
+    return { before, a, b, c, tile, total, world, best };
+  });
+  check('пройденным раньше — по звезде', stars.before === '111', stars.before);
+  check('легко — ★, и подсказка «Больше звёзд — на «Нормально»»', stars.a.stars === '1111' && /Больше звёзд — на «Нормально»/.test(stars.a.line),
+    JSON.stringify(stars.a));
+  check('не все звёзды — в итоге есть «Ещё раз»', stars.a.again.includes('Ещё раз'), stars.a.again.join());
+  check('трудно — ★★★, +2', stars.b.stars === '1113' && /\+2/.test(stars.b.line) && !stars.b.again.includes('Ещё раз'),
+    JSON.stringify(stars.b));
+  check('хуже лучшего — звёзды не убавились', stars.c.stars === '1113' && /Лучший результат/.test(stars.c.line), JSON.stringify(stars.c));
+  check('на карте: у соперника ★★★, в мире и всего — 6', stars.tile === '★★★' && /⭐ 6/.test(stars.total) && /⭐ 6\/30/.test(stars.world),
+    JSON.stringify(stars));
+  check('в карточке — лучший результат', /★★★/.test(stars.best), stars.best);
+  const diffBtns = await page.evaluate(() => [...document.querySelectorAll('#advDiff .ad-btn')].map(b => b.textContent));
+  check('у кнопок сложности — сколько звёзд', diffBtns.join() === 'Легко★,Нормально★★,Трудно★★★', diffBtns.join());
+
+  // База: звёзды уходят и сливаются
+  const sync = await page.evaluate(async () => {
+    window.__advStars = '0003000003';
+    await advSync();
+    return { local: advStars(), server: window.__advStars };
+  });
+  check('синхронизация: на каждом месте лучшее из телефона и базы', sync.local === '1113000003' && sync.server === '1113000003',
+    JSON.stringify(sync));
+
+  // Профиль и друзья
+  const pf = await page.evaluate(async () => {
+    window.__friendAdv = { done: 12, stars: '2', total: 21 };
+    await openFriendAch('Кира');
+    const friend = document.getElementById('achAdv').textContent;
+    closeFriendAch();
+    return { friend };
+  });
+  check('у друга видны звёзды и миры Приключения', pf.friend === '🗺️ Приключение: ⭐ 21 из 150 · миров 1 из 5', pf.friend);
+
+  // Переводы
+  for (const lang of ['en', 'fr', 'de']) {
+    const tx = await page.evaluate(l => {
+      currentLang = l; applyTranslations();
+      const T = t();
+      return BONUS_ADV.every(k => T.bonusNames[k] && T.tut.bcDesc[k] && (k === 'lava' || T.bonusDesc[k])) &&
+        T.forced.freeze && T.bonusKnow.even && T.adv.winStars && T.adv.pfLine && T.prog.q.adv_win2 &&
+        T.prog.q.adv_stars3 && T.prog.lad.advStars.forms && T.prog.lad.advWorlds.forms && T.online.rematchAsk;
+    }, lang);
+    check(lang + ': бонусы, звёзды, задания и реванш переведены', !!tx);
+  }
+  await page.evaluate(() => { currentLang = 'ru'; applyTranslations(); });
+  await page.context().close();
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -6626,7 +6732,8 @@ async function testAudit(browser) {
   await page.waitForTimeout(150);
   await page.click('#tStartMatch');
   await page.waitForTimeout(250);
-  await page.fill('#guessInput', '50');
+  // Мимо загаданного: попадание честно запустило бы салют этой партии
+  await page.fill('#guessInput', String(await page.evaluate(() => secret === 50 ? 51 : 50)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
   await liftCurtainIfShown(page);
@@ -6976,14 +7083,15 @@ async function testPolish(browser) {
   await page.click('.mode-btn.duel');
   await page.waitForTimeout(150);
   const setup = await page.evaluate(() => {
-    const w = document.getElementById('winsNeeded').getBoundingClientRect();
-    const h = document.getElementById('handicap').getBoundingClientRect();
+    const w = document.querySelector('.chips-winsNeeded').getBoundingClientRect();
+    const h = document.querySelector('.chips-handicap').getBoundingClientRect();
     return { frost: document.getElementById('tFrostHint').textContent, bonus: document.getElementById('tBonusHint').textContent,
-             wins: document.getElementById('tLblWins').textContent, sameRow: Math.abs(w.top - h.top) < 2 && h.left > w.right };
+             wins: document.getElementById('tLblWins').textContent, stacked: h.top > w.bottom && w.width > 300 };
   });
   check('у «Мороза» и «Бонусов» — пояснение одной строкой',
     /отрицательные/.test(setup.frost) && /сюрпризы/.test(setup.bonus), JSON.stringify(setup));
-  check('«Играем до» и «Фора» — в одну строку', setup.sameRow && setup.wins === 'Играем до', JSON.stringify(setup));
+  // Кнопкам нужна вся ширина: «Играем до» и «Фора» — друг под другом
+  check('«Играем до» и «Фора» — друг под другом, кнопками на всю ширину', setup.stacked && setup.wins === 'Играем до', JSON.stringify(setup));
   await page.evaluate(() => quitToMenu());
 
   // Тренировка: надписи над полем нет, история не обрезается
@@ -7123,7 +7231,7 @@ async function testProfile(browser) {
   check('кружок открывает и закрывает выбор', byFace && !byFaceAgain, byFace + ' ' + byFaceAgain);
 
   // Выбор иконки: буква и 40 иконок, выбранная отмечена
-  await page.click('#tAvatarStart');
+  await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   const grid = await page.evaluate(() => {
     const tiles = [...document.querySelectorAll('#avGrid .av-tile')];
@@ -7145,7 +7253,7 @@ async function testProfile(browser) {
   check('и сразу виден в шапке и в профиле', picked.head === '🐼' && picked.big === '🐼', JSON.stringify(picked));
   check('после выбора сетка сворачивается', !(await page.locator('#avGrid').isVisible()));
 
-  await page.click('#tAvatarStart');
+  await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   await page.click('#avGrid .av-tile.letter');
   await page.waitForTimeout(300);
@@ -7156,7 +7264,7 @@ async function testProfile(browser) {
   check('к букве можно вернуться', back.sent && back.sent.p_avatar === null && back.head === 'М', JSON.stringify(back));
 
   // Клетки выбора — не меньше 44px: мельче детскому пальцу попадать неудобно
-  await page.click('#tAvatarStart');
+  await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   const tile = await page.evaluate(() => {
     const r = document.querySelector('#avGrid .av-tile').getBoundingClientRect();
@@ -7528,6 +7636,7 @@ async function testKeyPage(browser) {
     await testRunStage(browser);
     await testBonusGuide(browser);
     await testAdventure(browser);
+    await testAdventureBonus(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

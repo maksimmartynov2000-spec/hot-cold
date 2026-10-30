@@ -142,8 +142,34 @@ let distanceHint = localStorage.getItem('hc_hint') !== '0';
 let showThermo = localStorage.getItem('hc_show_thermo') !== '0';
 let showLine = localStorage.getItem('hc_show_line') !== '0';
 
+function toggleVizPanel(e) {
+  if (e) e.stopPropagation();
+  const p = document.getElementById('vizPanel');
+  if (p.classList.contains('hidden')) openVizPanel(); else closeVizPanel();
+}
+function openVizPanel() {
+  renderVizToggles();
+  document.getElementById('vizPanel').classList.remove('hidden');
+  document.getElementById('vizBtn').classList.add('on');
+}
+function closeVizPanel() {
+  const p = document.getElementById('vizPanel');
+  if (!p) return;
+  p.classList.add('hidden');
+  document.getElementById('vizBtn').classList.remove('on');
+}
+// Нажатие мимо меню закрывает его
+document.addEventListener('click', () => closeVizPanel());
+
 function renderVizToggles() {
   const L = t();
+  document.getElementById('tVizThermo').textContent = L.vizThermo;
+  document.getElementById('tVizLine').textContent = L.vizLine;
+  document.getElementById('tVizHint').textContent = L.hintLabel;
+  document.getElementById('tVizSound').textContent = L.run.sound;
+  const snd = document.getElementById('vizSound');
+  snd.classList.toggle('on', soundOn);
+  snd.querySelector('.vr-ic').textContent = soundOn ? '🔊' : '🔇';
   [['toggleThermoBtn', showThermo, L.vizThermo], ['toggleLineBtn', showLine, L.vizLine],
    ['toggleHintBtn', distanceHint, L.hintLabel]]
     .forEach(([id, on, title]) => {
@@ -160,21 +186,18 @@ function toggleThermo() {
   showThermo = !showThermo;
   try { localStorage.setItem('hc_show_thermo', showThermo ? '1' : '0'); } catch (e) {}
   renderAll();
-  firstTimeTip('thermo', 'toggleThermoBtn', '🌡️', showThermo);
 }
 
 function toggleLine() {
   showLine = !showLine;
   try { localStorage.setItem('hc_show_line', showLine ? '1' : '0'); } catch (e) {}
   renderAll();
-  firstTimeTip('line', 'toggleLineBtn', '📏', showLine);
 }
 
 function toggleHint() {
   distanceHint = !distanceHint;
   try { localStorage.setItem('hc_hint', distanceHint ? '1' : '0'); } catch (e) {}
   renderAll();
-  firstTimeTip('hint', 'toggleHintBtn', '💡', distanceHint);
 }
 
 // Значок без подписи понятен, только когда уже знаешь, что он делает. Поэтому
@@ -328,6 +351,13 @@ const BONUS_GOOD = ['extra', 'fog', 'blind'];
 const BONUS_TRAP = ['skip', 'gift', 'memory'];
 const BONUS_TYPES = BONUS_GOOD.concat(BONUS_TRAP);
 const BONUS_TRAP_SHARE = 1 / 3;
+// Бонусы Приключения — только в нём. Рентген — чётное ли загаданное,
+// половина — в какой половине прямой, щит — отбивает следующую ловушку,
+// заморозка — соперник пропускает ход. Лава вернулась в Огненные горы
+const BONUS_ADV = ['xray', 'half', 'shield', 'freeze', 'lava'];
+// Набор бонусов на партию: null — обычный. Приключение подставляет свой:
+// { good: [...], trap: [...], count }
+let bonusSet = null;
 
 let bonusMode = localStorage.getItem('hc_bonus') === '1';
 let bonusCountChoice = parseInt(localStorage.getItem('hc_bonus_n')) || 0;  // 0 — «как обычно»
@@ -367,10 +397,13 @@ function bonusCount() {
 function placeBonuses() {
   D.bonuses = [];
   if (!bonusMode) return;
-  const count = bonusCount();
-  const traps = Math.round(count * BONUS_TRAP_SHARE);
-  const good = BONUS_GOOD.slice().sort(() => Math.random() - 0.5);
-  const trap = BONUS_TRAP.slice().sort(() => Math.random() - 0.5);
+  const set = bonusSet || { good: BONUS_GOOD, trap: BONUS_TRAP };
+  const count = Math.max(1, Math.min(set.count || bonusCount(), rangeCount() - 1));
+  const traps = set.trap.length ? Math.round(count * BONUS_TRAP_SHARE) : 0;
+  // Первый в наборе (бонус мира в Приключении) ложится всегда, остальные — вперемешку
+  const good = set.good.slice(0, set.first ? 1 : 0)
+    .concat(set.good.slice(set.first ? 1 : 0).sort(() => Math.random() - 0.5));
+  const trap = set.trap.slice().sort(() => Math.random() - 0.5);
   const pool = [];
   for (let i = 0; i < count - traps; i++) pool.push(good[i % good.length]);
   for (let i = 0; i < traps; i++) pool.push(trap[i % trap.length]);
@@ -450,8 +483,8 @@ function applyTranslations() {
   document.getElementById('tSoundLabel').textContent = L.run.sound;
   document.getElementById('tLblBot').textContent = L.lblBot;
   // У каждого экрана своё название — с тем же значком, что в меню
-  document.getElementById('tSetupScreen').textContent =
-    mode === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo;
+  setTitle('tSetupScreen',
+    mode === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo);
 
   document.getElementById('tLblP1').textContent = L.lblP1;
   document.getElementById('tLblP2').textContent = L.lblP2;
@@ -474,7 +507,7 @@ function applyTranslations() {
   document.getElementById('tBonusHint').textContent = L.bonusHint;
   document.getElementById('bonusSetup').checked = bonusMode;
   document.getElementById('tLblBonusCount').textContent = L.lblBonusCount;
-  document.getElementById('tBonusGuide').textContent = L.bgLink;
+  document.getElementById('tBonusGuide').title = L.bgLink;
   buildBonusCountOptions();
   renderBonusSetup();
   document.getElementById('tFrostRun').textContent = L.frostLabel;
@@ -482,7 +515,7 @@ function applyTranslations() {
 
   // экраны режима на рейтинг
   document.getElementById('tModeRun').textContent = L.run.mode;
-  document.getElementById('tRunScreen').textContent = '🏆 ' + L.run.mode;
+  setTitle('tRunScreen', '🏆 ' + L.run.mode);
   document.getElementById('tGroupOffline').textContent = L.groupOffline;
   document.getElementById('tGroupOnline').textContent = L.groupOnline;
   document.getElementById('tModeOnline').textContent = L.online.mode;
@@ -495,7 +528,7 @@ function applyTranslations() {
   document.getElementById('tOnlineBack').textContent = L.online.back;
   document.getElementById('tGamesTitle').textContent = L.online.games;
   document.getElementById('tFriendsBack').textContent = L.online.back;
-  document.getElementById('tFriendsScreen').textContent = L.online.menuFriends;
+  setTitle('tFriendsScreen', L.online.menuFriends);
   document.getElementById('tInviteBtn').textContent = L.inv.invBtn;
   document.getElementById('tDeleteAccount').textContent = L.online.deleteAccount;
   document.getElementById('tChatInvite').textContent = L.online.chatInvite;
@@ -508,7 +541,7 @@ function applyTranslations() {
   document.getElementById('tRkPlay').textContent = L.online.rkPlay;
   document.getElementById('tRkCancel').textContent = L.online.rkCancel;
   document.getElementById('tRkTop').textContent = L.online.rkTop;
-  document.getElementById('tOnlineScreen').textContent = '🌐 ' + L.online.mode;
+  setTitle('tOnlineScreen', '🌐 ' + L.online.mode);
   document.getElementById('tRkGames').textContent = L.online.rkGames;
   document.getElementById('tChRange').textContent = L.online.chRange;
   document.getElementById('tChFrost').textContent = L.frostLabel;
@@ -592,9 +625,10 @@ function showScreen(name) {
   document.getElementById('friendsBtn').classList.toggle('on', name === 'friends' || name === 'chat');
   updateAccountChip();
   // Вернулся в меню — задания могли продвинуться: партия или Испытание
-  if (name === 'mode') { loadProgress(); loadLadder().then(renderModeInfo); }
+  if (name === 'mode') { renderModeInfo(); loadProgress(); loadLadder().then(renderModeInfo); }
   // Ушёл с доски — праздник звёзд и салют закрываются: они про только что сыгранную партию
   if (name !== 'game') {
+    closeVizPanel();
     closeStarsShowNow();
     document.querySelectorAll('.confetti').forEach(el => el.remove());
   }
@@ -672,13 +706,65 @@ function openSetup(m, bot) {
   document.getElementById('namesPair').classList.toggle('hidden', setupBot);
   document.getElementById('handicapField').classList.toggle('hidden', setupBot);
   document.getElementById('tStartMatch').textContent = (m === 'duel') ? L.startMatch : L.startGame;
-  document.getElementById('tSetupScreen').textContent =
-    setupBot ? '🤖 ' + L.modeBot : m === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo;
+  setTitle('tSetupScreen',
+    setupBot ? '🤖 ' + L.modeBot : m === 'duel' ? '🤝 ' + L.modeDuel : '🎯 ' + L.modeSolo);
   buildRangeOptions();
   if (m === 'duel') buildHandicapOptions();
   if (setupBot) renderBotPick();
   renderBonusSetup();
+  refreshChips();
   showScreen('setup');
+}
+
+// Выбор из короткого списка — кнопками в ряд, а не системным колесом iPhone:
+// всё видно сразу, нажал — выбрал. Сам <select> остаётся (его читает и
+// пишет остальной код), просто спрятан: кнопки рисуются по его вариантам и
+// перерисовываются, когда варианты или значение меняются
+const CHIP_SELECTS = ['rangeMax', 'attemptsCount', 'winsNeeded', 'handicap', 'chRange', 'chWins'];
+function renderChips(sel) {
+  const box = sel.nextElementSibling;
+  if (!box || !box.classList.contains('chips')) return;
+  box.replaceChildren(...[...sel.options].map(o => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip' + (o.value === sel.value ? ' on' : '');
+    b.dataset.value = o.value;
+    b.textContent = o.textContent;
+    b.onclick = () => {
+      if (sel.value === o.value) return;
+      sel.value = o.value;
+      sel.dispatchEvent(new Event('change'));
+      renderChips(sel);
+    };
+    return b;
+  }));
+}
+function initChips() {
+  CHIP_SELECTS.forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel || sel.classList.contains('chipped')) return;
+    sel.classList.add('chipped');
+    const box = document.createElement('div');
+    box.className = 'chips chips-' + id;
+    sel.after(box);
+    sel.addEventListener('change', () => renderChips(sel));
+    // Варианты пересобираются (сменился диапазон, имена для форы) — и кнопки за ними
+    new MutationObserver(() => renderChips(sel)).observe(sel, { childList: true });
+    renderChips(sel);
+  });
+}
+function refreshChips() {
+  CHIP_SELECTS.forEach(id => { const sel = document.getElementById(id); if (sel) renderChips(sel); });
+}
+
+// Заголовок экрана — значок рисунком, как на главном, а не эмодзи
+const TITLE_ART = { '🎯': 'm-solo', '🤝': 'm-duel', '🤖': 'm-adventure', '🏆': 'm-run', '🌐': 'm-online', '👥': 'm-friends' };
+function setTitle(id, text) {
+  const el = document.getElementById(id);
+  const sp = text.indexOf(' ');
+  const em = sp > 0 ? text.slice(0, sp) : '';
+  el.innerHTML = TITLE_ART[em] ? artSpan('icons/' + TITLE_ART[em] + '.webp', em) + escapeHtml(text.slice(sp))
+                               : escapeHtml(text);
 }
 
 function buildRangeOptions() {
@@ -965,6 +1051,9 @@ function startRound() {
   D.autoLava = [false, false];
   D.skip = [false, false];
   D.shortMemory = [false, false];
+  D.know = [{}, {}];
+  D.shield = [false, false];
+  D.frozen = [false, false];
   D.nearBonus = false;
   D.lastBonus = null;
   placeBonuses();
@@ -1032,9 +1121,16 @@ function duelPlay(guess, forced) {
   // запас ходов — и ровно это игрок и увидит в строке под подсказкой
   let type = hit ? hit.type : null;
   if (type && bonusBlocked(type, 1 - D.cur)) type = 'extra';
+  // Щит отбивает ловушку: она снята с прямой, но не сработала
+  if (type && BONUS_TRAP.indexOf(type) >= 0 && D.shield && D.shield[D.cur]) {
+    D.shield[D.cur] = false;
+    if (hit) hit.taken = true;
+    D.shieldedTrap = type;
+    type = 'shieldUsed';
+  }
   D.lastBonus = type;
   D.lastBonusBy = D.cur;
-  if (hit) {
+  if (hit && type !== 'shieldUsed') {
     hit.taken = true;
     applyBonus(type, D.cur);
   }
@@ -1079,6 +1175,28 @@ function applyBonus(type, by) {
   if (type === 'skip') D.skip[by] = true;
   if (type === 'gift') D.tokens[rival] += 1;
   if (type === 'memory') D.shortMemory[by] = true;
+  // Знание — тому, кто наступил: чётность и половина прямой
+  if (type === 'xray') D.know[by].parity = Math.abs(secret) % 2;
+  if (type === 'half') D.know[by].half = secret <= halfMark() ? 'low' : 'high';
+  if (type === 'shield') D.shield[by] = true;
+  // Заморозка — пропуск следующего хода у соперника
+  if (type === 'freeze') { D.skip[rival] = true; D.frozen[rival] = true; }
+}
+
+// Граница половин: «не больше» неё — нижняя половина
+function halfMark() {
+  return Math.floor((RANGE_MIN + RANGE_MAX) / 2);
+}
+
+// Что игрок знает о загаданном из бонусов — коротким текстом
+function knowText(p) {
+  const k = D.know && D.know[p];
+  if (!k) return [];
+  const B = t().bonusKnow;
+  const out = [];
+  if (k.parity !== undefined) out.push(k.parity === 0 ? B.even : B.odd);
+  if (k.half) out.push((k.half === 'low' ? B.low : B.high).replace('{m}', formatNum(halfMark())));
+  return out;
 }
 
 // Ход отнят бонусом: игрок не вводит число, а нажимает кнопку. Раньше ход за
@@ -1129,6 +1247,7 @@ function doForcedTurn(byBot) {
   if (online) return onlineForcedTurn();
   if (kind === 'skip') {
     D.skip[D.cur] = false;
+    if (D.frozen) D.frozen[D.cur] = false;
     // Взведённый жетон работает и здесь: пропуск идёт первым ходом, а второй
     // игрок делает сам. Ради этого жетон и взводят
     if (D.armed) { D.armed = false; renderAll(); return; }
@@ -1245,7 +1364,8 @@ function renderBonusLine() {
   const by = D.lastBonusBy, rival = 1 - by;
   const desc = (L.bonusDesc[D.lastBonus] || '')
     .replace('{a}', escapeHtml(D.names[by]))
-    .replace('{b}', escapeHtml(D.names[rival]));
+    .replace('{b}', escapeHtml(D.names[rival]))
+    .replace('{t}', escapeHtml(L.bonusNames[D.shieldedTrap] || ''));
   // Рядом может лежать и ловушка, поэтому значок нейтральный: сигнал больше
   // не «иди сюда», а «здесь что-то есть — решай сам»
   box.innerHTML = D.lastBonus
@@ -1313,13 +1433,15 @@ function renderForcedTurn() {
   box.classList.toggle('hidden', !kind);
   if (!kind) return;
   const L = t();
+  // Заморозка — тот же пропуск хода, но слова свои: ловушки тут не было
+  const tk = kind === 'skip' && !online && D.frozen && D.frozen[D.cur] ? 'freeze' : kind;
   document.getElementById('forcedText').textContent =
-    L.forced[kind].replace('{a}', D.names[D.cur]);
-  document.getElementById('forcedBtn').textContent = L.forcedBtn[kind];
+    L.forced[tk].replace('{a}', D.names[D.cur]);
+  document.getElementById('forcedBtn').textContent = L.forcedBtn[tk];
   const canArm = !D.armed && D.tokens[D.cur] > 0 &&
                  (!online || D.cur === online.seat);
   const hint = document.getElementById('forcedHint');
-  hint.textContent = canArm ? L.forcedHint[kind] : '';
+  hint.textContent = canArm ? L.forcedHint[tk] : '';
   hint.classList.toggle('hidden', !canArm);
 }
 
@@ -1813,8 +1935,9 @@ function renderResult() {
       // Реванш зовёт того же соперника на тех же условиях. Пока приглашение
       // не отправлено — кнопка; после — строка о том, что оно ушло
       actions.innerHTML = online
-        ? ((online.rematchSent ? '' :
-            '<button class="btn" onclick="offerRematch()">' + L.online.rematch + '</button>') +
+        ? ((online.rematchSent || online.rematchDeclined ? '' :
+            '<button class="btn" onclick="offerRematch()">' +
+              (online.rematchOffer ? L.online.rematchAccept : L.online.rematch) + '</button>') +
            '<button class="btn-ghost" onclick="backToOnline()">' + L.toMenu + '</button>')
         : '<button class="btn" onclick="newMatch()">' + L.newMatch + '</button>' +
           '<button class="btn-ghost" onclick="quitToMenu()">' + L.toMenu + '</button>';
@@ -1837,10 +1960,14 @@ function renderResult() {
     // Причина стоит сразу под заголовком: иначе «выигрывает игру» рядом со
     // счётом 0:0 читается как ошибка, а не как сдача соперника
     let sentLine = null;
-    if (online && online.rematchSent) {
+    const rematchText = !online ? ''
+      : online.rematchDeclined ? L.online.rematchNo
+      : online.rematchSent ? L.online.rematchSent.replace('{name}', online.rematchSent)
+      : online.rematchOffer ? L.online.rematchAsk.replace('{name}', D.names[1 - online.seat]) : '';
+    if (rematchText) {
       sentLine = document.createElement('div');
-      sentLine.className = 'r-forfeit';
-      sentLine.textContent = L.online.rematchSent.replace('{name}', online.rematchSent);
+      sentLine.className = 'r-forfeit' + (online.rematchOffer ? ' r-offer' : '');
+      sentLine.textContent = rematchText;
     }
 
     box.appendChild(title);
@@ -1869,7 +1996,7 @@ function renderResult() {
 
     if (gameOverType === 'win' && lastWinIsRecord) {
       const rec = document.createElement('div');
-      rec.className = 'r-secret r-newrec r-pop';
+      rec.className = 'r-newrec r-pop';
       rec.textContent = L.newRecord;
       box.appendChild(rec);
     }
@@ -1918,10 +2045,9 @@ function renderPlayers() {
       : '<span class="p-dot" style="background:' + P_COLORS[p] + ';color:' + P_COLORS[p] + '"></span>';
     nameEl.innerHTML = mark + escapeHtml(D.names[p]);
 
-    let pips = '';
-    for (let i = 0; i < D.winsNeeded; i++) pips += (i < D.wins[p] ? '●' : '○');
+    // Счёт побед — числом «1/3» с кубком: кружочки ○○○ читались как непонятный узор
     const pipsEl = document.getElementById('ppips' + p);
-    pipsEl.textContent = pips;
+    pipsEl.textContent = '🏆 ' + D.wins[p] + '/' + D.winsNeeded;
     pipsEl.style.color = P_COLORS[p];
 
     const btn = document.getElementById('ptoken' + p);
@@ -1939,11 +2065,20 @@ function renderPlayers() {
     const flags = [[D.fog[p], bonusArtHtml('fog', '🙈'), L.bonusNames.fog],
                    [D.blind[p], bonusArtHtml('blind', '🌫️'), L.bonusNames.blind],
                    [D.autoLava[p], '🌋', L.bonusNames.lava],
-                   [D.skip[p], bonusArtHtml('skip', '⏭'), L.bonusNames.skip],
-                   [D.shortMemory[p], bonusArtHtml('memory', '🧠'), L.bonusNames.memory]].filter(f => f[0]);
+                   [D.skip[p] && !(D.frozen && D.frozen[p]), bonusArtHtml('skip', '⏭'), L.bonusNames.skip],
+                   [D.frozen && D.frozen[p], '🧊', L.bonusNames.freeze],
+                   [D.shortMemory[p], bonusArtHtml('memory', '🧠'), L.bonusNames.memory],
+                   [D.shield && D.shield[p], '🛡️', L.bonusNames.shield]].filter(f => f[0]);
+    // Знание из бонусов: своё — словами, чужое — только значком
+    const know = online ? [] : knowText(p);
+    const mineView = p === viewerSeat();
+    const knowHtml = know.length
+      ? (mineView ? know.map(k => '<span class="k-chip">' + escapeHtml(k) + '</span>').join('')
+                  : '<span class="k-chip">🩻 ?</span>')
+      : '';
     const eff = document.getElementById('peff' + p);
-    eff.innerHTML = flags.map(f => f[1]).join('');
-    eff.title = flags.map(f => f[2]).join(', ');
+    eff.innerHTML = flags.map(f => f[1]).join('') + knowHtml;
+    eff.title = flags.map(f => f[2]).concat(mineView ? know : []).join(', ');
   }
 }
 
@@ -2971,7 +3106,10 @@ const ACH_LADDERS = [
     tiers: [[5, 'run_5'], [10, 'run_10'], [15, 'run_15'], [20, 'run_20'], [25, 'run_25'], [30, 'run_30']] },
   { key: 'friends', icon: '🤝', stat: 'friends', tiers: [[1, 'friends_1'], [3, 'friends_3'], [10, 'friends_10'], [20, 'friends_20']] },
   { key: 'rivals', icon: '⚔️', stat: 'rivals', tiers: [[1, 'rivals_1'], [3, 'rivals_3'], [10, 'rivals_10']] },
-  { key: 'tutorial', icon: '🎓', stat: 'tutorial', tiers: [[1, 'tutorial']] }
+  { key: 'tutorial', icon: '🎓', stat: 'tutorial', tiers: [[1, 'tutorial']] },
+  { key: 'advStars', icon: '⭐', stat: 'advStars',
+    tiers: [[10, 'adv_stars_10'], [30, 'adv_stars_30'], [60, 'adv_stars_60'], [100, 'adv_stars_100'], [150, 'adv_stars_150']] },
+  { key: 'advWorlds', icon: '🗺️', stat: 'advWorlds', tiers: [[1, 'adv_worlds_1'], [3, 'adv_worlds_3'], [5, 'adv_worlds_5']] }
 ];
 const ACHIEVEMENTS = ACH_LADDERS.reduce((all, l) => all.concat(l.tiers.map(([n, code]) => ({ code, ladder: l, n }))), []);
 
@@ -3243,6 +3381,12 @@ function fillProgressProfile() {
   const line = document.getElementById('pfStreak');
   line.classList.toggle('hidden', !(on && (I.bestStreak || 0) > 0));
   if (on) line.textContent = P.pfStreak.replace('{n}', I.streak || 0).replace('{best}', I.bestStreak || 0);
+  // Приключение: звёзды и миры — по телефону, база их только подтверждает
+  const adv = document.getElementById('pfAdv');
+  const advStarsN = Math.max(advStarTotal(), (I && I.stats && I.stats.advStars) || 0);
+  adv.classList.toggle('hidden', !runAuth() || (advStarsN === 0 && advDone() === 0));
+  adv.textContent = t().adv.pfLine.replace('{s}', advStarsN).replace('{m}', ADV_TOTAL * 3)
+    .replace('{w}', Math.floor(advDone() / ADV_PER_WORLD));
   const fold = document.getElementById('pfAchFold');
   fold.classList.toggle('hidden', !on);
   if (!on) return;
@@ -3266,6 +3410,17 @@ async function openFriendAch(name) {
   } catch (e) {
     setNote('achNote', friendErrorText(e.message), true);
   }
+  // Звёзды Приключения у друга: без миграции 050 строки просто нет
+  const line = document.getElementById('achAdv');
+  line.classList.add('hidden');
+  try {
+    const a = await friendRpc('friend_adventure', { p_friend: name });
+    if (a && typeof a.total === 'number') {
+      line.textContent = t().adv.pfLine.replace('{s}', a.total).replace('{m}', ADV_TOTAL * 3)
+        .replace('{w}', Math.floor((a.done || 0) / ADV_PER_WORLD));
+      line.classList.remove('hidden');
+    }
+  } catch (e) {}
 }
 
 function closeFriendAch() {
@@ -3334,6 +3489,17 @@ function botCandidates(moves, seat, flags, careless) {
   const bands = reviewBands(FEEDBACK_META);
   const cand = new Uint8Array(RANGE_MAX - RANGE_MIN + 1).fill(1);
   seen.forEach(m => narrow(cand, RANGE_MIN, bands, m.guess, m.labelIndex));
+  // Знание из бонусов (рентген, половина) бот тоже использует
+  const k = flags.know;
+  if (k && (k.parity !== undefined || k.half)) {
+    const mid = halfMark();
+    for (let i = 0; i < cand.length; i++) {
+      const v = i + RANGE_MIN;
+      if (k.parity !== undefined && Math.abs(v) % 2 !== k.parity) cand[i] = 0;
+      if (k.half === 'low' && v > mid) cand[i] = 0;
+      if (k.half === 'high' && v <= mid) cand[i] = 0;
+    }
+  }
   // Ответы честные, загаданное всегда среди возможных. На всякий случай
   if (!cand.includes(1)) cand.fill(1);
   return cand;
@@ -3383,7 +3549,7 @@ function botMove() {
   const quirk = vsBot.adv ? vsBot.adv.quirk : null;
   const moves = history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex, p: h.p, timeout: !!h.timeout }));
   const flags = { fog: D.fog[1], blind: D.blind[1], shortMemory: D.shortMemory[1] || quirk === 'forget',
-                  fogFrom: D.fogFrom[1], blindFrom: D.blindFrom[1] };
+                  fogFrom: D.fogFrom[1], blindFrom: D.blindFrom[1], know: D.know && D.know[1] };
   const level = vsBot.bot.level;
   // Жетон: когда осталось два числа, два хода подряд выигрывают наверняка
   if (!D.armed && D.tokens[1] > 0 && history.length > 0) {
@@ -3477,6 +3643,7 @@ function toggleSound() {
   soundOn = !soundOn;
   try { localStorage.setItem('hc_sound', soundOn ? '1' : '0'); } catch (e) {}
   renderSoundBtn();
+  renderVizToggles();
   if (soundOn) playTone(660, 0.12);
 }
 

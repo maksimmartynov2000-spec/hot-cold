@@ -14,7 +14,7 @@ with checks(nn, what, ok) as (values
       (select count(*) from pg_constraint where conname in ('student_avatar_allowed', 'student_avatar_color_allowed')) = 2),
   (5, 'ни у кого нет иконки или цвета вне набора',
       not exists (select 1 from students
-                  where (avatar is not null and not avatar = any (avatar_choices() || reward_icons() || tutorial_icon() || quest_icons()))
+                  where (avatar is not null and not avatar = any (avatar_choices() || reward_icons() || tutorial_icon() || quest_icons() || adventure_icons()))
                      or (avatar_color is not null and not avatar_color = any (avatar_colors() || reward_colors()))))
 )
 select nn as "№",

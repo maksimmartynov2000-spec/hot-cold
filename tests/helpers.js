@@ -113,6 +113,31 @@ function stubSupabase(opts) {
           // noColor — сервер с профилем, но ещё без цвета (своя миграция не применена)
           // Приключение: база помнит большее из присланного и своего.
           // window.__adventure = null — сервер без миграции 049
+          // Звёзды (миграция 050): window.__advStars — строка по сопернику;
+          // window.__advNoStars — база до 050: функций со звёздами нет
+          const mergeStars = (a, b) => {
+            let out = '';
+            for (let i = 0; i < Math.max(a.length, b.length); i++) out += Math.max(+(a[i] || 0), +(b[i] || 0));
+            return out;
+          };
+          if ((name === 'adventure_sync' || name === 'adventure_result') && (window.__adventure === null || window.__advNoStars)) {
+            return { data: null, error: { message: 'Could not find the function public.' + name } };
+          }
+          if (name === 'adventure_sync') {
+            window.__adventure = Math.max(window.__adventure || 0, Math.min(50, args.p_done || 0));
+            window.__advStars = mergeStars(window.__advStars || '', args.p_stars || '');
+            return { data: { done: window.__adventure, stars: window.__advStars }, error: null };
+          }
+          if (name === 'adventure_result') {
+            window.__advResults = (window.__advResults || []).concat([[args.p_n, args.p_stars]]);
+            const cur = (window.__advStars || '').padEnd(args.p_n + 1, '0');
+            window.__advStars = mergeStars(cur, '0'.repeat(args.p_n) + args.p_stars);
+            window.__adventure = Math.max(window.__adventure || 0, args.p_n + 1);
+            return { data: { done: window.__adventure, stars: window.__advStars }, error: null };
+          }
+          if (name === 'friend_adventure') {
+            return { data: window.__friendAdv || { done: 0, stars: '', total: 0 }, error: null };
+          }
           if (name === 'adventure_save') {
             if (window.__adventure === null) return { data: null, error: { message: 'Could not find the function public.adventure_save' } };
             window.__adventure = Math.max(window.__adventure || 0, Math.min(50, args.p_done || 0));

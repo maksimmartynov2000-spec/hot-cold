@@ -355,6 +355,12 @@ function openLogoutModal() {
   document.getElementById('logoutModal').classList.remove('hidden');
 }
 
+function openPinFromWarn() {
+  document.getElementById('pfEditFold').open = true;
+  openPinChange(true);
+  document.getElementById('pinBox').scrollIntoView({ block: 'center' });
+}
+
 function showAvatarPicker(show) {
   document.getElementById('avGrid').classList.toggle('hidden', !show);
 }
@@ -1420,6 +1426,7 @@ function openChallenge(name) {
   renderChallengeBonuses();
   document.getElementById('challengeTitle').textContent =
     t().online.chTitle.replace('{name}', name);
+  refreshChips();
   box.classList.remove('hidden');
   // Окно вызова стоит над списком: друг мог быть внизу, прокручиваем к окну
   if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -1754,6 +1761,11 @@ function renderModeInfo() {
   const lg = runAuth() && ladderInfo;
   on.textContent = lg ? [leagueLabel(ladderInfo.stars), starsLine(ladderInfo.stars)].filter(Boolean).join(' · ') : '';
   on.classList.toggle('hidden', locked || !lg);
+  // Приключение: сколько соперников из 50 уже обыграно
+  const ad = document.getElementById('tAdvInfo');
+  const done = typeof advDone === 'function' ? advDone() : 0;
+  ad.textContent = done + '/' + ADV_TOTAL;
+  ad.classList.toggle('hidden', done === 0);
 }
 
 function openLessonGate() {
@@ -1882,7 +1894,8 @@ function renderLessonResult() {
 }
 
 // ---------- Карточки бонусов ----------
-const BONUS_ICON = { extra: '⚡', fog: '🙈', blind: '🌫️', rush: '⏳', lava: '🌋', skip: '⏭', gift: '🎁', memory: '🧠', near: '❓' };
+const BONUS_ICON = { extra: '⚡', fog: '🙈', blind: '🌫️', rush: '⏳', lava: '🌋', skip: '⏭', gift: '🎁', memory: '🧠', near: '❓',
+                     xray: '🩻', half: '🌗', shield: '🛡️', freeze: '🧊' };
 let bonusCardFor = null;
 function seenBonuses() {
   try { return JSON.parse(localStorage.getItem(SEEN_BONUS_KEY)) || []; } catch (e) { return []; }
@@ -1916,7 +1929,8 @@ function openBonusGuide(focus) {
     '<div class="bg-row' + (k === focus ? ' on' : '') + '"><span class="bg-ic">' + bonusArtHtml(k, BONUS_ICON[k]) + '</span>' +
     '<span class="bg-txt"><b>' + L.bonusNames[k] + '</b><span>' + L.tut.bcDesc[k] + '</span></span></div>').join('');
   document.getElementById('bgList').innerHTML = group(L.bgGood, ['extra', 'fog', 'blind', 'rush']) +
-    group(L.bgBad, ['skip', 'gift', 'memory']);
+    group(L.bgBad, ['skip', 'gift', 'memory']) +
+    group(L.bgAdv, BONUS_ADV);
   document.getElementById('bonusGuide').classList.remove('hidden');
 }
 function closeBonusGuide() {
@@ -2918,6 +2932,7 @@ function applyMatchState(st) {
     meta: (mv.tier === null || mv.tier === undefined) ? FEEDBACK_META[0] : FEEDBACK_META[mv.tier]
   }));
   secret = (st.secret === null || st.secret === undefined) ? 0 : st.secret;
+  applyRematch(st.rematch);
   applyRangeToInputs();
   renderAll();
   // Ключ меняется с каждым ходом, поэтому один ход окликает ровно один раз
@@ -3053,11 +3068,29 @@ async function offerRematch() {
   } catch (e) {
     return setMatchNote(onlineMatchError(e.message));
   }
-  // Бот согласия не ждёт: новая партия уже идёт
-  if (online.botSeat !== null && newId) { stopMatchPoll(); return openMatch(newId); }
+  // Старый бот согласия не ждёт, а позвавший соперник уже согласен: новая
+  // партия уже идёт
+  if ((online.botSeat !== null || online.rematchOffer) && newId) { stopMatchPoll(); return openMatch(newId); }
   online.rematchSent = other;
   setMatchNote('');
   renderAll();
+}
+
+// Реванш после законченной партии: база говорит, позвал ли кто-то и чем
+// кончилось. Позвал соперник — на итоге кнопка «Принять». Согласились —
+// новая партия открывается сама у обоих
+function applyRematch(rm) {
+  if (!online) return;
+  online.rematchOffer = !!(rm && rm.status === 'invited' && !rm.mine);
+  online.rematchDeclined = !!(rm && rm.status === 'declined' && rm.mine);
+  if (rm && rm.mine && rm.status === 'invited' && !online.rematchSent) {
+    online.rematchSent = D.names[1 - online.seat];
+  }
+  if (rm && rm.status === 'active' && online.rematchSent && !online.rematchOpening) {
+    online.rematchOpening = true;
+    stopMatchPoll();
+    setTimeout(() => { if (online && online.rematchOpening) openMatch(rm.id); }, 0);
+  }
 }
 
 // ================= ГОТОВЫЕ ФРАЗЫ =================

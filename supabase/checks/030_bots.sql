@@ -25,7 +25,7 @@ checks(nn, what, ok) as (values
   (4, 'у бота время не кончается',
       exists (select 1 from fn where name = 'apply_turn_timeout' and src like '%m.cur = m.bot_seat%')),
   (5, 'через 15 секунд ожидания — бот',
-      exists (select 1 from fn where name = 'ranked_pair' and src like '%bot_wait_seconds()%')
+      exists (select 1 from fn where name = 'ranked_pair' and (src like '%bot_wait_seconds()%' or src like '%bot_people%'))
       and exists (select 1 from fn where name = 'ranked_status' and src like '%ranked_pair(me, p_mode)%')),
   (6, 'рейтинг за бота вдвое меньше, сила бота подстраивается',
       exists (select 1 from fn where name = 'apply_elo' and src like '%bot_skill_after%')),
