@@ -6732,7 +6732,8 @@ async function testAudit(browser) {
   await page.waitForTimeout(150);
   await page.click('#tStartMatch');
   await page.waitForTimeout(250);
-  await page.fill('#guessInput', '50');
+  // Мимо загаданного: попадание честно запустило бы салют этой партии
+  await page.fill('#guessInput', String(await page.evaluate(() => secret === 50 ? 51 : 50)));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(250);
   await liftCurtainIfShown(page);
