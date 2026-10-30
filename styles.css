@@ -2347,3 +2347,94 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .adv-card .ac-gold { flex-basis: 100%; font-size: 12px; color: var(--muted); line-height: 1.35; }
 .av-head { grid-column: 1 / -1; text-align: left; font-size: 13px; font-weight: 900; margin: 8px 0 0; color: var(--gold); }
 .av-tile.adv-icon { padding: 3px !important; }
+
+/* Рамки с сезонного пути — те же кольца, что у лиг */
+.pf-avatar[data-frame="fire"] { --fr: conic-gradient(from 0deg, #fde047, #f97316, #dc2626, #f97316, #fde047, #f97316, #dc2626, #fde047); --fr-glow: rgba(249, 115, 22, 0.85); }
+.pf-avatar[data-frame="ice"] { --fr: conic-gradient(from 0deg, #e0f2fe, #7dd3fc, #ffffff, #38bdf8, #e0f2fe, #a5f3fc, #ffffff, #e0f2fe); --fr-glow: rgba(125, 211, 252, 0.85); }
+.pf-avatar[data-frame="space"] { --fr: conic-gradient(from 0deg, #1e1b4b, #7c3aed, #22d3ee, #f0abfc, #1e1b4b, #6366f1, #22d3ee, #1e1b4b); --fr-glow: rgba(124, 58, 237, 0.85); }
+.pf-avatar[data-frame="champion"] { --fr: conic-gradient(from 0deg, #fff7c2, #facc15, #b45309, #fde047, #ffffff, #facc15, #92400e, #fff7c2); --fr-glow: rgba(250, 204, 21, 0.95); }
+.pf-avatar[data-frame="streak"] { --fr: conic-gradient(from 0deg, #ff6b6b, #fb923c, #fde047, #fb923c, #ff6b6b, #f472b6, #ff6b6b); --fr-glow: rgba(255, 107, 107, 0.85); }
+/* На маленьких кружках — тонкое кольцо */
+.avatar[data-frame] { box-shadow: 0 0 0 2px var(--fr-solid, #ffd166), 0 0 8px var(--fr-solid, #ffd166); }
+.avatar[data-frame="fire"], .pr-frame[data-frame="fire"] { --fr-solid: #f97316; }
+.avatar[data-frame="ice"], .pr-frame[data-frame="ice"] { --fr-solid: #7dd3fc; }
+.avatar[data-frame="space"], .pr-frame[data-frame="space"] { --fr-solid: #8b5cf6; }
+.avatar[data-frame="champion"], .pr-frame[data-frame="champion"] { --fr-solid: #facc15; }
+.avatar[data-frame="streak"], .pr-frame[data-frame="streak"] { --fr-solid: #fb7185; }
+.pr-frame[data-frame="bronze"] { --fr-solid: #d08a4f; } .pr-frame[data-frame="silver"] { --fr-solid: #e2e8f0; }
+.pr-frame[data-frame="gold"] { --fr-solid: #facc15; } .pr-frame[data-frame="platinum"] { --fr-solid: #5eead4; }
+.pr-frame[data-frame="diamond"] { --fr-solid: #93c5fd; } .pr-frame[data-frame="legend"] { --fr-solid: #c084fc; }
+.pr-frame[data-frame="base"] { --fr-solid: #ff8a3d; }
+.pr-art { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 34px; height: 34px;
+  border-radius: 50%; background: var(--tile); font-size: 18px; vertical-align: middle; }
+.pr-art.pr-frame { background: #2b2370; box-shadow: inset 0 0 0 4px var(--fr-solid, #ffd166), 0 0 10px var(--fr-solid, #ffd166); }
+.pr-art.pr-icon { background: rgba(255, 255, 255, 0.1); }
+.pr-art .icon-art { width: 28px; height: 28px; }
+
+/* Карточка дня на экране онлайна */
+.ol-daily { margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
+.od-top { display: flex; gap: 8px; }
+.od-chest { all: unset; flex: 1; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 18px;
+  font-size: 15px; font-weight: 900; background: var(--surface); cursor: pointer; font-size: 26px; }
+.od-chest span { font-size: 14px; line-height: 1.3; }
+.od-chest.ready { background: linear-gradient(150deg, #ffb347, #ff6b3d); color: #fff; box-shadow: 0 4px 0 #b8321b, 0 0 22px rgba(255, 138, 61, 0.6);
+  animation: od-pulse 1.4s ease-in-out infinite; }
+.od-chest.locked { cursor: default; color: var(--muted); }
+.od-chest.done { color: var(--muted); }
+@keyframes od-pulse { 50% { transform: scale(1.03); } }
+@media (prefers-reduced-motion: reduce) { .od-chest.ready { animation: none; } }
+.od-streak { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 74px;
+  padding: 8px; border-radius: 18px; background: var(--surface); color: var(--muted); }
+.od-streak.on { color: #fb923c; }
+.od-streak b { font-size: 20px; }
+.od-streak small { font-size: 11px; font-weight: 700; }
+.od-streak i { position: absolute; top: 4px; right: 6px; font-style: normal; font-size: 12px; }
+.od-pass { all: unset; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 18px;
+  background: linear-gradient(150deg, rgba(124, 92, 255, 0.4), rgba(34, 211, 238, 0.18)); border: 2px solid rgba(167, 139, 250, 0.5); }
+.od-lvl { display: flex; align-items: baseline; }
+.od-lvl b { font-size: 24px; font-weight: 900; }
+.od-lvl small { font-size: 12px; color: var(--muted); font-weight: 800; }
+.od-bar { position: relative; flex: 1; height: 26px; border-radius: 13px; background: rgba(0, 0, 0, 0.3); overflow: hidden; }
+.od-bar > span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 13px; background: linear-gradient(90deg, #a78bfa, #22d3ee); }
+.od-bar em { position: relative; display: block; text-align: center; line-height: 26px; font-style: normal; font-size: 12px; font-weight: 900; }
+.od-next { display: flex; flex-direction: column; align-items: center; font-size: 11px; font-weight: 800; color: var(--muted); }
+
+/* Сундук */
+.chest-card { text-align: center; }
+.chest-card .ch-icon { font-size: 64px; }
+#chestModal.fresh .ch-icon { animation: ch-shake 0.6s ease 2; }
+@keyframes ch-shake { 25% { transform: rotate(-12deg) scale(1.1); } 75% { transform: rotate(12deg) scale(1.1); } }
+.chest-card .ch-title { font-size: 22px; font-weight: 900; margin: 4px 0 10px; }
+.ch-xp { font-size: 36px; font-weight: 900; color: var(--gold); }
+.ch-xp small { font-size: 14px; color: var(--muted); }
+.ch-streak { font-size: 15px; font-weight: 800; color: #fb923c; margin: 4px 0 10px; }
+.ch-streak small { display: block; color: #7dd3fc; font-size: 12px; }
+.ch-item { display: flex; align-items: center; gap: 10px; text-align: left; margin-top: 8px; padding: 10px 12px; border-radius: 14px; background: var(--tile); font-size: 14px; }
+.ch-item b { display: block; color: var(--gold); }
+.ch-item.gold { box-shadow: inset 0 0 0 2px var(--gold); }
+
+/* Сезонный путь */
+.pass-card .ps-title { font-size: 20px; font-weight: 900; }
+.pass-card .ps-sub { font-size: 13px; color: var(--muted); margin: 2px 0 8px; }
+.pass-card .ps-how { font-size: 12px; line-height: 1.4; color: var(--muted); text-align: left; padding: 8px 10px; border-radius: 12px; background: var(--tile); }
+.pl-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-height: 46vh; overflow: auto; }
+.pl-head { font-size: 14px; font-weight: 900; text-align: left; margin-top: 6px; }
+.pl-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: var(--tile); opacity: 0.75; text-align: left; }
+.pl-row.got { opacity: 1; box-shadow: inset 0 0 0 2px #34d399; }
+.pl-row.next { opacity: 1; box-shadow: inset 0 0 0 2px var(--gold); }
+.pl-n { min-width: 28px; font-size: 16px; font-weight: 900; color: var(--gold); }
+.pl-r { flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pl-r em { font-style: normal; font-size: 13px; font-weight: 700; }
+
+/* Рамка и титул в профиле */
+.pf-title { margin: -2px 0 8px; font-size: 13px; font-weight: 900; color: var(--gold); letter-spacing: 0.02em; }
+.st-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.st-frame { all: unset; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 62px; }
+.st-frame small { font-size: 11px; font-weight: 700; color: var(--muted); text-align: center; }
+.st-frame.sel .pr-art { outline: 3px solid #fff; outline-offset: 2px; }
+.st-title { all: unset; cursor: pointer; padding: 6px 12px; border-radius: 12px; background: var(--tile); font-size: 13px; font-weight: 800; }
+.st-title.sel { background: var(--accent); color: #fff; }
+.st-frame.locked, .st-title.locked { opacity: 0.4; }
+.p-title { display: block; font-size: 11px; font-weight: 800; color: var(--gold); margin-top: 1px; }
+.pl-r { flex-wrap: nowrap; }
+.pl-r em { flex: 1; min-width: 0; }

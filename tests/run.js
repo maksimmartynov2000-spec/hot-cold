@@ -6882,6 +6882,70 @@ async function testTrialSurprises(browser) {
   await page.context().close();
 }
 
+// Онлайн, часть 3а: сундук дня, серия, сезонный путь, рамки и титулы
+async function testOnlinePass(browser) {
+  console.log('\nОнлайн: сундук, серия, сезонный путь');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => {
+    window.__online = { day: '2026-10-30', played: false, chestOpened: false, chest: null, streak: 2, bestStreak: 2, freezeLeft: true,
+      season: '2026-10', xp: 250, levelXp: 100, maxLevel: 30, seasonLeft: 86400 * 5,
+      rewards: [{ level: 3, kind: 'phrase', code: 'lava' }, { level: 12, kind: 'frame', code: 'fire' }, { level: 9, kind: 'title', code: 'hunter' }],
+      streakRewards: [{ days: 3, kind: 'phrase', code: 'streak' }], owned: [], frame: null, title: null };
+    tutSave({ done: [1, 2, 3], skipped: true, veteran: true });
+  });
+  await page.evaluate(() => loadOnlineInfo());
+  await page.waitForTimeout(150);
+  const menu = await page.evaluate(() => document.getElementById('tOnlineInfo').textContent);
+  check('в меню на плитке онлайна — про сундук и серию', /Сыграйте — сундук/.test(menu) && /🔥 2/.test(menu), menu);
+  await page.evaluate(() => openOnline());
+  await page.waitForTimeout(500);
+  const card = await page.evaluate(() => ({ text: document.getElementById('olDaily').textContent,
+    locked: !!document.querySelector('#olDaily .od-chest.locked'), lvl: document.querySelector('#olDaily .od-lvl').textContent }));
+  check('до партии сундук закрыт и сказано почему', card.locked && /Сыграйте партию/.test(card.text), card.text);
+  check('ступень пути и очки до следующей', card.lvl === '2/30' && /50\/100/.test(card.text), JSON.stringify(card));
+  await page.evaluate(async () => { window.__online.played = true; window.__chestSurprise = { kind: 'phrase', code: 'genius' }; await loadOnlineInfo(); });
+  check('после партии — кнопка «Открыть сундук»', await page.locator('#odChest').isVisible());
+  await page.evaluate(() => openChest());
+  await page.waitForTimeout(500);
+  const chest = await page.evaluate(() => ({ shown: !document.getElementById('chestModal').classList.contains('hidden'),
+    text: document.getElementById('chestBody').textContent, card: document.getElementById('olDaily').textContent }));
+  check('сундук: очки, серия и сюрприз', chest.shown && /\+30/.test(chest.text) && /Серия: 3/.test(chest.text) &&
+    /Сюрприз/.test(chest.text) && /Гениально/.test(chest.text), chest.text);
+  check('после — «Сундук открыт · завтра новый»', /Сундук открыт/.test(chest.card), chest.card);
+  await page.evaluate(() => closeChest());
+  const say = await page.evaluate(() => sayCodesFor());
+  check('фраза из сундука — в наборе фраз чата', say.includes('genius') && !say.includes('lava'), say.join());
+  await page.evaluate(() => openPassModal());
+  await page.waitForTimeout(200);
+  const pass = await page.evaluate(() => ({ rows: [...document.querySelectorAll('#passList .pl-row')].map(r => r.dataset.level + (r.classList.contains('got') ? '+' : '-')),
+    sub: document.getElementById('passSub').textContent }));
+  check('путь: награды по ступеням, полученные отмечены', pass.rows.join() === '2+,3-,9-,12-' && /Ступень 2 из 30/.test(pass.sub), JSON.stringify(pass));
+  await page.evaluate(() => closePassModal());
+  // Рамка и титул: чужое не надеть, своё — видно в профиле
+  await page.evaluate(async () => { window.__online.owned.push({ kind: 'frame', code: 'fire' }, { kind: 'title', code: 'hunter' }); await loadOnlineInfo(); openLogoutModal(); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => chooseStyle('frame', 'ice'));
+  const lockedNote = await page.evaluate(() => document.getElementById('styleNote').textContent);
+  check('чужая рамка — сказано, где взять', /ступень|серия|сундук/.test(lockedNote), lockedNote);
+  await page.evaluate(async () => { await chooseStyle('frame', 'fire'); await chooseStyle('title', 'hunter'); });
+  await page.waitForTimeout(200);
+  const pf = await page.evaluate(() => ({ frame: document.getElementById('pfAvatar').dataset.frame, title: document.getElementById('pfTitle').textContent,
+    sent: window.__online.frame + '/' + window.__online.title }));
+  check('надел рамку «Огонь» и титул — видно в профиле и ушло в базу', pf.frame === 'fire' && pf.title === 'Охотник за числами' && pf.sent === 'fire/hunter',
+    JSON.stringify(pf));
+  // Без миграции 053 ничего этого нет и ничего не ломается
+  const none = await page.evaluate(async () => { window.__online = null; await loadOnlineInfo(); closeLogoutModal(); openOnline();
+    return { card: document.getElementById('olDaily').classList.contains('hidden'), say: sayCodesFor().length === SAY_CODES.length }; });
+  check('без миграции карточки нет, фразы обычные', none.card && none.say, JSON.stringify(none));
+  for (const lang of ['en', 'fr', 'de']) {
+    const ok = await page.evaluate(l => { const P = i18n[l].pass;
+      return PASS_FRAMES.every(k => P.frames[k]) && PASS_TITLES.every(k => P.titles[k]) && PASS_PHRASES.every(k => i18n[l].say[k]) &&
+        P.chestOpen && P.how && P.locked && P.menuChest; }, lang);
+    check(lang + ': сундук, путь, рамки, титулы и фразы переведены', ok);
+  }
+  await page.context().close();
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -7807,6 +7871,7 @@ async function testKeyPage(browser) {
     await testAdventureBonus(browser);
     await testTrainBonusFx(browser);
     await testTrialSurprises(browser);
+    await testOnlinePass(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

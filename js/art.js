@@ -21,7 +21,11 @@ const AVATAR_GRAD = {
   'grad-sunset': 'linear-gradient(135deg, #ffd166 0%, #ff8a3d 45%, #ff4d6d 100%)',
   'grad-ocean': 'linear-gradient(135deg, #a5f3fc 0%, #42c8ff 40%, #4f46e5 100%)',
   'grad-candy': 'linear-gradient(135deg, #fbcfe8 0%, #f472b6 45%, #a78bfa 100%)',
-  'grad-forest': 'linear-gradient(135deg, #d9f99d 0%, #4ade80 45%, #0f766e 100%)'
+  'grad-forest': 'linear-gradient(135deg, #d9f99d 0%, #4ade80 45%, #0f766e 100%)',
+  // С сезонного пути и из сундука
+  'grad-aurora': 'linear-gradient(135deg, #a7f3d0 0%, #22d3ee 35%, #a78bfa 70%, #f0abfc 100%)',
+  'grad-lava': 'linear-gradient(135deg, #fde68a 0%, #fb923c 35%, #ef4444 70%, #7f1d1d 100%)',
+  'grad-night': 'linear-gradient(135deg, #c7d2fe 0%, #6366f1 35%, #1e1b4b 75%, #0f172a 100%)'
 };
 // С каким фоном кружок ещё и переливается
 const SHINY_BG = ['#0ea5e9', '#d946ef'];

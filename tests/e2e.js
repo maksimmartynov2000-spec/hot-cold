@@ -583,8 +583,8 @@ async function registerPlayer(p, name, pin) {
 
   const calls = A.log.concat(B.log);
   check('профиль шёл через настоящие функции базы',
-    ['my_profile', 'set_avatar', 'set_avatar_color', 'avatars_for', 'rename_student', 'change_pin', 'send_friend_text', 'friend_thread']
-      .every(f => calls.includes(f)),
+    ['my_profile', 'set_avatar', 'set_avatar_color', 'rename_student', 'change_pin', 'send_friend_text', 'friend_thread']
+      .every(f => calls.includes(f)) && (calls.includes('faces_for') || calls.includes('avatars_for')),
     [...new Set(calls)].join(', '));
   check('всё шло через настоящие функции базы',
     calls.includes('match_guess') && calls.includes('match_state') &&

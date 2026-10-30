@@ -178,6 +178,11 @@ function paintAvatar(el, name) {
   const bg = colorOf(name);
   el.style.background = avatarBgCss(bg);
   el.classList.toggle('shine', isShinyBg(bg));
+  // Рамка с пути — тонким кольцом и на маленьких кружках
+  if (el.id !== 'pfAvatar') {
+    const fr = name === myName() ? (typeof onlineInfo !== 'undefined' && onlineInfo && onlineInfo.frame) : (avatarCache[name] || {}).frame;
+    if (fr) el.dataset.frame = fr; else delete el.dataset.frame;
+  }
   el.dataset.avatarFor = name;
 }
 
@@ -191,6 +196,7 @@ function repaintAvatarsOf(name) {
 // чьих иконок ещё не знаем. Сервер без профиля отвечает ошибкой: тогда
 // остаются буквы, и больше не спрашиваем
 let avatarsSupported = true;
+let facesSupported = true;
 async function fetchAvatars(names) {
   if (!avatarsSupported || !runAuth()) return;
   const me = myName();
@@ -198,15 +204,23 @@ async function fetchAvatars(names) {
     n && n !== me && String(n).charAt(0) !== '#' && !(n in avatarCache)).slice(0, 200);
   if (!want.length) return;
   let rows;
+  // С рамкой и титулом (миграция 053), а без неё — как раньше
   try {
-    rows = await friendRpc('avatars_for', { p_names: want });
+    if (facesSupported) rows = await friendRpc('faces_for', { p_names: want });
   } catch (e) {
-    if (/avatars_for|function|schema/i.test(e.message)) avatarsSupported = false;
-    return;
+    if (/faces_for|function|schema/i.test(e.message)) facesSupported = false; else return;
+  }
+  if (!facesSupported) {
+    try {
+      rows = await friendRpc('avatars_for', { p_names: want });
+    } catch (e) {
+      if (/avatars_for|function|schema/i.test(e.message)) avatarsSupported = false;
+      return;
+    }
   }
   want.forEach(n => { avatarCache[n] = { icon: '', color: '' }; });
   (Array.isArray(rows) ? rows : []).forEach(r => {
-    avatarCache[r.username] = { icon: r.avatar || '', color: r.color || '' };
+    avatarCache[r.username] = { icon: r.avatar || '', color: r.color || '', frame: r.frame || '', title: r.title || '' };
   });
   document.querySelectorAll('.avatar[data-avatar-for]').forEach(el => {
     if (want.indexOf(el.dataset.avatarFor) >= 0) paintAvatar(el, el.dataset.avatarFor);
@@ -261,7 +275,14 @@ function fillProfile() {
   // Рамка кружка — цвета лиги: бронза, серебро, золото, платина, алмаз,
   // легенда. Ещё не играл на звёзды — фирменная, золотая с оранжевым
   const FRAMES = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'legend'];
-  face.dataset.frame = auth ? (ladderInfo ? FRAMES[ladderPos(ladderInfo.stars).league] : 'base') : '';
+  face.dataset.frame = auth ? ((typeof onlineInfo !== 'undefined' && onlineInfo && onlineInfo.frame) ||
+    (ladderInfo ? FRAMES[ladderPos(ladderInfo.stars).league] : 'base')) : '';
+  const ttl = document.getElementById('pfTitle');
+  const myTitle = auth && typeof onlineInfo !== 'undefined' && onlineInfo && onlineInfo.title;
+  ttl.textContent = myTitle ? t().pass.titles[myTitle] : '';
+  ttl.classList.toggle('hidden', !myTitle);
+  if (typeof renderStylePicker === 'function') renderStylePicker();
+  document.getElementById('tPfStyle').textContent = t().pass.styleHead;
   if (auth) {
     paintAvatar(face, auth.username);
   } else {
@@ -341,6 +362,7 @@ function openLogoutModal() {
   document.getElementById('pfMoreFold').open = false;
   ['avNote', 'renameNote', 'pinNote'].forEach(id => setNote(id, ''));
   fillProfile();
+  if (auth) loadOnlineInfo().then(() => { if (!document.getElementById('logoutModal').classList.contains('hidden')) fillProfile(); });
   if (auth) {
     setNote('pushNote', '');
     loadPushState();
@@ -389,9 +411,10 @@ function renderAvatarGrid() {
   // Награды за лиги — только когда сервер знает лиги
   const rewardsOf = kind => ladderInfo ? LEAGUE_REWARDS.filter(r => r.kind === kind).map(r => r.value) : [];
   if (colorsSupported()) {
-    AVATAR_BG.concat(rewardsOf('color')).forEach(color => {
+    AVATAR_BG.concat(rewardsOf('color')).concat(onlineInfo ? PASS_COLORS : []).forEach(color => {
       const c = document.createElement('button');
-      const locked = rewardLeague('color', color) > 0 && !rewardOpen('color', color);
+      const locked = PASS_COLORS.indexOf(color) >= 0 ? !passOwns('color', color)
+        : rewardLeague('color', color) > 0 && !rewardOpen('color', color);
       c.className = 'av-color' + (color === bg ? ' sel' : '') + (locked ? ' locked' : '');
       c.dataset.color = color;
       c.style.background = avatarBgCss(color);
@@ -410,7 +433,8 @@ function renderAvatarGrid() {
   const questIcons = progressInfo ? QUEST_ICONS.map(q => q.icon) : [];
   // Иконки боссов Приключения — когда база о них знает (миграция 049)
   const advIcons = advServer ? ADV_ICONS : [];
-  ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons, ...advIcons].forEach((icon, i) => {
+  const passIcons = onlineInfo ? PASS_ICONS : [];
+  ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons, ...advIcons, ...passIcons].forEach((icon, i) => {
     // Награды — отдельным блоком после обычных: их не выбирают, а заслуживают
     if (i === AVATAR_CHOICES.length + 1) {
       const sep = document.createElement('div');
@@ -421,6 +445,7 @@ function renderAvatarGrid() {
     const locked = icon === TUTORIAL_ICON ? !tutorialIconOpen()
       : questIconDays(icon) ? !questIconOpen(icon)
       : ADV_ICONS.indexOf(icon) >= 0 ? !advIconOpen(icon)
+      : PASS_ICONS.indexOf(icon) >= 0 ? !passOwns('icon', icon)
       : rewardLeague('icon', icon) > 0 && !rewardOpen('icon', icon);
     b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '') + (locked ? ' locked' : '');
     b.dataset.icon = icon;
@@ -460,6 +485,9 @@ function lockedNote(kind, value) {
 }
 
 async function chooseColor(color) {
+  if (PASS_COLORS.indexOf(color) >= 0 && !passOwns('color', color)) {
+    return setNote('avNote', t().pass.locked.replace('{w}', passWhere('color', color)), true);
+  }
   if (lockedNote('color', color)) return;
   const before = myColor();
   if (color === colorOf(myName())) return;
@@ -490,6 +518,9 @@ async function chooseAvatar(icon) {
   if (lockedNote('icon', icon)) return;
   if (questIconDays(icon) && !questIconOpen(icon)) {
     return setNote('avNote', t().prog.streakLocked.replace('{n}', questIconDays(icon)), true);
+  }
+  if (PASS_ICONS.indexOf(icon) >= 0 && !passOwns('icon', icon)) {
+    return setNote('avNote', t().pass.locked.replace('{w}', passWhere('icon', icon)), true);
   }
   if (ADV_CHAR_ICONS.indexOf(icon) >= 0 && !advCharIconOpen(icon)) {
     const w = Math.floor(ADV_CHAR_ICONS.indexOf(icon) / ADV_PER_WORLD);
@@ -934,6 +965,7 @@ function openOnline() {
   loadFriends(true);
   loadMatches();
   loadRanked();
+  loadOnlineInfo();
   // Лестница меняется только после партии — спрашиваем при входе, не в опросе
   loadLadder().then(() => { if (screen === 'online') { renderRanked(null); loadEloTop(); } });
 }
@@ -1693,8 +1725,15 @@ function renderModeInfo() {
   run.classList.toggle('hidden', locked || !best);
   const on = document.getElementById('tOnlineInfo');
   const lg = runAuth() && ladderInfo;
-  on.textContent = lg ? [leagueLabel(ladderInfo.stars), starsLine(ladderInfo.stars)].filter(Boolean).join(' · ') : '';
-  on.classList.toggle('hidden', locked || !lg);
+  // Сундук готов — главный повод зайти: пишем его первым
+  const oi = typeof onlineInfo !== 'undefined' && onlineInfo;
+  const hints = [];
+  if (oi && oi.played && !oi.chestOpened) hints.push(t().pass.menuChest);
+  else if (oi && !oi.played) hints.push(t().pass.menuPlay);
+  if (oi && oi.streak) hints.push('🔥 ' + oi.streak);
+  if (lg) hints.push([leagueLabel(ladderInfo.stars), starsLine(ladderInfo.stars)].filter(Boolean).join(' · '));
+  on.textContent = hints.join(' · ');
+  on.classList.toggle('hidden', locked || !hints.length);
   // Приключение: сколько соперников из 50 уже обыграно
   const ad = document.getElementById('tAdvInfo');
   const done = typeof advDone === 'function' ? advDone() : 0;
@@ -2805,7 +2844,7 @@ function applyMatchState(st) {
   if (st.matchOver && online.wasPlaying) online.justFinished = true;
   if (st.matchOver && !online.progressAsked) {
     online.progressAsked = true;
-    setTimeout(() => { if (runAuth()) loadProgress(); }, 2500);
+    setTimeout(() => { if (runAuth()) { loadProgress(); loadOnlineInfo(); } }, 2500);
   }
   online.elo = st.elo;
   online.botSeat = (st.botSeat === null || st.botSeat === undefined) ? null : st.botSeat;
@@ -2828,6 +2867,10 @@ function applyMatchState(st) {
   D.names = st.names.map(playerName);
   // Имена как в базе: по ним узнаём бота, переведённое имя для этого не годится
   online.rawNames = st.names.slice();
+  if (!online.facesAsked) {
+    online.facesAsked = true;
+    fetchAvatars(st.names.slice()).then(() => { if (online && screen === 'game') renderAll(); });
+  }
   D.winsNeeded = st.winsNeeded;
   D.wins = st.wins.slice();
   // Новый раунд — замечание про прошлое число к нему не относится
@@ -3065,7 +3108,7 @@ function renderSayPad() {
 
   const L = t().say;
   pad.innerHTML = '';
-  SAY_CODES.forEach(code => {
+  sayCodesFor().forEach(code => {
     const b = document.createElement('button');
     b.textContent = L[code];
     b.dataset.code = code;
