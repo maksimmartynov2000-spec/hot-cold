@@ -6522,6 +6522,22 @@ async function testAdventureBonus(browser) {
     return r;
   });
   check('у Фокусника бонусов вдвое больше и есть ловушки', magic.count === 2 * magic.auto && magic.traps === 3, JSON.stringify(magic));
+  // Соперник «Первый ход» ходит сам, без нажатий игрока: раньше его ход не
+  // назначался, потому что партия рисовалась до открытия доски
+  const firstMove = await page.evaluate(async () => {
+    const n = [...Array(50).keys()].find(i => advChar(i).quirk === 'first');
+    BOT_SPEED = 0.05;
+    startAdventure(n);
+    const planned = !!botTimer;
+    const t0 = Date.now();
+    while (history.length === 0 && Date.now() - t0 < 3000) await new Promise(r => setTimeout(r, 20));
+    const r = { planned, moved: history.length === 1 && history[0].p === 1, cur: D.cur };
+    quitToMenu();
+    BOT_SPEED = 1000;
+    return r;
+  });
+  check('первым ходит соперник — он ходит сам, ход передаётся игроку', firstMove.planned && firstMove.moved && firstMove.cur === 0,
+    JSON.stringify(firstMove));
   const after = await page.evaluate(() => ({ set: bonusSet, adv: !!adv }));
   check('после Приключения обычный набор бонусов вернулся', after.set === null && !after.adv, JSON.stringify(after));
 
