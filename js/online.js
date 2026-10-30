@@ -431,6 +431,23 @@ function renderAvatarGrid() {
     b.onclick = () => chooseAvatar(icon);
     grid.appendChild(b);
   });
+  // Из Приключения: рисунки соперников, по мирам. Когда база их знает (миграция 052)
+  if (progressInfo && progressInfo.stats && 'advGold' in progressInfo.stats) {
+    const head = document.createElement('div');
+    head.className = 'av-head';
+    head.textContent = t().adv.pickHead.replace('{i}', advGoldCount() * ADV_PER_WORLD).replace('{m}', ADV_CHAR_ICONS.length);
+    grid.appendChild(head);
+    ADV_CHAR_ICONS.forEach(icon => {
+      const b = document.createElement('button');
+      const locked = !advCharIconOpen(icon);
+      b.className = 'av-tile has-art adv-icon' + (icon === current ? ' sel' : '') + (locked ? ' locked' : '');
+      b.dataset.icon = icon;
+      b.innerHTML = iconArt(icon, 0);
+      b.style.background = avatarBgCss(bg);
+      b.onclick = () => chooseAvatar(icon);
+      grid.appendChild(b);
+    });
+  }
 }
 
 // Цвет виден сразу; сетка не сворачивается — после цвета часто выбирают и
@@ -473,6 +490,10 @@ async function chooseAvatar(icon) {
   if (lockedNote('icon', icon)) return;
   if (questIconDays(icon) && !questIconOpen(icon)) {
     return setNote('avNote', t().prog.streakLocked.replace('{n}', questIconDays(icon)), true);
+  }
+  if (ADV_CHAR_ICONS.indexOf(icon) >= 0 && !advCharIconOpen(icon)) {
+    const w = Math.floor(ADV_CHAR_ICONS.indexOf(icon) / ADV_PER_WORLD);
+    return setNote('avNote', t().adv.charLocked.replace('{w}', t().adv.worlds[w]).replace('{n}', advWorldThree(w)), true);
   }
   if (ADV_ICONS.indexOf(icon) >= 0 && !advIconOpen(icon)) {
     return setNote('avNote', t().adv.iconLocked.replace('{w}', t().adv.worlds[ADV_ICONS.indexOf(icon)]), true);

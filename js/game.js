@@ -3209,7 +3209,8 @@ const ACH_LADDERS = [
   { key: 'tutorial', icon: '🎓', stat: 'tutorial', tiers: [[1, 'tutorial']] },
   { key: 'advStars', icon: '⭐', stat: 'advStars',
     tiers: [[10, 'adv_stars_10'], [30, 'adv_stars_30'], [60, 'adv_stars_60'], [100, 'adv_stars_100'], [150, 'adv_stars_150']] },
-  { key: 'advWorlds', icon: '🗺️', stat: 'advWorlds', tiers: [[1, 'adv_worlds_1'], [3, 'adv_worlds_3'], [5, 'adv_worlds_5']] }
+  { key: 'advWorlds', icon: '🗺️', stat: 'advWorlds', tiers: [[1, 'adv_worlds_1'], [3, 'adv_worlds_3'], [5, 'adv_worlds_5']] },
+  { key: 'advGold', icon: '🎨', stat: 'advGold', tiers: [[1, 'adv_gold_1'], [3, 'adv_gold_3'], [5, 'adv_gold_5']] }
 ];
 const ACHIEVEMENTS = ACH_LADDERS.reduce((all, l) => all.concat(l.tiers.map(([n, code]) => ({ code, ladder: l, n }))), []);
 
@@ -3486,7 +3487,8 @@ function fillProgressProfile() {
   const advStarsN = Math.max(advStarTotal(), (I && I.stats && I.stats.advStars) || 0);
   adv.classList.toggle('hidden', !runAuth() || (advStarsN === 0 && advDone() === 0));
   adv.textContent = t().adv.pfLine.replace('{s}', advStarsN).replace('{m}', ADV_TOTAL * 3)
-    .replace('{w}', Math.floor(advDone() / ADV_PER_WORLD));
+    .replace('{w}', Math.floor(advDone() / ADV_PER_WORLD)) +
+    t().adv.pfIcons.replace('{i}', advGoldCount() * ADV_PER_WORLD).replace('{m}', ADV_CHAR_ICONS.length);
   const fold = document.getElementById('pfAchFold');
   fold.classList.toggle('hidden', !on);
   if (!on) return;

@@ -1,0 +1,267 @@
+-- Иконки соперников Приключения — в кружок. Применять в Supabase: SQL Editor →
+-- вставить целиком → Run. Применить ДО мёржа.
+--
+-- Пятьдесят рисунков соперников (adv-01 … adv-50) открываются по мирам:
+-- все десять соперников мира пройдены на 3★ — все десять иконок этого мира
+-- можно поставить в кружок. Проверяет база: по звёздам, которые она хранит.
+-- Плюс достижения «миры на 3★» (1, 3, 5) и счётчик для профиля.
+
+-- 1. Коды рисунков. Копия — в js/adventure.js (ADV_CHAR_ICONS), сверяется тестом
+create or replace function adventure_char_icons()
+returns text[]
+language sql
+immutable
+as $$
+  select array_agg('adv-' || lpad(i::text, 2, '0') order by i) from generate_series(1, 50) i;
+$$;
+
+-- Сколько миров пройдено целиком на 3★
+create or replace function adventure_gold_worlds(p_stars text)
+returns int
+language sql
+immutable
+as $$
+  select count(*)::int from generate_series(0, 4) w
+  where substr(coalesce(p_stars, ''), w * 10 + 1, 10) = '3333333333';
+$$;
+
+-- 2. База пускает эти рисунки в кружок
+alter table students drop constraint if exists student_avatar_allowed;
+alter table students add constraint student_avatar_allowed
+  check (avatar is null or avatar = any (avatar_choices() || reward_icons() || tutorial_icon() || quest_icons()
+                                         || adventure_icons() || adventure_char_icons()));
+
+create or replace function set_avatar(p_username text, p_pin text, p_avatar text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; need int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  -- Иконка за обучение — тому, кто его прошёл
+  if p_avatar = tutorial_icon() then
+    if not coalesce((select tutorial_done from students where username = me), false) then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка за серию заданий — тому, у кого была такая серия
+  elsif p_avatar = any (quest_icons()) then
+    select days into need from quest_rewards() where icon = p_avatar;
+    if coalesce((select quest_best from player_stats where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка босса Приключения — тому, кто прошёл его мир
+  elsif p_avatar = any (adventure_icons()) then
+    need := array_position(adventure_icons(), p_avatar) * 10;
+    if coalesce((select adventure from students where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка соперника Приключения — когда весь его мир пройден на 3★
+  elsif p_avatar = any (adventure_char_icons()) then
+    need := (substr(p_avatar, 5)::int - 1) / 10;
+    if substr(coalesce((select adventure_stars from students where username = me), ''), need * 10 + 1, 10) <> '3333333333' then
+      raise exception 'avatar_locked';
+    end if;
+  elsif p_avatar is not null and not (p_avatar = any (avatar_choices())) then
+    select league into need from league_rewards() where kind = 'icon' and value = p_avatar;
+    if need is null then raise exception 'invalid_avatar'; end if;
+    if coalesce((select peak from ladder where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  end if;
+  update students set avatar = p_avatar where username = me;
+  return p_avatar;
+end;
+$$;
+
+-- 3. Достижения: миры на 3★
+create or replace function achievement_codes()
+returns text[]
+language sql
+immutable
+as $$
+  select array['first_win', 'wins_5', 'wins_10', 'wins_25', 'wins_50', 'wins_100', 'wins_250', 'wins_500', 'wins_1000',
+               'games_10', 'games_50', 'games_200', 'games_500', 'games_1000',
+               'streak_3', 'streak_5', 'streak_10', 'streak_15', 'streak_20',
+               'first_try_1', 'first_try_3', 'first_try_10',
+               'modes_2', 'modes_3', 'modes_4',
+               'league_silver', 'league_gold', 'league_platinum', 'league_diamond', 'legend',
+               'quests_3', 'quests_7', 'quests_14', 'quests_30', 'quests_60', 'quests_100',
+               'run_5', 'run_10', 'run_15', 'run_20', 'run_25', 'run_30',
+               'friends_1', 'friends_3', 'friends_10', 'friends_20',
+               'rivals_1', 'rivals_3', 'rivals_10',
+               'tutorial',
+               'adv_stars_10', 'adv_stars_30', 'adv_stars_60', 'adv_stars_100', 'adv_stars_150',
+               'adv_worlds_1', 'adv_worlds_3', 'adv_worlds_5',
+               'adv_gold_1', 'adv_gold_3', 'adv_gold_5'];
+$$;
+
+create or replace function achievements_sync(p_username text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare st player_stats; l ladder; fr int; td boolean; peak int; ws int; ft int; md int; rv int;
+        s students; ast int; aw int; ag int;
+begin
+  if p_username is null or p_username like '#%' or p_username like '@bot:%' then return; end if;
+  select * into s from students where username = p_username;
+  if s.username is null or s.is_bot then return; end if;
+  insert into player_stats(username) values (p_username) on conflict do nothing;
+  select * into st from player_stats where username = p_username;
+  select * into l from ladder where username = p_username;
+  peak := coalesce(l.peak, 0);
+  ws := greatest(st.best_win_streak, coalesce(l.streak, 0));
+  select count(*) into fr from friendships
+  where status = 'accepted' and p_username in (requester, addressee);
+  td := s.tutorial_done;
+  ft := ach_first_try(p_username);
+  md := ach_modes(p_username);
+  rv := ach_friends_beaten(p_username);
+  ast := adventure_star_total(s.adventure_stars);
+  aw := adventure_worlds(s.adventure);
+  ag := adventure_gold_worlds(s.adventure_stars);
+  insert into achievements(username, code)
+  select p_username, c
+  from unnest(array[
+    case when st.online_wins >= 1 then 'first_win' end,
+    case when st.online_wins >= 5 then 'wins_5' end,
+    case when st.online_wins >= 10 then 'wins_10' end,
+    case when st.online_wins >= 25 then 'wins_25' end,
+    case when st.online_wins >= 50 then 'wins_50' end,
+    case when st.online_wins >= 100 then 'wins_100' end,
+    case when st.online_wins >= 250 then 'wins_250' end,
+    case when st.online_wins >= 500 then 'wins_500' end,
+    case when st.online_wins >= 1000 then 'wins_1000' end,
+    case when st.online_games >= 10 then 'games_10' end,
+    case when st.online_games >= 50 then 'games_50' end,
+    case when st.online_games >= 200 then 'games_200' end,
+    case when st.online_games >= 500 then 'games_500' end,
+    case when st.online_games >= 1000 then 'games_1000' end,
+    case when ws >= 3 then 'streak_3' end,
+    case when ws >= 5 then 'streak_5' end,
+    case when ws >= 10 then 'streak_10' end,
+    case when ws >= 15 then 'streak_15' end,
+    case when ws >= 20 then 'streak_20' end,
+    case when ft >= 1 then 'first_try_1' end,
+    case when ft >= 3 then 'first_try_3' end,
+    case when ft >= 10 then 'first_try_10' end,
+    case when md >= 2 then 'modes_2' end,
+    case when md >= 3 then 'modes_3' end,
+    case when md >= 4 then 'modes_4' end,
+    case when peak >= 1 then 'league_silver' end,
+    case when peak >= 2 then 'league_gold' end,
+    case when peak >= 3 then 'league_platinum' end,
+    case when peak >= 4 then 'league_diamond' end,
+    case when peak >= 5 then 'legend' end,
+    case when st.quest_best >= 3 then 'quests_3' end,
+    case when st.quest_best >= 7 then 'quests_7' end,
+    case when st.quest_best >= 14 then 'quests_14' end,
+    case when st.quest_best >= 30 then 'quests_30' end,
+    case when st.quest_best >= 60 then 'quests_60' end,
+    case when st.quest_best >= 100 then 'quests_100' end,
+    case when st.run_best >= 5 then 'run_5' end,
+    case when st.run_best >= 10 then 'run_10' end,
+    case when st.run_best >= 15 then 'run_15' end,
+    case when st.run_best >= 20 then 'run_20' end,
+    case when st.run_best >= 25 then 'run_25' end,
+    case when st.run_best >= 30 then 'run_30' end,
+    case when fr >= 1 then 'friends_1' end,
+    case when fr >= 3 then 'friends_3' end,
+    case when fr >= 10 then 'friends_10' end,
+    case when fr >= 20 then 'friends_20' end,
+    case when rv >= 1 then 'rivals_1' end,
+    case when rv >= 3 then 'rivals_3' end,
+    case when rv >= 10 then 'rivals_10' end,
+    case when coalesce(td, false) then 'tutorial' end,
+    case when ast >= 10 then 'adv_stars_10' end,
+    case when ast >= 30 then 'adv_stars_30' end,
+    case when ast >= 60 then 'adv_stars_60' end,
+    case when ast >= 100 then 'adv_stars_100' end,
+    case when ast >= 150 then 'adv_stars_150' end,
+    case when aw >= 1 then 'adv_worlds_1' end,
+    case when aw >= 3 then 'adv_worlds_3' end,
+    case when aw >= 5 then 'adv_worlds_5' end,
+    case when ag >= 1 then 'adv_gold_1' end,
+    case when ag >= 3 then 'adv_gold_3' end,
+    case when ag >= 5 then 'adv_gold_5' end]) c
+  where c is not null
+  on conflict do nothing;
+end;
+$$;
+
+do $$
+declare u text;
+begin
+  for u in select username from students where adventure_stars like '%3333333333%' and not is_bot loop
+    perform achievements_sync(u);
+  end loop;
+end $$;
+
+create or replace function my_progress(p_username text, p_pin text, p_tz text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; s students; d date; st player_stats; quests jsonb; ach jsonb; streak int;
+        fr int; peak int; cur_streak int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into s from students where username = me;
+  if p_tz is not null and p_tz is distinct from s.tz
+     and (s.tz is null or s.tz_set_at is null or s.tz_set_at <= now() - interval '20 hours')
+     and exists (select 1 from pg_timezone_names where name = p_tz) then
+    update students set tz = p_tz, tz_set_at = now() where username = me;
+  end if;
+  perform season_end_check();
+  perform achievements_sync(me);
+  d := quest_ensure(me);
+  select * into st from player_stats where username = me;
+  select jsonb_agg(jsonb_build_object('code', q.code, 'goal', q.goal, 'progress', q.progress) order by q.slot)
+    into quests
+  from daily_quests q where q.username = me and q.day = d;
+  select coalesce(jsonb_agg(jsonb_build_object('code', a.code, 'at', a.at) order by a.at), '[]'::jsonb)
+    into ach
+  from achievements a where a.username = me;
+  select count(*) into fr from friendships
+  where status = 'accepted' and me in (requester, addressee);
+  select coalesce(l.peak, 0), coalesce(l.streak, 0) into peak, cur_streak from ladder l where l.username = me;
+  streak := case when st.quest_last >= d - 1 then st.quest_streak else 0 end;
+  return jsonb_build_object(
+    'day', d,
+    'quests', coalesce(quests, '[]'::jsonb),
+    'streak', coalesce(streak, 0),
+    'bestStreak', coalesce(st.quest_best, 0),
+    'doneToday', coalesce(st.quest_last = d, false),
+    'secondsLeft', greatest(0, floor(extract(epoch from
+        ((d + 1)::timestamp at time zone coalesce((select tz from students where username = me), 'UTC')) - now())))::int,
+    'achievements', ach,
+    'stats', jsonb_build_object(
+      'wins', coalesce(st.online_wins, 0),
+      'games', coalesce(st.online_games, 0),
+      'winStreak', greatest(coalesce(st.best_win_streak, 0), coalesce(cur_streak, 0)),
+      'firstTry', ach_first_try(me),
+      'modes', ach_modes(me),
+      'peak', coalesce(peak, 0),
+      'questBest', coalesce(st.quest_best, 0),
+      'runBest', coalesce(st.run_best, 0),
+      'friends', fr,
+      'rivals', ach_friends_beaten(me),
+      'tutorial', coalesce(s.tutorial_done, false),
+      'advStars', adventure_star_total(s.adventure_stars),
+      'advWorlds', adventure_worlds(s.adventure),
+      'advGold', adventure_gold_worlds(s.adventure_stars)));
+end;
+$$;
+
+revoke execute on function achievements_sync(text) from public, anon;
+grant execute on function adventure_char_icons() to anon;
+grant execute on function adventure_gold_worlds(text) to anon;
+grant execute on function set_avatar(text, text, text) to anon;
+grant execute on function achievement_codes() to anon;
+grant execute on function my_progress(text, text, text) to anon;

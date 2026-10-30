@@ -57,7 +57,7 @@ begin
   then raise exception 'ОШИБКА: счётчики %', s; end if;
   if not exists (select 1 from achievements where username = 'Лев' and code = 'friends_1') then raise exception 'ОШИБКА: нет первого друга'; end if;
   if exists (select 1 from achievements where not (code = any (achievement_codes()))) then raise exception 'ОШИБКА: код не из списка'; end if;
-  if array_length(achievement_codes(), 1) <> 58 then raise exception 'ОШИБКА: достижений %', array_length(achievement_codes(), 1); end if;
+  if array_length(achievement_codes(), 1) <> 61 then raise exception 'ОШИБКА: достижений %', array_length(achievement_codes(), 1); end if;
 end $$;
 \echo ok
 
