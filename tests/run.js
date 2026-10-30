@@ -1309,8 +1309,8 @@ async function testBonusMode(browser) {
   check('вместо поля ввода — панель с кнопкой', waiting.panel && !waiting.input,
     JSON.stringify(waiting));
   check('в панели сказано, что ход сделается сам',
-    waiting.text.indexOf('лаву') >= 0 && waiting.text.indexOf('сам') >= 0, waiting.text);
-  check('кнопка называется «В лаву»', waiting.btn === 'В лаву', waiting.btn);
+    waiting.text.indexOf('Шальной бросок') >= 0 && waiting.text.indexOf('сам') >= 0, waiting.text);
+  check('кнопка называется «Бросить»', waiting.btn === 'Бросить', waiting.btn);
   check('жетон на отнятом ходе взвести можно', waiting.token === false);
   check('и об этом сказано прямо в панели',
     waiting.hint.indexOf('жетон') >= 0, waiting.hint);
@@ -1921,7 +1921,8 @@ async function testScaleMemory(browser) {
     !(await tp.locator('#toggleThermoBtn').isVisible()) && await tp.locator('#vizBtn').isVisible());
   await tp.click('#vizBtn');
   const rows = await tp.evaluate(() => [...document.querySelectorAll('#vizPanel .viz-row')].map(r => r.textContent.trim()));
-  check('в меню — четыре подписанных переключателя', rows.length === 4 && rows.every(r => r.length > 3), rows.join(' | '));
+  // В тренировке пятый — «Где может быть число»
+  check('в меню — пять подписанных переключателей', rows.length === 5 && rows.every(r => r.length > 3), rows.join(' | '));
   await tp.click('#toggleThermoBtn');
   check('меню не закрывается от переключения', await tp.locator('#vizPanel').isVisible() &&
     !(await tp.evaluate(() => showThermo)));
@@ -6636,7 +6637,7 @@ async function testAdventureBonus(browser) {
     quitToMenu();
     return r;
   });
-  check('в Огненных горах лава: ход в лаву у игрока', lava.has && lava.forced === 'lava' && lava.btn === 'В лаву', JSON.stringify(lava));
+  check('в Огненных горах лава: ход в лаву у игрока', lava.has && lava.forced === 'lava' && lava.btn === 'Бросить', JSON.stringify(lava));
 
   // Звёзды по сложности и лучший результат
   const stars = await page.evaluate(async () => {
@@ -6711,6 +6712,100 @@ async function testAdventureBonus(browser) {
     check(lang + ': бонусы, звёзды, задания и реванш переведены', !!tx);
   }
   await page.evaluate(() => { currentLang = 'ru'; applyTranslations(); });
+  await page.context().close();
+}
+
+// Часть 1 переработки: шальной бросок, вспышка и звук бонуса, метки на
+// прямой, уроки-приёмы, «где может быть число», разбор и прогресс тренировки
+async function testTrainBonusFx(browser) {
+  console.log('\nТренировка и бонусы: вспышка, метки, уроки, прогресс');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => {
+    localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'rush', 'lava', 'skip', 'gift', 'memory', 'near', 'half', 'shield', 'freeze', 'xray']));
+    localStorage.setItem('hc_adv_максим', '50');
+  });
+  const names = await page.evaluate(() => ['ru', 'en', 'fr', 'de'].map(l => i18n[l].bonusNames.lava));
+  check('«Бросок в лаву» переименован на 4 языках', names.join() === 'Шальной бросок,Wild throw,Lancer fou,Wilder Wurf', names.join());
+  const fx = await page.evaluate(() => {
+    const tones = [];
+    const orig = playTone;
+    window.playTone = (...a) => { tones.push(a[0]); };
+    startAdventure(41); stopBot(); D.cur = 0;
+    const v = secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN;
+    D.bonuses = [{ value: v, type: 'freeze', taken: false }];
+    duelPlay(v);
+    const box = document.getElementById('bonusFlash');
+    const r = { show: box.classList.contains('show'), cls: box.className, name: document.getElementById('bfName').textContent,
+                tones: tones.length, mark: !!document.querySelector('#numLineSvg .nl-bonus') };
+    window.playTone = orig;
+    quitToMenu();
+    return r;
+  });
+  check('бонус сработал — крупная вспышка с эффектом и названием', fx.show && /k-freeze/.test(fx.cls) && fx.name === 'Заморозка', JSON.stringify(fx));
+  check('у бонуса свой звук', fx.tones >= 2, String(fx.tones));
+  check('взятый бонус остаётся значком на прямой', fx.mark);
+  const first = await page.evaluate(() => {
+    localStorage.setItem('hc_seen_bonus', '[]');
+    startAdventure(41); stopBot(); D.cur = 0;
+    const v = secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN;
+    D.bonuses = [{ value: v, type: 'freeze', taken: false }];
+    document.getElementById('bonusFlash').classList.remove('show');
+    duelPlay(v);
+    const r = { flash: document.getElementById('bonusFlash').classList.contains('show'),
+                card: !document.getElementById('bonusCard').classList.contains('hidden') };
+    closeBonusCard(); quitToMenu();
+    return r;
+  });
+  check('впервые — вместо вспышки карточка с объяснением', !first.flash && first.card, JSON.stringify(first));
+
+  // Тренировка: панель на настройке
+  await page.evaluate(() => openSetup('solo'));
+  await page.waitForTimeout(300);
+  const panel = await page.evaluate(() => ({ shown: !document.getElementById('trainPanel').classList.contains('hidden'),
+    drills: document.querySelectorAll('#trainDrills .drill-chip').length, goal: document.getElementById('trainGoal').textContent }));
+  check('в настройке тренировки — 4 урока и цель', panel.shown && panel.drills === 4 && /Цель/.test(panel.goal), JSON.stringify(panel));
+  await page.click('#trainDrills .drill-chip[data-drill="bands"]');
+  await page.waitForTimeout(200);
+  const card = await page.evaluate(() => document.getElementById('drWhy').textContent);
+  check('урок объясняет, почему приём работает', /не говорит, в какую сторону/.test(card), card.slice(0, 80));
+  await page.click('#drGo');
+  await page.waitForTimeout(300);
+  const coach = await page.evaluate(() => {
+    const before = document.getElementById('drillCoach').textContent;
+    const g = secret <= 10 ? 15 : 5;
+    document.getElementById('guessInput').value = g; handleGuess();
+    return { before, after: document.getElementById('drillCoach').textContent, max: RANGE_MAX };
+  });
+  check('урок «Расстояние»: 1–20 и подсказка учителя после хода', coach.max === 20 && /Назовите любое/.test(coach.before) &&
+    /разница/.test(coach.after), JSON.stringify(coach));
+  const win = await page.evaluate(() => { document.getElementById('guessInput').value = secret; handleGuess();
+    return { done: JSON.parse(localStorage.getItem('hc_drills') || '[]'), log: JSON.parse(localStorage.getItem('hc_train_log') || '[]').length }; });
+  check('победа в уроке — урок отмечен пройденным, игра в журнале', win.done.includes('bands') && win.log === 1, JSON.stringify(win));
+  const rv = await page.evaluate(() => { openReview(); const r = { strong: document.getElementById('rvStrong').textContent,
+    left: [...document.querySelectorAll('#rvList .rv-left')].map(e => e.textContent) }; closeReview(); return r; });
+  check('разбор: сколько хватило бы лучшими ходами и «было → осталось»', /Лучшими ходами — за/.test(rv.strong) && rv.left.length >= 1 &&
+    /было \d+ → осталось \d+/.test(rv.left[0]), JSON.stringify(rv));
+  // «Где может быть число» в обычной тренировке
+  const known = await page.evaluate(() => {
+    quitToMenu(); openSetup('solo'); startFromSetup();
+    knownOn = false; toggleKnown();
+    const g = secret === 50 ? 51 : 50;
+    document.getElementById('guessInput').value = g; handleGuess();
+    const r = { line: document.getElementById('knownLine').textContent, rects: document.querySelectorAll('#numLineSvg .nl-known').length,
+                btn: !document.getElementById('toggleKnownBtn').classList.contains('hidden') };
+    toggleKnown();
+    return r;
+  });
+  check('«Где может быть число»: строка и отрезки на прямой', /Ещё возможно/.test(known.line) && known.rects >= 1 && known.btn, JSON.stringify(known));
+  const duelKnown = await page.evaluate(() => { quitToMenu(); startAdventure(0); stopBot(); renderAll();
+    const r = document.getElementById('toggleKnownBtn').classList.contains('hidden'); quitToMenu(); return r; });
+  check('в игре против соперника «где может быть» нет', duelKnown);
+  for (const lang of ['en', 'fr', 'de']) {
+    const ok = await page.evaluate(l => { const T = i18n[l].train;
+      return ['bands', 'best', 'two', 'minus'].every(k => T.drills[k].title && T.drills[k].why && T.drills[k].first) &&
+        T.goal && T.strong && T.left && T.distOne; }, lang);
+    check(lang + ': уроки и прогресс переведены', ok);
+  }
   await page.context().close();
 }
 
@@ -7637,6 +7732,7 @@ async function testKeyPage(browser) {
     await testBonusGuide(browser);
     await testAdventure(browser);
     await testAdventureBonus(browser);
+    await testTrainBonusFx(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

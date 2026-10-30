@@ -1894,7 +1894,7 @@ function renderLessonResult() {
 }
 
 // ---------- Карточки бонусов ----------
-const BONUS_ICON = { extra: '⚡', fog: '🙈', blind: '🌫️', rush: '⏳', lava: '🌋', skip: '⏭', gift: '🎁', memory: '🧠', near: '❓',
+const BONUS_ICON = { extra: '⚡', fog: '🙈', blind: '🌫️', rush: '⏳', lava: '💫', skip: '⏭', gift: '🎁', memory: '🧠', near: '❓',
                      xray: '🩻', half: '🌗', shield: '🛡️', freeze: '🧊' };
 let bonusCardFor = null;
 function seenBonuses() {
