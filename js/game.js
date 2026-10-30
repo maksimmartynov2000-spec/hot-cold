@@ -632,7 +632,7 @@ function showScreen(name) {
   document.getElementById('friendsBtn').classList.toggle('on', name === 'friends' || name === 'chat');
   updateAccountChip();
   // Вернулся в меню — задания могли продвинуться: партия или Испытание
-  if (name === 'mode') { renderModeInfo(); loadProgress(); loadLadder().then(renderModeInfo); }
+  if (name === 'mode') { renderModeInfo(); loadProgress(); loadLadder().then(renderModeInfo); loadOnlineInfo(); }
   // Ушёл с доски — праздник звёзд и салют закрываются: они про только что сыгранную партию
   if (name !== 'game') {
     closeVizPanel();
@@ -2129,7 +2129,14 @@ function renderPlayers() {
     const mark = bot && iconArt(bot.icon, 0)
       ? '<span class="p-bot" style="background:' + bot.color + '">' + iconArt(bot.icon, 0) + '</span>'
       : '<span class="p-dot" style="background:' + P_COLORS[p] + ';color:' + P_COLORS[p] + '"></span>';
-    nameEl.innerHTML = mark + escapeHtml(D.names[p]);
+    // Онлайн — титул под именем: свой и соперника (миграция 053)
+    let title = '';
+    if (online && online.rawNames && typeof onlineInfo !== 'undefined') {
+      const raw = online.rawNames[p];
+      const code = raw === myName() ? (onlineInfo && onlineInfo.title) : (avatarCache[raw] || {}).title;
+      if (code && t().pass.titles[code]) title = '<small class="p-title">' + escapeHtml(t().pass.titles[code]) + '</small>';
+    }
+    nameEl.innerHTML = mark + escapeHtml(D.names[p]) + title;
 
     // Счёт побед — числом «1/3» с кубком: кружочки ○○○ читались как непонятный узор
     const pipsEl = document.getElementById('ppips' + p);

@@ -387,6 +387,8 @@
        есть что показать -->
   <div id="screenOnline" class="hidden">
     <div class="screen-title" id="tOnlineScreen"></div>
+    <!-- Сундук дня, серия и сезонный путь (миграция 053) -->
+    <div class="ol-daily hidden" id="olDaily"></div>
 
     <div id="olRanked">
       <div class="rk-modes" id="rkModes"></div>
@@ -615,6 +617,26 @@
   </div>
 </div>
 
+<div class="modal-backdrop hidden" id="chestModal" onclick="if (event.target === this) closeChest()">
+  <div class="modal-card chest-card">
+    <div class="ch-icon">🎁</div>
+    <div class="ch-title" id="chestTitle"></div>
+    <div class="ch-body" id="chestBody"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="chestOk" onclick="closeChest()"></button>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="passModal" onclick="if (event.target === this) closePassModal()">
+  <div class="modal-card pass-card">
+    <div class="ps-title" id="passTitle"></div>
+    <div class="ps-sub" id="passSub"></div>
+    <div class="ps-how" id="passHow"></div>
+    <div class="pl-list" id="passList"></div>
+    <div class="pl-list" id="passStreak"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="passOk" onclick="closePassModal()"></button>
+  </div>
+</div>
+
 <!-- Вспышка бонуса: поверх доски на секунду, нажатиям не мешает -->
 <div class="bonus-flash" id="bonusFlash" aria-live="polite">
   <div class="bf-card"><span class="bf-ic" id="bfIcon"></span><b class="bf-name" id="bfName"></b><span class="bf-who" id="bfWho"></span></div>
@@ -651,6 +673,7 @@
   <div class="modal-card profile-card">
     <div class="pf-avatar" id="pfAvatar" onclick="if (this.classList.contains('editable')) toggleAvatarPicker()"></div>
     <div class="pf-name" id="accountName"></div>
+    <div class="pf-title hidden" id="pfTitle"></div>
     <div class="pf-sub" id="tAccountTitle"></div>
     <!-- Лига и значки прошлых сезонов: одна строка под именем -->
     <div class="pf-league hidden" id="pfLeague" onclick="if (ladderInfo) { closeLogoutModal(); openPath(); }"></div>
@@ -666,6 +689,18 @@
         <div class="av-grid hidden" id="avGrid"></div>
         <div class="fr-note hidden" id="avNote"></div>
       </div>
+
+      <!-- Рамка кружка и титул под именем — из наград онлайна -->
+      <details class="fold pf-fold hidden" id="pfStyle" style="margin-bottom:8px">
+        <summary class="fold-head" id="tPfStyle"></summary>
+        <div class="fold-body">
+          <div class="pf-label" id="tPfFrames"></div>
+          <div class="st-row" id="pfFrames"></div>
+          <div class="pf-label" id="tPfTitles"></div>
+          <div class="st-row" id="pfTitles"></div>
+          <div class="fr-note hidden" id="styleNote"></div>
+        </div>
+      </details>
 
       <!-- Достижения: открытые — в цвете, остальные — серые, с тем, как открыть -->
       <details class="fold pf-fold hidden" id="pfAchFold" style="margin-bottom:8px">
@@ -945,6 +980,7 @@
 <script src="js/online.js"></script>
 <script src="js/adventure.js"></script>
 <script src="js/trial.js"></script>
+<script src="js/pass.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

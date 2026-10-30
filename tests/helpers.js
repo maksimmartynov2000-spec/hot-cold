@@ -186,6 +186,26 @@ function stubSupabase(opts) {
           // очередь и НЕ отдаёт загаданное число, пока раунд не кончился
           // Забег: заглушка считает его так же, как сервер, и так же не отдаёт
           // загаданное число — иначе проверки рейтинга смотрели бы в пустоту
+          // Сундук, серия и путь (миграция 053). window.__online не задан — база без 053
+          if (['my_online', 'open_chest', 'set_frame', 'set_title', 'faces_for'].includes(name) && !window.__online) {
+            return { data: null, error: { message: 'Could not find the function public.' + name } };
+          }
+          if (name === 'my_online') return { data: JSON.parse(JSON.stringify(window.__online)), error: null };
+          if (name === 'open_chest') {
+            const O = window.__online;
+            if (!O.played) return { data: null, error: { message: 'chest_locked' } };
+            if (O.chestOpened) return { data: Object.assign({ already: true }, O.chest), error: null };
+            O.streak = (O.streak || 0) + 1; O.chestOpened = true; O.xp += 30;
+            O.chest = { xp: 30, streak: O.streak, froze: false, surprise: window.__chestSurprise || null, streakReward: null };
+            if (O.chest.surprise) O.owned.push(O.chest.surprise);
+            return { data: O.chest, error: null };
+          }
+          if (name === 'set_frame') { window.__online.frame = args.p_frame; return { data: args.p_frame, error: null }; }
+          if (name === 'set_title') { window.__online.title = args.p_title; return { data: args.p_title, error: null }; }
+          if (name === 'faces_for') {
+            return { data: (args.p_names || []).map(n => Object.assign({ username: n, avatar: null, color: null, frame: null, title: null },
+              (window.__faces || {})[n] || {})), error: null };
+          }
           if (name === 'run_report') {
             window.__runReported = Math.max(window.__runReported || 0, args.p_score || 0);
             return { data: { best: window.__runReported, bestRounds: args.p_rounds }, error: null };

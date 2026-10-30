@@ -4,7 +4,7 @@
 
 // Версию поднимаем, когда меняется что-то из CORE: старый кеш отдаётся сразу,
 // и без смены имени телефон продолжил бы брать прежний manifest
-const CACHE = 'hot-cold-v17';
+const CACHE = 'hot-cold-v19';
 
 // Своё, что нужно для запуска
 const CORE = [
@@ -17,6 +17,7 @@ const CORE = [
   './js/online.js',
   './js/adventure.js',
   './js/trial.js',
+  './js/pass.js',
   './js/main.js',
   './vendor/qrcode.js',
   './fonts/nunito-latin.woff2',
