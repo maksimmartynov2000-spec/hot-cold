@@ -2363,6 +2363,31 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .avatar[data-frame="champion"], .pr-frame[data-frame="champion"] { --fr-solid: #facc15; }
 .avatar[data-frame="streak"], .pr-frame[data-frame="streak"] { --fr-solid: #fb7185; }
 .avatar[data-frame="tourney"], .pr-frame[data-frame="tourney"] { --fr-solid: #f59e0b; }
+/* Рамки турнира по месяцам (миграция 055): январь — лёд, … декабрь — праздник */
+.pf-avatar[data-frame="cup-01"] { --fr: conic-gradient(from 0deg, #e0f2fe, #7dd3fc, #ffffff, #bae6fd, #7dd3fc, #ffffff, #e0f2fe); --fr-glow: rgba(186, 230, 253, 0.9); }
+.pf-avatar[data-frame="cup-02"] { --fr: conic-gradient(from 0deg, #fbcfe8, #f472b6, #ffffff, #e11d48, #f472b6, #ffffff, #fbcfe8); --fr-glow: rgba(244, 114, 182, 0.9); }
+.pf-avatar[data-frame="cup-03"] { --fr: conic-gradient(from 0deg, #d9f99d, #4ade80, #fef08a, #22c55e, #4ade80, #fef08a, #d9f99d); --fr-glow: rgba(74, 222, 128, 0.85); }
+.pf-avatar[data-frame="cup-04"] { --fr: conic-gradient(from 0deg, #c7d2fe, #60a5fa, #e0f2fe, #818cf8, #60a5fa, #e0f2fe, #c7d2fe); --fr-glow: rgba(129, 140, 248, 0.85); }
+.pf-avatar[data-frame="cup-05"] { --fr: conic-gradient(from 0deg, #f5d0fe, #c084fc, #bbf7d0, #a855f7, #c084fc, #bbf7d0, #f5d0fe); --fr-glow: rgba(192, 132, 252, 0.85); }
+.pf-avatar[data-frame="cup-06"] { --fr: conic-gradient(from 0deg, #fef08a, #facc15, #fff7ed, #fb923c, #facc15, #fff7ed, #fef08a); --fr-glow: rgba(250, 204, 21, 0.95); }
+.pf-avatar[data-frame="cup-07"] { --fr: conic-gradient(from 0deg, #99f6e4, #2dd4bf, #fecaca, #fb7185, #2dd4bf, #fecaca, #99f6e4); --fr-glow: rgba(45, 212, 191, 0.85); }
+.pf-avatar[data-frame="cup-08"] { --fr: conic-gradient(from 0deg, #f0abfc, #d946ef, #bef264, #84cc16, #d946ef, #bef264, #f0abfc); --fr-glow: rgba(217, 70, 239, 0.85); }
+.pf-avatar[data-frame="cup-09"] { --fr: conic-gradient(from 0deg, #fde68a, #d97706, #fef3c7, #92400e, #d97706, #fef3c7, #fde68a); --fr-glow: rgba(217, 119, 6, 0.85); }
+.pf-avatar[data-frame="cup-10"] { --fr: conic-gradient(from 0deg, #fdba74, #f97316, #c4b5fd, #7c3aed, #f97316, #c4b5fd, #fdba74); --fr-glow: rgba(249, 115, 22, 0.9); }
+.pf-avatar[data-frame="cup-11"] { --fr: conic-gradient(from 0deg, #fecaca, #b91c1c, #fde047, #7f1d1d, #b91c1c, #fde047, #fecaca); --fr-glow: rgba(220, 38, 38, 0.85); }
+.pf-avatar[data-frame="cup-12"] { --fr: conic-gradient(from 0deg, #bbf7d0, #16a34a, #fde047, #dc2626, #16a34a, #fde047, #bbf7d0); --fr-glow: rgba(22, 163, 74, 0.85); }
+.avatar[data-frame="cup-01"], .pr-frame[data-frame="cup-01"] { --fr-solid: #7dd3fc; }
+.avatar[data-frame="cup-02"], .pr-frame[data-frame="cup-02"] { --fr-solid: #f472b6; }
+.avatar[data-frame="cup-03"], .pr-frame[data-frame="cup-03"] { --fr-solid: #4ade80; }
+.avatar[data-frame="cup-04"], .pr-frame[data-frame="cup-04"] { --fr-solid: #60a5fa; }
+.avatar[data-frame="cup-05"], .pr-frame[data-frame="cup-05"] { --fr-solid: #c084fc; }
+.avatar[data-frame="cup-06"], .pr-frame[data-frame="cup-06"] { --fr-solid: #facc15; }
+.avatar[data-frame="cup-07"], .pr-frame[data-frame="cup-07"] { --fr-solid: #2dd4bf; }
+.avatar[data-frame="cup-08"], .pr-frame[data-frame="cup-08"] { --fr-solid: #d946ef; }
+.avatar[data-frame="cup-09"], .pr-frame[data-frame="cup-09"] { --fr-solid: #d97706; }
+.avatar[data-frame="cup-10"], .pr-frame[data-frame="cup-10"] { --fr-solid: #f97316; }
+.avatar[data-frame="cup-11"], .pr-frame[data-frame="cup-11"] { --fr-solid: #b91c1c; }
+.avatar[data-frame="cup-12"], .pr-frame[data-frame="cup-12"] { --fr-solid: #16a34a; }
 .pr-frame[data-frame="bronze"] { --fr-solid: #d08a4f; } .pr-frame[data-frame="silver"] { --fr-solid: #e2e8f0; }
 .pr-frame[data-frame="gold"] { --fr-solid: #facc15; } .pr-frame[data-frame="platinum"] { --fr-solid: #5eead4; }
 .pr-frame[data-frame="diamond"] { --fr-solid: #93c5fd; } .pr-frame[data-frame="legend"] { --fr-solid: #c084fc; }
@@ -2481,3 +2506,8 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .cup-claim { all: unset; cursor: pointer; padding: 6px 10px; border-radius: 10px; font-size: 12px; font-weight: 900; color: #fff;
   background: linear-gradient(150deg, #ffb347, #ff6b3d); box-shadow: 0 3px 0 #b8321b; animation: od-pulse 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .cup-claim { animation: none; } }
+
+/* ---- Таблица турнира ---- */
+.cup-table { all: unset; cursor: pointer; align-self: center; padding: 6px 14px; border-radius: 12px; font-size: 13px; font-weight: 900;
+  background: rgba(0, 0, 0, 0.25); color: #fde68a; }
+.cup-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }

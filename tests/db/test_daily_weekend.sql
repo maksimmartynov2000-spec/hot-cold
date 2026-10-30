@@ -174,8 +174,9 @@ begin
   if (r->>'xp')::int <> 50 or r->'surprise' is null or r->'surprise' = 'null'::jsonb then raise exception 'ОШИБКА: сундук за 3 %', r; end if;
   if not (weekend_claim('Лев', '1234', 3)->>'already')::boolean then raise exception 'ОШИБКА: сундук дважды'; end if;
   r := weekend_claim('Лев', '1234', 5);
-  if r->>'frame' <> 'tourney' or not cosmetic_has('Лев', 'frame', 'tourney') then raise exception 'ОШИБКА: рамка %', r; end if;
-  if set_frame('Лев', '1234', 'tourney') <> 'tourney' then raise exception 'ОШИБКА: рамку не надеть'; end if;
+  -- С миграции 055 рамка — своя у каждого месяца
+  if r->>'frame' is null or not cosmetic_has('Лев', 'frame', r->>'frame') then raise exception 'ОШИБКА: рамка %', r; end if;
+  if set_frame('Лев', '1234', r->>'frame') <> r->>'frame' then raise exception 'ОШИБКА: рамку не надеть'; end if;
   begin
     perform weekend_claim('Кира', '4321', 3);
     raise exception 'ОШИБКА: награда без побед';

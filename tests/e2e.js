@@ -556,9 +556,11 @@ async function registerPlayer(p, name, pin) {
   check('в меню — задания дня из настоящей базы, прогресс как в базе',
     qc.shown && qc.rows.length === 3 && qc.rows.join() === dq.map(q => q.code + ' ' + Math.min(q.progress, q.goal) + '/' + q.goal).join(),
     JSON.stringify({ qc, dq }));
-  // Первое задание — «сыграть онлайн» или «на звёзды»: у Лады 3 партии с исходом, из них 2 на звёзды
-  check('партии онлайн продвинули первое задание',
-    dq[0].progress === Math.min(dq[0].goal, dq[0].code === 'ladder2' ? lad.games : decided), JSON.stringify(dq[0]));
+  // Первое задание — «сыграть онлайн» или «на звёзды»: у Лады 3 партии с исходом, из них 2 на звёзды.
+  // Задание про Приключение или режим дня этими партиями не двигается
+  const want = { ladder2: lad.games, play2: decided, play3: decided }[dq[0].code] || 0;
+  check('партии онлайн продвинули первое задание (или не тронули чужое)',
+    dq[0].progress === Math.min(dq[0].goal, want), JSON.stringify(dq[0]));
 
   // «В игре сейчас» через настоящую базу: первый отметился — второй видит точку
   await db.query("update students set last_seen = null where username in ('Артур', 'Лада')");

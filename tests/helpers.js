@@ -200,6 +200,11 @@ function stubSupabase(opts) {
             if (O.chest.surprise) O.owned.push(O.chest.surprise);
             return { data: O.chest, error: null };
           }
+          // Таблица турнира (миграция 055): window.__cupTop
+          if (name === 'cup_top') {
+            if (!window.__cupTop) return { data: null, error: { message: 'Could not find the function public.cup_top' } };
+            return { data: JSON.parse(JSON.stringify(window.__cupTop)), error: null };
+          }
           // Турнир выходных (миграция 054): weekend в __online
           if (name === 'weekend_claim') {
             const W = window.__online && window.__online.weekend;
@@ -207,10 +212,11 @@ function stubSupabase(opts) {
             const k = 'claim' + args.p_goal;
             if (W.wins < args.p_goal) return { data: null, error: { message: 'cup_locked' } };
             if (W[k]) return { data: Object.assign({ already: true }, W[k]), error: null };
-            const O = window.__online, own = O.owned.some(o => o.kind === 'frame' && o.code === 'tourney');
-            W[k] = args.p_goal === 5 && !own ? { goal: 5, xp: 50, frame: 'tourney', surprise: null }
+            const fr = W.frame || 'tourney';
+            const O = window.__online, own = O.owned.some(o => o.kind === 'frame' && o.code === fr);
+            W[k] = args.p_goal === 5 && !own ? { goal: 5, xp: 50, frame: fr, surprise: null }
               : { goal: args.p_goal, xp: args.p_goal === 3 ? 50 : 100, frame: null, surprise: window.__chestSurprise || null };
-            if (W[k].frame) O.owned.push({ kind: 'frame', code: 'tourney' });
+            if (W[k].frame) O.owned.push({ kind: 'frame', code: W[k].frame });
             if (W[k].surprise) O.owned.push(W[k].surprise);
             O.xp += W[k].xp;
             return { data: W[k], error: null };

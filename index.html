@@ -638,6 +638,19 @@
   </div>
 </div>
 
+<!-- Таблица турнира выходных (миграция 055) -->
+<div class="modal-backdrop hidden" id="cupModal" onclick="if (event.target === this) closeCupTable()">
+  <div class="modal-card pass-card">
+    <div class="ps-title" id="cupTitle"></div>
+    <div class="ps-sub" id="cupSub"></div>
+    <div class="pl-head" id="tCupFriends"></div>
+    <div class="cup-list" id="cupFriends"></div>
+    <div class="pl-head" id="tCupTop"></div>
+    <div class="cup-list" id="cupTop"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="cupOk" onclick="closeCupTable()"></button>
+  </div>
+</div>
+
 <!-- Вспышка бонуса: поверх доски на секунду, нажатиям не мешает -->
 <div class="bonus-flash" id="bonusFlash" aria-live="polite">
   <div class="bf-card"><span class="bf-ic" id="bfIcon"></span><b class="bf-name" id="bfName"></b><span class="bf-who" id="bfWho"></span></div>
