@@ -1,0 +1,465 @@
+-- Онлайн, часть 3а: сундук дня, серия дней и сезонный путь. Применять в
+-- Supabase: SQL Editor → вставить целиком → Run. Применить ДО мёржа.
+--
+-- • Сундук дня: первая доигранная онлайн-партия за день открывает сундук —
+--   очки сезона (больше с серией) и иногда сюрприз: фраза, цвет или иконка.
+-- • Серия дней онлайн: на 3, 7, 14 и 30 днях — награда. Раз в неделю
+--   пропущенный день серию не сжигает (заморозка).
+-- • Сезонный путь: 30 ступеней на сезон (месяц), по 100 очков. Очки — за
+--   партию (10), победу (+10), задание дня (20) и сундук. На каждой третьей
+--   ступени — награда: рамка кружка, титул под именем, фраза для чата,
+--   иконка или цвет. Полученное остаётся навсегда.
+-- Всё считает база: из игры очки не прислать.
+
+-- ============ 1. Награды ============
+create table if not exists cosmetics (
+  username text not null references students(username) on update cascade on delete cascade,
+  kind text not null,
+  code text not null,
+  source text,
+  got_at timestamptz not null default now(),
+  primary key (username, kind, code)
+);
+alter table cosmetics enable row level security;
+alter table cosmetics drop constraint if exists cosmetic_kind;
+alter table cosmetics add constraint cosmetic_kind check (kind in ('frame', 'title', 'phrase', 'icon', 'color'));
+
+alter table students add column if not exists frame text;
+alter table students add column if not exists title text;
+
+-- Наборы. Копии — в js/pass.js, сверяются тестом
+create or replace function pass_frames() returns text[] language sql immutable as
+$$ select array['fire', 'ice', 'space', 'champion', 'streak']; $$;
+create or replace function pass_titles() returns text[] language sql immutable as
+$$ select array['hunter', 'sniper', 'regular', 'champion']; $$;
+create or replace function pass_phrases() returns text[] language sql immutable as
+$$ select array['lava', 'rematch', 'streak', 'oops', 'genius', 'close']; $$;
+create or replace function pass_icons() returns text[] language sql immutable as
+$$ select array['🦦', '🐞']; $$;
+create or replace function pass_colors() returns text[] language sql immutable as
+$$ select array['grad-aurora', 'grad-lava', 'grad-night']; $$;
+
+-- Ступени пути с наградой
+create or replace function season_rewards()
+returns table(level int, kind text, code text)
+language sql immutable as $$
+  values (3, 'phrase', 'lava'), (6, 'color', 'grad-aurora'), (9, 'title', 'hunter'), (12, 'frame', 'fire'),
+         (15, 'icon', '🦦'), (18, 'frame', 'ice'), (21, 'title', 'sniper'), (24, 'frame', 'space'),
+         (27, 'phrase', 'rematch'), (30, 'frame', 'champion'), (30, 'title', 'champion');
+$$;
+-- Награды за серию дней
+create or replace function streak_rewards()
+returns table(days int, kind text, code text)
+language sql immutable as $$
+  values (3, 'phrase', 'streak'), (7, 'title', 'regular'), (14, 'color', 'grad-lava'), (30, 'frame', 'streak');
+$$;
+-- Что может выпасть сюрпризом из сундука
+create or replace function chest_surprises()
+returns table(kind text, code text)
+language sql immutable as $$
+  values ('phrase', 'oops'), ('phrase', 'genius'), ('phrase', 'close'), ('icon', '🐞'), ('color', 'grad-night');
+$$;
+
+create or replace function cosmetic_has(p_username text, p_kind text, p_code text)
+returns boolean language sql stable security definer set search_path = public, pg_temp as $$
+  select exists (select 1 from cosmetics c where c.username = p_username and c.kind = p_kind and c.code = p_code);
+$$;
+
+-- Выдать; true — если это новое
+create or replace function cosmetic_grant(p_username text, p_kind text, p_code text, p_source text)
+returns boolean language plpgsql security definer set search_path = public, pg_temp as $$
+declare n int;
+begin
+  insert into cosmetics(username, kind, code, source) values (p_username, p_kind, p_code, p_source)
+  on conflict do nothing;
+  get diagnostics n = row_count;
+  return n > 0;
+end;
+$$;
+
+-- ============ 2. Сезонный путь ============
+create table if not exists season_pass (
+  username text not null references students(username) on update cascade on delete cascade,
+  season text not null,
+  xp int not null default 0,
+  primary key (username, season)
+);
+alter table season_pass enable row level security;
+
+create or replace function pass_level_xp() returns int language sql immutable as $$ select 100; $$;
+create or replace function pass_max_level() returns int language sql immutable as $$ select 30; $$;
+
+-- Очки сезона. Новые ступени — сразу награды
+create or replace function season_xp(p_username text, p_xp int)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare se text; before int; after int; r record;
+begin
+  if p_username is null or p_username like '#%' or p_username like '@bot:%' or coalesce(p_xp, 0) <= 0 then return 0; end if;
+  if exists (select 1 from students where username = p_username and is_bot) then return 0; end if;
+  se := ladder_season();
+  insert into season_pass(username, season) values (p_username, se) on conflict do nothing;
+  select xp into before from season_pass where username = p_username and season = se for update;
+  update season_pass set xp = before + p_xp where username = p_username and season = se returning xp into after;
+  for r in select * from season_rewards() s
+           where s.level > least(pass_max_level(), before / pass_level_xp())
+             and s.level <= least(pass_max_level(), after / pass_level_xp()) loop
+    perform cosmetic_grant(p_username, r.kind, r.code, 'pass:' || se);
+  end loop;
+  return after;
+end;
+$$;
+
+-- ============ 3. День онлайн и серия ============
+create table if not exists online_days (
+  username text not null references students(username) on update cascade on delete cascade,
+  day date not null,
+  played boolean not null default false,
+  chest_at timestamptz,
+  chest jsonb,
+  primary key (username, day)
+);
+alter table online_days enable row level security;
+
+create table if not exists online_streak (
+  username text primary key references students(username) on update cascade on delete cascade,
+  streak int not null default 0,
+  best int not null default 0,
+  last_day date,
+  freeze_week text
+);
+alter table online_streak enable row level security;
+
+-- Партия онлайн с исходом: очки сезона и отметка «сегодня играл»
+create or replace function matches_pass()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare seat int; who text; w int;
+begin
+  w := match_winner(new);
+  if w is null then return null; end if;
+  for seat in 0..1 loop
+    if new.bot_seat is not null and new.bot_seat = seat then continue; end if;
+    who := case when seat = 0 then new.p0 else new.p1 end;
+    if who like '#%' then continue; end if;
+    perform season_xp(who, 10 + case when w = seat then 10 else 0 end);
+    insert into online_days(username, day, played) values (who, player_day(who), true)
+    on conflict (username, day) do update set played = true;
+  end loop;
+  return null;
+end;
+$$;
+drop trigger if exists matches_pass on matches;
+create trigger matches_pass after update of status on matches
+  for each row when (new.status = 'finished' and old.status is distinct from 'finished')
+  execute function matches_pass();
+
+-- Выполненное задание дня — 20 очков
+create or replace function daily_quests_pass()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.progress >= new.goal and old.progress < old.goal then
+    perform season_xp(new.username, 20);
+  end if;
+  return null;
+end;
+$$;
+drop trigger if exists daily_quests_pass on daily_quests;
+create trigger daily_quests_pass after update of progress on daily_quests
+  for each row execute function daily_quests_pass();
+
+-- Открыть сундук. Можно раз в день и только после доигранной партии
+create or replace function open_chest(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; d date; od online_days; st online_streak; s int; froze boolean := false;
+        wk text; xp int; sur record; got jsonb := null; sr record; srew jsonb := null; res jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  d := player_day(me);
+  select * into od from online_days where username = me and day = d for update;
+  if od.username is null or not od.played then raise exception 'chest_locked'; end if;
+  if od.chest_at is not null then return od.chest || jsonb_build_object('already', true); end if;
+
+  insert into online_streak(username) values (me) on conflict do nothing;
+  select * into st from online_streak where username = me for update;
+  wk := to_char(d, 'IYYY-IW');
+  if st.last_day = d - 1 then s := st.streak + 1;
+  elsif st.last_day = d - 2 and coalesce(st.freeze_week, '') <> wk then s := st.streak + 1; froze := true;
+  else s := 1;
+  end if;
+  update online_streak set streak = s, best = greatest(best, s), last_day = d,
+                           freeze_week = case when froze then wk else freeze_week end
+  where username = me;
+
+  xp := 30 + 5 * least(s - 1, 10);
+  -- Сюрприз — примерно в каждом пятом сундуке, из того, чего ещё нет
+  if random() < 0.2 then
+    select c.* into sur from chest_surprises() c where not cosmetic_has(me, c.kind, c.code) order by random() limit 1;
+    if sur.kind is not null and cosmetic_grant(me, sur.kind, sur.code, 'chest') then
+      got := jsonb_build_object('kind', sur.kind, 'code', sur.code);
+    end if;
+  end if;
+  select r.* into sr from streak_rewards() r where r.days = s;
+  if sr.kind is not null and cosmetic_grant(me, sr.kind, sr.code, 'streak') then
+    srew := jsonb_build_object('kind', sr.kind, 'code', sr.code, 'days', s);
+  end if;
+  perform season_xp(me, xp);
+  res := jsonb_build_object('xp', xp, 'streak', s, 'froze', froze, 'surprise', got, 'streakReward', srew);
+  update online_days set chest_at = now(), chest = res where username = me and day = d;
+  return res;
+end;
+$$;
+
+-- ============ 4. Что показать игроку ============
+create or replace function my_online(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; d date; od online_days; st online_streak; se text; xp int; s students; owned jsonb; rew jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  d := player_day(me);
+  select * into od from online_days where username = me and day = d;
+  select * into st from online_streak where username = me;
+  se := ladder_season();
+  select coalesce(p.xp, 0) into xp from (select 1) x left join season_pass p on p.username = me and p.season = se;
+  select * into s from students where username = me;
+  select coalesce(jsonb_agg(jsonb_build_object('kind', c.kind, 'code', c.code) order by c.got_at), '[]'::jsonb)
+    into owned from cosmetics c where c.username = me;
+  select jsonb_agg(jsonb_build_object('level', r.level, 'kind', r.kind, 'code', r.code) order by r.level, r.kind)
+    into rew from season_rewards() r;
+  return jsonb_build_object(
+    'day', d,
+    'played', coalesce(od.played, false),
+    'chestOpened', od.chest_at is not null,
+    'chest', od.chest,
+    'streak', case when st.last_day >= d - 1 then st.streak
+                   when st.last_day = d - 2 and coalesce(st.freeze_week, '') <> to_char(d, 'IYYY-IW') then st.streak
+                   else 0 end,
+    'bestStreak', coalesce(st.best, 0),
+    'freezeLeft', coalesce(st.freeze_week, '') <> to_char(d, 'IYYY-IW'),
+    'season', se,
+    'xp', xp,
+    'levelXp', pass_level_xp(),
+    'maxLevel', pass_max_level(),
+    'seasonLeft', greatest(0, floor(extract(epoch from
+        (date_trunc('month', now() at time zone 'UTC') + interval '1 month') - (now() at time zone 'UTC'))))::int,
+    'rewards', rew,
+    'streakRewards', (select jsonb_agg(jsonb_build_object('days', r.days, 'kind', r.kind, 'code', r.code) order by r.days) from streak_rewards() r),
+    'owned', owned,
+    'frame', s.frame,
+    'title', s.title);
+end;
+$$;
+
+-- Рамка и титул: из своих. null — рамка лиги / без титула
+create or replace function set_frame(p_username text, p_pin text, p_frame text)
+returns text language plpgsql security definer set search_path = public, extensions, pg_temp as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_frame is not null and not cosmetic_has(me, 'frame', p_frame) then raise exception 'frame_locked'; end if;
+  update students set frame = p_frame where username = me;
+  return p_frame;
+end;
+$$;
+
+create or replace function set_title(p_username text, p_pin text, p_title text)
+returns text language plpgsql security definer set search_path = public, extensions, pg_temp as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_title is not null and not cosmetic_has(me, 'title', p_title) then raise exception 'title_locked'; end if;
+  update students set title = p_title where username = me;
+  return p_title;
+end;
+$$;
+
+-- Кружки других: иконка, цвет, рамка и титул одним запросом
+create or replace function faces_for(p_username text, p_pin text, p_names text[])
+returns table(username text, avatar text, color text, frame text, title text, league int)
+language plpgsql security definer set search_path = public, extensions, pg_temp as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if coalesce(array_length(p_names, 1), 0) > 200 then raise exception 'too_many_names'; end if;
+  return query
+  select s.username, s.avatar, s.avatar_color, s.frame, s.title,
+         (select ladder_league(l.stars) from ladder l where l.username = s.username)
+  from students s where s.username = any (p_names);
+end;
+$$;
+
+-- ============ 5. Цвета, иконки и фразы — только свои ============
+alter table students drop constraint if exists student_avatar_color_allowed;
+alter table students add constraint student_avatar_color_allowed
+  check (avatar_color is null or avatar_color = any (avatar_colors() || reward_colors() || pass_colors()));
+
+create or replace function set_avatar_color(p_username text, p_pin text, p_color text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; need int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_color = any (pass_colors()) then
+    if not cosmetic_has(me, 'color', p_color) then raise exception 'color_locked'; end if;
+  elsif p_color is not null and not (p_color = any (avatar_colors())) then
+    select league into need from league_rewards() where kind = 'color' and value = p_color;
+    if need is null then raise exception 'invalid_color'; end if;
+    if coalesce((select peak from ladder where username = me), 0) < need then
+      raise exception 'color_locked';
+    end if;
+  end if;
+  update students set avatar_color = p_color where username = me;
+  return p_color;
+end;
+$$;
+
+alter table students drop constraint if exists student_avatar_allowed;
+alter table students add constraint student_avatar_allowed
+  check (avatar is null or avatar = any (avatar_choices() || reward_icons() || tutorial_icon() || quest_icons()
+                                         || adventure_icons() || adventure_char_icons() || pass_icons()));
+
+create or replace function set_avatar(p_username text, p_pin text, p_avatar text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; need int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  -- Иконка за обучение — тому, кто его прошёл
+  if p_avatar = tutorial_icon() then
+    if not coalesce((select tutorial_done from students where username = me), false) then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка за серию заданий — тому, у кого была такая серия
+  elsif p_avatar = any (quest_icons()) then
+    select days into need from quest_rewards() where icon = p_avatar;
+    if coalesce((select quest_best from player_stats where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка босса Приключения — тому, кто прошёл его мир
+  elsif p_avatar = any (adventure_icons()) then
+    need := array_position(adventure_icons(), p_avatar) * 10;
+    if coalesce((select adventure from students where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка соперника Приключения — когда весь его мир пройден на 3★
+  elsif p_avatar = any (adventure_char_icons()) then
+    need := (substr(p_avatar, 5)::int - 1) / 10;
+    if substr(coalesce((select adventure_stars from students where username = me), ''), need * 10 + 1, 10) <> '3333333333' then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка сезонного пути или сундука — тому, у кого она есть
+  elsif p_avatar = any (pass_icons()) then
+    if not cosmetic_has(me, 'icon', p_avatar) then raise exception 'avatar_locked'; end if;
+  elsif p_avatar is not null and not (p_avatar = any (avatar_choices())) then
+    select league into need from league_rewards() where kind = 'icon' and value = p_avatar;
+    if need is null then raise exception 'invalid_avatar'; end if;
+    if coalesce((select peak from ladder where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  end if;
+  update students set avatar = p_avatar where username = me;
+  return p_avatar;
+end;
+$$;
+
+
+create or replace function chat_codes()
+returns text[]
+language sql
+immutable
+as $$
+  select array['hi', 'luck', 'nice', 'wow', 'think', 'almost', 'again', 'gg',
+               'hot', 'cold', 'hurry'] || pass_phrases();
+$$;
+
+create or replace function send_phrase(p_username text, p_pin text,
+                                       p_match_id bigint, p_code text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; my_seat int; recent int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  my_seat := match_seat(m, me);
+  if my_seat is null then raise exception 'not_your_match'; end if;
+  if m.status not in ('active', 'invited') then raise exception 'not_playing'; end if;
+  if not (p_code = any(chat_codes())) then raise exception 'bad_phrase'; end if;
+  -- Фраза из наград — только у того, у кого она есть
+  if p_code = any (pass_phrases()) and not cosmetic_has(me, 'phrase', p_code) then raise exception 'phrase_locked'; end if;
+
+  select count(*) into recent from match_chat c
+  where c.match_id = p_match_id and c.seat = my_seat
+    and c.created_at > now() - interval '10 seconds';
+  if recent >= 3 then raise exception 'too_fast'; end if;
+
+  insert into match_chat(match_id, seat, code) values (p_match_id, my_seat, p_code);
+  return true;
+end;
+$$;
+
+-- Соперники-«люди» тоже бывают с рамками и титулами: как у живых игроков
+update students s set
+  frame = case when abs(hashtext(s.username || ':fr')) % 4 = 0 then (pass_frames())[1 + abs(hashtext(s.username || ':frc')) % 3] end,
+  title = case when abs(hashtext(s.username || ':ti')) % 5 = 0 then (pass_titles())[1 + abs(hashtext(s.username || ':tic')) % 3] end
+where s.is_bot and s.username not like '@bot:%';
+
+-- ============ 6. Права ============
+revoke execute on function cosmetic_has(text, text, text) from public, anon;
+revoke execute on function cosmetic_grant(text, text, text, text) from public, anon;
+revoke execute on function season_xp(text, int) from public, anon;
+revoke execute on function matches_pass() from public, anon;
+revoke execute on function daily_quests_pass() from public, anon;
+grant execute on function pass_frames() to anon;
+grant execute on function pass_titles() to anon;
+grant execute on function pass_phrases() to anon;
+grant execute on function pass_icons() to anon;
+grant execute on function pass_colors() to anon;
+grant execute on function season_rewards() to anon;
+grant execute on function streak_rewards() to anon;
+grant execute on function chest_surprises() to anon;
+grant execute on function open_chest(text, text) to anon;
+grant execute on function my_online(text, text) to anon;
+grant execute on function set_frame(text, text, text) to anon;
+grant execute on function set_title(text, text, text) to anon;
+grant execute on function faces_for(text, text, text[]) to anon;
+grant execute on function set_avatar_color(text, text, text) to anon;
+grant execute on function set_avatar(text, text, text) to anon;
+grant execute on function chat_codes() to anon;
+grant execute on function send_phrase(text, text, bigint, text) to anon;
