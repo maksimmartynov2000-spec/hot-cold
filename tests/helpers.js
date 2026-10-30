@@ -186,6 +186,10 @@ function stubSupabase(opts) {
           // очередь и НЕ отдаёт загаданное число, пока раунд не кончился
           // Забег: заглушка считает его так же, как сервер, и так же не отдаёт
           // загаданное число — иначе проверки рейтинга смотрели бы в пустоту
+          if (name === 'run_report') {
+            window.__runReported = Math.max(window.__runReported || 0, args.p_score || 0);
+            return { data: { best: window.__runReported, bestRounds: args.p_rounds }, error: null };
+          }
           if (name === 'run_start') {
             const R = window.__run;
             if (!R.active || args.p_fresh) {

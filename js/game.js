@@ -235,6 +235,8 @@ function rangeCount() { return RANGE_MAX - RANGE_MIN + 1; }
 // «короткая память» режет это вдвое — и в списке, и на прямой, иначе прямая
 // показывала бы то, что из истории убрали
 function historyVisible() {
+  // Туман в Испытании — видно только два последних хода
+  if (mode === 'run' && RUN && RUN.mod === 'fog' && !gameOver) return 2;
   return (mode === 'duel' && !D.roundOver && D.shortMemory[viewerSeat()])
     ? HISTORY_SHORT : HISTORY_VISIBLE;
 }
@@ -568,10 +570,6 @@ function applyTranslations() {
   document.getElementById('tRunPin').textContent = runAuthMode === 'register' ? L.run.pin : L.run.pinLogin;
   document.getElementById('runUsername').placeholder = L.run.namePh;
   document.getElementById('tRunStart').textContent = L.run.start;
-  document.getElementById('tRunTop').textContent = L.run.top;
-  document.getElementById('tRunTopDay').textContent = L.run.topDay;
-  document.getElementById('tRunTopWeek').textContent = L.run.topWeek;
-  document.getElementById('tRunTopAll').textContent = L.run.topAll;
   document.getElementById('tRunToMenu').textContent = L.run.toMenu;
   if (runPause) {
     document.getElementById('tMenu').textContent = L.run.pause;
@@ -1323,8 +1321,11 @@ function isHit(h) { return !!(h && h.meta && h.meta.labelIndex === 8); }
 function getFeedback(distance) {
   return FEEDBACK_META.find(f => distance >= f.min && distance <= f.max) || FEEDBACK_META[0];
 }
-function getFbText(meta) { return t().labels[meta.labelIndex]; }
-function getFbHtml(meta) { return tierLabelHtml(meta.labelIndex, getFbText(meta)); }
+// «Теплее / холоднее» в Испытании — не пояс, а сравнение с прошлым ходом
+function getFbText(meta) { return meta.custom ? t().trial.rel[meta.custom] : t().labels[meta.labelIndex]; }
+function getFbHtml(meta) {
+  return meta.custom ? meta.icon + ' ' + escapeHtml(getFbText(meta)) : tierLabelHtml(meta.labelIndex, getFbText(meta));
+}
 
 function renderAll() {
   if (screen !== 'game' && mode === null) return;
@@ -1476,7 +1477,7 @@ function renderFeedback() {
   // Пояс — помощь для тренировки: там учатся. В игре с другом и в рейтинге его
   // нет, иначе это преимущество, а не учёба
   const band = document.getElementById('feedbackBand');
-  const showBand = distanceHint && !isHit(last);
+  const showBand = distanceHint && !isHit(last) && !last.meta.custom;
   band.classList.toggle('hidden', !showBand);
   band.textContent = showBand ? t().fbBand.replace('{r}', last.meta.rangeSign) : '';
   band.style.color = last.meta.color;
@@ -1489,7 +1490,8 @@ function renderThermo() {
   // На итогах градусник только повторяет карточку («в точку!»), а ответ и
   // так отмечен на прямой — убираем его, чтобы итог и история попыток
   // поместились на экран
-  const hide = !showThermo || roundOver();
+  const lastMv = currentMove();
+  const hide = !showThermo || roundOver() || !!(lastMv && lastMv.meta.custom);
   wrap.classList.toggle('hidden', hide);
   // Градусник слева от слова — карточка в две колонки; без него слово по центру
   document.getElementById('feedbackPanel').classList.toggle('with-thermo', !hide);
@@ -3713,6 +3715,8 @@ function buildLegend() {
 function renderScaleStrip() {
   const box = document.getElementById('scaleStrip');
   if (!box) return;
+  // В раунде «теплее / холоднее» поясов нет — и шкала не нужна
+  box.classList.toggle('hidden', mode === 'run' && !!RUN && RUN.mod === 'warmer');
   box.classList.toggle('open', scaleOpen);
   box.setAttribute('aria-expanded', scaleOpen ? 'true' : 'false');
   const last = currentMove();

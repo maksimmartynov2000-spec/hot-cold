@@ -106,19 +106,18 @@ function serve() {
   await page.click('#navPlay');
   await page.waitForTimeout(300);
 
-  // Рейтинг тоже перестал работать без сети: забег считает сервер. Это
-  // сознательная потеря, и она должна быть сказана вслух, а не проявиться
-  // молчащей кнопкой
+  // Испытание считается в телефоне — без сети оно играется
   await page.click('#tModeRun');
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(500);
   const runOffline = await page.evaluate(() => {
-    const el = document.getElementById('runNote');
-    return { open: !document.getElementById('screenRunHub').classList.contains('hidden'),
-             note: el ? el.textContent : '', bad: el ? el.classList.contains('bad') : false };
+    const open = !document.getElementById('screenRunHub').classList.contains('hidden');
+    startRun(true);
+    document.getElementById('guessInput').value = secret; handleGuess();
+    return { open, won: !!RUN.stage, score: RUN.totalScore };
   });
-  check('без сети рейтинг сразу говорит про связь',
-    runOffline.open && runOffline.bad && runOffline.note.length > 0,
+  check('без сети Испытание открывается и играется', runOffline.open && runOffline.won && runOffline.score > 0,
     JSON.stringify(runOffline));
+  await page.evaluate(() => runToHub());
   await page.click('#navPlay');
   await page.waitForTimeout(300);
 
