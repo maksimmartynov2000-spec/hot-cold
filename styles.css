@@ -2511,3 +2511,22 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .cup-table { all: unset; cursor: pointer; align-self: center; padding: 6px 14px; border-radius: 12px; font-size: 13px; font-weight: 900;
   background: rgba(0, 0, 0, 0.25); color: #fde68a; }
 .cup-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+
+/* ---- Онлайн: «Играть» закреплена над нижним меню ---- */
+body.on-online #rkPlayBar { position: fixed; left: 0; right: 0; z-index: 45; padding: 10px 16px 8px;
+  bottom: calc(62px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, transparent, var(--bar) 30%); }
+body.on-online #rkPlayBar > * { max-width: 520px; margin-left: auto; margin-right: auto; }
+body.on-online #rkPlayBar #tRkPlay { margin: 0 auto; }
+body.on-online #rkPlayBar .rk-wait { margin-top: 0; padding: 10px 12px; border-radius: 18px; background: var(--surface); }
+body.on-online #screenOnline { padding-bottom: 120px; }
+.train-panel.after-start { margin-top: 18px; }
+.rk-daily .dm-next { grid-column: 1; }
+.rk-daily .dm-pick { grid-column: 2; align-self: end; justify-self: center; margin-top: 4px; padding: 4px 10px; border-radius: 10px;
+  font-size: 12px; font-weight: 900; background: rgb(var(--ink) / 0.12); white-space: nowrap; }
+.rk-daily.active .dm-pick { background: var(--accent); color: #fff; }
+.auth-why { margin: -4px 0 14px; font-size: 14px; line-height: 1.4; color: var(--muted); }
+/* Испытание: главная «Начать» первой; кнопка Испытания дня — своя, фиолетовая,
+   чтобы две оранжевые не спорили, какая главнее */
+#screenRunHub .run-start-main { margin-bottom: 10px; }
+.btn.btn-daily { background: linear-gradient(150deg, #a78bfa, #7c3aed); box-shadow: 0 4px 0 #4c1d95; }

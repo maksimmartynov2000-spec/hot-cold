@@ -246,7 +246,8 @@ function renderAdventure() {
     }
     // Цель мира: ★★★ у всех — их иконки в профиль
     const goal = document.createElement('div');
-    goal.className = 'aw-goal' + (advWorldGold(w) ? ' got' : '');
+    // У закрытого мира цели не видно: пять одинаковых строк подряд только мешали
+    goal.className = 'aw-goal' + (advWorldGold(w) ? ' got' : '') + (done < w * ADV_PER_WORLD ? ' hidden' : '');
     goal.textContent = advWorldGold(w) ? A.goldDone : A.goldGoal.replace('{n}', advWorldThree(w));
     sec.append(head, grid, goal);
     return sec;

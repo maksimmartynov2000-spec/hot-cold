@@ -89,7 +89,7 @@ function renderOnlineDaily() {
       '<span class="od-lvl"><b>' + lvl + '</b><small>/' + I.maxLevel + '</small></span>' +
       '<span class="od-bar"><span style="width:' + Math.round(100 * inLevel / I.levelXp) + '%"></span>' +
         '<em>' + escapeHtml(P.pathTitle) + ' · ' + inLevel + '/' + I.levelXp + '</em></span>' +
-      (next ? '<span class="od-next">' + passRewardArt(next.kind, next.code) + '<small>' + next.level + '</small></span>' : '<span class="od-next">🏆</span>') +
+      (next ? '<span class="od-next">' + passRewardArt(next.kind, next.code) + '<small>' + escapeHtml(P.nextAt.replace('{n}', next.level)) + '</small></span>' : '<span class="od-next">🏆</span>') +
     '</button>' + cupCardHtml();
 }
 
