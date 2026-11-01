@@ -558,6 +558,8 @@ function applyTranslations() {
   document.getElementById('tChCancel').textContent = L.online.chCancel;
   document.getElementById('friendSearch').placeholder = L.online.searchPh;
   document.getElementById('tRunChoiceLogin').textContent = L.run.choiceLogin;
+  document.getElementById('tAuthChoiceWhy').textContent = L.run.choiceWhy;
+  renderAuthChoiceTitle();
   document.getElementById('tRunChoiceLoginSub').textContent = L.run.choiceLoginSub;
   document.getElementById('tRunChoiceRegister').textContent = L.run.choiceRegister;
   document.getElementById('tRunChoiceRegisterSub').textContent = L.run.choiceRegisterSub;
@@ -628,6 +630,7 @@ function showScreen(name) {
   // прижимают поле ввода к низу
   document.body.className = document.body.className.replace(/\bon-\S+/g, '').trim();
   document.body.classList.add('on-' + name);
+  if (name === 'authChoice' && typeof renderAuthChoiceTitle === 'function') renderAuthChoiceTitle();
   document.getElementById('navPlay').classList.toggle('on', name === 'mode');
   document.getElementById('friendsBtn').classList.toggle('on', name === 'friends' || name === 'chat');
   updateAccountChip();
@@ -3977,7 +3980,7 @@ const DRILLS = [
   { key: 'bands', range: 20, frost: false, icon: '📏' },
   { key: 'best', range: 100, frost: false, icon: '🧠' },
   { key: 'two', range: 100, frost: false, icon: '🔍', known: true },
-  { key: 'minus', range: 50, frost: true, icon: '➖' }
+  { key: 'minus', range: 50, frost: true, icon: '❄️' }
 ];
 let drill = null;
 function drillsDone() {

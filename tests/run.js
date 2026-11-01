@@ -126,7 +126,7 @@ async function testRating(browser) {
   const hub = await page.evaluate(() => ({ best: document.getElementById('trialBest').textContent,
     medals: document.querySelectorAll('#trialBest .tr-medal').length, daily: document.getElementById('trialDaily').textContent }));
   check('в хабе — личный рекорд и три медали', /Личный рекорд/.test(hub.best) && hub.medals === 3, hub.best);
-  check('в хабе — Испытание дня с правилом и кнопкой', /Испытание дня/.test(hub.daily) && /Сегодня во всех раундах/.test(hub.daily) &&
+  check('в хабе — Испытание дня с правилом и кнопкой', /Испытание дня/.test(hub.daily) && /Так во всех раундах сегодня/.test(hub.daily) &&
     /Играть Испытание дня/.test(hub.daily), hub.daily);
 
   await page.click('#tRunStart');
@@ -1264,7 +1264,7 @@ async function testBonusMode(browser) {
   check('кнопка называется «Бросить»', waiting.btn === 'Бросить', waiting.btn);
   check('жетон на отнятом ходе взвести можно', waiting.token === false);
   check('и об этом сказано прямо в панели',
-    waiting.hint.indexOf('жетон') >= 0, waiting.hint);
+    waiting.hint.indexOf('+1 ход') >= 0, waiting.hint);
 
   await page.click('#forcedBtn');
   await page.waitForTimeout(400);
@@ -3684,8 +3684,9 @@ async function testNewLook(browser) {
   await page.waitForTimeout(100);
   check('тап мимо окна закрывает профиль', !(await page.locator('#logoutModal').isVisible()));
 
-  // Главное меню: у каждого режима значок. Строки-пояснения под названиями
-  // убраны по просьбе — названий и блоков «без интернета / нужен интернет» хватает
+  // Главное меню: у каждого режима значок и короткое «что это» под названием.
+  // Раньше подписи убирали; вернули по разбору «понятно ли ребёнку» — новичок
+  // не отличал Испытание от Тренировки
   const menu = await page.evaluate(() =>
     [...document.querySelectorAll('#screenMode .mode-btn:not(.hidden)')].map(b => ({
       icon: (b.querySelector('.m-icon') || {}).textContent || '',
@@ -3694,7 +3695,7 @@ async function testNewLook(browser) {
     })));
   check('у каждого режима есть значок', menu.every(m => m.icon.trim().length > 0),
     menu.map(m => m.icon).join(' '));
-  check('описаний под названиями режимов нет', menu.every(m => m.subs === 0),
+  check('под каждым режимом — одна короткая подпись', menu.every(m => m.subs === 1),
     menu.map(m => m.subs).join(','));
 
   // Одиночный режим на очки назывался «Игра на рейтинг» — почти как кнопка
@@ -3877,8 +3878,8 @@ async function testCalmScreens(browser) {
   await page.fill('#nameP1', 'Маша');
   await page.fill('#nameP2', 'Петя');
   const hc = await page.evaluate(() => [...document.querySelectorAll('#handicap option')].map(o => o.textContent));
-  check('в форе только «нет» и лишний жетон кому-то одному',
-    hc.join(' | ') === 'Нет | Маша — 2 жетона | Петя — 2 жетона', hc.join(' | '));
+  check('в форе только «нет» и «⚡ +1 ход ×2» кому-то одному',
+    hc.join(' | ') === 'Нет | Маша — ⚡ +1 ход ×2 | Петя — ⚡ +1 ход ×2', hc.join(' | '));
   check('«всегда ходит первым» убрано', !hc.some(o => /перв/.test(o)), hc.join(' | '));
   const setupLook = await page.evaluate(() => ({
     title: document.getElementById('tSetupScreen').textContent,
@@ -3925,13 +3926,13 @@ async function testCalmScreens(browser) {
   const hub = await page.evaluate(() => {
     const b = document.getElementById('tRunStart').getBoundingClientRect();
     const f = document.querySelector('#screenRunHub .frost-row').getBoundingClientRect();
-    // Галочка — над кнопкой: выбирают до начала игры
-    return { gap: Math.round(b.top - f.bottom), title: document.getElementById('tRunScreen').textContent,
+    // «Начать» — первой, «Мороз и Жара» — сразу под ней, с отступом
+    return { gap: Math.round(f.top - b.bottom), title: document.getElementById('tRunScreen').textContent,
              greet: !!document.getElementById('runGreeting') };
   });
   check('у «Испытания» название, без строки «Играет …»',
     hub.title === '🏆 Испытание' && !hub.greet, JSON.stringify(hub));
-  check('галочка стоит над кнопкой и не прилипает к ней', hub.gap >= 8, hub.gap + 'px');
+  check('«Мороз и Жара» под кнопкой и не прилипает к ней', hub.gap >= 8, hub.gap + 'px');
   await done(page);
 
   // Вход: подпись под названием, а не узкой полоской сбоку
@@ -6115,14 +6116,14 @@ async function testUxPass(browser) {
     n.text === 'Нужно число от 1 до 100' && await page.evaluate(() => !window.__rpcCalls.some(c => c.name === 'match_guess')), JSON.stringify(n));
   await page.context().close();
 
-  // Испытание: правила раскрыты, пока не играл
+  // Испытание: правила свёрнуты всегда — кнопка «Начать» первая
   page = await newGame(browser, { user: 'Лев' });
   await page.click('.mode-btn.run');
   await page.waitForTimeout(500);
   let rules = await page.evaluate(() => ({ open: document.getElementById('runRules').open,
     head: document.getElementById('tRunRulesHead').textContent, n: document.querySelectorAll('#runRulesList li').length }));
-  check('Испытание: «❓ Как играть» раскрыто до первой игры, 5 правил',
-    rules.open && rules.head === '❓ Как играть' && rules.n === 5, JSON.stringify(rules));
+  check('Испытание: «❓ Как играть» свёрнуто, внутри 5 правил',
+    !rules.open && rules.head === '❓ Как играть' && rules.n === 5, JSON.stringify(rules));
   await page.click('#tRunStart');
   await page.waitForTimeout(400);
   await page.evaluate(() => openRunHub());
@@ -6234,7 +6235,8 @@ async function testRedesign(browser) {
   await page.waitForTimeout(300);
   check('под Испытанием — рекорд', /1\s240/.test(await page.locator('#tRunInfo').textContent()) &&
     await page.locator('#tRunInfo').isVisible(), await page.locator('#tRunInfo').textContent());
-  check('под игрой онлайн — лига и звёзды', /Серебро 7 · ★☆☆/.test(await page.locator('#tOnlineInfo').textContent()),
+  check('под игрой онлайн — лига, без ряда звёздочек', /Серебро 7/.test(await page.locator('#tOnlineInfo').textContent()) &&
+    !/★/.test(await page.locator('#tOnlineInfo').textContent()),
     await page.locator('#tOnlineInfo').textContent());
   check('онлайн — выше режимов без интернета', await page.evaluate(() =>
     document.querySelector('.mode-btn.online').getBoundingClientRect().top <
@@ -6926,7 +6928,7 @@ async function testOnlinePass(browser) {
   await page.evaluate(() => loadOnlineInfo());
   await page.waitForTimeout(150);
   const menu = await page.evaluate(() => document.getElementById('tOnlineInfo').textContent);
-  check('в меню на плитке онлайна — про сундук и серию', /Сыграйте — сундук/.test(menu) && /🔥 2/.test(menu), menu);
+  check('в меню на плитке онлайна — про сундук, без серии и значков', /Сыграйте — сундук/.test(menu) && !/🔥/.test(menu), menu);
   await page.evaluate(() => openOnline());
   await page.waitForTimeout(500);
   const card = await page.evaluate(() => ({ text: document.getElementById('olDaily').textContent,
@@ -7090,6 +7092,46 @@ async function testDailyWeekend(browser) {
         PASS_FRAMES.every(f => P.frames[f]) && i18n[l].prog.q.daily2 && i18n[l].prog.q.daily_win1; }, lang);
     check(lang + ': режим дня и турнир переведены', ok);
   }
+  await page.context().close();
+}
+
+// Разбор «понятно ли ребёнку»: главное — на первом экране, слова — одни и те же
+async function testKidClarity(browser) {
+  console.log('\nПонятно ребёнку: кнопки на виду, слова одни');
+  let page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => {
+    window.__online = { day: '2026-11-01', played: false, chestOpened: false, chest: null, streak: 3, bestStreak: 6, freezeLeft: true,
+      season: '2026-11', xp: 640, levelXp: 100, maxLevel: 30, seasonLeft: 86400 * 29, rewards: [{ level: 9, kind: 'title', code: 'hunter' }],
+      streakRewards: [], owned: [], frame: null, title: null, daily: { variant: 'chaos', next: 'mini', endsIn: 3600 },
+      weekend: { on: true, wins: 1, claim3: null, claim5: null, frame: 'cup-11', startsIn: 0, endsIn: 3600 } };
+    tutSave({ done: [1, 2, 3], skipped: true, veteran: true });
+    openOnline();
+  });
+  await page.waitForTimeout(700);
+  const play = await page.evaluate(() => { const r = document.getElementById('tRkPlay').getBoundingClientRect();
+    const tab = document.getElementById('tabbar').getBoundingClientRect();
+    return { top: Math.round(r.top), bottom: Math.round(r.bottom), tab: Math.round(tab.top), h: innerHeight }; });
+  check('онлайн: «Играть» видна без прокрутки и не под нижним меню', play.top > 0 && play.bottom <= play.tab, JSON.stringify(play));
+  const pick = await page.evaluate(() => document.querySelector('#rkDaily .dm-pick').textContent);
+  check('карточка режима дня подписана как выбор — «Выбрать ›»', pick === 'Выбрать ›', pick);
+  const next = await page.evaluate(() => document.querySelector('.od-next small').textContent);
+  check('у награды пути — «ступень 9», а не просто число', next === 'ступень 9', next);
+  await page.context().close();
+
+  page = await newGame(browser, {});
+  await page.evaluate(() => openFriendsEntry());
+  await page.waitForTimeout(400);
+  const auth = await page.evaluate(() => ({ title: document.getElementById('tAuthChoiceTitle').textContent,
+    why: document.getElementById('tAuthChoiceWhy').textContent, shown: screen }));
+  check('вход: заголовок «куда» и зачем имя и PIN', auth.shown === 'authChoice' && /Друзья/.test(auth.title) && /PIN/.test(auth.why), JSON.stringify(auth));
+  await page.evaluate(() => openAdventure());
+  await page.waitForTimeout(400);
+  const adv = await page.evaluate(() => ({ goals: [...document.querySelectorAll('#advMap .aw-goal:not(.hidden)')].length,
+    hint: document.getElementById('advDiffHint').textContent }));
+  check('Приключение: цель «★★★ у всех» — только у открытого мира', adv.goals === 1, String(adv.goals));
+  check('Приключение: «Обычная сложность · за победу ★★»', adv.hint === 'Обычная сложность · за победу ★★', adv.hint);
+  const words = await page.evaluate(() => ['en', 'ru', 'fr', 'de'].map(l => JSON.stringify(i18n[l]).match(/жетон|jeton|\bMarken?\b|\btokens?\b(?!\")/g)));
+  check('слова «жетон» в текстах больше нет — везде «⚡ +1 ход»', words.every(w => !w), JSON.stringify(words));
   await page.context().close();
 }
 
@@ -8020,6 +8062,7 @@ async function testKeyPage(browser) {
     await testTrialSurprises(browser);
     await testOnlinePass(browser);
     await testDailyWeekend(browser);
+    await testKidClarity(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

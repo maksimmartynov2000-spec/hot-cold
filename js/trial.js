@@ -118,7 +118,7 @@ function openRunHub() {
       '</b><small>' + escapeHtml(T.dailyRule.replace('{rule}', T.mods[mod][1])) + '</small></span></div>' +
     '<div class="td-today">' + escapeHtml(today ? T.dailyToday.replace('{n}', withPlural(today, L.run.roundForms)) : T.dailyNone) +
       (tm ? ' ' + tm[2] : '') + '</div>' +
-    '<button class="btn btn-block" id="trialDailyGo" onclick="startRun(true, true)">' + escapeHtml(T.dailyGo) + '</button>' +
+    '<button class="btn btn-block btn-daily" id="trialDailyGo" onclick="startRun(true, true)">' + escapeHtml(T.dailyGo) + '</button>' +
     '<div class="td-coll">' + escapeHtml(T.dailyColl) + ' <span>🥇 ' + counts.gold + '</span><span>🥈 ' + counts.silver +
       '</span><span>🥉 ' + counts.bronze + '</span></div>';
   showScreen('runHub');
@@ -132,9 +132,8 @@ function renderRunRules() {
     li.textContent = line;
     return li;
   }));
-  let seen = false;
-  try { seen = localStorage.getItem('hc_run_rules_seen') === '1'; } catch (e) {}
-  document.getElementById('runRules').open = !seen;
+  // Свёрнуты всегда: кнопка «Начать» стоит первой, правила — для любопытных
+  document.getElementById('runRules').open = false;
 }
 
 // ---------- партия ----------

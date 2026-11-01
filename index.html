@@ -73,12 +73,14 @@
         <span class="m-icon">🎯</span>
         <span class="m-text">
           <span class="m-title" id="tModeSolo">Single player</span>
+          <span class="m-sub" id="tSoloSub"></span>
         </span>
       </button>
       <button class="mode-btn duel tile" onclick="openSetup('duel')">
         <span class="m-icon">🤝</span>
         <span class="m-text">
           <span class="m-title" id="tModeDuel">Play with a friend</span>
+          <span class="m-sub" id="tDuelSub"></span>
         </span>
       </button>
       <button class="mode-btn bot tile" onclick="openAdventure()">
@@ -118,14 +120,6 @@
   <div id="screenSetup" class="hidden">
     <div class="screen-title" id="tSetupScreen"></div>
     <!-- Тренировка: уроки-приёмы и прогресс на выбранном диапазоне -->
-    <div class="train-panel hidden" id="trainPanel">
-      <div class="tp-head" id="tTrainDrills"></div>
-      <div class="train-drills" id="trainDrills"></div>
-      <div class="tp-head" id="tTrainProg"></div>
-      <div class="train-stats" id="trainStats"></div>
-      <div class="train-bars hidden" id="trainBars"></div>
-      <div class="train-goal" id="trainGoal"></div>
-    </div>
     <div class="setup-field tight">
       <label id="tLblRange">Range</label>
       <select class="field" id="rangeMax" onchange="onRangeChange()"></select>
@@ -193,6 +187,15 @@
     <div class="setup-row">
       <button class="btn-ghost" onclick="showScreen('mode')" id="tBack">Back</button>
       <button class="btn btn-block" onclick="startFromSetup()" id="tStartMatch">Start match</button>
+    </div>
+    <!-- Уроки-приёмы и прогресс — под «Начать»: кто пришёл просто играть, не листает -->
+    <div class="train-panel after-start hidden" id="trainPanel">
+      <div class="tp-head" id="tTrainDrills"></div>
+      <div class="train-drills" id="trainDrills"></div>
+      <div class="tp-head" id="tTrainProg"></div>
+      <div class="train-stats" id="trainStats"></div>
+      <div class="train-bars hidden" id="trainBars"></div>
+      <div class="train-goal" id="trainGoal"></div>
     </div>
   </div>
 
@@ -340,6 +343,9 @@
 
   <!-- ЭКРАН: выбор вход/регистрация -->
   <div id="screenAuthChoice" class="hidden">
+    <!-- Зачем входить — словами: без этого две кнопки висели без объяснения -->
+    <div class="screen-title" id="tAuthChoiceTitle"></div>
+    <p class="auth-why" id="tAuthChoiceWhy"></p>
     <div class="mode-list">
       <button class="mode-btn solo stack" onclick="showRunAuth('login')">
         <div class="m-title" id="tRunChoiceLogin"></div>
@@ -402,11 +408,15 @@
         <div class="rk-path-link hidden" id="rkPathLink"></div>
       </div>
       <div class="fr-note hidden" id="rkNote"></div>
-      <button class="btn btn-block" id="tRkPlay" onclick="startRanked()"></button>
-      <div class="rk-wait hidden" id="rkWaitBox">
-        <div class="rk-wait-text" id="rkWaitText"></div>
-        <div class="rk-wait-sub" id="rkWaitSub"></div>
-        <button class="btn-ghost btn-block" id="tRkCancel" onclick="cancelRanked()"></button>
+      <!-- «Играть» — всегда на виду, над нижним меню: сундук, путь и турнир
+           выше не должны уводить её за край экрана -->
+      <div class="rk-play-bar" id="rkPlayBar">
+        <button class="btn btn-block" id="tRkPlay" onclick="startRanked()"></button>
+        <div class="rk-wait hidden" id="rkWaitBox">
+          <div class="rk-wait-text" id="rkWaitText"></div>
+          <div class="rk-wait-sub" id="rkWaitSub"></div>
+          <button class="btn-ghost btn-block" id="tRkCancel" onclick="cancelRanked()"></button>
+        </div>
       </div>
       <!-- Идущие рейтинговые игры. Пусто — блока нет: «игра не идёт» и так
            видно по тому, что вы не в игре -->
@@ -546,19 +556,20 @@
       <button class="btn btn-block" style="margin-top:14px" id="tUnfinishedResume" onclick="resumeSavedRun()"></button>
       <button class="btn-ghost btn-block" style="margin-top:8px" id="tUnfinishedFinish" onclick="finishSavedRun()"></button>
     </div>
-    <div class="trial-best" id="trialBest"></div>
-    <div class="trial-daily" id="trialDaily"></div>
-    <!-- Правила: пока человек ни разу не играл — раскрыты, потом свёрнуты -->
-    <details class="fold run-rules" id="runRules">
-      <summary class="fold-head" id="tRunRulesHead"></summary>
-      <ul class="fold-body run-rules-list" id="runRulesList"></ul>
-    </details>
+    <!-- Главная кнопка — первой: пришёл играть — играй. Мороз и Жара — под ней -->
+    <button class="btn btn-block run-start-main" id="tRunStart" onclick="startRun()"></button>
     <label class="frost-row">
       <input type="checkbox" id="frostRun" onchange="setFrostMode(this.checked)" />
       <span class="fr-text"><span id="tFrostRun"></span><small class="row-hint" id="tFrostRunHint"></small></span>
       <button type="button" class="hint-q" onclick="event.preventDefault(); this.closest('.frost-row').classList.toggle('show-hint')" aria-label="?">?</button>
     </label>
-    <button class="btn btn-block" id="tRunStart" onclick="startRun()"></button>
+    <div class="trial-daily" id="trialDaily"></div>
+    <div class="trial-best" id="trialBest"></div>
+    <!-- Правила — свёрнуты: кнопка «Играть» и так первая, а читать их будет тот, кому интересно -->
+    <details class="fold run-rules" id="runRules">
+      <summary class="fold-head" id="tRunRulesHead"></summary>
+      <ul class="fold-body run-rules-list" id="runRulesList"></ul>
+    </details>
     <div class="run-hub-actions">
       <button class="btn-ghost btn-block" id="tRunToMenu" onclick="showScreen('mode')"></button>
     </div>

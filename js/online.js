@@ -748,13 +748,13 @@ function afterAuth() {
 function openOnlineEntry() {
   if (!onlineOpen()) return openLessonGate();
   authReturn = 'online';
-  if (runAuth()) openOnline(); else showScreen('authChoice');
+  if (runAuth()) openOnline(); else { authReturn = 'online'; renderAuthChoiceTitle(); showScreen('authChoice'); }
 }
 
 function openFriendsEntry() {
   if (!onlineOpen()) return openLessonGate();
   authReturn = 'friends';
-  if (runAuth()) openFriends(); else showScreen('authChoice');
+  if (runAuth()) openFriends(); else { authReturn = 'friends'; renderAuthChoiceTitle(); showScreen('authChoice'); }
 }
 
 // Открывает форму заново: поля чистые, ошибок нет
@@ -955,7 +955,7 @@ let friendsBusy = false;
 // рейтингом приходят играть сейчас, к друзьям — договариваться
 function openOnline() {
   const auth = runAuth();
-  if (!auth) { authReturn = 'online'; return showScreen('authChoice'); }
+  if (!auth) { authReturn = 'online'; renderAuthChoiceTitle(); return showScreen('authChoice'); }
   setNote('rkNote', '');
   applyTranslations();
   renderRankedModes();
@@ -976,7 +976,7 @@ let findDecided = false;
 
 function openFriends() {
   const auth = runAuth();
-  if (!auth) { authReturn = 'friends'; return showScreen('authChoice'); }
+  if (!auth) { authReturn = 'friends'; renderAuthChoiceTitle(); return showScreen('authChoice'); }
   friendsData = null;
   friendMatches = [];
   document.getElementById('findBox').open = false;
@@ -1721,24 +1721,30 @@ function renderModeInfo() {
   const locked = !onlineOpen();
   const best = runAuth() ? runBest() : 0;
   const run = document.getElementById('tRunInfo');
-  run.textContent = best ? t().run.best + formatNum(best) : '';
-  run.classList.toggle('hidden', locked || !best);
+  // Нет своего — короткое «что это»: новичку иначе не понять, чем Испытание
+  // отличается от Тренировки
+  const M = t().tut.menuSub;
+  run.textContent = best ? t().run.best + formatNum(best) : M.run;
+  run.classList.remove('hidden');
+  document.getElementById('tSoloSub').textContent = M.solo;
+  document.getElementById('tDuelSub').textContent = M.duel;
   const on = document.getElementById('tOnlineInfo');
   const lg = runAuth() && ladderInfo;
-  // Сундук готов — главный повод зайти: пишем его первым
+  // Не больше двух коротких вещей: один повод зайти и лига. Раньше тут стояли
+  // ещё серия и ряд звёздочек — выходил набор значков, а не фраза
   const oi = typeof onlineInfo !== 'undefined' && onlineInfo;
   const hints = [];
   if (oi && oi.played && !oi.chestOpened) hints.push(t().pass.menuChest);
+  else if (oi && oi.weekend && oi.weekend.on) hints.push(t().pass.cup.starsX2);
   else if (oi && !oi.played) hints.push(t().pass.menuPlay);
-  if (oi && oi.streak) hints.push('🔥 ' + oi.streak);
-  if (lg) hints.push([leagueLabel(ladderInfo.stars), starsLine(ladderInfo.stars)].filter(Boolean).join(' · '));
-  on.textContent = hints.join(' · ');
-  on.classList.toggle('hidden', locked || !hints.length);
+  if (lg) hints.push(leagueLabel(ladderInfo.stars));
+  on.textContent = hints.length ? hints.join(' · ') : M.online;
+  on.classList.toggle('hidden', locked);
   // Приключение: сколько соперников из 50 уже обыграно
   const ad = document.getElementById('tAdvInfo');
   const done = typeof advDone === 'function' ? advDone() : 0;
-  ad.textContent = done + '/' + ADV_TOTAL;
-  ad.classList.toggle('hidden', done === 0);
+  ad.textContent = done ? done + '/' + ADV_TOTAL : M.adv;
+  ad.classList.remove('hidden');
 }
 
 function openLessonGate() {
@@ -2596,7 +2602,9 @@ function renderDailyMode() {
     '<span class="dm-rule">' + escapeHtml(D[v + 'D']) + '</span>' +
     '<span class="dm-perk">' + escapeHtml(D.perk) + '</span>' +
     '<small class="dm-next">' + escapeHtml(D.next.replace('{v}', D[dailyVariant(true)])
-      .replace('{t}', timeLeftText(onlineInfo.daily.endsIn || 0))) + '</small>';
+      .replace('{t}', timeLeftText(onlineInfo.daily.endsIn || 0))) + '</small>' +
+    // Карточка — тоже выбор режима, как кнопки ниже: сказать это словами
+    '<span class="dm-pick">' + escapeHtml(rankedMode === DAILY_MODE ? D.picked : D.pick) + '</span>';
 }
 
 function rankedModeRange(mode) {
@@ -3220,4 +3228,12 @@ function botSay(code) {
   box.style.borderColor = P_COLORS[1];
   box.classList.remove('hidden');
   setTimeout(renderSayBubble, SAY_SHOW_MS + 50);
+}
+
+// Заголовок экрана входа: куда человек шёл — онлайн или к друзьям
+function renderAuthChoiceTitle() {
+  const el = document.getElementById('tAuthChoiceTitle');
+  if (!el) return;
+  const L = t();
+  el.textContent = authReturn === 'friends' ? '👥 ' + L.navFriends : '🌐 ' + L.online.mode;
 }
