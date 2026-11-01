@@ -954,6 +954,8 @@ let friendsBusy = false;
 // Рейтинг и друзья — разные экраны. На одном они мешали друг другу: за
 // рейтингом приходят играть сейчас, к друзьям — договариваться
 function openOnline() {
+  // Миграцию 056 могли применить, пока игра была открыта: проверяем заново
+  playApi = 'new';
   const auth = runAuth();
   if (!auth) { authReturn = 'online'; renderAuthChoiceTitle(); return showScreen('authChoice'); }
   setNote('rkNote', '');
@@ -2539,6 +2541,48 @@ let rankedMode = (function () {
 })();
 let rankedRatings = null;
 
+// ---------- «Играть» и «Своя игра» (миграция 056) ----------
+// Очередь — по правилам: диапазон, бонусы, до скольки побед, время на ход или
+// правила дня. «Играть» — правила по умолчанию. Рейтинг один на всё.
+// Без миграции 056 игра ходит в старую очередь режима, ближайшего к правилам
+const PLAY_DEFAULT = { range: '100', bonuses: true, wins: 3, blitz: false };
+const PLAY_RANGES = ['20', '100', 'pm100'];
+const PLAY_WINS = [1, 3, 5];
+let playApi = 'new';
+let playOffers = [];
+let playElo = null;
+let playRules = (function () {
+  try { return playNorm(JSON.parse(localStorage.getItem('hc_rules') || 'null')); } catch (e) { return playNorm(null); }
+})();
+
+function playNorm(r) {
+  if (!r || typeof r !== 'object') return Object.assign({}, PLAY_DEFAULT);
+  if (r.daily) return { daily: true };
+  return { range: PLAY_RANGES.includes(r.range) ? r.range : '100', bonuses: r.bonuses !== false,
+           wins: PLAY_WINS.includes(r.wins) ? r.wins : 3, blitz: !!r.blitz };
+}
+function playIsDefault(r) {
+  return !r.daily && r.range === '100' && r.bonuses && r.wins === 3 && !r.blitz;
+}
+function playSave() {
+  try { localStorage.setItem('hc_rules', JSON.stringify(playRules)); } catch (e) {}
+}
+// Правила словами: «1–100 · с бонусами · до 3 побед»; правила дня — названием дня
+function playRulesText(r) {
+  const R = t().online.rules;
+  if (!r) return '';
+  if (r.daily) return '📅 ' + t().pass.daily[dailyVariant()] + ' · ' + t().pass.daily[dailyVariant() + 'D'];
+  return [R.ranges[r.range], r.bonuses ? R.on : R.off, R.wins[r.wins]].concat(r.blitz ? [R.blitz] : []).join(' · ');
+}
+// Старая очередь (до миграции 056): режим из правил
+function playOldMode(r) {
+  if (r.daily) return DAILY_MODE;
+  return (r.range === 'pm100' ? 1 : 0) + (r.bonuses ? 2 : 0);
+}
+function playMissing(e) {
+  return /Could not find the function|does not exist/.test((e && e.message) || '');
+}
+
 function startRankedPoll() {
   stopRankedPoll();
   rankedTimer = setInterval(() => {
@@ -2629,25 +2673,102 @@ function rankedModeButton(mode, active, onClick) {
 // Переключение разновидности выводит из очереди: ждать в двух местах нельзя,
 // иначе человека затянуло бы в две партии сразу
 async function setRankedMode(mode) {
-  if (mode === rankedMode) return;
+  return setPlayRules(mode === DAILY_MODE ? { daily: true }
+    : { range: (mode & 1) ? 'pm100' : '100', bonuses: (mode & 2) === 2, wins: 3, blitz: false });
+}
+
+// Новые правила: из очереди выйти (ждать в двух местах нельзя), запомнить
+async function setPlayRules(r) {
   const wasQueued = rankedInQueue;
-  rankedMode = mode;
-  try { localStorage.setItem('hc_rkmode', String(mode)); } catch (e) {}
+  playRules = playNorm(r);
+  rankedMode = playOldMode(playRules);
+  playSave();
   if (wasQueued) await cancelRanked();
   renderRankedModes();
   renderRanked(null);
-  loadEloTop();
   loadRanked(true);
 }
 
 function renderRankedModes() {
   const box = document.getElementById('rkModes');
   if (!box) return;
-  // Без миграции 054 режима дня нет — возвращаемся к обычному
-  if (rankedMode === DAILY_MODE && onlineInfo && !onlineInfo.daily) rankedMode = 0;
-  box.innerHTML = '';
-  RANKED_MODES.forEach(mode => box.appendChild(rankedModeButton(mode, mode === rankedMode, () => setRankedMode(mode))));
-  renderDailyMode();
+  // Без миграции 054 правил дня нет — возвращаемся к обычным
+  if (playRules.daily && !dailyOpen()) { playRules = Object.assign({}, PLAY_DEFAULT); playSave(); }
+  rankedMode = playOldMode(playRules);
+  // Вместо четырёх вкладок — строка правил и «Своя игра»
+  box.classList.add('hidden');
+  document.getElementById('rkDaily').classList.add('hidden');
+  const bar = document.getElementById('rkRules');
+  if (!bar) return;
+  const R = t().online.rules;
+  bar.innerHTML = '<span class="rr-text"><small>' + escapeHtml(playIsDefault(playRules) ? R.quick : R.custom) + '</small><b>' +
+    escapeHtml(playRulesText(playRules)) + '</b></span>' +
+    '<button class="rr-btn" onclick="openRulesModal()">' + escapeHtml(R.btn) + '</button>';
+}
+
+// ---------- окно «Своя игра» ----------
+let rulesDraft = null;
+function openRulesModal() {
+  rulesDraft = Object.assign({}, playRules.daily ? PLAY_DEFAULT : playRules);
+  rulesDraft.daily = !!playRules.daily;
+  renderRulesModal();
+  document.getElementById('rulesModal').classList.remove('hidden');
+}
+function closeRulesModal() { document.getElementById('rulesModal').classList.add('hidden'); }
+function rulesPick(key, val) {
+  rulesDraft[key] = val;
+  rulesDraft.daily = false;
+  renderRulesModal();
+}
+function renderRulesModal() {
+  const R = t().online.rules, d = rulesDraft;
+  const chips = (key, vals, label) => '<div class="ru-row"><div class="ru-head">' + escapeHtml(label) + '</div><div class="ru-chips">' +
+    vals.map(([v, text]) => '<button class="ru-chip' + (!d.daily && d[key] === v ? ' on' : '') + '" data-k="' + key + '" data-v="' + v +
+      '" onclick="rulesPick(\'' + key + '\', ' + JSON.stringify(v).replace(/"/g, '&quot;') + ')">' + escapeHtml(text) + '</button>').join('') + '</div></div>';
+  document.getElementById('rulesTitle').textContent = R.title;
+  document.getElementById('rulesBody').innerHTML =
+    chips('range', PLAY_RANGES.map(v => [v, R.ranges[v]]), R.range) +
+    chips('bonuses', [[true, R.on], [false, R.off]], R.bonusesHead) +
+    chips('wins', PLAY_WINS.map(v => [v, R.wins[v]]), R.winsHead) +
+    chips('blitz', [[false, R.normal], [true, R.blitz]], R.time) +
+    (dailyOpen() ? '<button class="ru-daily' + (d.daily ? ' on' : '') + '" onclick="rulesDraft.daily = true; renderRulesModal()">' +
+      escapeHtml(R.daily.replace('{v}', t().pass.daily[dailyVariant()])) + '<small>' + escapeHtml(t().pass.daily[dailyVariant() + 'D'] + ' · ' + t().pass.daily.perk) +
+      '</small></button>' : '') +
+    '<button class="ru-reset" onclick="rulesDraft = Object.assign({}, PLAY_DEFAULT); renderRulesModal()">' + escapeHtml(R.reset) + '</button>';
+  document.getElementById('rulesOk').textContent = R.done;
+}
+async function saveRulesModal() {
+  closeRulesModal();
+  await setPlayRules(rulesDraft.daily ? { daily: true } : rulesDraft);
+}
+
+// Кто ждёт с другими правилами — «Сыграть» встаёт в очередь с его правилами
+function renderOffers() {
+  const box = document.getElementById('rkOffers');
+  if (!box) return;
+  const R = t().online.rules;
+  box.classList.toggle('hidden', !rankedInQueue || !playOffers.length);
+  if (!rankedInQueue || !playOffers.length) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="of-head">' + escapeHtml(R.offerHead) + '</div>' + playOffers.map((o, i) =>
+    '<div class="of-row"><span class="avatar" data-avatar-for="' + escapeHtml(o.username) + '"></span><span class="of-text"><b>' +
+    escapeHtml(playerName(o.username)) + '</b><small>' + escapeHtml(playRulesText(playNorm(o.rules))) + '</small></span>' +
+    '<button class="of-go" onclick="acceptOffer(' + i + ')">' + escapeHtml(R.offerGo) + '</button></div>').join('');
+  box.querySelectorAll('.avatar').forEach(a => paintAvatar(a, a.dataset.avatarFor));
+  fetchAvatars(playOffers.map(o => o.username));
+  fitPlayBar();
+}
+// Закреплённая внизу панель растёт (ожидание, предложения) — снизу экрана
+// столько же места, чтобы она ничего не закрывала
+function fitPlayBar() {
+  const bar = document.getElementById('rkPlayBar'), scr = document.getElementById('screenOnline');
+  if (bar && scr) scr.style.paddingBottom = (bar.offsetHeight + 24) + 'px';
+}
+async function acceptOffer(i) {
+  const o = playOffers[i];
+  if (!o) return;
+  // Чужие правила — только на эту партию: свои остаются запомненными
+  await cancelRanked();
+  return startRanked(playNorm(o.rules));
 }
 
 // Давность в человеческих словах. Меньше полутора минут — «только что»:
@@ -2663,7 +2784,7 @@ function rankedAgoText(seconds) {
 
 function renderRanked(st) {
   const L = t().online;
-  const mine = rankedRatings && rankedRatings[rankedMode];
+  const mine = playElo || (rankedRatings && rankedRatings[rankedMode]);
   const elo = document.getElementById('rkElo');
   const starsEl = document.getElementById('rkStars');
   elo.classList.toggle('league', !!ladderInfo);
@@ -2704,6 +2825,7 @@ function renderRanked(st) {
   play.textContent = rankedMatchId ? L.rkResume : L.rkPlay;
   play.classList.toggle('hidden', rankedInQueue);
   document.getElementById('rkWaitBox').classList.toggle('hidden', !rankedInQueue);
+  fitPlayBar();
   if (!rankedInQueue || !st) return;
 
   // Точки в конце — единственная живая деталь на экране ожидания: по ней
@@ -2725,12 +2847,23 @@ function renderRanked(st) {
 
 async function loadRanked(quiet) {
   try {
-    const st = await friendRpc('ranked_status', { p_mode: rankedMode });
+    let st;
+    if (playApi === 'new') {
+      try {
+        st = await friendRpc('play_status', {});
+      } catch (e) {
+        if (!playMissing(e)) throw e;
+        playApi = 'old';
+      }
+    }
+    if (playApi === 'old') st = await friendRpc('ranked_status', { p_mode: rankedMode });
     if (!st) return;
     const wasQueued = rankedInQueue;
     rankedMatchId = st.matchId || null;
     rankedInQueue = !!st.inQueue;
     rankedRatings = st.ratings || null;
+    playElo = playApi === 'new' ? { elo: st.elo, games: st.games } : null;
+    playOffers = playApi === 'new' ? (st.offers || []) : [];
     // В матч затягиваем только того, кто стоял в очереди и ждал именно этого.
     // Иначе с экрана начатой игры было бы не уйти: он открывался бы заново
     if (rankedMatchId && wasQueued) {
@@ -2742,9 +2875,9 @@ async function loadRanked(quiet) {
     if (rankedInQueue && !rankedTimer) startRankedPoll();
     renderRankedModes();
     renderRanked(st);
-    // Ждём в другой разновидности — об этом надо сказать, иначе «Играть»
-    // здесь выглядит как потеря очереди без причины
-    const other = (st.queueMode === null || st.queueMode === undefined || st.inQueue)
+    renderOffers();
+    // Старая очередь: ждём в другой разновидности — сказать
+    const other = (playApi === 'new' || st.queueMode === null || st.queueMode === undefined || st.inQueue)
       ? '' : t().online.rkOtherMode.replace('{mode}', rankedModeLabel(st.queueMode));
     if (other) setNote('rkNote', other);
     else if (!quiet) setNote('rkNote', '');
@@ -2753,13 +2886,24 @@ async function loadRanked(quiet) {
   }
 }
 
-async function startRanked() {
+// rules — разово чужие правила (из предложения); без них — свои
+async function startRanked(rules) {
   if (rankedBusy) return;
   if (rankedMatchId) return openMatch(rankedMatchId);
   rankedBusy = true;
   setNote('rkNote', '');
+  const use = rules && rules.range !== undefined || (rules && rules.daily) ? rules : playRules;
   try {
-    const r = await friendRpc('join_ranked_queue', { p_mode: rankedMode });
+    let r;
+    if (playApi === 'new') {
+      try {
+        r = await friendRpc('play_join', { p_rules: use });
+      } catch (e) {
+        if (!playMissing(e)) throw e;
+        playApi = 'old';
+      }
+    }
+    if (playApi === 'old') r = await friendRpc('join_ranked_queue', { p_mode: playOldMode(use) });
     if (r && r.matchId) {
       rankedInQueue = false;
       rankedMatchId = r.matchId;
@@ -2810,7 +2954,7 @@ async function loadEloTop() {
     return;
   }
   try {
-    const { data, error } = await sb.rpc('elo_leaderboard', { p_mode: rankedMode });
+    const { data, error } = await sb.rpc('elo_leaderboard', { p_mode: playApi === 'new' ? 0 : rankedMode });
     if (error) throw new Error(error.message);
     const rows = data || [];
     const me = (runAuth() || {}).username;
@@ -2904,7 +3048,9 @@ function applyMatchState(st) {
   // Без поля (база до миграции 035) считаем, что звёзды есть: так было
   online.ladder = st.ladder === undefined ? true : !!st.ladder;
   // Режим дня: правила видны по самой партии (миграция 054 их и ставит)
-  online.variant = st.rankedMode !== DAILY_MODE ? null
+  online.variant = st.rankedMode !== DAILY_MODE
+    // Своя игра с блицем (миграция 056): 10 секунд на ход без «Спешки»
+    ? (st.ranked && st.turnSeconds === 10 && !(st.rush || []).some(Boolean) ? 'blitz' : null)
     : st.rangeMax === 50 ? 'mini' : st.bonusesOn ? 'chaos' : 'blitz';
   mode = 'duel';
   RANGE_MIN = st.rangeMin;

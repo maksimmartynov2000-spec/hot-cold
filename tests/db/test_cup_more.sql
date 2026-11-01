@@ -44,7 +44,7 @@ begin
   r := weekend_claim('Лев', '1234', 5);
   if r->>'frame' is not null or (r->>'xp')::int <> 100 then raise exception 'ОШИБКА: второй раз в ноябре %', r; end if;
   if array_length(pass_frames(), 1) <> 18 then raise exception 'ОШИБКА: рамок %', array_length(pass_frames(), 1); end if;
-  perform set_config('hc.now', '', true);
+  perform set_config('hc.now', '2026-11-04 12:00+00', true);  -- обычная среда, как во всех сценариях
 end $$;
 \echo ok
 
@@ -67,7 +67,7 @@ begin
   end if;
   if late <= early then raise exception 'ОШИБКА: к концу не прибавилось % → %', early, late; end if;
   if exists (select 1 from jsonb_array_elements(r->'top') x where (x->>'wins')::int <= 0) then raise exception 'ОШИБКА: ноль в десятке'; end if;
-  perform set_config('hc.now', '', true);
+  perform set_config('hc.now', '2026-11-04 12:00+00', true);  -- обычная среда, как во всех сценариях
 end $$;
 \echo ok
 
@@ -118,7 +118,7 @@ begin
     raise exception 'ОШИБКА: «до награды» %', (select who from push_outbox where kind = 'cup_left');
   end if;
   if push_tick() <> 0 then raise exception 'ОШИБКА: «до награды» дважды'; end if;
-  perform set_config('hc.now', '', true);
+  perform set_config('hc.now', '2026-11-04 12:00+00', true);  -- обычная среда, как во всех сценариях
 end $$;
 \echo ok
 

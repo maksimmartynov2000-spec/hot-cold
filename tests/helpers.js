@@ -353,6 +353,24 @@ function stubSupabase(opts) {
           }
           // Рейтинговый онлайн: очередь и подбор живут в window.__rankedQ,
           // тест сам решает, когда соперник «нашёлся»
+          // «Играть» и «Своя игра» (миграция 056): window.__play — очередь по
+          // правилам; не задан — база до 056, игра ходит в старую очередь
+          if ((name === 'play_status' || name === 'play_join') && !window.__play) {
+            return { data: null, error: { message: 'Could not find the function public.' + name } };
+          }
+          if (name === 'play_join') {
+            const P = window.__play;
+            P.joined = args.p_rules;
+            if (P.matchId) return { data: { matchId: P.matchId }, error: null };
+            P.inQueue = true; P.rules = args.p_rules; P.since = Date.now();
+            return { data: { matchId: null, waiting: true, rules: args.p_rules }, error: null };
+          }
+          if (name === 'play_status') {
+            const P = window.__play;
+            return { data: { matchId: P.matchId || null, inQueue: !!P.inQueue && !P.matchId, rules: P.rules || null,
+              waited: P.inQueue ? Math.floor((Date.now() - (P.since || Date.now())) / 1000) : 0, queue: 1,
+              offers: P.offers || [], elo: P.elo || 1000, games: P.games || 0, lastAgo: window.__rankedQ.lastAgo }, error: null };
+          }
           if (name === 'ranked_status') return { data: window.__ranked(args.p_mode), error: null };
           if (name === 'join_ranked_queue') {
             const Q = window.__rankedQ;
@@ -364,6 +382,7 @@ function stubSupabase(opts) {
           }
           if (name === 'leave_ranked_queue') {
             window.__rankedQ.inQueue = false;
+            if (window.__play) window.__play.inQueue = false;
             return { data: true, error: null };
           }
           if (name === 'elo_leaderboard') {

@@ -49,6 +49,11 @@ mig_args() {
 
 FAILED=0
 
+# Сценарии видят «сейчас» как обычную среду: иначе в выходные (звёзды ×2)
+# и в другие дни режима дня проверки звёзд давали бы разное. Где важен
+# день, сценарий ставит своё через set_config('hc.now', …)
+HC_NOW=2026-11-04T12:00:00+00
+
 # 1. База с нуля по всем миграциям подряд: номера стоят в том порядке,
 #    в котором миграции можно применить. Каждую — дважды: если человек не
 #    уверен, что миграция прошла, и запустит её снова, это не должно ломаться
@@ -94,7 +99,7 @@ su postgres -c "psql -q -d hotcold_test -c 'alter table matches disable trigger 
 cd "$DIR"
 for T in "$DIR"/test_*.sql; do
   echo "--- $(basename "$T")"
-  if ! su postgres -c "psql -q -d hotcold_test -v ON_ERROR_STOP=1 -f $T" 2>&1; then
+  if ! su postgres -c "PGOPTIONS='-c hc.now=$HC_NOW' psql -q -d hotcold_test -v ON_ERROR_STOP=1 -f $T" 2>&1; then
     FAILED=1
   fi
 done

@@ -136,9 +136,12 @@ begin
   if (select streak from rivalry) is distinct from 4 then
     raise exception 'ОШИБКА: серия не общая — %', (select streak from rivalry);
   end if;
-  -- Четвёртая победа шла уже с коэффициентом 0.4
-  select elo into got from elo_ratings where username = 'Лев' and mode = 3;
-  if got is distinct from 1008 then raise exception 'ОШИБКА: четвёртый режим дал % вместо 1008', got; end if;
+  -- Четвёртая победа шла уже с коэффициентом 0.4: прибавка меньше половины
+  -- первой. Рейтинг с миграции 056 один, поэтому сравниваем прибавки партий
+  select elo_delta[1] into got from matches order by id desc limit 1;
+  if got >= (select elo_delta[1] from matches order by id limit 1) / 2 then
+    raise exception 'ОШИБКА: четвёртая победа дала %, коэффициент не сработал', got;
+  end if;
 end $$;
 \echo ok
 
