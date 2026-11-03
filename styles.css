@@ -2559,3 +2559,5 @@ body.on-online #screenOnline { padding-bottom: 120px; } /* точнее — fitP
   background: linear-gradient(150deg, #22c55e, #16a34a); box-shadow: 0 3px 0 #166534; }
 /* Вкладки режимов скрыты с миграции 056 — их display: grid !important выше не должен их показывать */
 #screenOnline #rkModes.hidden { display: none !important; }
+/* Название бонуса — в одну строку: при длинном описании «◐ Половина» переносилась */
+.bonus-line .b-name { white-space: nowrap; flex-shrink: 0; }

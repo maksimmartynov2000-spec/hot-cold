@@ -7198,6 +7198,39 @@ async function testOnlineAdvBonuses(browser) {
   await page.context().close();
 }
 
+// «С другом» на одном телефоне: бонусы из Приключения работают и здесь
+async function testLocalAdvBonuses(browser) {
+  console.log('\nС другом: бонусы из Приключения');
+  const page = await newGame(browser);
+  await page.click('#tModeDuel');
+  await page.waitForTimeout(150);
+  await page.selectOption('#rangeMax', '100');
+  await page.evaluate(() => { const b = document.getElementById('bonusSetup'); if (b && !b.checked) b.click(); });
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(() => {
+    secret = 40;
+    D.bonuses = [{ value: 70, type: 'xray', taken: false }, { value: 20, type: 'freeze', taken: false },
+                 { value: 90, type: 'shield', taken: false }, { value: 10, type: 'skip', taken: false }];
+    return { on: bonusMode };
+  });
+  check('бонусы включены', r.on);
+  const step = async g => { await page.fill('#guessInput', String(g)); await page.click('#tSubmitGuess'); await page.waitForTimeout(350);
+    await page.evaluate(() => { document.querySelectorAll('.curtain:not(.hidden), #curtain:not(.hidden)').forEach(c => c.click());
+      const bc = document.getElementById('bonusCard'); if (bc) bc.classList.add('hidden'); }); };
+  await step(70);                       // игрок 1 — Рентген
+  const x = await page.evaluate(() => ({ know: D.know[0].parity, eff: document.getElementById('peff0').innerHTML }));
+  check('Рентген: игрок 1 узнал, что число чётное', x.know === 0, JSON.stringify(x));
+  await step(90);                       // игрок 2 — Щит
+  check('Щит: у игрока 2', await page.evaluate(() => D.shield[1]));
+  await step(20);                       // игрок 1 — Заморозка: игрок 2 пропускает
+  const f = await page.evaluate(() => ({ skip: D.skip[1], frozen: D.frozen[1], forced: forcedTurn() }));
+  check('Заморозка: игрок 2 пропускает ход', f.skip && f.frozen && f.forced === 'skip', JSON.stringify(f));
+  const ft = await page.evaluate(() => document.getElementById('forcedText').textContent);
+  check('и сказано — «Заморозка»', /Заморозка/.test(ft), ft);
+  await page.context().close();
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -7309,8 +7342,9 @@ async function testAudit(browser) {
   check('−1000…1000 и 2000 бонусов — на поле ровно 2000, все на разных числах, кроме загаданного',
     opts.includes('2000') && bon.min === -1000 && bon.max === 1000 && bon.n === 2000 && bon.uniq === 2000 && !bon.onSecret && bon.typed,
     JSON.stringify(bon));
-  check('«Бросок в лаву» убран: среди 2000 бонусов его нет, остальные виды есть',
-    bon.kinds === 'blind,extra,fog,gift,memory,skip', bon.kinds);
+  // С другом — и четыре из Приключения: рентген, половина, щит, заморозка
+  check('«Бросок в лаву» убран: среди 2000 бонусов его нет, остальные виды есть (и 4 из Приключения)',
+    bon.kinds === 'blind,extra,fog,freeze,gift,half,memory,shield,skip,xray', bon.kinds);
   await page.evaluate(() => quitToMenu());
   await done(page);
 
@@ -8127,6 +8161,7 @@ async function testKeyPage(browser) {
     await testDailyWeekend(browser);
     await testKidClarity(browser);
     await testOnlineAdvBonuses(browser);
+    await testLocalAdvBonuses(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
