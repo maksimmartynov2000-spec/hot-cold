@@ -15,9 +15,18 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
+  <!-- Шрифт нужен сразу: без предзагрузки текст сначала рисовался системным
+       шрифтом и потом перескакивал на Nunito — строки меняли ширину -->
+  <link rel="preload" href="fonts/nunito-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="fonts/nunito-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <!-- Соединение с базой — заранее, пока грузится страница: первый ответ
+       (вход, задания) приходит быстрее -->
+  <link rel="preconnect" href="https://fzakcsvyceqsnowvkxfu.supabase.co" crossorigin />
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<!-- booting: пока скрипты не нарисовали первый экран, заготовку не видно —
+     иначе на слабом телефоне мелькали пустые карточки и английские подписи -->
+<body class="booting">
 <div class="card" id="card">
   <div id="updateBanner" class="hidden"></div>
   <div class="top-controls">
@@ -220,6 +229,10 @@
       </div>
 
       <div class="center">
+        <!-- Две половины партии. На телефоне вертикально их нет (display: contents) —
+             всё идёт одной колонкой. Горизонтально (телефон, iPad) слева подсказка,
+             справа поле ввода, прямая и ходы: поле ввода не закрывает подсказку -->
+        <div class="g-main">
 
         <div class="info-bar" id="infoBar">
           <span class="confirmed" id="tConfirmed"></span>
@@ -300,6 +313,9 @@
 
         <div class="bonus-line hidden" id="bonusLine" role="button" onclick="openBonusGuide(D.lastBonus)"></div>
 
+        </div>
+        <div class="g-side">
+
         <div class="numline hidden" id="numLine"><svg id="numLineSvg" width="100%" height="48"></svg></div>
         <div class="known-line hidden" id="knownLine"></div>
 
@@ -336,6 +352,7 @@
           <div class="history-list" id="historyList"></div>
         </div>
 
+        </div>
       </div>
     </div>
 
@@ -1009,8 +1026,10 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="vendor/qrcode.js"></script>
+<!-- supabase-js 2.118.0 (MIT) — своей копией, а не с CDN: чужой сервер
+     держал запуск игры, пока не ответит, и мог быть недоступен из какой-то
+     страны. QR-код (vendor/qrcode.js) грузится, только когда он нужен -->
+<script src="vendor/supabase.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/art.js"></script>
 <script src="js/game.js"></script>

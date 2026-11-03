@@ -192,7 +192,10 @@ function openAdventure() {
   endLessonMode();
   showScreen('adventure');
   renderAdventure();
-  advSync().then(() => { if (screen === 'adventure') renderAdventure(); });
+  // Карту перерисовываем, только если база что-то поменяла: 50 соперников с
+  // картинками заново — заметная пауза на слабом телефоне
+  const was = advDone() + '|' + advStars();
+  advSync().then(() => { if (screen === 'adventure' && advDone() + '|' + advStars() !== was) renderAdventure(); });
 }
 
 function renderAdventure() {

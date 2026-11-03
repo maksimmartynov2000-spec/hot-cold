@@ -599,6 +599,10 @@ function stubSupabase(opts) {
 
 // Ставит заглушку на страницу: обе части — и функция, и её настройки
 async function applyStub(page, opts) {
+  // Настоящая библиотека лежит рядом (vendor/supabase.js) и, загрузившись,
+  // затёрла бы заглушку — вместо неё отдаём пустой файл
+  await page.route('**/vendor/supabase.js', route =>
+    route.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
   await page.addInitScript(stubSupabase(opts || {}), opts || {});
 }
 

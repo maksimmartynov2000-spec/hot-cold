@@ -4,7 +4,7 @@
 
 // Версию поднимаем, когда меняется что-то из CORE: старый кеш отдаётся сразу,
 // и без смены имени телефон продолжил бы брать прежний manifest
-const CACHE = 'hot-cold-v37';
+const CACHE = 'hot-cold-v38';
 
 // Своё, что нужно для запуска
 const CORE = [
@@ -20,6 +20,7 @@ const CORE = [
   './js/pass.js',
   './js/main.js',
   './vendor/qrcode.js',
+  './vendor/supabase.js',
   './fonts/nunito-latin.woff2',
   './fonts/nunito-cyrillic.woff2',
   './manifest.webmanifest',
@@ -84,7 +85,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Остальное (иконки, библиотека с CDN): отдаём из кеша сразу,
+  // Остальное (иконки, библиотеки из vendor/): отдаём из кеша сразу,
   // а свежую версию подтягиваем в фоне на следующий раз
   event.respondWith(
     caches.match(req).then(hit => {
