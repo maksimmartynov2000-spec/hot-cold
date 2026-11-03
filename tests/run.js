@@ -7280,6 +7280,12 @@ async function testTablet(browser) {
     const tr = await page.evaluate(() => { const a = document.getElementById('tRunStart').getBoundingClientRect(),
       b = document.getElementById('trialDaily').getBoundingClientRect(); return Math.abs(a.top - b.top) < 4 && b.left > a.right; });
     check(w + '×' + h + ': Испытание — ' + (w > h ? 'две колонки' : 'одна колонка'), tr === (w > h), String(tr));
+    // Приключение: два мира в ряд — только горизонтально
+    await page.evaluate(() => { showScreen('mode'); openAdventure(); });
+    await page.waitForTimeout(400);
+    const adv = await page.evaluate(() => { const w = document.querySelectorAll('#advMap .adv-world');
+      const a = w[0].getBoundingClientRect(), b = w[1].getBoundingClientRect(); return Math.abs(a.top - b.top) < 4; });
+    check(w + '×' + h + ': Приключение — ' + (w > h ? 'два мира в ряд' : 'один под другим'), adv === (w > h), String(adv));
     await page.evaluate(() => showScreen('mode'));
     await page.click('.mode-btn.solo');
     await page.evaluate(() => { document.getElementById('rangeMax').value = '100'; onRangeChange(); });
