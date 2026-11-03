@@ -44,9 +44,9 @@ function serve() {
     localStorage.setItem('hc_run_pin', '1234');
   });
 
-  // supabase-js берётся с CDN, которого в тесте нет — подменяем заглушкой,
-  // чтобы проверять именно офлайн-загрузку страницы, а не сеть до Supabase
-  await page.route('**/supabase-js*', route =>
+  // supabase-js лежит в vendor/, но ходит в настоящую базу — подменяем
+  // заглушкой, чтобы проверять именно офлайн-загрузку страницы, а не сеть до Supabase
+  await page.route('**/vendor/supabase.js', route =>
     route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.supabase={createClient:()=>({from:()=>({select:()=>({eq:()=>({single:async()=>({data:null,error:1})})})}),' +
             // без сети настоящий supabase-js падает на fetch — заглушка должна вести себя так же,
             // иначе офлайн-проверка получит успешный ответ и ничего не проверит
@@ -69,8 +69,10 @@ function serve() {
   await page.waitForTimeout(600);
 
   check('без сети страница открывается', await page.locator('#screenMode').isVisible());
-  // QR-код приглашения рисуется и без интернета: библиотека лежит рядом с игрой
-  check('без сети библиотека QR-кода на месте', await page.evaluate(() => typeof qrcode === 'function'));
+  // QR-код приглашения рисуется и без интернета: библиотека грузится, только
+  // когда нужна, и без сети берётся из кеша
+  check('без сети библиотека QR-кода на месте', await page.evaluate(() => loadQrLib().then(() => typeof qrcode === 'function')));
+  check('supabase-js — из кеша, без CDN', await page.evaluate(() => caches.match('./vendor/supabase.js').then(r => !!r)));
   check('без сети видны все пять режимов',
     (await page.locator('#screenMode .mode-btn:not(.hidden)').count()) === 5);
 

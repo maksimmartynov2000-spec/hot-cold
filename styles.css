@@ -2634,3 +2634,117 @@ body.on-online #rkPlayBar { max-width: 560px; margin: 0 auto; }
   #advMap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
   #advMap .adv-world { margin: 0; }
 }
+
+/* ================= ЭКРАНЫ НА ВСЕХ УСТРОЙСТВАХ =================
+   Один проход по всем экранам: iPhone SE … Pro Max, телефон набок, iPad. */
+
+/* Ширина окна меняется сразу, без анимации: плавный переход по ширине
+   перестраивал весь экран каждый кадр — экран дёргался при каждом переходе
+   и при запуске на iPad */
+.card { transition: none; }
+
+/* Половины партии: на телефоне вертикально их как будто нет — одна колонка */
+.g-main, .g-side { display: contents; }
+
+/* «⚡ +1 ход» и кнопки в списке друзей — под палец ребёнка: были 28–29 px */
+.board.duel .pcard .token-btn { min-height: 36px; padding: 6px 12px; font-size: 14px; }
+.friend-row .fr-btn { min-height: 36px; padding: 7px 12px; font-size: 13.5px; }
+
+/* ---- Партия горизонтально: телефон набок и iPad ----
+   Поле ввода, закреплённое внизу, на низком экране закрывало подсказку и
+   прямую, а ходы уезжали за край. Теперь слева — плашки игроков, ход,
+   подсказка и шкала, справа — поле ввода, прямая и ходы. Поле ввода сверху
+   правой половины и не уезжает при прокрутке: клавиатура его не закрывает */
+@media (orientation: landscape) and (pointer: coarse) and (min-width: 640px) {
+  body.on-game .card { max-width: 1040px; padding-bottom: 16px; }
+  body.on-game .board.solo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "main side"; gap: 0 18px; }
+  body.on-game .board.duel { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "p0 p1" "main side"; gap: 10px 18px; align-items: start; }
+  body.on-game .board .center { display: contents; }
+  body.on-game .g-main { display: block; grid-area: main; min-width: 0; }
+  body.on-game .g-side { display: flex; flex-direction: column; grid-area: side; min-width: 0; }
+  body.on-game .g-side > :is(#guessSection, #finalBox, #forcedTurn) { order: -1; position: sticky; top: 8px; bottom: auto; left: auto; right: auto;
+    z-index: 5; max-width: none; margin: 0 0 12px; padding: 10px; border: none; border-radius: 18px; }
+  body.on-game .g-side .numline { margin-top: 4px; }
+  /* Слева подсказка встаёт сразу под строкой хода: отступы — как в телефонной дуэли */
+  body.on-game .g-main .feedback-panel { margin-top: 10px; }
+  /* Половина уже экрана: слово подсказки — по её ширине, а не по ширине экрана,
+     и «от 1 до 1 000» в поле ввода помещается целиком */
+  body.on-game .feedback-panel .fb-label { font-size: clamp(22px, 3.2vw, 32px) !important; }
+  body.on-game .feedback-panel .fb-label.long { font-size: clamp(20px, 2.7vw, 28px) !important; }
+  body.on-game .g-side #guessInput { min-width: 0; padding-left: 6px; padding-right: 6px; font-size: 19px; }
+  body.on-game .g-side #tSubmitGuess { padding-left: 16px; padding-right: 16px; }
+}
+
+/* ---- Телефон набок: низкий экран ----
+   Нижнее меню — в одну строку (значок рядом с подписью): по высоте вдвое
+   ниже. Меню, Испытание, онлайн и Приключение — в две колонки, как на iPad */
+@media (orientation: landscape) and (max-height: 500px) {
+  .tabbar { padding: 3px 12px calc(3px + env(safe-area-inset-bottom)); }
+  .tab { flex-direction: row; justify-content: center; align-items: center; gap: 8px; min-height: 42px; }
+  .card { padding-bottom: 64px; }
+  .card { padding-top: 4px; }
+  #screenMode .mode-list { gap: 10px; }
+  /* Меню целиком на одном экране: плитки ниже, значки меньше */
+  #screenMode .mode-btn.wide { padding-top: 12px; padding-bottom: 12px; }
+  #screenMode .mode-btn.tile { padding: 10px 4px 9px; gap: 4px; }
+  #screenMode .mode-btn.tile .m-icon { width: 44px; height: 44px; }
+}
+
+/* Окно выше экрана прокручивается целиком, и его верх не уезжает за край.
+   На iPad это было в профиле: экран масштабирован, а высота окна считалась
+   по немасштабированному — низ окна с «Готово» был не достать */
+.modal-backdrop { overflow-y: auto; overscroll-behavior: contain; }
+.modal-backdrop > .modal-card { margin-top: auto; margin-bottom: auto; flex-shrink: 0; }
+@media (min-width: 744px) and (pointer: coarse) {
+  .modal-card, .path-card { max-height: none; }
+}
+
+/* Подпись вкладки — своей строкой с первого кадра: текст приходит из
+   скрипта, и без запаса нижнее меню подрастало на глазах при запуске */
+.tab > span:last-child { display: block; min-height: 1.25em; line-height: 1.25; }
+@media (orientation: landscape) and (pointer: coarse) and (min-width: 640px) and (max-width: 1023px) {
+  body.on-mode .card { max-width: 860px; }
+  #screenMode .mode-list { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  #screenMode .mode-list > .mode-btn.wide { grid-column: span 3; }
+  #screenMode .mode-list > .mode-btn.tile { grid-column: span 2; }
+
+  body.on-runHub .card, body.on-online .card { max-width: 900px; }
+  #screenRunHub:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; align-items: start; }
+  #screenRunHub > * { grid-column: 1 / -1; }
+  #screenRunHub > #tRunStart, #screenRunHub > .frost-row, #screenRunHub > #trialBest { grid-column: 1; }
+  #screenRunHub > #trialDaily, #screenRunHub > #runRules { grid-column: 2; }
+  #screenRunHub > #trialDaily { grid-row: 2 / span 3; }
+  #screenRunHub > #runRules { grid-row: 5; }
+  #screenRunHub > #tRunStart { grid-row: 2; }
+  #screenRunHub > .frost-row { grid-row: 3; }
+  #screenRunHub > #trialBest { grid-row: 4 / span 2; }
+
+  #screenOnline:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; align-items: start; }
+  #screenOnline > * { grid-column: 1 / -1; }
+  #screenOnline > #olDaily:not(.hidden) { grid-column: 1; grid-row: 2; margin-bottom: 0; }
+  #screenOnline > #olDaily:not(.hidden) ~ #olRanked { grid-column: 2; grid-row: 2; }
+
+  body.on-adventure .card { max-width: 980px; }
+  #advMap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  #advMap .adv-world { margin: 0; }
+}
+
+/* ---- Высокий экран (большой iPhone, iPad вертикально) ----
+   Меню занимало верхнюю треть, ниже — пустота. Плитки растут вместе с
+   высотой экрана: крупнее кнопки — легче попасть, меньше пустоты */
+@media (min-height: 800px) and (orientation: portrait) {
+  #screenMode .mode-btn.wide { min-height: clamp(84px, 11vh, 120px); }
+  #screenMode .mode-btn.tile { min-height: clamp(150px, 21vh, 220px); }
+  #screenMode .mode-btn.tile .m-icon { width: clamp(56px, 8vh, 84px); height: clamp(56px, 8vh, 84px); }
+  #screenMode .mode-btn.wide .m-icon { width: clamp(52px, 6.5vh, 68px); height: clamp(52px, 6.5vh, 68px); }
+}
+
+/* ---- Скорость ----
+   Миры Приключения за краем экрана браузер не раскладывает и не рисует, пока
+   до них не долистали: при открытии карты — один-два мира, а не пять с 50
+   картинками. Место под них держится по последнему размеру */
+.adv-world { content-visibility: auto; contain-intrinsic-size: auto 270px; }
+/* Запуск: до первого экрана видно только фон. Не сработал скрипт — через
+   3 секунды показываем как есть, чтобы не остаться с пустым экраном */
+body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forwards; }
+@keyframes hc-reveal { to { visibility: visible; } }

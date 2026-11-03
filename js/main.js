@@ -68,6 +68,8 @@ document.getElementById('winsNeeded').value = '3';
 initChips();
 applyTranslations();
 showScreen('mode');
+// Первый экран нарисован — показать (до этого видна только заставка-фон)
+document.body.classList.remove('booting');
 // Подтянуть свою иконку и проверить, что сохранённый вход ещё наш
 if (runAuth()) { syncProfile(); startSignals(); startSeen(); }
 // Вернулся в игру — сразу отметиться «я здесь», не дожидаясь минуты

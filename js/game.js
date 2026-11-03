@@ -3953,11 +3953,19 @@ function bestPathLength(target, min, max) {
 }
 
 // В среднем у сильного игрока на этом диапазоне — по равномерной выборке
-// загаданных. Считается один раз на диапазон
+// загаданных. Считается один раз на диапазон и запоминается в телефоне:
+// перебор на 1–1000 занимал четверть секунды на слабом телефоне при каждом
+// первом открытии тренировки. Поменяется расчёт — сменить версию ключа
 const strongCache = {};
+const STRONG_KEY = 'hc_strong_v1';
+function strongSaved() {
+  try { const v = JSON.parse(localStorage.getItem(STRONG_KEY)); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; }
+}
 function strongAverage() {
   const key = RANGE_MIN + ':' + RANGE_MAX;
-  if (strongCache[key]) return strongCache[key];
+  if (key in strongCache) return strongCache[key];
+  const saved = strongSaved();
+  if (typeof saved[key] === 'number') return (strongCache[key] = saved[key]);
   const n = rangeCount(), samples = Math.min(n, 24);
   let sum = 0, cnt = 0;
   for (let i = 0; i < samples; i++) {
@@ -3966,6 +3974,10 @@ function strongAverage() {
     if (k) { sum += k; cnt++; }
   }
   strongCache[key] = cnt ? sum / cnt : null;
+  if (strongCache[key] !== null) {
+    saved[key] = strongCache[key];
+    try { localStorage.setItem(STRONG_KEY, JSON.stringify(saved)); } catch (e) {}
+  }
   return strongCache[key];
 }
 

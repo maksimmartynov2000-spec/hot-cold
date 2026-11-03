@@ -7307,6 +7307,120 @@ async function testTablet(browser) {
   await ctx.close();
 }
 
+async function testScreensEverywhere(browser) {
+  console.log('\nЭкраны на всех устройствах: набок, iPad, скорость');
+  // Телефон набок и iPad горизонтально: партия в две половины. Раньше поле
+  // ввода, закреплённое внизу, закрывало подсказку и прямую
+  for (const [w, h] of [[844, 390], [667, 375], [1180, 820]]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: true });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => check('без ошибок JS', false, e.message));
+    await applyStub(page, { user: 'Лев' });
+    await page.addInitScript(() => { window.__play = { elo: 1000, games: 0, offers: [] }; });
+    await page.goto(GAME_URL);
+    await page.waitForTimeout(400);
+    const tag = w + '×' + h;
+    if (h < 500) {
+      const tb = await page.evaluate(() => document.getElementById('tabbar').offsetHeight);
+      check(tag + ': нижнее меню в одну строку — ниже вдвое', tb > 0 && tb <= 52, tb + 'px');
+    }
+    await page.click('.mode-btn.solo');
+    await page.evaluate(() => { document.getElementById('rangeMax').value = '100'; onRangeChange(); });
+    await page.click('#tStartMatch');
+    await page.evaluate(() => { secret = 63; });
+    await page.fill('#guessInput', '50'); await page.click('#tSubmitGuess'); await page.waitForTimeout(300);
+    const g = await page.evaluate(() => {
+      const r = el => el.getBoundingClientRect();
+      const main = r(document.querySelector('.g-main')), side = r(document.querySelector('.g-side'));
+      const fb = r(document.getElementById('feedbackPanel')), inp = r(document.getElementById('guessSection'));
+      const line = r(document.getElementById('numLine'));
+      const cross = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      return { sideBySide: side.left >= main.right - 1, inputUp: inp.top < innerHeight / 2,
+        hidesHint: cross(inp, fb), hidesLine: cross(inp, line), hs: document.documentElement.scrollWidth > innerWidth + 1,
+        hist: document.querySelectorAll('#historyList > *').length };
+    });
+    check(tag + ': партия — слева подсказка, справа поле ввода и ходы', g.sideBySide && g.inputUp && !g.hs && g.hist === 1, JSON.stringify(g));
+    check(tag + ': поле ввода не закрывает подсказку и прямую', !g.hidesHint && !g.hidesLine, JSON.stringify(g));
+    // Слово подсказки целиком в своей половине
+    const fit = await page.evaluate(() => { const l = document.getElementById('feedbackLabel'), p = document.getElementById('feedbackPanel');
+      return l.getBoundingClientRect().right <= p.getBoundingClientRect().right + 1; });
+    check(tag + ': «горячо/холодно» помещается в карточку', fit);
+    await page.evaluate(() => { quitToMenu(); openSetup('duel'); });
+    await page.click('#tStartMatch');
+    await page.waitForTimeout(300);
+    const d = await page.evaluate(() => {
+      const p0 = document.getElementById('pcard0').getBoundingClientRect(), p1 = document.getElementById('pcard1').getBoundingClientRect();
+      const main = document.querySelector('.g-main').getBoundingClientRect(), side = document.querySelector('.g-side').getBoundingClientRect();
+      return { cardsRow: Math.abs(p0.top - p1.top) < 2 && p1.left > p0.right, below: main.top >= p0.bottom - 1 && side.top >= p1.bottom - 1 };
+    });
+    check(tag + ': дуэль — плашки игроков в ряд над обеими половинами', d.cardsRow && d.below, JSON.stringify(d));
+    // «⚡ +1 ход» — под палец: не ниже 36 px (было 28)
+    const tok = await page.evaluate(() => document.getElementById('ptoken0').getBoundingClientRect().height / (parseFloat(getComputedStyle(document.documentElement).zoom) || 1));
+    check(tag + ': кнопка «+1 ход» не мельче 36 px', tok >= 35.5, tok.toFixed(1));
+    await ctx.close();
+  }
+
+  // Телефон вертикально — по-старому: поле ввода закреплено внизу экрана
+  let page = await newGame(browser, { user: 'Лев' });
+  await page.click('#tModeSolo');
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(200);
+  const v = await page.evaluate(() => ({ pos: getComputedStyle(document.getElementById('guessSection')).position,
+    bottom: Math.round(innerHeight - document.getElementById('guessSection').getBoundingClientRect().bottom),
+    halves: getComputedStyle(document.querySelector('.g-main')).display }));
+  check('телефон вертикально: поле ввода внизу экрана, одна колонка', v.pos === 'fixed' && v.bottom <= 1 && v.halves === 'contents', JSON.stringify(v));
+  // Скорость: QR-код не грузится при запуске, а приходит, когда открыли приглашение
+  const qr0 = await page.evaluate(() => typeof qrcode);
+  await page.evaluate(() => openInvite());
+  await page.waitForTimeout(500);
+  const qr1 = await page.evaluate(() => ({ lib: typeof qrcode, svg: !!document.querySelector('#invQr svg') }));
+  check('QR-библиотека грузится только для приглашения', qr0 === 'undefined' && qr1.lib === 'function' && qr1.svg, qr0 + ' → ' + JSON.stringify(qr1));
+  // Запуск без мелькания заготовки: класс снят после первого экрана
+  check('после запуска экран показан (booting снят)', await page.evaluate(() => !document.body.classList.contains('booting')));
+  // supabase-js — своей копией из vendor/, а не с CDN
+  check('supabase-js подключён из vendor/, не с CDN', await page.evaluate(() =>
+    [...document.scripts].some(s => /vendor\/supabase\.js$/.test(s.src)) && ![...document.scripts].some(s => /jsdelivr/.test(s.src))));
+  await done(page);
+
+  // Профиль: сетка иконок строится, только когда её открыли
+  page = await newGame(browser, { user: 'Лев', profile: { avatar: '🦊', color: '#60a5fa' } });
+  await page.evaluate(() => openLogoutModal());
+  await page.waitForTimeout(300);
+  const av0 = await page.evaluate(() => document.querySelectorAll('#avGrid .av-tile').length);
+  await page.evaluate(() => showAvatarPicker(true));
+  const av1 = await page.evaluate(() => document.querySelectorAll('#avGrid .av-tile').length);
+  check('профиль: сетка иконок — только по нажатию', av0 === 0 && av1 > 20, av0 + ' → ' + av1);
+  await done(page);
+
+  // Онлайн набок: «Играть» стоит прямо над нижним меню, а не посреди экрана
+  const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  page = await ctx.newPage();
+  await applyStub(page, { user: 'Лев' });
+  await page.addInitScript(() => { window.__play = { elo: 1000, games: 0, offers: [] }; });
+  await page.goto(GAME_URL);
+  await page.waitForTimeout(300);
+  await openAuth(page);
+  await page.evaluate(() => openOnline());
+  await page.waitForTimeout(600);
+  const pb = await page.evaluate(() => { const b = document.getElementById('rkPlayBar').getBoundingClientRect(), t = document.getElementById('tabbar').getBoundingClientRect();
+    return Math.round(t.top - b.bottom); });
+  check('онлайн набок: «Играть» прямо над нижним меню', Math.abs(pb) <= 2, pb + 'px');
+  await ctx.close();
+
+  // iPad горизонтально: окно профиля выше экрана — прокручивается, верх не за краем
+  const ip = await browser.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
+  page = await ip.newPage();
+  await applyStub(page, { user: 'Лев', profile: { avatar: '🦊', color: '#60a5fa' } });
+  await page.goto(GAME_URL);
+  await page.waitForTimeout(300);
+  await page.evaluate(() => openLogoutModal());
+  await page.waitForTimeout(400);
+  const m = await page.evaluate(() => { const bd = document.getElementById('logoutModal'), c = bd.firstElementChild.getBoundingClientRect();
+    return { top: Math.round(c.top), fits: c.bottom <= innerHeight + 1, scroll: bd.scrollHeight > bd.clientHeight + 1 }; });
+  check('iPad: окно профиля целиком достаётся (верх на экране, низ — прокруткой)', m.top >= -1 && (m.fits || m.scroll), JSON.stringify(m));
+  await ip.close();
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -8240,6 +8354,7 @@ async function testKeyPage(browser) {
     await testLocalAdvBonuses(browser);
     await testNoJumps(browser);
     await testTablet(browser);
+    await testScreensEverywhere(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

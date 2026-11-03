@@ -342,7 +342,10 @@ function fillProfile() {
   document.getElementById('pfEdit').classList.toggle('hidden', !(auth && profileInfo));
   document.getElementById('pfBlockedFold').classList.toggle('hidden', !(auth && profileInfo));
   document.getElementById('tMoreHead').textContent = L.more;
-  if (auth && profileInfo) renderAvatarGrid();
+  // Сетка иконок (больше сотни кнопок с картинками) — только когда она открыта:
+  // окно профиля перерисовывается до пяти раз, пока приходят ответы сервера,
+  // и каждый раз строить свёрнутую сетку заново стоило полсекунды на слабом телефоне
+  if (auth && profileInfo && !document.getElementById('avGrid').classList.contains('hidden')) renderAvatarGrid();
   if (auth) {
     paintPinButton();
     document.getElementById('tLogoutAsk').textContent = L.run.logoutAsk.replace('{name}', auth.username);
@@ -388,6 +391,7 @@ function openPinFromWarn() {
 }
 
 function showAvatarPicker(show) {
+  if (show && runAuth() && profileInfo) renderAvatarGrid();
   document.getElementById('avGrid').classList.toggle('hidden', !show);
 }
 
@@ -1573,6 +1577,24 @@ async function acceptPendingInvite() {
   }
 }
 
+// Библиотека QR-кода нужна только в «Пригласить друга» — её не грузим при
+// запуске. Без сети она берётся из кеша service worker'а (sw.js)
+let qrLibLoading = null;
+function loadQrLib() {
+  if (typeof qrcode === 'function') return Promise.resolve();
+  if (!qrLibLoading) {
+    qrLibLoading = new Promise(resolve => {
+      const s = document.createElement('script');
+      s.src = 'vendor/qrcode.js';
+      s.onload = resolve;
+      // Не загрузилась — приглашение работает и без картинки: ссылка и «Поделиться»
+      s.onerror = () => { qrLibLoading = null; resolve(); };
+      document.head.appendChild(s);
+    });
+  }
+  return qrLibLoading;
+}
+
 async function openInvite() {
   const I = t().inv;
   document.getElementById('invTitle').textContent = I.invTitle;
@@ -1591,13 +1613,16 @@ async function openInvite() {
   inviteLink = location.href.split(/[?#]/)[0] + '?invite=' + encodeURIComponent(code);
   const box = document.getElementById('invQr');
   box.innerHTML = '';
-  if (typeof qrcode === 'function') {
+  // Окно — сразу, QR-код — как только приедет библиотека (обычно из кеша)
+  document.getElementById('inviteModal').classList.remove('hidden');
+  const link = inviteLink;
+  await loadQrLib();
+  if (typeof qrcode === 'function' && inviteLink === link) {
     const qr = qrcode(0, 'M');
-    qr.addData(inviteLink);
+    qr.addData(link);
     qr.make();
     box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
   }
-  document.getElementById('inviteModal').classList.remove('hidden');
 }
 
 function closeInvite() { document.getElementById('inviteModal').classList.add('hidden'); }
@@ -2771,8 +2796,15 @@ function renderOffers() {
 // столько же места, чтобы она ничего не закрывала
 function fitPlayBar() {
   const bar = document.getElementById('rkPlayBar'), scr = document.getElementById('screenOnline');
-  if (bar && scr) scr.style.paddingBottom = (bar.offsetHeight + 24) + 'px';
+  if (!bar || !scr) return;
+  // Прямо над нижним меню, какой бы высоты оно ни было: у телефона набок оно
+  // ниже, и панель с запасом под вертикальное меню висела посреди экрана
+  const tabs = document.getElementById('tabbar');
+  if (tabs && tabs.offsetHeight) bar.style.bottom = tabs.offsetHeight + 'px';
+  scr.style.paddingBottom = (bar.offsetHeight + 24) + 'px';
 }
+// Повернули телефон — меню сменило высоту: панель переставить
+window.addEventListener('resize', () => { if (screen === 'online') fitPlayBar(); });
 async function acceptOffer(i) {
   const o = playOffers[i];
   if (!o) return;

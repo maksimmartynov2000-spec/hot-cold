@@ -69,7 +69,7 @@ async function callFunction(db, fn, args) {
 }
 
 async function attach(context, db, log) {
-  await context.route('**/cdn.jsdelivr.net/**', route =>
+  await context.route('**/vendor/supabase.js', route =>
     route.fulfill({ status: 200, contentType: 'text/javascript', body: SHIM }));
   await context.route(SUPA + '/**', async route => {
     const url = new URL(route.request().url());
