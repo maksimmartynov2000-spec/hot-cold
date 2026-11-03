@@ -1909,9 +1909,11 @@ function openBonusGuide(focus) {
   const group = (head, kinds) => '<div class="bg-head">' + head + '</div>' + kinds.map(k =>
     '<div class="bg-row' + (k === focus ? ' on' : '') + '"><span class="bg-ic">' + bonusArtHtml(k, BONUS_ICON[k]) + '</span>' +
     '<span class="bg-txt"><b>' + L.bonusNames[k] + '</b><span>' + L.tut.bcDesc[k] + '</span></span></div>').join('');
-  document.getElementById('bgList').innerHTML = group(L.bgGood, ['extra', 'fog', 'blind', 'rush']) +
+  // Рентген, половина, щит и заморозка теперь и в онлайне (миграция 057);
+  // только в Приключении остался Шальной бросок
+  document.getElementById('bgList').innerHTML = group(L.bgGood, BONUS_ONLINE) +
     group(L.bgBad, ['skip', 'gift', 'memory']) +
-    group(L.bgAdv, BONUS_ADV);
+    group(L.bgAdv, ['lava']);
   document.getElementById('bonusGuide').classList.remove('hidden');
 }
 function closeBonusGuide() {
@@ -3084,6 +3086,16 @@ function applyMatchState(st) {
   D.rush = (st.rush || [0, 0]).slice();
   D.nearBonus = !!st.nearBonus;
   D.lastBonus = st.lastBonus || null;
+  // Бонусы из Приключения (миграция 057): щит и заморозку видят оба, знание —
+  // только своё (сервер чужое не присылает)
+  D.shield = (st.shield || [false, false]).slice();
+  D.frozen = (st.frozen || [false, false]).slice();
+  D.shieldedTrap = st.shieldTrap || null;
+  D.know = [{}, {}];
+  if (st.know) {
+    if (st.know.parity !== null && st.know.parity !== undefined) D.know[st.seat].parity = st.know.parity;
+    if (st.know.half) D.know[st.seat].half = st.know.half;
+  }
   D.lastBonusBy = st.lastBonusBy || 0;
   D.bonuses = [];
   bonusMode = !!st.bonusesOn;

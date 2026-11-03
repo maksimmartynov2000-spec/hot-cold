@@ -7148,6 +7148,56 @@ async function testKidClarity(browser) {
   await page.context().close();
 }
 
+// Онлайн: Рентген, Половина, Щит, Заморозка (миграция 057)
+async function testOnlineAdvBonuses(browser) {
+  console.log('\nОнлайн: бонусы из Приключения');
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => {
+    Object.assign(window.__match, { bonusesOn: true, seat: 0, cur: 0, names: ['Лев', 'Кира'],
+      shield: [true, false], frozen: [false, false], know: { parity: 0, half: 'low' },
+      lastBonus: 'xray', lastBonusBy: 0 });
+    openMatch(1);
+  });
+  await page.waitForTimeout(500);
+  const v = await page.evaluate(() => ({ me: document.getElementById('peff0').innerHTML, rival: document.getElementById('peff1').innerHTML,
+    line: document.getElementById('bonusLine').textContent }));
+  check('у меня — щит и что я знаю: чётное, нижняя половина', /🛡️/.test(v.me) && /чётн/i.test(v.me) && /≤ ?50|до 50|50/.test(v.me), v.me);
+  check('у соперника моего знания нет', !/чётн/i.test(v.rival), v.rival);
+  check('строка бонуса — «Рентген»', /Рентген/.test(v.line), v.line);
+
+  // Сопернику: он взял Рентген, но ответа ему не видно — сервер не присылает
+  await page.evaluate(() => { Object.assign(window.__match, { seat: 1, know: { parity: null, half: null }, shield: [true, false] }); refreshMatch(true); });
+  await page.waitForTimeout(300);
+  const other = await page.evaluate(() => ({ me: document.getElementById('peff1').innerHTML, rival: document.getElementById('peff0').innerHTML }));
+  check('щит соперника видно мне', /🛡️/.test(other.rival), other.rival);
+  check('его чётность мне не видна', !/чётн/i.test(other.me + other.rival), other.me + other.rival);
+
+  // Заморозка: мой ход пропускается — словами про заморозку, не про ловушку
+  await page.evaluate(() => { Object.assign(window.__match, { seat: 1, cur: 1, skip: [false, true], frozen: [false, true], forced: 'skip',
+    lastBonus: 'freeze', lastBonusBy: 0, shield: [false, false] }); refreshMatch(true); });
+  await page.waitForTimeout(300);
+  const fz = await page.evaluate(() => ({ text: document.getElementById('forcedText').textContent, eff: document.getElementById('peff1').innerHTML }));
+  check('замёрз — «Заморозка — этот ход вы пропускаете», значок 🧊', /Заморозка/.test(fz.text) && /🧊/.test(fz.eff), JSON.stringify(fz));
+
+  // Щит отбил ловушку
+  await page.evaluate(() => { Object.assign(window.__match, { seat: 0, cur: 1, skip: [false, false], frozen: [false, false], forced: null,
+    lastBonus: 'shieldUsed', lastBonusBy: 0, shieldTrap: 'skip' }); refreshMatch(true); });
+  await page.waitForTimeout(300);
+  const su = await page.evaluate(() => document.getElementById('bonusLine').textContent);
+  check('строка: щит отбил ловушку «Пропуск хода»', /Щит/.test(su) && /Пропуск хода/.test(su), su);
+
+  // Список бонусов: четыре новых — в полезных, «только в Приключении» — один Шальной бросок
+  await page.evaluate(() => openBonusGuide());
+  const guide = await page.evaluate(() => [...document.querySelectorAll('#bgList .bg-head')].map(h => {
+    const rows = []; let n = h.nextElementSibling;
+    while (n && n.classList.contains('bg-row')) { rows.push(n.querySelector('b').textContent); n = n.nextElementSibling; }
+    return h.textContent + ': ' + rows.join(',');
+  }));
+  check('список бонусов: Рентген, Половина, Щит, Заморозка — среди полезных', /Рентген,Половина,Щит,Заморозка/.test(guide[0]) &&
+    guide[2] === 'Только в Приключении: Шальной бросок', guide.join(' | '));
+  await page.context().close();
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -8076,6 +8126,7 @@ async function testKeyPage(browser) {
     await testOnlinePass(browser);
     await testDailyWeekend(browser);
     await testKidClarity(browser);
+    await testOnlineAdvBonuses(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
