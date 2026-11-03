@@ -1059,9 +1059,13 @@ function startRound() {
   secret = RANGE_MIN + Math.floor(Math.random() * rangeCount());
   history = [];
   setGuessNote('');
-  D.tokens = [1, 1];
+  // В Приключении «⚡ +1 ход» раздаёт сложность: легко 2/0, нормально 1/1, трудно 0/2
+  D.tokens = (vsBot && vsBot.adv) ? advTokens(vsBot.adv, vsBot.diff) : [1, 1];
   if (D.handicap === 1) D.tokens[0] = 2;
   if (D.handicap === 2) D.tokens[1] = 2;
+  // Был ли у игрока «+1 ход» в этом раунде: «использован» — только у того,
+  // у кого он был, а на «Трудно» у игрока его нет с начала
+  D.tokenSeen = D.tokens.map(k => k > 0);
   D.cur = D.starter;
   D.armed = false;
   D.roundOver = false;
@@ -2167,7 +2171,9 @@ function renderPlayers() {
       const code = raw === myName() ? (onlineInfo && onlineInfo.title) : (avatarCache[raw] || {}).title;
       if (code && t().pass.titles[code]) title = '<small class="p-title">' + escapeHtml(t().pass.titles[code]) + '</small>';
     }
-    nameEl.innerHTML = mark + escapeHtml(D.names[p]) + title;
+    // Имя — своим блоком: длинное («Черепаха Путешественница») сокращается
+    // многоточием и не сплющивает портрет рядом
+    nameEl.innerHTML = mark + '<span class="p-nm">' + escapeHtml(D.names[p]) + '</span>' + title;
 
     // Счёт побед — числом «1/3» с кубком: кружочки ○○○ читались как непонятный узор
     const pipsEl = document.getElementById('ppips' + p);
@@ -2184,8 +2190,10 @@ function renderPlayers() {
     const count = D.tokens[p] > 1 ? ' ×' + D.tokens[p] : '';
     // На кнопке — коротко: длинная подпись переносилась на две строки и
     // наезжала на счёт и значки помех. Полностью сказано в полосе над доской
+    if (D.tokenSeen && D.tokens[p] > 0) D.tokenSeen[p] = true;
+    const never = !online && D.tokenSeen && !D.tokenSeen[p];
     btn.textContent = (D.armed && D.cur === p) ? L.tokenOn
-                      : (D.tokens[p] === 0 ? L.tokenSpent : L.tokenBtn + count);
+                      : (D.tokens[p] === 0 ? (never ? L.tokenNone : L.tokenSpent) : L.tokenBtn + count);
 
     // Что на игроке висит — значками, с полными названиями по наведению
     const flags = [[D.fog[p], bonusArtHtml('fog', '🙈'), L.bonusNames.fog],

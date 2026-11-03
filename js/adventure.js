@@ -44,18 +44,26 @@ function advChar(n) {
 }
 function advName(n) { return t().adv.names[n]; }
 
-// Сила соперника растёт от мира к миру и чуть-чуть внутри мира
-function advLevel(c, diff) {
+// Сила соперника растёт от мира к миру и чуть-чуть внутри мира. От
+// сложности не зависит: соперник — один и тот же характер, сложность меняет
+// только, у кого сколько «⚡ +1 ход» (см. advTokens)
+function advLevel(c) {
   let L = 0.08 + c.w * 0.18 + c.i * 0.012 + (c.boss ? 0.06 : 0);
   if (c.quirk === 'fast') L -= 0.08;
   if (c.quirk === 'slow') L += 0.08;
-  if (diff === 'easy') L *= 0.5;
-  if (diff === 'hard') L += 0.2;
   return Math.max(0.02, Math.min(0.98, L));
 }
-function advThink(c, diff) {
-  const base = c.quirk === 'fast' ? [0.6, 1.3] : c.quirk === 'slow' ? [3, 5] : [1.2, 2.8];
-  return diff === 'easy' ? base.map(x => x * 1.2) : base;
+function advThink(c) {
+  return c.quirk === 'fast' ? [0.6, 1.3] : c.quirk === 'slow' ? [3, 5] : [1.2, 2.8];
+}
+
+// Сложность — это «⚡ +1 ход» (два хода подряд) на раунд: [у игрока, у соперника].
+// Легко — оба у игрока, трудно — оба у соперника. «Запасливый» берёт на один больше
+const ADV_DIFF_TOKENS = { easy: [2, 0], normal: [1, 1], hard: [0, 2] };
+function advTokens(c, diff) {
+  const t = (ADV_DIFF_TOKENS[diff] || ADV_DIFF_TOKENS.normal).slice();
+  if (c && c.quirk === 'tokens') t[1]++;
+  return t;
 }
 
 function advDiff() {
@@ -68,6 +76,23 @@ function advDiff() {
 function setAdvDiff(d) {
   try { localStorage.setItem('hc_adv_diff', d); } catch (e) {}
   renderAdventure();
+  // Выбрали в карточке соперника — там же сразу видно, что изменилось
+  if (advCardFor !== null && !document.getElementById('advCard').classList.contains('hidden')) renderAdvCardDiff(advCardFor);
+}
+
+// Кнопки сложности: название и сколько звёзд за победу. Одни и те же — на карте
+// и в карточке соперника
+function advDiffButtons(box) {
+  const A = t().adv, diff = advDiff();
+  box.replaceChildren(...ADV_DIFFS.map((d, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ad-btn' + (d === diff ? ' on' : '');
+    b.dataset.diff = d;
+    b.innerHTML = escapeHtml(A.diff[i]) + '<small class="ad-stars">' + '★'.repeat(i + 1) + '</small>';
+    b.onclick = () => setAdvDiff(d);
+    return b;
+  }));
 }
 
 // ---------- прогресс ----------
@@ -203,14 +228,8 @@ function renderAdventure() {
   document.getElementById('tAdvTitle').innerHTML = artSpan('icons/m-adventure.webp', '🗺️') + ' ' + escapeHtml(A.title);
   document.getElementById('tAdvHint').textContent = A.hint;
   const diff = advDiff();
-  document.getElementById('advDiff').replaceChildren(...ADV_DIFFS.map((d, i) => {
-    const b = document.createElement('button');
-    b.className = 'ad-btn' + (d === diff ? ' on' : '');
-    b.dataset.diff = d;
-    b.innerHTML = escapeHtml(A.diff[i]) + '<small class="ad-stars">' + '★'.repeat(i + 1) + '</small>';
-    b.onclick = () => setAdvDiff(d);
-    return b;
-  }));
+  advDiffButtons(document.getElementById('advDiff'));
+  // Что значит сложность — прямо под кнопками: у кого сколько «⚡ +1 ход»
   document.getElementById('advDiffHint').textContent = A.diffHint[ADV_DIFFS.indexOf(diff)] + ' · ' +
     A.winStars.replace('{s}', '★'.repeat(advDiffStars(diff)));
   advFillStars();
@@ -259,8 +278,26 @@ function renderAdventure() {
   if (next && next.scrollIntoView && done > 0) next.scrollIntoView({ block: 'center' });
 }
 
+// Сложность в карточке: кнопки и у кого сколько «⚡ +1 ход» с этим соперником —
+// выбирают прямо перед боем и видят, что меняется
+let advCardFor = null;
+function renderAdvCardDiff(n) {
+  const A = t().adv, c = advChar(n), diff = advDiff();
+  advDiffButtons(document.getElementById('acDiff'));
+  const [mine, theirs] = advTokens(c, diff);
+  document.getElementById('acTokens').innerHTML =
+    '<span class="act-row"><span class="act-side"><b>' + escapeHtml(A.tokYou) + '</b><span class="act-n">' + advTokenIcons(mine) + '</span></span>' +
+    '<span class="act-side"><b>' + escapeHtml(A.tokThem) + '</b><span class="act-n">' + advTokenIcons(theirs) + '</span></span></span>' +
+    '<small>' + escapeHtml(A.tokWhat) + ' · ' + escapeHtml(A.winStars.replace('{s}', '★'.repeat(advDiffStars(diff)))) + '</small>';
+}
+// «⚡⚡» — столько, сколько есть; ни одного — «—»
+function advTokenIcons(k) {
+  return k > 0 ? '⚡'.repeat(k) : '<span class="act-none">—</span>';
+}
+
 // Карточка соперника: кто, в каком мире, чем опасен, на каких числах
 function openAdvCard(n) {
+  advCardFor = n;
   const A = t().adv, L = t();
   const c = advChar(n), done = advDone();
   const face = document.getElementById('acFace');
@@ -291,9 +328,13 @@ function openAdvCard(n) {
   go.disabled = !open;
   go.onclick = () => startAdventure(n);
   document.getElementById('acBack').textContent = L.back;
+  // Сложность — только у открытого: закрытого всё равно не сыграть
+  document.getElementById('acDiffBox').classList.toggle('hidden', !open);
+  if (open) renderAdvCardDiff(n);
   document.getElementById('advCard').classList.remove('hidden');
 }
 function closeAdvCard() {
+  advCardFor = null;
   document.getElementById('advCard').classList.add('hidden');
 }
 
@@ -326,13 +367,13 @@ function startAdventure(n) {
     trap: (c.boss || magic) ? BONUS_TRAP : [],
     count: magic ? 2 * autoBonusCountFor(rangeCount()) : 0
   };
-  vsBot = { adv: c, diff: diff, bot: { key: c.icon, icon: c.icon, color: c.world.color, level: advLevel(c, diff),
-                           think: advThink(c, diff), greet: 'luck', react: 'nice' } };
+  vsBot = { adv: c, diff: diff, bot: { key: c.icon, icon: c.icon, color: c.world.color, level: advLevel(c),
+                           think: advThink(c), greet: 'luck', react: 'nice' } };
   D.names[0] = myName() || L.you;
   D.names[1] = advName(n);
   D.winsNeeded = c.boss ? 2 : 1;
-  // Жетоны: у «запасливого» два у соперника, на лёгком — два у игрока
-  D.handicap = c.quirk === 'tokens' ? 2 : (diff === 'easy' ? 1 : 0);
+  // «⚡ +1 ход» раздаёт сложность (advTokens) в начале каждого раунда, а не фора
+  D.handicap = 0;
   D.wins = [0, 0];
   D.round = 1;
   D.matchOver = false;
