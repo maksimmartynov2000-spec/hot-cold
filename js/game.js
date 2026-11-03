@@ -361,6 +361,9 @@ const BONUS_TRAP_SHARE = 1 / 3;
 // половина — в какой половине прямой, щит — отбивает следующую ловушку,
 // заморозка — соперник пропускает ход. Лава вернулась в Огненные горы
 const BONUS_ADV = ['xray', 'half', 'shield', 'freeze', 'lava'];
+// Полезные бонусы онлайн-партии (миграция 057): к прежним — четыре из
+// Приключения. Копия online_bonus_good() из базы, сверяется тестом
+const BONUS_ONLINE = ['extra', 'fog', 'blind', 'rush', 'xray', 'half', 'shield', 'freeze'];
 // Набор бонусов на партию: null — обычный. Приключение подставляет свой:
 // { good: [...], trap: [...], count }
 let bonusSet = null;
@@ -1457,7 +1460,7 @@ function renderForcedTurn() {
   if (!kind) return;
   const L = t();
   // Заморозка — тот же пропуск хода, но слова свои: ловушки тут не было
-  const tk = kind === 'skip' && !online && D.frozen && D.frozen[D.cur] ? 'freeze' : kind;
+  const tk = kind === 'skip' && D.frozen && D.frozen[D.cur] ? 'freeze' : kind;
   document.getElementById('forcedText').textContent =
     L.forced[tk].replace('{a}', D.names[D.cur]);
   document.getElementById('forcedBtn').textContent = L.forcedBtn[tk];
@@ -2186,8 +2189,9 @@ function renderPlayers() {
                    [D.frozen && D.frozen[p], '🧊', L.bonusNames.freeze],
                    [D.shortMemory[p], bonusArtHtml('memory', '🧠'), L.bonusNames.memory],
                    [D.shield && D.shield[p], '🛡️', L.bonusNames.shield]].filter(f => f[0]);
-    // Знание из бонусов: своё — словами, чужое — только значком
-    const know = online ? [] : knowText(p);
+    // Знание из бонусов: своё — словами, чужое — только значком. В онлайне
+    // сервер присылает только своё (миграция 057)
+    const know = knowText(p);
     const mineView = p === viewerSeat();
     const knowHtml = know.length
       ? (mineView ? know.map(k => '<span class="k-chip">' + escapeHtml(k) + '</span>').join('')

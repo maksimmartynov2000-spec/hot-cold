@@ -571,6 +571,9 @@ function stubSupabase(opts) {
         nextIn: M.nextIn === undefined ? (M.roundOver && !M.matchOver ? 10 : null) : M.nextIn,
         ready: M.ready || [false, false],
         ladder: M.ladder === undefined ? true : !!M.ladder,
+        // Бонусы из Приключения (миграция 057): знание — только своё
+        shield: M.shield || [false, false], frozen: M.frozen || [false, false],
+        shieldTrap: M.shieldTrap || null, know: M.know || { parity: null, half: null },
         updatedAt: '2026-01-01T00:00:00Z' };
     };
 
