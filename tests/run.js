@@ -7274,6 +7274,13 @@ async function testTablet(browser) {
     const row = await page.evaluate(() => { const a = document.querySelector('.mode-btn.run').getBoundingClientRect(),
       b = document.querySelector('.mode-btn.online').getBoundingClientRect(); return Math.abs(a.top - b.top) < 2; });
     check(w + '×' + h + ': меню — ' + (w > h ? 'Испытание и Онлайн рядом' : 'друг под другом'), row === (w > h), String(row));
+    // Испытание: «Начать» и Испытание дня — рядом только горизонтально
+    await page.evaluate(() => openRunEntry());
+    await page.waitForTimeout(400);
+    const tr = await page.evaluate(() => { const a = document.getElementById('tRunStart').getBoundingClientRect(),
+      b = document.getElementById('trialDaily').getBoundingClientRect(); return Math.abs(a.top - b.top) < 4 && b.left > a.right; });
+    check(w + '×' + h + ': Испытание — ' + (w > h ? 'две колонки' : 'одна колонка'), tr === (w > h), String(tr));
+    await page.evaluate(() => showScreen('mode'));
     await page.click('.mode-btn.solo');
     await page.evaluate(() => { document.getElementById('rangeMax').value = '100'; onRangeChange(); });
     await page.click('#tStartMatch');

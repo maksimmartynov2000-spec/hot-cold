@@ -2603,3 +2603,26 @@ body.on-online #rkPlayBar { max-width: 560px; margin: 0 auto; }
   #screenMode .mode-list > .mode-btn.wide { grid-column: span 3; }
   #screenMode .mode-list > .mode-btn.tile { grid-column: span 2; }
 }
+
+/* ---- iPad горизонтально: Испытание и онлайн в две колонки ----
+   Испытание: слева «Начать», «Мороз и Жара», рекорд и медали; справа
+   Испытание дня и «Как играть». Онлайн: слева сундук, путь и турнир; справа
+   правила, лига и топ. «Играть» онлайна по-прежнему закреплена внизу */
+@media (min-width: 1024px) and (orientation: landscape) and (pointer: coarse) {
+  body.on-runHub .card, body.on-online .card { max-width: 900px; }
+
+  #screenRunHub:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; align-items: start; }
+  #screenRunHub > * { grid-column: 1 / -1; }
+  #screenRunHub > #tRunStart, #screenRunHub > .frost-row, #screenRunHub > #trialBest { grid-column: 1; }
+  #screenRunHub > #trialDaily, #screenRunHub > #runRules { grid-column: 2; }
+  #screenRunHub > #trialDaily { grid-row: 2 / span 3; }
+  #screenRunHub > #runRules { grid-row: 5; }
+  #screenRunHub > #tRunStart { grid-row: 2; }
+  #screenRunHub > .frost-row { grid-row: 3; }
+  #screenRunHub > #trialBest { grid-row: 4 / span 2; }
+
+  #screenOnline:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; align-items: start; }
+  #screenOnline > * { grid-column: 1 / -1; }
+  #screenOnline > #olDaily:not(.hidden) { grid-column: 1; grid-row: 2; margin-bottom: 0; }
+  #screenOnline > #olDaily:not(.hidden) ~ #olRanked { grid-column: 2; grid-row: 2; }
+}
