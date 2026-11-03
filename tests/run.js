@@ -4753,7 +4753,7 @@ async function testBots(browser) {
   await page.waitForTimeout(300);
   const board = await page.evaluate(() => ({
     game: !document.getElementById('screenGame').classList.contains('hidden'),
-    p1: [...document.getElementById('pname1').childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join(''),
+    p1: (document.querySelector('#pname1 .p-nm') || {}).textContent,
     drawn: !!document.querySelector('#pname1 .p-bot svg.icon-art'),
     who: [...document.querySelectorAll('#historyList .h-who')].map(e => e.textContent) }));
   check('нашёлся бот — открылась доска с ним', board.game && board.p1 === 'Лис 🤖' && board.drawn, JSON.stringify(board));
@@ -6439,11 +6439,15 @@ async function testAdventure(browser) {
     (await page.locator('#acName').textContent()) === 'Белка Жёлудь' && !(await page.locator('#acGo').isDisabled()));
   await page.click('#acBack');
 
-  // Сложность влияет на силу и запоминается
+  // Сложность — только «⚡ +1 ход»: соперник один и тот же, меняется, у кого сколько
   await page.click('.ad-btn[data-diff="hard"]');
   check('сложность запоминается', await page.evaluate(() => localStorage.getItem('hc_adv_diff')) === 'hard');
   const lv = await page.evaluate(() => [advLevel(advChar(3), 'easy'), advLevel(advChar(3), 'normal'), advLevel(advChar(3), 'hard')]);
-  check('легко < нормально < трудно', lv[0] < lv[1] && lv[1] < lv[2], lv.join(' '));
+  check('сила соперника от сложности не зависит', lv[0] === lv[1] && lv[1] === lv[2], lv.join(' '));
+  const toks = await page.evaluate(() => ['easy', 'normal', 'hard'].map(d => advTokens(advChar(3), d).join(':')));
+  check('«⚡ +1 ход»: легко 2:0, нормально 1:1, трудно 0:2', toks.join() === '2:0,1:1,0:2', toks.join());
+  const hoard = await page.evaluate(() => { const c = advChar(5); return c.quirk + ' ' + ['easy', 'normal', 'hard'].map(d => advTokens(c, d).join(':')).join(','); });
+  check('«Запасливый» — на один «+1 ход» больше: 2:1, 1:2, 0:3', hoard === 'tokens 2:1,1:2,0:3', hoard);
   const grow = await page.evaluate(() => [0, 10, 20, 30, 40].map(n => advLevel(advChar(n), 'normal')));
   check('от мира к миру соперники сильнее', grow.every((v, i) => !i || v > grow[i - 1]), grow.join(' '));
 
@@ -7142,8 +7146,9 @@ async function testKidClarity(browser) {
   const adv = await page.evaluate(() => ({ goals: [...document.querySelectorAll('#advMap .aw-goal:not(.hidden)')].length,
     hint: document.getElementById('advDiffHint').textContent }));
   check('Приключение: цель «★★★ у всех» — только у открытого мира', adv.goals === 1, String(adv.goals));
-  check('Приключение: «Обычная сложность · за победу ★★»', adv.hint === 'Обычная сложность · за победу ★★', adv.hint);
-  const words = await page.evaluate(() => ['en', 'ru', 'fr', 'de'].map(l => JSON.stringify(i18n[l]).match(/жетон|jeton|\bMarken?\b|\btokens?\b(?!\")/g)));
+  check('Приключение: под сложностью — у кого сколько «⚡ +1 ход» и звёзды',
+    adv.hint === '«⚡ +1 ход»: у вас и у соперника по одному · за победу ★★', adv.hint);
+  const words = await page.evaluate(() => ['en', 'ru', 'fr', 'de'].map(l => JSON.stringify(i18n[l]).match(/жетон|jeton|\bMarken?\b|\btokens?\b(?!\")/gi)));
   check('слова «жетон» в текстах больше нет — везде «⚡ +1 ход»', words.every(w => !w), JSON.stringify(words));
   await page.context().close();
 }
@@ -7305,6 +7310,70 @@ async function testTablet(browser) {
   const z = await page.evaluate(() => getComputedStyle(document.documentElement).zoom);
   check('компьютер: масштаба нет', z === '1' || z === 'normal', z);
   await ctx.close();
+}
+
+// Сложность Приключения — только «⚡ +1 ход»: видно на карте, в карточке
+// соперника перед боем и на плашках в бою
+async function testAdvDifficulty(browser) {
+  console.log('\nПриключение: сложность — это «⚡ +1 ход»');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => { localStorage.setItem(advKey(), '13'); BOT_SPEED = 1000; openAdventure(); });
+  await page.waitForTimeout(300);
+  // Карточка открытого соперника: те же кнопки сложности и у кого сколько «+1 ход»
+  await page.evaluate(() => openAdvCard(13));
+  await page.waitForTimeout(150);
+  const card = () => page.evaluate(() => ({
+    box: !document.getElementById('acDiffBox').classList.contains('hidden'),
+    on: (document.querySelector('#acDiff .ad-btn.on') || {}).dataset.diff,
+    sides: [...document.querySelectorAll('#acTokens .act-side')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
+    note: (document.querySelector('#acTokens small') || {}).textContent }));
+  let c = await card();
+  check('карточка: сложность прямо перед боем, «у вас ⚡ · у соперника ⚡»', c.box && c.on === 'normal' &&
+    c.sides.join('|') === 'У вас⚡|У соперника⚡' && /два хода подряд/.test(c.note) && /★★$/.test(c.note), JSON.stringify(c));
+  await page.click('#acDiff .ad-btn[data-diff="easy"]');
+  c = await card();
+  check('«Легко» в карточке: у вас ⚡⚡, у соперника — ничего, за победу ★', c.on === 'easy' &&
+    c.sides.join('|') === 'У вас⚡⚡|У соперника—' && /★$/.test(c.note), JSON.stringify(c));
+  const synced = await page.evaluate(() => ({ stored: localStorage.getItem('hc_adv_diff'),
+    map: (document.querySelector('#advDiff .ad-btn.on') || {}).dataset.diff }));
+  check('выбор в карточке — тот же, что на карте', synced.stored === 'easy' && synced.map === 'easy', JSON.stringify(synced));
+  await page.click('#acDiff .ad-btn[data-diff="hard"]');
+  c = await card();
+  check('«Трудно»: у вас ничего, у соперника ⚡⚡, за победу ★★★', c.sides.join('|') === 'У вас—|У соперника⚡⚡' && /★★★$/.test(c.note), JSON.stringify(c));
+  // «Запасливый» (Хамелеон Очки) — на один больше
+  await page.evaluate(() => { closeAdvCard(); openAdvCard(12); });
+  c = await card();
+  check('«Запасливый» на «Трудно»: у соперника ⚡⚡⚡', c.sides.join('|') === 'У вас—|У соперника⚡⚡⚡', JSON.stringify(c));
+  // Закрытого не сыграть — и сложности в его карточке нет
+  await page.evaluate(() => { closeAdvCard(); openAdvCard(30); });
+  check('у закрытого соперника сложности нет', !(await card()).box);
+  // Бой на «Трудно»: у игрока «Без ⚡», у соперника ×3, раунд за раундом
+  await page.evaluate(() => { closeAdvCard(); startAdventure(12); });
+  await page.waitForTimeout(300);
+  const fight = await page.evaluate(() => { stopBot(); return { tokens: D.tokens.join(':'), mine: document.getElementById('ptoken0').textContent,
+    theirs: document.getElementById('ptoken1').textContent, disabled: document.getElementById('ptoken0').disabled }; });
+  check('бой на «Трудно»: «Без ⚡» у вас, «⚡ +1 ход ×3» у Запасливого', fight.tokens === '0:3' && fight.mine === 'Без ⚡' &&
+    fight.theirs === '⚡ +1 ход ×3' && fight.disabled, JSON.stringify(fight));
+  // Сила одна и та же на любой сложности
+  const lv = await page.evaluate(() => { const a = vsBot.bot.level; quitToMenu(); closeAdvCard(); setAdvDiff('easy'); startAdventure(12); stopBot();
+    return { hard: a, easy: vsBot.bot.level, tokens: D.tokens.join(':'), mine: document.getElementById('ptoken0').textContent }; });
+  check('«Легко»: та же сила соперника, у вас ⚡ ×2, у Запасливого один', lv.hard === lv.easy && lv.tokens === '2:1' &&
+    lv.mine === '⚡ +1 ход ×2', JSON.stringify(lv));
+  // Босс — два раунда: «⚡» раздаются заново в каждом
+  const boss = await page.evaluate(() => { quitToMenu(); closeAdvCard(); localStorage.setItem(advKey(), '19'); setAdvDiff('hard');
+    startAdventure(19); stopBot(); D.tokens[1] = 0; D.cur = 0; duelPlay(secret); nextRound(); stopBot(); return D.tokens.join(':'); });
+  check('у босса во втором раунде — снова по сложности (0:2)', boss === '0:2', boss);
+  // Длинное имя не сплющивает портрет: многоточие вместо сжатого кружка
+  const face = await page.evaluate(() => { quitToMenu(); closeAdvCard(); startAdventure(13); stopBot();
+    const r = document.querySelector('#pname1 .p-bot').getBoundingClientRect(), nm = document.querySelector('#pname1 .p-nm');
+    return { w: Math.round(r.width), h: Math.round(r.height), cut: getComputedStyle(nm).textOverflow }; });
+  check('«Ленивец Колпачок»: портрет 18×18, имя с многоточием', face.w === 18 && face.h === 18 && face.cut === 'ellipsis', JSON.stringify(face));
+  // Потратили свой — «использован», а не «Без ⚡»
+  const spent = await page.evaluate(() => { quitToMenu(); closeAdvCard(); setAdvDiff('normal'); startAdventure(12); stopBot();
+    D.cur = 0; useToken(0); duelPlay(secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN); stopBot();
+    return { tokens: D.tokens.join(':'), mine: document.getElementById('ptoken0').textContent }; });
+  check('потраченный «+1 ход» — «использован»', spent.tokens.startsWith('0') && /использован/.test(spent.mine), JSON.stringify(spent));
+  await done(page);
 }
 
 async function testScreensEverywhere(browser) {
@@ -8355,6 +8424,7 @@ async function testKeyPage(browser) {
     await testNoJumps(browser);
     await testTablet(browser);
     await testScreensEverywhere(browser);
+    await testAdvDifficulty(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
