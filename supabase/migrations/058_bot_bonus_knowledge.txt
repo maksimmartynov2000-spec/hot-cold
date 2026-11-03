@@ -1,0 +1,58 @@
+-- Соперник-«человек» в онлайне пользуется Рентгеном и Половиной.
+-- Применять в Supabase: SQL Editor → вставить целиком → Run. Применить ДО мёржа.
+--
+-- Раньше бот брал эти бонусы, но знание не применял. Теперь, как и игрок,
+-- после Рентгена ищет только среди чётных (или нечётных), после Половины —
+-- только в своей половине прямой.
+
+create or replace function bot_candidates(p_match_id bigint, p_seat int, p_careless boolean)
+returns int[]
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; db int[]; mv record; cand boolean[]; n int; i int; res int[] := '{}';
+begin
+  select * into m from matches where id = p_match_id;
+  n := match_span(m);
+  db := bot_dist_bands(n);
+  cand := array_fill(true, array[n]);
+  for mv in
+    select k.guess, k.tier from (
+      select x.guess, x.tier, x.id from match_moves x
+      where x.match_id = p_match_id and x.round = m.round
+        and x.guess is not null and x.tier is not null
+        and not (m.fog[p_seat + 1] and x.seat <> p_seat and x.id > m.fog_from[p_seat + 1])
+        and not (m.blind[p_seat + 1] and x.seat = p_seat and x.id > m.blind_from[p_seat + 1])
+      order by x.id desc
+      limit case when p_careless then 1 when m.short_memory[p_seat + 1] then 2 else null end
+    ) k
+  loop
+    for i in 1..n loop
+      if cand[i] and db[abs(m.range_min + i - 1 - mv.guess) + 1] <> mv.tier then
+        cand[i] := false;
+      end if;
+    end loop;
+  end loop;
+  -- Знание из бонусов (миграция 058): Рентген — чётность, Половина — половина
+  -- прямой. Бот пользуется им, как пользовался бы человек
+  for i in 1..n loop
+    if cand[i] and m.know_parity[p_seat + 1] is not null
+       and abs(m.range_min + i - 1) % 2 <> m.know_parity[p_seat + 1] then cand[i] := false; end if;
+    if cand[i] and m.know_half[p_seat + 1] = 'low' and m.range_min + i - 1 > match_half_mark(m) then cand[i] := false; end if;
+    if cand[i] and m.know_half[p_seat + 1] = 'high' and m.range_min + i - 1 <= match_half_mark(m) then cand[i] := false; end if;
+  end loop;
+  for i in 1..n loop
+    if cand[i] then res := res || (m.range_min + i - 1); end if;
+  end loop;
+  -- Ответы честные, поэтому загаданное всегда среди возможных и пусто не
+  -- бывает. На всякий случай — весь диапазон, а не ошибка посреди партии
+  if coalesce(array_length(res, 1), 0) = 0 then
+    select array_agg(g order by g) into res from generate_series(m.range_min, m.range_max) g;
+  end if;
+  return res;
+end;
+$$;
+
+revoke execute on function bot_candidates(bigint, int, boolean) from public, anon;

@@ -353,7 +353,10 @@ function bonusNearRadius() {
 // из-за этого сигнал «рядом» перестаёт быть приманкой и становится выбором
 // «Бросок в лаву» убран: ход случайным числом злил больше, чем радовал.
 // Игра по-прежнему умеет его показать — на случай партии, где его взяли раньше
-const BONUS_GOOD = ['extra', 'fog', 'blind'];
+// «С другом» на одном телефоне: к прежним трём — четыре из Приключения
+// (рентген, половина, щит, заморозка), как и в онлайне. «Спешки» здесь нет:
+// у хода нет часов
+const BONUS_GOOD = ['extra', 'fog', 'blind', 'xray', 'half', 'shield', 'freeze'];
 const BONUS_TRAP = ['skip', 'gift', 'memory'];
 const BONUS_TYPES = BONUS_GOOD.concat(BONUS_TRAP);
 const BONUS_TRAP_SHARE = 1 / 3;
