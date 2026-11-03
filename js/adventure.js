@@ -28,18 +28,169 @@ const ADV_WORLDS = [
 const ADV_ICONS = ADV_WORLDS.map(w => w.boss);
 const ADV_PER_WORLD = 10;
 const ADV_TOTAL = ADV_WORLDS.length * ADV_PER_WORLD;
-// Особенности по кругу, в каждом мире — со своего места: в каждом мире есть
-// все девять, но идут они по-разному, и миры не похожи друг на друга
-const ADV_QUIRKS = ['plain', 'fast', 'forget', 'first', 'gambler', 'tokens', 'slow', 'bonus', 'frost'];
-const ADV_QUIRK_ICON = { plain: '🙂', fast: '💨', forget: '🫧', first: '🥇', gambler: '🎲', tokens: '⚡',
-                         slow: '🤔', bonus: '🎁', frost: '❄️', boss: '👑' };
 const ADV_DIFFS = ['easy', 'normal', 'hard'];
+
+// ---------- характеры ----------
+// У каждого соперника — своё постоянное правило, у босса — две способности.
+// Правило — набор «крючков», которые движок дуэли зовёт в нужный момент
+// (game.js: startRound, duelPlay, useToken, botMove, hiddenRow, applyBonus):
+//   start(R)        — начало раунда;
+//   after(R, m)     — после хода m (m.p: 0 — игрок, 1 — соперник);
+//   arm(R, p)       — p взвёл «⚡ +1 ход»; true — взвод перехвачен;
+//   turn(R)         — соперник начинает свой ход;
+//   pick(R, cand)   — какое число назовёт соперник (null — как обычно).
+// Поля: icon — значок, level / think — сила и раздумья, tokens — прибавка
+// «⚡ +1 ход» [игроку, сопернику], frost — числа с минусом, first — ходит
+// первым, forget — помнит два хода, gamble — доля ходов наугад, immune — какие
+// помехи на него не действуют, bonus — свои бонусы на прямой, noTokens — сам
+// «+1 ход» не берёт.
+// Загаданное число правила не трогают никогда: меняется только, кто что
+// видит, кто когда ходит и у кого сколько «+1 ход».
+const ADV_HOT = 5, ADV_VERY_HOT = 6, ADV_COLD = 1;   // пояса: «Горячо», «Очень горячо», «Холодно»
+const ADV_CAST = [
+  'apple', 'acorns', 'thief', 'hop', 'specs', 'shy', 'cloak', 'sleepy', 'owl', 'wizard',
+  'toucan', 'frog', 'chameleon', 'sloth', 'banana', 'snake', 'zebra', 'giraffe', 'elephant', 'gorilla',
+  'clown', 'seahorse', 'crab', 'jelly', 'seal', 'turtle', 'penguin', 'octopus', 'shark', 'kraken',
+  'spark', 'miner', 'ember', 'bat', 'bell', 'phoenix', 'beetle', 'knight', 'crystal', 'dragon',
+  'robot', 'alien', 'cat', 'moon', 'meteor', 'whale', 'eyes', 'comet', 'blackhole', 'ufo'
+];
+// «Горячо» и ближе, но не попадание: на попадании раунд уже кончился
+function advHot(R, m) { const k = R.tier(m); return k >= ADV_HOT && k < 8; }
+function advVeryHot(R, m) { const k = R.tier(m); return k >= ADV_VERY_HOT && k < 8; }
+// Первый ход соперника в раунде — повод сказать про своё правило
+function advFirstBotMove(R, m) { return m.p === 1 && R.count(1) === 1; }
+const ADV_RULES = {
+  // ---- Волшебный лес ----
+  apple: { icon: '🍎', after(R, m) { if (m.p === 0 && advHot(R, m) && R.once('apple')) { R.give(0, 1); R.fire('rule'); } } },
+  acorns: { icon: '🌰', tokens: [0, 1], arm(R, p) { if (p === 1) R.fire('rule'); } },
+  thief: { icon: '🧣', after(R, m) {
+    if (m.p === 0 && R.tier(m) <= ADV_COLD && D.tokens[0] > 0) { R.take(0, 1); R.give(1, 1); R.fire('rule'); } } },
+  hop: { icon: '🥕', first: true, after(R, m) { if (advFirstBotMove(R, m)) { R.again(); R.fire('rule'); } } },
+  specs: { icon: '👓', start(R) { R.know(0, 'parity'); R.know(1, 'parity'); R.fire('rule', { k: R.word('parity') }); } },
+  shy: { icon: '🌼', after(R, m) { if (m.p === 0 && advVeryHot(R, m) && R.once('shy')) { R.skip(1); R.fire('rule'); } } },
+  cloak: { icon: '🦊', after(R, m) { if (advFirstBotMove(R, m)) { R.hide(m); R.fire('rule'); } } },
+  sleepy: { icon: '🍯', after(R, m) { if (m.p === 1 && R.count(1) % 2 === 0) { R.skip(1); R.fire('rule'); } } },
+  owl: { icon: '🧐', start(R) { R.know(1, 'half'); R.fire('rule'); } },
+  wizard: { icon: '👑', a1icon: '🌫️', a2icon: '✨', boss: true, after(R, m) {
+    if (m.p === 0 && advHot(R, m) && !D.blind[0] && R.once('a1')) { R.fog(0); R.fire('a1'); }
+    else if (m.p === 1 && advHot(R, m) && R.once('a2')) { R.again(); R.fire('a2'); } } },
+  // ---- Джунгли ----
+  toucan: { icon: '📢', after(R, m) {
+    if (m.p === 1 && R.tier(m) < 8) { const k = R.dir(m.guess); R.know(0, k, m.guess); R.fire('rule', { k: R.word(k, m.guess) }); } } },
+  frog: { icon: '🐸', pick(R, cand, plan) {
+    // Пока чисел много — прыгает на ближайшее круглое
+    if (R.left(cand) <= 5) return null;
+    const r = Math.round(plan / 5) * 5;
+    const v = Math.max(RANGE_MIN, Math.min(RANGE_MAX, r));
+    if (R.once('frog')) R.fire('rule');
+    return R.named(v) ? null : v; } },
+  chameleon: { icon: '🦎', after(R, m) {
+    // Виден только последний его ход: прежние прячутся
+    if (m.p !== 1) return;
+    history.forEach(h => { if (h.p === 1 && h !== m) R.hide(h); });
+    if (R.count(1) === 2) R.fire('rule'); } },
+  sloth: { icon: '🤔', level: 0.08, think: [3, 5], after(R, m) { if (advFirstBotMove(R, m)) R.fire('rule'); } },
+  banana: { icon: '🍌', after(R, m) {
+    if (m.p === 0 && R.tier(m) < 8 && R.nearBot(m.guess, 2) && R.once('banana')) { R.skip(0); R.fire('rule'); } } },
+  snake: { icon: '🎀', arm(R, p) { if (p === 0) { R.give(1, 1); R.fire('rule'); } } },
+  zebra: { icon: '🎧', level: -0.08, think: [0.6, 1.3], after(R, m) { if (advFirstBotMove(R, m)) R.fire('rule'); } },
+  giraffe: { icon: '🦒', pick(R, cand) {
+    const b = R.bonusIn(cand);
+    if (b === null || Math.random() > 0.7) return null;
+    R.fire('rule');
+    return b; } },
+  elephant: { icon: '🐘', after(R, m) { if (m.p === 1 && advHot(R, m) && R.once('elephant')) { R.skip(0); R.fire('rule'); } } },
+  gorilla: { icon: '👑', a1icon: '🔊', a2icon: '🍌', boss: true,
+    start(R) { if (D.tokens[0] > 0) { R.take(0, 1); R.give(1, 1); R.fire('a2'); } },
+    after(R, m) { if (m.p === 0 && advHot(R, m) && R.once('a1')) { R.skip(0, true); R.fire('a1'); } } },
+  // ---- Морская глубина ----
+  clown: { icon: '🤡', gamble: 0.3 },
+  seahorse: { icon: '🔮', start(R) { R.know(0, 'half'); R.fire('rule', { k: R.word('half') }); } },
+  crab: { icon: '🦀', after(R, m) {
+    if (m.p !== 0) return;
+    if (R.round.grab) { R.round.grab = false; R.hide(m); }
+    else if (advHot(R, m) && R.once('crab')) { R.round.grab = true; R.fire('rule'); } } },
+  jelly: { icon: '🪼', forget: true, after(R, m) { if (m.p === 1 && R.count(1) === 3) R.fire('rule'); } },
+  seal: { icon: '🍦', frost: true, start(R) { if (D.round === 1) R.fire('rule'); } },
+  turtle: { icon: '🐢', immune: ['fog', 'blind', 'freeze'] },
+  penguin: { icon: '🐧', first: true, start(R) { R.fire('rule'); } },
+  octopus: { icon: '🤹', bonus: 'magic', start(R) { R.fire('rule'); } },
+  shark: { icon: '🦈', start(R) { R.know(1, 'parity'); R.fire('rule'); } },
+  kraken: { icon: '👑', a1icon: '🌑', a2icon: '🏴‍☠️', boss: true,
+    // Абордаж: взведённый «+1 ход» игрока уходит кракену
+    arm(R, p) { if (p === 0 && R.once('a2')) { R.give(1, 1); R.fire('a2'); return true; } },
+    after(R, m) { if (m.p === 0 && advHot(R, m) && R.once('a1')) { R.memory(0); R.fire('a1'); } } },
+  // ---- Огненные горы ----
+  spark: { icon: '✨', after(R, m) { if (m.p === 0 && R.tier(m) <= ADV_COLD && R.once('spark')) { R.lava(0); R.fire('rule'); } } },
+  miner: { icon: '⛏️', pick(R, cand) {
+    // Копает по порядку: 25, 50, 75… — пока сам не дойдёт до «Тепло»
+    if (history.some(h => h.p === 1 && R.tier(h) >= 3)) return null;
+    for (let v = 25; v <= RANGE_MAX; v += 25) {
+      if (v >= RANGE_MIN && !R.named(v) && cand[v - RANGE_MIN]) { if (R.once('miner')) R.fire('rule'); return v; }
+    }
+    return null; } },
+  ember: { icon: '🔥', arm(R, p) { if (p === 1) { D.armedExtra = 1; R.fire('rule'); } } },
+  // Дальние её ходы («Прохладно» и холоднее) — в темноте, близкие видно
+  bat: { icon: '🦇', after(R, m) { if (m.p === 1 && R.tier(m) <= 2) { R.hide(m); if (R.once('bat')) R.fire('rule'); } } },
+  bell: { icon: '🔔', after(R, m) {
+    if (m.p === 0 && advHot(R, m)) { const k = R.dir(m.guess); R.know(0, k, m.guess); R.fire('rule', { k: R.word(k, m.guess) }); } } },
+  phoenix: { icon: '🐣', after(R, m) { if (m.p === 1 && R.tier(m) <= ADV_COLD && R.once('phoenix')) { R.again(); R.fire('rule'); } } },
+  beetle: { icon: '🪲', after(R, m) { if (m.p === 1 && R.tier(m) <= ADV_COLD && D.tokens[1] < 3) { R.give(1, 1); R.fire('rule'); } } },
+  knight: { icon: '🛡️', bonus: 'knight', noTokens: true, start(R) { R.fire('rule'); },
+    pick(R, cand, plan) {
+      // Бонусы обходит: если задуманное число — бонус, берёт соседнее возможное
+      if (!D.bonuses.some(b => !b.taken && b.value === plan)) return null;
+      for (let d = 1; d <= RANGE_MAX - RANGE_MIN; d++) {
+        for (const v of [plan - d, plan + d]) {
+          if (v >= RANGE_MIN && v <= RANGE_MAX && cand[v - RANGE_MIN] && !R.named(v) &&
+              !D.bonuses.some(b => !b.taken && b.value === v)) return v;
+        }
+      }
+      return null; } },
+  crystal: { icon: '💎', frost: true, start(R) { R.know(0, 'parity'); R.know(1, 'parity'); R.fire('rule', { k: R.word('parity') }); } },
+  // Обе способности сильные — сам дракон играет попроще, иначе он выходил
+  // сложнее финального босса
+  dragon: { icon: '👑', a1icon: '🔥', a2icon: '🌡️', boss: true, level: -0.3, after(R, m) {
+    if (m.p !== 1) return;
+    if (R.count(1) === 3) { R.lava(0); R.fire('a1'); }
+    else if (advVeryHot(R, m) && D.tokens[0] > 0 && R.once('a2')) { D.tokens[0] = 0; R.fire('a2'); } } },
+  // ---- Космос ----
+  robot: { icon: '🤖', levelSet: 0.98, after(R, m) { if (advFirstBotMove(R, m)) R.fire('rule'); } },
+  alien: { icon: '👽', tokens: [1, 0], start(R) { R.fire('rule'); } },
+  cat: { icon: '🐱', pick(R, cand) {
+    // Любопытный: идёт к вашему последнему числу — ближайшее возможное к нему
+    const mine = history.filter(h => h.p === 0);
+    if (!mine.length) return null;
+    const x = mine[mine.length - 1].guess;
+    let best = null;
+    for (let i = 0; i < cand.length; i++) {
+      const v = i + RANGE_MIN;
+      if (cand[i] && !R.named(v) && (best === null || Math.abs(v - x) < Math.abs(best - x))) best = v;
+    }
+    if (best !== null && R.once('cat')) R.fire('rule');
+    return best; } },
+  moon: { icon: '🌙', after(R, m) { if (m.p === 1 && R.count(1) % 2 === 0) { R.hide(m); if (R.once('moon')) R.fire('rule'); } } },
+  meteor: { icon: '☄️', after(R, m) {
+    // Каждый третий ход — метеорит: следующий ход, чей бы он ни был, делается сам
+    if (history.length % 3 === 0 && R.tier(m) < 8) { D.lavaNext = true; R.fire('rule'); } } },
+  whale: { icon: '🐋', start(R) { R.know(0, 'half'); R.know(1, 'half'); R.fire('rule', { k: R.word('half') }); } },
+  // Обмен: сам знает половину, а вам говорит чётность
+  eyes: { icon: '👁️', start(R) { R.know(1, 'half'); R.know(0, 'parity'); R.fire('rule', { k: R.word('parity') }); } },
+  comet: { icon: '💫', level: 0.12, think: [0.3, 0.8], after(R, m) { if (advFirstBotMove(R, m)) R.fire('rule'); } },
+  blackhole: { icon: '🌀', frost: true, after(R, m) { if (m.p === 0 && R.tier(m) === 0) { R.hide(m); R.fire('rule'); } } },
+  ufo: { icon: '👑', a1icon: '🛸', a2icon: '🚀', boss: true,
+    turn(R) { if (R.round.teleport) { R.round.teleport = false; D.armed = true; } },
+    after(R, m) {
+      if (m.p !== 0) return;
+      if (advHot(R, m) && R.once('a1')) { R.hide(m); R.fire('a1'); }
+      else if (R.tier(m) <= ADV_COLD && R.once('a2')) { R.round.teleport = true; R.fire('a2'); } } }
+};
 
 function advChar(n) {
   const w = Math.floor(n / ADV_PER_WORLD), i = n % ADV_PER_WORLD;
   const boss = i === ADV_PER_WORLD - 1;
-  return { n: n, w: w, i: i, boss: boss, world: ADV_WORLDS[w],
-           quirk: boss ? 'boss' : ADV_QUIRKS[(i + w * 3) % ADV_QUIRKS.length],
+  const rule = ADV_CAST[n];
+  return { n: n, w: w, i: i, boss: boss, world: ADV_WORLDS[w], rule: rule, R: ADV_RULES[rule],
            icon: 'adv-' + String(n + 1).padStart(2, '0') };
 }
 function advName(n) { return t().adv.names[n]; }
@@ -48,22 +199,173 @@ function advName(n) { return t().adv.names[n]; }
 // сложности не зависит: соперник — один и тот же характер, сложность меняет
 // только, у кого сколько «⚡ +1 ход» (см. advTokens)
 function advLevel(c) {
-  let L = 0.08 + c.w * 0.18 + c.i * 0.012 + (c.boss ? 0.06 : 0);
-  if (c.quirk === 'fast') L -= 0.08;
-  if (c.quirk === 'slow') L += 0.08;
+  if (c.R.levelSet) return c.R.levelSet;
+  const L = 0.08 + c.w * 0.18 + c.i * 0.012 + (c.boss ? 0.06 : 0) + (c.R.level || 0);
   return Math.max(0.02, Math.min(0.98, L));
 }
 function advThink(c) {
-  return c.quirk === 'fast' ? [0.6, 1.3] : c.quirk === 'slow' ? [3, 5] : [1.2, 2.8];
+  return c.R.think || [1.2, 2.8];
 }
 
 // Сложность — это «⚡ +1 ход» (два хода подряд) на раунд: [у игрока, у соперника].
-// Легко — оба у игрока, трудно — оба у соперника. «Запасливый» берёт на один больше
+// Легко — оба у игрока, трудно — оба у соперника. Правило соперника может
+// добавить: Белка Жёлудь берёт себе на один больше, Зелёныш дарит один игроку
 const ADV_DIFF_TOKENS = { easy: [2, 0], normal: [1, 1], hard: [0, 2] };
 function advTokens(c, diff) {
   const t = (ADV_DIFF_TOKENS[diff] || ADV_DIFF_TOKENS.normal).slice();
-  if (c && c.quirk === 'tokens') t[1]++;
-  return t;
+  const add = (c && c.R && c.R.tokens) || [0, 0];
+  return [t[0] + add[0], t[1] + add[1]];
+}
+
+// ---------- правило в партии ----------
+// Состояние правила на раунд: что уже сработало, что запланировано
+function advRoundState() {
+  if (!vsBot || !vsBot.adv) return null;
+  if (!vsBot.advRound || vsBot.advRound.round !== D.round) {
+    vsBot.advRound = { round: D.round, once: {}, fired: {}, queue: null };
+  }
+  return vsBot.advRound;
+}
+
+// Что правилу можно делать. Всё — через состояние дуэли D, как у бонусов
+function advCtx() {
+  const round = advRoundState();
+  if (!round) return null;
+  const c = vsBot.adv;
+  const R = {
+    c: c, rule: c.R, round: round,
+    tier: m => (m && m.meta ? m.meta.labelIndex : 0),
+    count: p => history.filter(h => h.p === p && !h.timeout).length,
+    once: key => (round.once[key] ? false : (round.once[key] = true)),
+    named: v => history.some(h => h.guess === v),
+    left: cand => { let k = 0; for (let i = 0; i < cand.length; i++) k += cand[i]; return k; },
+    nearBot: (x, d) => history.some(h => h.p === 1 && h.guess !== x && Math.abs(h.guess - x) <= d),
+    bonusIn: cand => { const b = D.bonuses.find(b => !b.taken && cand[b.value - RANGE_MIN] && !R.named(b.value)); return b ? b.value : null; },
+    give: (p, k) => { D.tokens[p] = Math.min(9, D.tokens[p] + k); },
+    take: (p, k) => { D.tokens[p] = Math.max(0, D.tokens[p] - k); },
+    skip: (p, freeze) => { D.skip[p] = true; if (freeze) D.frozen[p] = true; },
+    fog: p => { if (!D.fog[p]) { D.fog[p] = true; D.fogFrom[p] = 0; } },
+    memory: p => { D.shortMemory[p] = true; },
+    lava: p => { D.autoLava[p] = true; },
+    again: () => { D.extraTurn = true; },
+    hide: m => { m.ruleHidden = true; },
+    dir: x => (secret > x ? 'gt' : 'lt'),
+    know: (p, key, x) => {
+      const k = D.know[p];
+      if (key === 'parity') k.parity = Math.abs(secret) % 2;
+      if (key === 'half') k.half = secret <= halfMark() ? 'low' : 'high';
+      if (key === 'gt') k.gt = k.gt === undefined ? x : Math.max(k.gt, x);
+      if (key === 'lt') k.lt = k.lt === undefined ? x : Math.min(k.lt, x);
+    },
+    // Слово для реплики: «чётное», «больше 23», «не больше 50»
+    word: (key, x) => {
+      const W = t().adv.kw;
+      if (key === 'parity') return Math.abs(secret) % 2 === 0 ? W.even : W.odd;
+      if (key === 'half') return (secret <= halfMark() ? W.low : W.high).replace('{m}', formatNum(halfMark()));
+      return W[key].replace('{n}', formatNum(x));
+    },
+    // Правило сработало: в первый раз за раунд — большой карточкой посреди
+    // экрана, дальше — репликой в пузыре. В начале раунда — в очередь: экран
+    // партии ещё не открыт
+    fire: (kind, vars) => {
+      const text = advLine(c.n, kind, vars);
+      if (!text) return;
+      round.firedNow = true;
+      const big = !round.fired[kind];
+      round.fired[kind] = true;
+      if (round.queue) { round.queue.push([kind, text, big]); return; }
+      advShowFire(kind, text, big);
+    }
+  };
+  return R;
+}
+
+// Реплика соперника: hi, rule, a1, a2, luck, worry, win, lose
+function advLine(n, kind, vars) {
+  const cast = t().adv.cast[n] || {};
+  let text = cast[kind] || '';
+  if (vars) Object.keys(vars).forEach(k => { text = text.split('{' + k + '}').join(vars[k]); });
+  return text;
+}
+// Название сработавшего: правило — его имя, способность босса — её имя
+function advFireTitle(n, kind) {
+  const cast = t().adv.cast[n] || {};
+  return kind === 'a1' ? cast.a1t : kind === 'a2' ? cast.a2t : cast.t;
+}
+function advShowFire(kind, text, big) {
+  const c = vsBot && vsBot.adv;
+  if (!c) return;
+  if (big && typeof showRuleFlash === 'function') {
+    const icon = kind === 'a1' ? c.R.a1icon : kind === 'a2' ? c.R.a2icon : c.R.icon;
+    showRuleFlash(c, icon + ' ' + (advFireTitle(c.n, kind) || ''), text);
+  } else if (typeof botSayText === 'function') botSayText(text);
+}
+function advSay(kind) {
+  if (!vsBot || !vsBot.adv) return;
+  const text = advLine(vsBot.adv.n, kind);
+  if (text && typeof botSayText === 'function') botSayText(text);
+}
+
+// Крючки для движка дуэли (game.js)
+function advRoundStart() {
+  const R = advCtx();
+  if (!R) return;
+  R.round.queue = [];
+  if (R.rule.first) { D.starter = 1; D.cur = 1; }
+  if (R.rule.start) R.rule.start(R);
+  const queue = R.round.queue;
+  R.round.queue = null;
+  // Экран партии откроется чуть позже: реплики — после него. В первом раунде
+  // сначала «привет», потом правило
+  const hi = D.round === 1;
+  // Пока ждали, бой могли бросить или раунд мог кончиться — тогда молчим
+  const alive = () => vsBot && vsBot.adv === R.c && D.round === R.round.round;
+  setTimeout(() => {
+    if (!alive()) return;
+    if (hi) advSay('hi');
+    queue.forEach(([kind, text, big], i) => setTimeout(() => { if (alive()) advShowFire(kind, text, big); },
+                                                       (hi ? 1600 : 0) + i * 1800));
+  }, 650);
+}
+function advAfterMove(m) {
+  const R = advCtx();
+  // Победный ход закрывает раунд: правило молчит, слово — за репликой
+  // «выиграл/проиграл» (иначе Мишка Медок, выиграв, говорил бы про сон)
+  if (!R || D.roundOver) return;
+  R.round.firedNow = false;
+  if (R.rule.after) R.rule.after(R, m);
+  if (R.round.firedNow) return;
+  // Без правила — реплика на удачный ход: свой или ваш, раз за раунд
+  if (m.p === 1 && advVeryHot(R, m) && R.once('luck')) advSay('luck');
+  else if (m.p === 0 && advVeryHot(R, m) && R.once('worry')) advSay('worry');
+}
+// Взвели «⚡ +1 ход». true — взвод перехвачен правилом (Кракен)
+function advArm(p) {
+  const R = advCtx();
+  return !!(R && R.rule.arm && R.rule.arm(R, p));
+}
+function advBotTurn() {
+  const R = advCtx();
+  if (R && R.rule.turn) R.rule.turn(R);
+}
+function advPick(cand, plan) {
+  const R = advCtx();
+  if (!R || !R.rule.pick) return null;
+  const v = R.rule.pick(R, cand, plan);
+  return (typeof v === 'number' && v >= RANGE_MIN && v <= RANGE_MAX) ? v : null;
+}
+// Помеха на соперника не действует (Черепаха): сказать об этом
+function advImmune(type) {
+  const R = advCtx();
+  if (!R || !R.rule.immune || R.rule.immune.indexOf(type) < 0) return false;
+  R.fire('rule');
+  return true;
+}
+// Итог: раунд или вся партия
+function advRoundEndLine() {
+  if (!vsBot || !vsBot.adv) return;
+  const botWon = D.roundWinner === 1;
+  advSay(D.matchOver ? (botWon ? 'win' : 'lose') : (botWon ? 'luck' : 'worry'));
 }
 
 function advDiff() {
@@ -259,7 +561,7 @@ function renderAdventure() {
       b.className = 'adv-tile ' + state + (c.boss ? ' boss' : '');
       b.dataset.n = n;
       const st = advStarAt(n);
-      b.innerHTML = iconArt(c.icon, 0) + '<span class="at-quirk">' + ADV_QUIRK_ICON[c.quirk] + '</span>' +
+      b.innerHTML = iconArt(c.icon, 0) + '<span class="at-quirk">' + c.R.icon + '</span>' +
         (state === 'done' ? '<span class="at-stars s' + st + '">' + advStarRow(st) + '</span>'
           : state === 'locked' ? '<span class="at-mark">🔒</span>' : '');
       b.setAttribute('aria-label', advName(n));
@@ -306,11 +608,14 @@ function openAdvCard(n) {
   document.querySelector('#advCard .adv-card').style.setProperty('--wc', c.world.color);
   document.getElementById('acWorld').textContent = A.worlds[c.w] + ' · ' + (c.i + 1) + '/' + ADV_PER_WORLD;
   document.getElementById('acName').textContent = advName(n);
-  const q = A.quirks[c.quirk];
-  document.getElementById('acQuirk').innerHTML = '<b>' + ADV_QUIRK_ICON[c.quirk] + ' ' + escapeHtml(q[0]) + '</b>' +
-    '<span>' + escapeHtml(q[1]) + '</span>';
+  const cast = A.cast[n] || {};
+  document.getElementById('acQuirk').innerHTML = c.boss
+    ? '<b>👑 ' + escapeHtml(A.bossTitle) + '</b><span>' + escapeHtml(A.bossNote) + '</span>' +
+      '<span class="ac-ab"><b>' + c.R.a1icon + ' ' + escapeHtml(cast.a1t) + '</b>' + escapeHtml(cast.a1d) + '</span>' +
+      '<span class="ac-ab"><b>' + c.R.a2icon + ' ' + escapeHtml(cast.a2t) + '</b>' + escapeHtml(cast.a2d) + '</span>'
+    : '<b>' + c.R.icon + ' ' + escapeHtml(cast.t) + '</b><span>' + escapeHtml(cast.d) + '</span>';
   const half = Math.floor(c.world.range / 2);
-  const range = c.quirk === 'frost' ? L.placeholderTpl.replace('{a}', formatNum(-half)).replace('{b}', formatNum(half))
+  const range = c.R.frost ? L.placeholderTpl.replace('{a}', formatNum(-half)).replace('{b}', formatNum(half))
     : L.placeholderTpl.replace('{a}', '1').replace('{b}', formatNum(c.world.range));
   const best = advStarAt(n);
   const bk = c.world.bonus;
@@ -320,7 +625,7 @@ function openAdvCard(n) {
     '<span class="ac-best">' + escapeHtml(A.best) + ': <b class="s' + best + '">' + advStarRow(best) + '</b></span>' +
     '<button type="button" class="ac-bonus" onclick="openBonusGuide(\'' + bk + '\')">' + escapeHtml(A.worldBonus) + ': <b>' +
       bonusArtHtml(bk, BONUS_ICON[bk]) + ' ' + escapeHtml(L.bonusNames[bk]) + '</b>' +
-      (c.boss || c.quirk === 'bonus' ? ' · ' + escapeHtml(A.traps) : '') + '</button>' +
+      (c.boss || c.R.bonus === 'magic' ? ' · ' + escapeHtml(A.traps) : '') + '</button>' +
     '<span class="ac-gold">' + escapeHtml(advWorldGold(c.w) ? A.goldDone : A.cardGold.replace('{n}', advWorldThree(c.w))) + '</span>';
   const go = document.getElementById('acGo');
   const open = n <= done;
@@ -332,6 +637,8 @@ function openAdvCard(n) {
   document.getElementById('acDiffBox').classList.toggle('hidden', !open);
   if (open) renderAdvCardDiff(n);
   document.getElementById('advCard').classList.remove('hidden');
+  // Новая карточка — с начала, а не с того места, где листали прошлую
+  document.getElementById('acBody').scrollTop = 0;
 }
 function closeAdvCard() {
   advCardFor = null;
@@ -353,19 +660,21 @@ function startAdventure(n) {
   mode = 'duel';
   setupBot = false;
   stopBot();
-  frostMode = c.quirk === 'frost';
+  frostMode = !!c.R.frost;
   bonusCountChoice = 0;
   applyBounds(c.world.range);
   applyRangeToInputs();
-  // Бонусы — у всех: бонус мира ложится всегда, ловушки — у босса и Фокусника,
-  // у Фокусника бонусов вдвое больше
-  const magic = c.quirk === 'bonus';
+  // Бонусы — у всех: бонус мира ложится всегда, ловушки — у босса и у
+  // Осьминога Жонглёра (у него бонусов вдвое больше). У Ящера Рыцаря — втрое
+  // больше, и только полезные
+  const magic = c.R.bonus === 'magic', knight = c.R.bonus === 'knight';
+  const allGood = ['xray', 'half', 'shield', 'freeze'].filter(k => k !== c.world.bonus);
   bonusMode = true;
   bonusSet = {
     first: true,
-    good: [c.world.bonus, 'extra', 'fog', 'blind'].concat(magic ? ['xray', 'half', 'shield', 'freeze'].filter(k => k !== c.world.bonus) : []),
+    good: [c.world.bonus, 'extra', 'fog', 'blind'].concat(magic || knight ? allGood : []),
     trap: (c.boss || magic) ? BONUS_TRAP : [],
-    count: magic ? 2 * autoBonusCountFor(rangeCount()) : 0
+    count: magic ? 2 * autoBonusCountFor(rangeCount()) : knight ? 3 * autoBonusCountFor(rangeCount()) : 0
   };
   vsBot = { adv: c, diff: diff, bot: { key: c.icon, icon: c.icon, color: c.world.color, level: advLevel(c),
                            think: advThink(c), greet: 'luck', react: 'nice' } };
@@ -377,11 +686,11 @@ function startAdventure(n) {
   D.wins = [0, 0];
   D.round = 1;
   D.matchOver = false;
-  D.starter = c.quirk === 'first' ? 1 : 0;
+  D.starter = c.R.first ? 1 : 0;
   startRound();
   applyTranslations();
   showScreen('game');
-  setTimeout(() => botSay(vsBot && vsBot.bot.greet), 600);
+  // «Привет» и правило соперник говорит сам — из advRoundStart
 }
 
 function endAdventureMode() {

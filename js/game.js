@@ -660,6 +660,10 @@ function quitToMenu() {
   liftCurtain();
   curtainPrevCur = null;
   hideBarTip();
+  // Вспышка бонуса или правила соперника не доигрывает поверх меню и нового боя
+  clearTimeout(bonusFxTimer);
+  const flash = document.getElementById('bonusFlash');
+  if (flash) flash.classList.remove('show');
   stopBot();
   vsBot = null;
   mode = null;
@@ -1064,7 +1068,8 @@ function startRound() {
   if (D.handicap === 1) D.tokens[0] = 2;
   if (D.handicap === 2) D.tokens[1] = 2;
   // Был ли у игрока «+1 ход» в этом раунде: «использован» — только у того,
-  // у кого он был, а на «Трудно» у игрока его нет с начала
+  // у кого он был, а на «Трудно» у игрока его нет с начала. Пересчитывается
+  // ещё раз после правила соперника (Король Горилла забирает «+1 ход»)
   D.tokenSeen = D.tokens.map(k => k > 0);
   D.cur = D.starter;
   D.armed = false;
@@ -1082,7 +1087,13 @@ function startRound() {
   D.frozen = [false, false];
   D.nearBonus = false;
   D.lastBonus = null;
+  D.extraTurn = false;
+  D.armedExtra = 0;
+  D.lavaNext = false;
   placeBonuses();
+  // Приключение: правило соперника на этот раунд (кто ходит первым, что знает…)
+  if (vsBot && vsBot.adv && typeof advRoundStart === 'function') advRoundStart();
+  D.tokenSeen = D.tokens.map(k => k > 0);
   document.getElementById('guessInput').value = '';
   renderAll();
 }
@@ -1117,6 +1128,8 @@ function useToken(p) {
   // Жетон — в любой момент, и первым ходом раунда тоже
   D.tokens[p]--;
   D.armed = true;
+  // Приключение: соперник может ответить на взвод (Змей Бантик, Кракен Пират)
+  if (vsBot && vsBot.adv && typeof advArm === 'function' && advArm(p)) D.armed = false;
   renderAll();
 }
 
@@ -1169,13 +1182,22 @@ function duelPlay(guess, forced) {
     D.roundWinner = D.cur;
     D.wins[D.cur]++;
     if (D.wins[D.cur] >= D.winsNeeded) D.matchOver = true;
-    if (vsBot) botSay(D.matchOver ? 'gg' : (D.cur === 0 && Math.random() < 0.5 ? vsBot.bot.react : null));
+    if (vsBot && vsBot.adv) advRoundEndLine();
+    else if (vsBot) botSay(D.matchOver ? 'gg' : (D.cur === 0 && Math.random() < 0.5 ? vsBot.bot.react : null));
   }
+  // Приключение: правило соперника после хода (может спрятать ход, отнять
+  // «+1 ход», дать лишний ход…). Загаданное оно не трогает
+  if (vsBot && vsBot.adv && typeof advAfterMove === 'function') advAfterMove(move);
   // У каждого пояса свой звук: закрытый от человека ход бота звучать не
   // должен, иначе туман слышно. Проверяем после бонуса и конца раунда —
   // от них зависит, закрыт ли ход
   if (!(vsBot && hiddenRow(move.p, move))) soundForGuess(meta);
-  if (distance !== 0 && !usedDouble) D.cur = 1 - D.cur;
+  if (distance !== 0 && !usedDouble && !D.extraTurn) D.cur = 1 - D.cur;
+  D.extraTurn = false;
+  // «+1 ход» Лиса Огонька — три хода подряд: после второго взводится ещё раз
+  if (usedDouble && distance !== 0 && D.armedExtra > 0) { D.armedExtra--; D.armed = true; }
+  // Метеорит: следующий ход — чей бы он ни был — делается сам
+  if (D.lavaNext) { D.lavaNext = false; if (!D.roundOver) D.autoLava[D.cur] = true; }
   renderAll();
 }
 
@@ -1191,6 +1213,8 @@ function bonusBlocked(type, victim) {
 // Полезные бонусы бьют по сопернику, ловушки — по тому, кто наступил
 function applyBonus(type, by) {
   const rival = 1 - by;
+  if (rival === 1 && vsBot && vsBot.adv && typeof advImmune === 'function' &&
+      (type === 'fog' || type === 'blind' || type === 'freeze') && advImmune(type)) return;
   if (type === 'extra') D.tokens[by] += 2;
   // Отметка — номер следующего хода: этот ход уже в истории и остаётся виден
   // Туман закрывает все ходы соперника в раунде, слепота — все свои, и прежние
@@ -1222,6 +1246,8 @@ function knowText(p) {
   const out = [];
   if (k.parity !== undefined) out.push(k.parity === 0 ? B.even : B.odd);
   if (k.half) out.push((k.half === 'low' ? B.low : B.high).replace('{m}', formatNum(halfMark())));
+  if (k.gt !== undefined) out.push(B.gt.replace('{n}', formatNum(k.gt)));
+  if (k.lt !== undefined) out.push(B.lt.replace('{n}', formatNum(k.lt)));
   return out;
 }
 
@@ -1302,6 +1328,8 @@ function hiddenRow(ownerP, h) {
   if (online) return !!(h && h.masked);
   if (mode !== 'duel' || D.roundOver || D.matchOver) return false;
   if (ownerP === null || ownerP === undefined) return false;
+  // Приключение: ход спрятан правилом соперника (плащ, маскировка, чернила…)
+  if (vsBot && vsBot.adv && h && h.ruleHidden) return true;
   // Прячутся ходы, сделанные после того, как помеха легла. С ботом в экран
   // смотрит только человек — помеха на нём действует весь раунд, на любом
   // ходу. Вдвоём за одним телефоном — пока ходит тот, на ком помеха: в
@@ -3698,26 +3726,33 @@ function botMove() {
   if (!vsBot || online || mode !== 'duel' || screen !== 'game') return;
   if (D.roundOver || D.matchOver || D.cur !== 1) return;
   if (localForced()) return doForcedTurn(true);
-  const quirk = vsBot.adv ? vsBot.adv.quirk : null;
+  // Приключение: правило соперника (vsBot.adv.R) — см. adventure.js
+  const rule = vsBot.adv ? vsBot.adv.R : null;
+  if (rule && typeof advBotTurn === 'function') advBotTurn();
   const moves = history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex, p: h.p, timeout: !!h.timeout }));
-  const flags = { fog: D.fog[1], blind: D.blind[1], shortMemory: D.shortMemory[1] || quirk === 'forget',
+  const flags = { fog: D.fog[1], blind: D.blind[1], shortMemory: D.shortMemory[1] || !!(rule && rule.forget),
                   fogFrom: D.fogFrom[1], blindFrom: D.blindFrom[1], know: D.know && D.know[1] };
   const level = vsBot.bot.level;
   // Жетон: когда осталось два числа, два хода подряд выигрывают наверняка
-  if (!D.armed && D.tokens[1] > 0 && history.length > 0) {
+  if (!D.armed && D.tokens[1] > 0 && history.length > 0 && !(rule && rule.noTokens)) {
     const left = botCandidates(moves, 1, flags, false).reduce((a, c) => a + c, 0);
     if ((left === 2 && Math.random() < 0.2 + 0.8 * level) || (left === 3 && Math.random() < 0.5 * level)) {
       D.tokens[1]--;
       D.armed = true;
+      if (rule && typeof advArm === 'function') advArm(1);
     }
   }
-  // Азартный соперник иногда бьёт наугад — по любому ещё возможному числу
-  if (quirk === 'gambler' && Math.random() < 0.3) {
+  // Шутник иногда бьёт наугад — по любому ещё возможному числу
+  if (rule && rule.gamble && Math.random() < rule.gamble) {
     const cand = botCandidates(moves, 1, flags, false), left = [];
     for (let i = 0; i < cand.length; i++) if (cand[i]) left.push(i + RANGE_MIN);
+    const R = advCtx();
+    if (R && R.once('gamble')) R.fire('rule');
     return duelPlay(left[Math.floor(Math.random() * left.length)]);
   }
-  duelPlay(botPick(moves, 1, flags, level));
+  const plan = botPick(moves, 1, flags, level);
+  const own = rule && rule.pick ? advPick(botCandidates(moves, 1, flags, false), plan) : null;
+  duelPlay(own !== null ? own : plan);
 }
 
 function escapeHtml(s) {
@@ -3895,6 +3930,22 @@ function showBonusFlash(kind, by) {
   document.getElementById('bfWho').textContent = (L.bonusDesc[kind] || '')
     .replace('{a}', D.names[by] || '').replace('{b}', D.names[1 - by] || '')
     .replace('{t}', L.bonusNames[D.shieldedTrap] || '');
+  void box.offsetWidth;
+  box.classList.add('show');
+  clearTimeout(bonusFxTimer);
+  bonusFxTimer = setTimeout(() => box.classList.remove('show'), 1700);
+}
+
+// Правило соперника в Приключении сработало — та же вспышка, что у бонуса:
+// портрет соперника, название правила и его реплика
+function showRuleFlash(c, title, text) {
+  const box = document.getElementById('bonusFlash');
+  if (!box) return;
+  box.className = 'bonus-flash rule';
+  const face = document.getElementById('bfIcon');
+  face.innerHTML = '<span class="bf-face" style="background:' + c.world.color + '">' + iconArt(c.icon, 0) + '</span>';
+  document.getElementById('bfName').textContent = title;
+  document.getElementById('bfWho').textContent = text;
   void box.offsetWidth;
   box.classList.add('show');
   clearTimeout(bonusFxTimer);

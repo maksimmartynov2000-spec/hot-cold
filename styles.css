@@ -2772,3 +2772,29 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
    Раньше у «Ленивца Колпачка» портрет сплющивался в полоску в 2 px */
 .pcard .p-name .p-bot { flex-shrink: 0; }
 .pcard .p-name .p-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Правило соперника сработало: портрет соперника в кружке цвета его мира */
+.bonus-flash.rule { --bf: #ffd166; }
+.bonus-flash .bf-face { display: block; width: 84px; height: 84px; border-radius: 50%; padding: 4px; box-sizing: border-box;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3); }
+.bonus-flash .bf-face .icon-art { width: 100%; height: 100%; display: block; }
+/* Карточка босса: две способности — каждая своей строкой */
+.adv-card .ac-quirk .ac-ab { display: block; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgb(var(--ink) / 0.1); text-align: left; }
+.adv-card .ac-quirk .ac-ab b { display: block; font-size: 15px; margin-bottom: 2px; }
+
+/* Карточка соперника: описание прокручивается, «В бой!» и «Назад» всегда
+   внизу на виду. У босса две способности — и кнопка уезжала за край экрана */
+.adv-card { display: flex; flex-direction: column; overflow: hidden; }
+.adv-card .ac-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 20px; }
+.adv-card .ac-actions { flex: none; position: relative; }
+/* Низ описания тает под кнопками: видно, что дальше есть ещё */
+.adv-card .ac-actions::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: 20px;
+  background: linear-gradient(rgb(34 28 85 / 0), var(--surface)); pointer-events: none; }
+/* На планшете вся игра увеличена (zoom у html), а высота экрана в CSS — без
+   увеличения: делим на тот же множитель, иначе карточка снова выше экрана */
+@media (min-width: 744px) and (pointer: coarse) {
+  .adv-card { max-height: calc(100dvh / 1.3 - 40px); }
+}
+@media (min-width: 1024px) and (pointer: coarse) {
+  .adv-card { max-height: calc(100dvh / 1.25 - 40px); }
+}
