@@ -6414,7 +6414,7 @@ async function testAdventure(browser) {
   await page.waitForTimeout(150);
   const card = await page.evaluate(() => ({ name: document.getElementById('acName').textContent,
     quirk: document.getElementById('acQuirk').textContent, facts: document.getElementById('acFacts').textContent }));
-  check('карточка: имя, особенность, числа', card.name === 'Ёжик Яблочко' && /Простак/.test(card.quirk) &&
+  check('карточка: имя, правило, числа', card.name === 'Ёжик Яблочко' && /Угощает/.test(card.quirk) &&
     /от 1 до 20/.test(card.facts), JSON.stringify(card));
   await page.evaluate(() => { BOT_SPEED = 1000; });
   await page.click('#acGo');
@@ -6446,15 +6446,15 @@ async function testAdventure(browser) {
   check('сила соперника от сложности не зависит', lv[0] === lv[1] && lv[1] === lv[2], lv.join(' '));
   const toks = await page.evaluate(() => ['easy', 'normal', 'hard'].map(d => advTokens(advChar(3), d).join(':')));
   check('«⚡ +1 ход»: легко 2:0, нормально 1:1, трудно 0:2', toks.join() === '2:0,1:1,0:2', toks.join());
-  const hoard = await page.evaluate(() => { const c = advChar(5); return c.quirk + ' ' + ['easy', 'normal', 'hard'].map(d => advTokens(c, d).join(':')).join(','); });
-  check('«Запасливый» — на один «+1 ход» больше: 2:1, 1:2, 0:3', hoard === 'tokens 2:1,1:2,0:3', hoard);
+  const hoard = await page.evaluate(() => { const c = advChar(1); return c.rule + ' ' + ['easy', 'normal', 'hard'].map(d => advTokens(c, d).join(':')).join(','); });
+  check('Белка Жёлудь «Запасливая» — на один «+1 ход» больше: 2:1, 1:2, 0:3', hoard === 'acorns 2:1,1:2,0:3', hoard);
   const grow = await page.evaluate(() => [0, 10, 20, 30, 40].map(n => advLevel(advChar(n), 'normal')));
   check('от мира к миру соперники сильнее', grow.every((v, i) => !i || v > grow[i - 1]), grow.join(' '));
 
   // Особенности: у каждого мира все девять, у босса — две победы
   const quirks = await page.evaluate(() => [0, 1, 2, 3, 4].map(w =>
-    [...new Set(Array.from({ length: 9 }, (_, i) => advChar(w * 10 + i).quirk))].length));
-  check('в каждом мире все девять особенностей', quirks.every(n => n === 9), quirks.join());
+    new Set(Array.from({ length: 10 }, (_, i) => advChar(w * 10 + i).rule)).size));
+  check('в каждом мире у всех десяти — свои правила', quirks.every(n => n === 10), quirks.join());
 
   // Босс первого мира: до двух побед, за него — иконка 🧙
   await page.evaluate(() => { localStorage.setItem(advKey(), '9'); renderAdventure(); });
@@ -6493,8 +6493,8 @@ async function testAdventure(browser) {
     const bad = [];
     if (!A || A.names.length !== 50 || A.names.some(n => !n)) bad.push('names');
     if (A.worlds.length !== 5) bad.push('worlds');
-    ['plain', 'fast', 'forget', 'first', 'gambler', 'tokens', 'slow', 'bonus', 'frost', 'boss']
-      .forEach(q => { if (!A.quirks[q] || !A.quirks[q][0] || !A.quirks[q][1]) bad.push(q); });
+    if (!A.cast || A.cast.length !== 50) bad.push('cast');
+    if (!A.bossTitle || !A.bossNote || !A.kw || !A.kw.gt) bad.push('boss/kw');
     return l + ':' + (bad.join(',') || 'ok');
   }));
   check('Приключение переведено на 4 языка', tr.every(x => /:ok$/.test(x)), tr.join(' '));
@@ -6534,17 +6534,17 @@ async function testAdventureBonus(browser) {
   });
   check('босс играет с ловушками', boss.traps === 3 && boss.wins === 2, JSON.stringify(boss));
   const magic = await page.evaluate(() => {
-    const n = [...Array(50).keys()].find(i => advChar(i).quirk === 'bonus' && advChar(i).w === 2);
+    const n = [...Array(50).keys()].find(i => advChar(i).rule === 'octopus');
     startAdventure(n); stopBot();
     const r = { n, count: D.bonuses.length, auto: autoBonusCountFor(rangeCount()), traps: bonusSet.trap.length };
     quitToMenu();
     return r;
   });
-  check('у Фокусника бонусов вдвое больше и есть ловушки', magic.count === 2 * magic.auto && magic.traps === 3, JSON.stringify(magic));
+  check('у Осьминога Жонглёра бонусов вдвое больше и есть ловушки', magic.count === 2 * magic.auto && magic.traps === 3, JSON.stringify(magic));
   // Соперник «Первый ход» ходит сам, без нажатий игрока: раньше его ход не
   // назначался, потому что партия рисовалась до открытия доски
   const firstMove = await page.evaluate(async () => {
-    const n = [...Array(50).keys()].find(i => advChar(i).quirk === 'first');
+    const n = [...Array(50).keys()].find(i => advChar(i).rule === 'penguin');
     BOT_SPEED = 0.05;
     startAdventure(n);
     const planned = !!botTimer;
@@ -7312,6 +7312,197 @@ async function testTablet(browser) {
   await ctx.close();
 }
 
+// Соперники Приключения: у каждого своё правило, у босса — две способности,
+// у всех — свои реплики. Каждое правило проверяется на своём моменте
+async function testAdvRules(browser) {
+  console.log('\nПриключение: у каждого соперника своё правило');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => { localStorage.setItem(advKey(), '50'); BOT_SPEED = 1000; });
+  const cast = await page.evaluate(() => ({
+    n: ADV_CAST.length, uniq: new Set(ADV_CAST).size, known: ADV_CAST.every(id => !!ADV_RULES[id]),
+    texts: ['en', 'ru', 'fr', 'de'].map(l => i18n[l].adv.cast.filter((c, n) => n % 10 === 9
+      ? c.a1t && c.a1d && c.a2t && c.a2d && c.hi && c.a1 && c.a2 && c.win && c.lose
+      : c.t && c.d && c.hi && c.rule && c.luck && c.worry && c.win && c.lose).length),
+    titles: new Set(i18n.ru.adv.cast.filter((c, n) => n % 10 !== 9).map(c => c.t)).size,
+    bosses: ADV_CAST.filter((id, n) => n % 10 === 9).every(id => ADV_RULES[id].boss) }));
+  check('50 соперников — 50 разных правил, у боссов по две способности', cast.n === 50 && cast.uniq === 50 && cast.known && cast.bosses,
+    JSON.stringify(cast));
+  check('у всех правила и реплики на 4 языках, названия правил не повторяются', cast.texts.every(k => k === 50) && cast.titles === 45,
+    JSON.stringify(cast.texts) + ' ' + cast.titles);
+
+  // Карточка: правило — вместо прежней «особенности»; у босса — две способности
+  const card = await page.evaluate(() => {
+    openAdventure(); openAdvCard(2);
+    const reg = document.getElementById('acQuirk').textContent;
+    closeAdvCard(); openAdvCard(9);
+    const boss = { text: document.getElementById('acQuirk').textContent, ab: document.querySelectorAll('#acQuirk .ac-ab').length };
+    closeAdvCard();
+    const badge = document.querySelector('#advMap .adv-tile[data-n="2"] .at-quirk').textContent;
+    return { reg, boss, badge };
+  });
+  check('карточка Енота: «Воришка» и что он делает', /Воришка/.test(card.reg) && /Холодно/.test(card.reg) && card.badge === '🧣', JSON.stringify(card));
+  check('карточка Волшебника: «Морок» и «Колдовской шаг»', card.boss.ab === 2 && /Морок/.test(card.boss.text) && /Колдовской шаг/.test(card.boss.text),
+    JSON.stringify(card.boss));
+
+  // Помощники в странице: начать бой без раздумий бота, сделать ход с нужным поясом
+  await page.evaluate(() => {
+    window.__fires = [];
+    window.showRuleFlash = (c, title, text) => { window.__fires.push('F ' + title + ' | ' + text); };
+    window.botSayText = text => { window.__fires.push('S ' + text); };
+    // Бонусы с прямой убираем: случайный бонус под ходом сбил бы счёт «+1 ход»
+    window.advTest = (n, s, diff) => {
+      quitToMenu(); closeAdvCard(); setAdvDiff(diff || 'normal'); startAdventure(n); stopBot();
+      if (s !== undefined) secret = s;
+      D.bonuses = [];
+      window.__fires = [];
+    };
+    // Число с нужным поясом k (0 — «Очень холодно», 5 — «Горячо»…): по расстоянию от загаданного
+    window.atTier = k => {
+      const f = FEEDBACK_META[k];
+      for (let d = f.min; d <= f.max; d++) for (const v of [secret - d, secret + d]) {
+        if (v >= RANGE_MIN && v <= RANGE_MAX && v !== secret && !history.some(h => h.guess === v)) return v;
+      }
+      return null;
+    };
+    window.play = (p, k) => { const v = atTier(k); if (v === null) return; stopBot(); D.cur = p; duelPlay(v); stopBot(); };
+  });
+  const r = {};
+  r.apple = await page.evaluate(() => { advTest(0, 10); const t0 = D.tokens[0]; play(0, 5); const t1 = D.tokens[0];
+    play(1, 1); play(0, 6); return { gain: t1 - t0, once: D.tokens[0] === t1, fire: __fires[0] || '' }; });
+  check('Ёжик: вам «Горячо» — дарит «+1 ход», раз за раунд', r.apple.gain === 1 && r.apple.once && /яблочко/.test(r.apple.fire), JSON.stringify(r.apple));
+  r.thief = await page.evaluate(() => { advTest(2, 15); const a = D.tokens.join(':'); play(0, 0); return { a, b: D.tokens.join(':') }; });
+  check('Енот: вам «Холодно» — утаскивает ваш «+1 ход» себе', r.thief.a === '1:1' && r.thief.b === '0:2', JSON.stringify(r.thief));
+  r.hop = await page.evaluate(() => { advTest(3, 15); const first = D.cur; play(1, 1); return { first, still: D.cur }; });
+  check('Заяц: ходит первым и прыгает два раза подряд', r.hop.first === 1 && r.hop.still === 1, JSON.stringify(r.hop));
+  r.specs = await page.evaluate(() => { advTest(4, 14); advRoundStart(); return { me: D.know[0].parity, bot: D.know[1].parity, txt: knowText(0).join() }; });
+  check('Барсук: оба знают чётность — у вас она видна у имени', r.specs.me === 0 && r.specs.bot === 0 && /чётное/.test(r.specs.txt), JSON.stringify(r.specs));
+  r.shy = await page.evaluate(() => { advTest(5, 10); play(0, 6); return D.skip[1]; });
+  check('Оленёнок: вам «Очень горячо» — пропускает ход', r.shy === true);
+  r.cloak = await page.evaluate(() => { advTest(6, 10); play(0, 1); play(1, 2); const m = history[history.length - 1];
+    const hid = hiddenRow(1, m); play(0, 3); play(1, 3); const second = hiddenRow(1, history[history.length - 1]); return { hid, second }; });
+  check('Лис: его первый ход спрятан, второй — виден', r.cloak.hid === true && r.cloak.second === false, JSON.stringify(r.cloak));
+  r.sleepy = await page.evaluate(() => { advTest(7, 10); play(0, 1); play(1, 1); const a = D.skip[1]; play(0, 2); play(1, 2); return { a, b: D.skip[1] }; });
+  check('Мишка: после второго своего хода засыпает', r.sleepy.a === false && r.sleepy.b === true, JSON.stringify(r.sleepy));
+  r.owl = await page.evaluate(() => { advTest(8, 15); advRoundStart(); return { bot: D.know[1].half, me: D.know[0].half || null }; });
+  check('Филин: половину знает только он', r.owl.bot === 'high' && r.owl.me === null, JSON.stringify(r.owl));
+  r.wizard = await page.evaluate(() => { advTest(9, 10); play(0, 5); const fog = D.fog[0]; play(1, 5); return { fog, again: D.cur, fires: __fires.length }; });
+  check('Волшебник: вам «Горячо» — туман; ему «Горячо» — ходит ещё раз', r.wizard.fog === true && r.wizard.again === 1, JSON.stringify(r.wizard));
+  r.toucan = await page.evaluate(() => { advTest(10, 30); play(1, 2); const k = D.know[0]; return { gt: k.gt, lt: k.lt, txt: knowText(0).join(), fire: __fires[0] || '' }; });
+  check('Тукан: после своего хода проговаривается — «больше/меньше»',
+    (r.toucan.gt !== undefined || r.toucan.lt !== undefined) && /больше|меньше/.test(r.toucan.txt) && /Загаданное/.test(r.toucan.fire), JSON.stringify(r.toucan));
+  r.chameleon = await page.evaluate(() => { advTest(12, 25); play(1, 1); play(0, 1); play(1, 2);
+    const bot = history.filter(h => h.p === 1); return bot.map(h => hiddenRow(1, h)).join(); });
+  check('Хамелеон: виден только его последний ход', r.chameleon === 'true,false', r.chameleon);
+  r.banana = await page.evaluate(() => { advTest(14, 25); stopBot(); D.cur = 1; duelPlay(40); stopBot(); D.cur = 0; duelPlay(41); return D.skip[0]; });
+  check('Мартышка: назвали число рядом с её ходом — пропуск хода', r.banana === true);
+  r.snake = await page.evaluate(() => { advTest(15, 25); D.cur = 0; useToken(0); return D.tokens.join(':') + (D.armed ? ' взведён' : ''); });
+  check('Змей: вы взяли «+1 ход» — он тоже', r.snake === '0:2 взведён', r.snake);
+  r.elephant = await page.evaluate(() => { advTest(18, 25); play(1, 5); return D.skip[0]; });
+  check('Слон: ему «Горячо» — вы пропускаете ход', r.elephant === true);
+  r.gorilla = await page.evaluate(() => { advTest(19, 25); const tax = D.tokens.join(':'); play(0, 5); return { tax, skip: D.skip[0], frozen: D.frozen[0] }; });
+  check('Горилла: налог «+1 ход» в начале раунда, рёв на ваше «Горячо»', r.gorilla.tax === '0:2' && r.gorilla.skip && r.gorilla.frozen, JSON.stringify(r.gorilla));
+  r.crab = await page.evaluate(() => { advTest(22, 50); play(0, 5); play(1, 1); play(0, 2); return hiddenRow(0, history[history.length - 1]); });
+  check('Краб: после вашего «Горячо» хватает следующий ваш ход', r.crab === true);
+  r.frost = await page.evaluate(() => [24, 38, 48].map(n => { advTest(n); return RANGE_MIN + '…' + RANGE_MAX; }).join(' '));
+  check('Тюлень, Хрусталь, Вихрик — числа с минусом', r.frost === '-50…50 -100…100 -250…250', r.frost);
+  r.turtle = await page.evaluate(() => { advTest(25, 50); applyBonus('fog', 0); applyBonus('freeze', 0); return { fog: D.fog[1], skip: D.skip[1] }; });
+  check('Черепаха: туман и заморозка на неё не действуют', r.turtle.fog === false && r.turtle.skip === false, JSON.stringify(r.turtle));
+  r.penguin = await page.evaluate(() => { advTest(26); return D.cur; });
+  check('Пингвин: ходит первым', r.penguin === 1);
+  r.kraken = await page.evaluate(() => { advTest(29, 50); D.cur = 0; useToken(0); const a = { armed: D.armed, t: D.tokens.join(':') };
+    D.tokens[0] = 1; useToken(0); return { a, second: D.armed }; });
+  check('Кракен: первый ваш «+1 ход» за раунд перехватывает', r.kraken.a.armed === false && r.kraken.a.t === '0:2' && r.kraken.second === true, JSON.stringify(r.kraken));
+  r.spark = await page.evaluate(() => { advTest(30, 5); play(0, 0); return D.autoLava[0]; });
+  check('Саламандра: вам «Холодно» — следующий ваш ход сделается сам', r.spark === true);
+  r.ember = await page.evaluate(() => { advTest(32, 5); D.cur = 1; D.armed = true; advArm(1); play(1, 2); const a = D.cur; play(1, 3); const b = D.cur; play(1, 4); return [a, b, D.cur].join(); });
+  check('Лис Огонёк: с «+1 ход» ходит три раза подряд', r.ember === '1,1,0', r.ember);
+  r.bat = await page.evaluate(() => { advTest(33, 5); play(1, 1); const far = hiddenRow(1, history[history.length - 1]);
+    play(0, 2); play(1, 5); const near = hiddenRow(1, history[history.length - 1]); return { far, near }; });
+  check('Мышка: дальние её ходы в темноте, близкие видно', r.bat.far === true && r.bat.near === false, JSON.stringify(r.bat));
+  r.phoenix = await page.evaluate(() => { advTest(35, 5); play(1, 0); return D.cur; });
+  check('Феникс: «Холодно» — сразу ходит ещё раз', r.phoenix === 1);
+  r.beetle = await page.evaluate(() => { advTest(36, 5); const a = D.tokens[1]; play(1, 0); return D.tokens[1] - a; });
+  check('Жук: его «Холодно» — ему «+1 ход»', r.beetle === 1);
+  r.knight = await page.evaluate(() => { advTest(37); return { traps: bonusSet.trap.length, more: bonusSet.count, base: autoBonusCountFor(rangeCount()), noTok: !!vsBot.adv.R.noTokens }; });
+  check('Рыцарь: полезных бонусов втрое больше, ловушек нет, «+1 ход» не берёт',
+    r.knight.traps === 0 && r.knight.more === 3 * r.knight.base && r.knight.noTok, JSON.stringify(r.knight));
+  r.dragon = await page.evaluate(() => { advTest(39, 5); play(1, 2); play(0, 2); play(1, 3); play(0, 3); play(1, 4); const lava = D.autoLava[0];
+    D.tokens[0] = 2; D.autoLava[0] = false; play(1, 6); return { lava, melt: D.tokens[0] }; });
+  check('Дракон: третьим ходом — ваш шальной бросок; «Очень горячо» — плавит «+1 ход»', r.dragon.lava === true && r.dragon.melt === 0, JSON.stringify(r.dragon));
+  r.robot = await page.evaluate(() => { advTest(40); return vsBot.bot.level; });
+  check('Робот: сильнейший', r.robot === 0.98, String(r.robot));
+  r.alien = await page.evaluate(() => { advTest(41); return D.tokens.join(':'); });
+  check('Зелёныш: дарит «+1 ход» в начале раунда', r.alien === '2:1', r.alien);
+  r.moon = await page.evaluate(() => { advTest(43, 100); play(1, 1); play(0, 1); play(1, 2); return history.filter(h => h.p === 1).map(h => hiddenRow(1, h)).join(); });
+  check('Лунный зайка: каждый второй его ход спрятан', r.moon === 'false,true', r.moon);
+  r.meteor = await page.evaluate(() => { advTest(44, 100); play(0, 1); play(1, 1); play(0, 1); return { next: D.cur, lava: D.autoLava[D.cur] }; });
+  check('Метеорит: третий ход — следующий делается сам', r.meteor.lava === true, JSON.stringify(r.meteor));
+  r.whale = await page.evaluate(() => { advTest(45, 100); advRoundStart(); return [D.know[0].half, D.know[1].half].join(); });
+  check('Кит: оба знают половину', r.whale === 'low,low', r.whale);
+  r.eyes = await page.evaluate(() => { advTest(46, 100); advRoundStart(); return [D.know[1].parity === undefined ? '-' : D.know[1].parity, D.know[1].half, D.know[0].half || '-'].join(); });
+  r.eyesMine = await page.evaluate(() => D.know[0].parity);
+  check('Трёхглазик: сам знает половину, вам говорит чётность', r.eyes === '-,low,-' && r.eyesMine === 0, r.eyes + ' ' + r.eyesMine);
+  r.blackhole = await page.evaluate(() => { advTest(48, -240); play(0, 0); return hiddenRow(0, history[history.length - 1]); });
+  check('Вихрик: ваш ход «Очень холодно» затягивает', r.blackhole === true);
+  r.ufo = await page.evaluate(() => { advTest(49, 100); play(0, 5); const hid = hiddenRow(0, history[history.length - 1]);
+    play(1, 1); play(0, 0); stopBot(); D.cur = 1; advBotTurn(); return { hid, double: D.armed }; });
+  check('НЛО: похищает ваш «Горячо», после «Холодно» — двойной ход', r.ufo.hid === true && r.ufo.double === true, JSON.stringify(r.ufo));
+
+  // Загаданное число правила не трогают: тот же secret до конца партии
+  const same = await page.evaluate(() => {
+    let ok = true;
+    for (const n of [2, 9, 19, 29, 39, 44, 49]) {
+      advTest(n, 17);
+      for (let i = 0; i < 6 && !D.roundOver; i++) { play(i % 2, i % 3 ? 1 : 5); if (secret !== 17) ok = false; }
+    }
+    return ok;
+  });
+  check('ни одно правило не меняет загаданное число', same);
+
+  // Реплики: «привет» в начале боя, правило — большой карточкой в первый раз
+  await page.evaluate(() => { advTest(4); });
+  await page.waitForTimeout(2600);
+  const lines = await page.evaluate(() => ({ list: window.__fires.slice(), even: D.know[0].parity === 0 }));
+  check('Барсук: «привет», потом правило карточкой с ответом',
+    /В очках всё видно/.test(lines.list[0] || '') &&
+    new RegExp('^F .*Всё видит \\| Скажу честно: число ' + (lines.even ? 'чётное' : 'нечётное') + '!').test(lines.list[1] || ''),
+    JSON.stringify(lines));
+  const end = await page.evaluate(() => { advTest(0, 10); __fires = []; D.cur = 0; duelPlay(10); return __fires.slice(); });
+  check('проиграл — говорит своё «проиграл»', /Ты победил! Держи яблочко/.test(end.join()), JSON.stringify(end));
+  // Победный ход правило не трогает: Мишка выиграл вторым ходом — говорит
+  // «выиграл», а не про сон, и не засыпает
+  const bear = await page.evaluate(() => { advTest(7, 10); play(1, 0); play(0, 0); __fires = []; D.cur = 1; duelPlay(10);
+    return { fires: __fires.slice(), skip: D.skip[1], win: i18n.ru.adv.cast[7].win }; });
+  check('Мишка выиграл вторым ходом — «выиграл», а не «Соня»', bear.fires.length === 1 && bear.fires[0] === 'S ' + bear.win && !bear.skip,
+    JSON.stringify(bear));
+  await done(page);
+
+  // Карточка босса длиннее экрана: описание прокручивается, а «В бой!» и
+  // «Назад» на виду везде — на iPhone, маленьком iPhone, набок и на iPad
+  for (const [w, h] of [[390, 844], [375, 667], [844, 390], [820, 1180], [1180, 820]]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: true });
+    const pg = await ctx.newPage();
+    await applyStub(pg, { user: 'Максим' });
+    await pg.goto(GAME_URL);
+    await pg.waitForTimeout(300);
+    const r = await pg.evaluate(() => {
+      localStorage.setItem(advKey(), '50'); openAdventure(); openAdvCard(39);
+      const body = document.getElementById('acBody');
+      body.scrollTop = 9999;
+      const scrolled = body.scrollTop;
+      closeAdvCard(); openAdvCard(2);
+      const back = document.getElementById('acBack').getBoundingClientRect(), go = document.getElementById('acGo').getBoundingClientRect();
+      const top = body.scrollTop;
+      closeAdvCard(); openAdvCard(39);
+      const b2 = document.getElementById('acBack').getBoundingClientRect();
+      return { bossBack: Math.round(b2.bottom), back: Math.round(back.bottom), go: Math.round(go.top), vh: innerHeight, scrolled, top };
+    });
+    check(w + '×' + h + ': у босса «В бой!» и «Назад» видны без прокрутки', r.bossBack <= r.vh && r.back <= r.vh && r.go > 0, JSON.stringify(r));
+    check(w + '×' + h + ': следующая карточка открывается с начала', r.top === 0, JSON.stringify(r));
+    await ctx.close();
+  }
+}
+
 // Сложность Приключения — только «⚡ +1 ход»: видно на карте, в карточке
 // соперника перед боем и на плашках в бою
 async function testAdvDifficulty(browser) {
@@ -7340,24 +7531,24 @@ async function testAdvDifficulty(browser) {
   await page.click('#acDiff .ad-btn[data-diff="hard"]');
   c = await card();
   check('«Трудно»: у вас ничего, у соперника ⚡⚡, за победу ★★★', c.sides.join('|') === 'У вас—|У соперника⚡⚡' && /★★★$/.test(c.note), JSON.stringify(c));
-  // «Запасливый» (Хамелеон Очки) — на один больше
-  await page.evaluate(() => { closeAdvCard(); openAdvCard(12); });
+  // «Запасливая» Белка Жёлудь — на один больше
+  await page.evaluate(() => { closeAdvCard(); openAdvCard(1); });
   c = await card();
-  check('«Запасливый» на «Трудно»: у соперника ⚡⚡⚡', c.sides.join('|') === 'У вас—|У соперника⚡⚡⚡', JSON.stringify(c));
+  check('«Запасливая» на «Трудно»: у соперника ⚡⚡⚡', c.sides.join('|') === 'У вас—|У соперника⚡⚡⚡', JSON.stringify(c));
   // Закрытого не сыграть — и сложности в его карточке нет
   await page.evaluate(() => { closeAdvCard(); openAdvCard(30); });
   check('у закрытого соперника сложности нет', !(await card()).box);
   // Бой на «Трудно»: у игрока «Без ⚡», у соперника ×3, раунд за раундом
-  await page.evaluate(() => { closeAdvCard(); startAdventure(12); });
+  await page.evaluate(() => { closeAdvCard(); startAdventure(1); });
   await page.waitForTimeout(300);
   const fight = await page.evaluate(() => { stopBot(); return { tokens: D.tokens.join(':'), mine: document.getElementById('ptoken0').textContent,
     theirs: document.getElementById('ptoken1').textContent, disabled: document.getElementById('ptoken0').disabled }; });
-  check('бой на «Трудно»: «Без ⚡» у вас, «⚡ +1 ход ×3» у Запасливого', fight.tokens === '0:3' && fight.mine === 'Без ⚡' &&
+  check('бой на «Трудно»: «Без ⚡» у вас, «⚡ +1 ход ×3» у Белки Жёлудь', fight.tokens === '0:3' && fight.mine === 'Без ⚡' &&
     fight.theirs === '⚡ +1 ход ×3' && fight.disabled, JSON.stringify(fight));
   // Сила одна и та же на любой сложности
-  const lv = await page.evaluate(() => { const a = vsBot.bot.level; quitToMenu(); closeAdvCard(); setAdvDiff('easy'); startAdventure(12); stopBot();
+  const lv = await page.evaluate(() => { const a = vsBot.bot.level; quitToMenu(); closeAdvCard(); setAdvDiff('easy'); startAdventure(1); stopBot();
     return { hard: a, easy: vsBot.bot.level, tokens: D.tokens.join(':'), mine: document.getElementById('ptoken0').textContent }; });
-  check('«Легко»: та же сила соперника, у вас ⚡ ×2, у Запасливого один', lv.hard === lv.easy && lv.tokens === '2:1' &&
+  check('«Легко»: та же сила соперника, у вас ⚡ ×2, у Белки один', lv.hard === lv.easy && lv.tokens === '2:1' &&
     lv.mine === '⚡ +1 ход ×2', JSON.stringify(lv));
   // Босс — два раунда: «⚡» раздаются заново в каждом
   const boss = await page.evaluate(() => { quitToMenu(); closeAdvCard(); localStorage.setItem(advKey(), '19'); setAdvDiff('hard');
@@ -7368,11 +7559,12 @@ async function testAdvDifficulty(browser) {
     const r = document.querySelector('#pname1 .p-bot').getBoundingClientRect(), nm = document.querySelector('#pname1 .p-nm');
     return { w: Math.round(r.width), h: Math.round(r.height), cut: getComputedStyle(nm).textOverflow }; });
   check('«Ленивец Колпачок»: портрет 18×18, имя с многоточием', face.w === 18 && face.h === 18 && face.cut === 'ellipsis', JSON.stringify(face));
-  // Потратили свой — «использован», а не «Без ⚡»
+  // Потратили свой — «⚡ 0», а не «Без ⚡»: длинное «использован» вылезало
+  // из узкой карточки игрока на соседнюю
   const spent = await page.evaluate(() => { quitToMenu(); closeAdvCard(); setAdvDiff('normal'); startAdventure(12); stopBot();
     D.cur = 0; useToken(0); duelPlay(secret === RANGE_MIN ? RANGE_MIN + 1 : RANGE_MIN); stopBot();
     return { tokens: D.tokens.join(':'), mine: document.getElementById('ptoken0').textContent }; });
-  check('потраченный «+1 ход» — «использован»', spent.tokens.startsWith('0') && /использован/.test(spent.mine), JSON.stringify(spent));
+  check('потраченный «+1 ход» — «⚡ 0»', spent.tokens.startsWith('0') && spent.mine === '⚡ 0', JSON.stringify(spent));
   await done(page);
 }
 
@@ -8425,6 +8617,7 @@ async function testKeyPage(browser) {
     await testTablet(browser);
     await testScreensEverywhere(browser);
     await testAdvDifficulty(browser);
+    await testAdvRules(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

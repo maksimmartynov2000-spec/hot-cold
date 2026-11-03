@@ -100,7 +100,10 @@ async function openPlayer(browser, db, lang) {
     // Обучение проверяет run.js; здесь игроки его уже прошли
     if (localStorage.getItem('hc_tutorial') === null) {
       localStorage.setItem('hc_tutorial', JSON.stringify({ done: [1, 2, 3], skipped: false }));
-      localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'lava', 'skip', 'gift', 'memory', 'near']));
+      // Все бонусы онлайна, и четыре из Приключения (миграция 057) тоже: иначе
+      // случайный ход на 🩻/🌗/🛡️/🧊 открывал окно-объяснение поверх кнопок
+      localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'rush', 'lava', 'skip', 'gift', 'memory', 'near',
+        'xray', 'half', 'shield', 'freeze']));
     }
   }, lang || 'ru');
   await page.goto(GAME);

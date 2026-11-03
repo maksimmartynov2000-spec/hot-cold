@@ -3417,12 +3417,17 @@ function renderSayBubble() {
 
 // Фраза бота в игре без интернета — тот же пузырь, что у соперника онлайн
 function botSay(code) {
-  if (!code || !vsBot || online || screen !== 'game' || sayMuted) return;
+  if (!code) return;
+  botSayText(t().say[code] || '');
+}
+// Своими словами: реплики соперников Приключения (adventure.js)
+function botSayText(text) {
+  if (!text || !vsBot || online || screen !== 'game' || sayMuted) return;
   const box = document.getElementById('sayBubble');
   if (!box) return;
   sayShownUntil = Date.now() + SAY_SHOW_MS;
   box.innerHTML = '<span class="s-who" style="color:' + P_COLORS[1] + '">' +
-    escapeHtml(D.names[1]) + '</span>' + escapeHtml(t().say[code] || '');
+    escapeHtml(D.names[1]) + '</span>' + escapeHtml(text);
   box.style.borderColor = P_COLORS[1];
   box.classList.remove('hidden');
   setTimeout(renderSayBubble, SAY_SHOW_MS + 50);
