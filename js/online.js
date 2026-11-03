@@ -2229,7 +2229,15 @@ function renderChatPad() {
 function renderChatModes() {
   const box = document.getElementById('chatModes');
   box.innerHTML = '';
-  RANKED_MODES.forEach(mode => box.appendChild(rankedModeButton(mode, false, () => challengeRankedFromChat(mode))));
+  // Названия — правилами, как в «Своей игре»: прежних режимов («Обычная»,
+  // «Мороз и Жара») в онлайне больше нет (миграция 056)
+  const R = t().online.rules;
+  RANKED_MODES.forEach(mode => {
+    const b = rankedModeButton(mode, false, () => challengeRankedFromChat(mode));
+    b.querySelector('.rm-name').textContent = R.ranges[(mode & 1) ? 'pm100' : '100'];
+    b.querySelector('.rm-range').textContent = (mode & 2) ? R.on : R.off;
+    box.appendChild(b);
+  });
 }
 
 function renderChat(messages) {

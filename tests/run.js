@@ -7231,6 +7231,32 @@ async function testLocalAdvBonuses(browser) {
   await page.context().close();
 }
 
+// Полная проверка «что дёргается и куда не попасть»
+async function testNoJumps(browser) {
+  console.log('\nНичего не дёргается, кнопки под палец');
+  const page = await newGame(browser, { user: 'Лев' });
+  await page.click('.mode-btn.solo');
+  await page.evaluate(() => { document.getElementById('rangeMax').value = '100'; onRangeChange(); });
+  await page.click('#tStartMatch');
+  await page.evaluate(() => { secret = 63; });
+  const tops = [];
+  for (const g of [50, 80, 70, 60, 65, 64]) {
+    await page.fill('#guessInput', String(g)); await page.click('#tSubmitGuess'); await page.waitForTimeout(350);
+    tops.push(await page.evaluate(() => Math.round(document.getElementById('historySection').getBoundingClientRect().top)));
+  }
+  check('история ходов не прыгает от хода к ходу (и на «Очень горячо»)', new Set(tops.slice(1)).size === 1, tops.join(','));
+  const lab = await page.evaluate(() => { const l = document.getElementById('feedbackLabel'); return { h: l.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(l).fontSize), t: l.textContent }; });
+  check('подпись подсказки — в одну строку', lab.h < lab.lh * 1.8, JSON.stringify(lab));
+  const btns = await page.evaluate(() => ['vizBtn', 'tMenu'].map(id => { const r = document.getElementById(id).getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }));
+  check('кнопки над доской — не меньше 38×34', btns.every(x => { const [w, h] = x.split('x').map(Number); return w >= 38 && h >= 34; }), btns.join(' '));
+  await page.fill('#guessInput', '63'); await page.click('#tSubmitGuess'); await page.waitForTimeout(1200);
+  await page.evaluate(() => openReview());
+  await page.waitForTimeout(300);
+  const last = await page.evaluate(() => { const rows = document.querySelectorAll('#reviewList .rv-row, .rv-row'); return rows[rows.length - 1].textContent; });
+  check('у угадывающего хода нет «было 1 → осталось 1»', !/осталось/.test(last), last);
+  await page.context().close();
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -8162,6 +8188,7 @@ async function testKeyPage(browser) {
     await testKidClarity(browser);
     await testOnlineAdvBonuses(browser);
     await testLocalAdvBonuses(browser);
+    await testNoJumps(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

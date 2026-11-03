@@ -501,7 +501,9 @@ async function registerPlayer(p, name, pin) {
   check('через 26 секунд — партия с «человеком»', bm && bm.status === 'active' && bm.bot_seat === 1 &&
     isPerson && !/^@bot:/.test(bm.p1) && bm.ranked_mode === 0, JSON.stringify(bm && { p1: bm.p1, s: bm.status }));
   check('доска открылась сама', await B.page.locator('#screenGame').isVisible());
-  const botLabel = await B.page.locator('#pname1').textContent();
+  // Титул под ником (миграция 053) бывает и у соперника-«человека» — он не часть ника
+  const botLabel = await B.page.evaluate(() => { const el = document.getElementById('pname1').cloneNode(true);
+    el.querySelectorAll('.p-title').forEach(x => x.remove()); return el.textContent; });
   check('соперник подписан ником, без 🤖', botLabel.trim() === bm.p1 && !/🤖/.test(botLabel), botLabel);
   const botFlag = await B.page.evaluate(() => online && online.botSeat);
   check('игра не знает, что это бот', botFlag === null, String(botFlag));
