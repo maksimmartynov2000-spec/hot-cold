@@ -7270,6 +7270,10 @@ async function testTablet(browser) {
     await page.waitForTimeout(400);
     const r = await page.evaluate(() => ({ zoom: getComputedStyle(document.documentElement).zoom, hs: document.documentElement.scrollWidth > innerWidth + 1 }));
     check(w + '×' + h + ': игра крупнее (×' + z + '), без прокрутки вбок', r.zoom === z && !r.hs, JSON.stringify(r));
+    // Горизонтально — «Испытание» и «Онлайн» рядом, вертикально — друг под другом
+    const row = await page.evaluate(() => { const a = document.querySelector('.mode-btn.run').getBoundingClientRect(),
+      b = document.querySelector('.mode-btn.online').getBoundingClientRect(); return Math.abs(a.top - b.top) < 2; });
+    check(w + '×' + h + ': меню — ' + (w > h ? 'Испытание и Онлайн рядом' : 'друг под другом'), row === (w > h), String(row));
     await page.click('.mode-btn.solo');
     await page.evaluate(() => { document.getElementById('rangeMax').value = '100'; onRangeChange(); });
     await page.click('#tStartMatch');
