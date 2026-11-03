@@ -2593,3 +2593,13 @@ body.on-online #screenOnline { padding-bottom: 120px; } /* точнее — fitP
 /* Закреплённая «Играть» — по центру и шириной как поле ввода в партии: на
    масштабированном планшете растянутая на всю ширину панель съезжала влево */
 body.on-online #rkPlayBar { max-width: 560px; margin: 0 auto; }
+
+/* ---- iPad горизонтально: меню в две колонки ----
+   Широкий экран: «Испытание» и «Игра онлайн» — рядом, под ними три плитки,
+   ниже задания дня. Колонка меню шире, чтобы не было пустых полей по бокам */
+@media (min-width: 1024px) and (orientation: landscape) and (pointer: coarse) {
+  body.on-mode .card { max-width: 860px; }
+  #screenMode .mode-list { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  #screenMode .mode-list > .mode-btn.wide { grid-column: span 3; }
+  #screenMode .mode-list > .mode-btn.tile { grid-column: span 2; }
+}
