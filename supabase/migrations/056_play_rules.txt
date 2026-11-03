@@ -1,0 +1,320 @@
+-- Онлайн: одна кнопка «Играть» и «Своя игра» вместо четырёх режимов.
+-- Применять в Supabase: SQL Editor → вставить целиком → Run. Применить ДО мёржа.
+--
+-- • Очередь по правилам: диапазон (1–20, 1–100, −100…100), бонусы, до скольки
+--   побед (1, 3, 5), время на ход (обычное или блиц 10 с) — или «правила дня».
+--   «Играть» — это 1–100, с бонусами, до 3 побед, обычное время.
+-- • Соперник с такими же правилами — сразу. Кто-то ждёт с другими — игре
+--   видно, кто и чего хочет, и можно позвать к нему. Никого — через 5–25 с
+--   соперник-«человек» с вашими правилами.
+-- • Рейтинг один на всё: из прежних четырёх берётся лучший. Звёзды как были.
+-- Старые функции (join_ranked_queue, ranked_status) остаются — для тех, у кого
+-- в телефоне ещё старая версия игры.
+
+-- ============ 1. Правила ============
+-- Приводит присланное к одному виду; чужое и лишнее отбрасывается
+create or replace function play_rules(p jsonb)
+returns jsonb language plpgsql immutable as $$
+declare r text; w int;
+begin
+  if coalesce((p ->> 'daily')::boolean, false) then return jsonb_build_object('daily', true); end if;
+  r := coalesce(p ->> 'range', '100');
+  if r not in ('20', '100', 'pm100') then r := '100'; end if;
+  w := coalesce((p ->> 'wins')::int, 3);
+  if w not in (1, 3, 5) then w := 3; end if;
+  return jsonb_build_object('range', r, 'bonuses', coalesce((p ->> 'bonuses')::boolean, true),
+                            'wins', w, 'blitz', coalesce((p ->> 'blitz')::boolean, false));
+end;
+$$;
+
+-- Ключ для подбора: одинаковые правила — одинаковый ключ. У правил дня ключ
+-- меняется с днём: вчерашний ждущий не попадёт в сегодняшний режим
+create or replace function play_key(p jsonb)
+returns text language sql stable as $$
+  select case when coalesce((p ->> 'daily')::boolean, false) then 'daily:' || daily_variant()
+              else (p ->> 'range') || ':' || (case when (p ->> 'bonuses')::boolean then 'b' else 'n' end)
+                   || ':' || (p ->> 'wins') || ':' || (case when (p ->> 'blitz')::boolean then 'z' else 't' end) end;
+$$;
+
+alter table ranked_queue add column if not exists rules jsonb;
+alter table ranked_queue add column if not exists rkey text;
+
+-- Партия по правилам. Правила дня ставит сама партия (matches_daily_rules,
+-- режим 4); остальное — здесь. Режим 0: рейтинг один
+create or replace function play_make_match(p0 text, p1 text, p jsonb, p_bot_seat int, p_bot_level real)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare new_id bigint; daily boolean; pm boolean;
+begin
+  daily := coalesce((p ->> 'daily')::boolean, false);
+  pm := (p ->> 'range') = 'pm100';
+  insert into matches(p0, p1, wins_needed, range_min, range_max, frost, bonuses_on, variant,
+                      ranked, ranked_mode, status, starter, bot_seat, bot_level)
+  values (p0, p1,
+          case when daily then 3 else (p ->> 'wins')::int end,
+          case when daily then 1 when pm then -100 else 1 end,
+          case when daily then 100 when (p ->> 'range') = '20' then 20 else 100 end,
+          pm and not daily,
+          case when daily then false else (p ->> 'bonuses')::boolean end,
+          case when not daily and (p ->> 'blitz')::boolean then 'blitz' end,
+          true, case when daily then 4 else 0 end, 'active', 0, p_bot_seat, p_bot_level)
+  returning id into new_id;
+  perform start_match_round(new_id);
+  return new_id;
+end;
+$$;
+
+-- ============ 2. Один рейтинг ============
+-- Однажды: лучший из четырёх прежних — в общий (режим 0), партии — суммой
+create table if not exists hc_flags (key text primary key, at timestamptz not null default now());
+alter table hc_flags enable row level security;
+do $$
+declare n int;
+begin
+  insert into hc_flags(key) values ('elo_merged_056') on conflict do nothing;
+  get diagnostics n = row_count;
+  if n = 0 then return; end if;
+  insert into elo_ratings(username, mode, elo, games)
+  select username, 0, max(elo), sum(games) from elo_ratings group by username
+  on conflict (username, mode) do update set elo = excluded.elo, games = excluded.games;
+end $$;
+
+create or replace function apply_elo(p_match_id bigint, p_winner int)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; wn text; ln text; we int; le int; wg int; lg int; md int := 0;
+        expect double precision; kw int; kl int; delta int; mult double precision;
+        hs int; hn text; he int; hg int;
+begin
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null or not m.ranked or m.elo_applied or p_winner is null then return; end if;
+  -- Рейтинг один на все правила (режим 0) — и для режима дня тоже
+
+  if m.bot_seat is not null then
+    hs := 1 - m.bot_seat;
+    hn := case when hs = 0 then m.p0 else m.p1 end;
+    insert into elo_ratings(username, mode) values (hn, md) on conflict (username, mode) do nothing;
+    select elo, games into he, hg from elo_ratings where username = hn and mode = md;
+    delta := round((case when hg < 10 then 40 else 24 end) * 0.5 * 0.5);
+    if p_winner = hs then
+      update elo_ratings set elo = elo + delta, games = games + 1
+      where username = hn and mode = md;
+    else
+      update elo_ratings set elo = greatest(100, elo - delta), games = games + 1
+      where username = hn and mode = md
+      returning elo - he into delta;
+    end if;
+    update matches set elo_delta[hs + 1] = delta, elo_delta[m.bot_seat + 1] = 0, elo_applied = true
+    where id = p_match_id;
+    perform bot_skill_after(hn, md, p_winner = hs);
+    return;
+  end if;
+
+  wn := case when p_winner = 0 then m.p0 else m.p1 end;
+  ln := case when p_winner = 0 then m.p1 else m.p0 end;
+  insert into elo_ratings(username, mode) values (wn, md), (ln, md)
+  on conflict (username, mode) do nothing;
+  select elo, games into we, wg from elo_ratings where username = wn and mode = md;
+  select elo, games into le, lg from elo_ratings where username = ln and mode = md;
+  expect := 1.0 / (1.0 + power(10.0, (le - we) / 400.0));
+  kw := case when wg < 10 then 40 else 24 end;
+  kl := case when lg < 10 then 40 else 24 end;
+  mult := elo_multiplier(wn, ln);
+  delta := round(kw * (1 - expect) * mult);
+  update elo_ratings set elo = elo + delta, games = games + 1
+  where username = wn and mode = md;
+  update matches set elo_delta[p_winner + 1] = delta where id = p_match_id;
+  delta := round(kl * (1 - expect) * mult);
+  update elo_ratings set elo = greatest(100, elo - delta), games = games + 1
+  where username = ln and mode = md
+  returning elo - le into delta;
+  update matches set elo_delta[2 - p_winner] = delta, elo_applied = true
+  where id = p_match_id;
+end;
+$$;
+
+-- Достижение «победы в разных режимах»: режим теперь — сочетание правил
+-- (минус-числа и бонусы), как и были четыре прежних режима. У старых партий
+-- режим записан номером, у новых — правилами; режим дня не считается
+create or replace function ach_modes(p_username text)
+returns int
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select count(distinct case when coalesce(m.ranked_mode, 0) between 1 and 3 then m.ranked_mode
+                             else (case when m.frost then 1 else 0 end) + (case when m.bonuses_on then 2 else 0 end) end)::int
+  from matches m
+  where m.ranked and m.status = 'finished' and coalesce(m.ranked_mode, 0) < 4
+    and ((m.p0 = p_username and match_winner(m) = 0) or (m.p1 = p_username and match_winner(m) = 1));
+$$;
+
+-- ============ 3. Подбор ============
+create or replace function play_pair(p_me text)
+returns bigint
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare mine ranked_queue; opp ranked_queue; new_id bigint; lvl real; who text;
+begin
+  select * into mine from ranked_queue where username = p_me for update;
+  if mine.username is null or mine.match_id is not null or mine.rkey is null then return null; end if;
+  -- Правила дня сменились, пока ждал, — ключ обновляем
+  if mine.rkey <> play_key(mine.rules) then
+    update ranked_queue set rkey = play_key(mine.rules) where username = p_me;
+    mine.rkey := play_key(mine.rules);
+  end if;
+
+  select * into opp from ranked_queue q
+  where q.username <> p_me and q.match_id is null and q.rkey = mine.rkey
+    and q.joined_at > now() - interval '5 minutes'
+    and not players_blocked(q.username, p_me)
+    and abs(q.elo - mine.elo) <= greatest(queue_window(q.joined_at), queue_window(mine.joined_at))
+  order by abs(q.elo - mine.elo), q.joined_at
+  limit 1
+  for update skip locked;
+
+  if opp.username is not null then
+    -- Кто ждал дольше, тот ходит первым
+    new_id := play_make_match(opp.username, p_me, mine.rules, null, null);
+    update ranked_queue set match_id = new_id where username = opp.username;
+    delete from ranked_queue where username = p_me;
+    return new_id;
+  end if;
+
+  if mine.joined_at > now() - make_interval(secs => 5 + abs(hashtext(p_me || mine.joined_at::text)) % 21) then
+    return null;
+  end if;
+
+  select b.username into who from bot_people b
+  where not exists (select 1 from matches x where x.status in ('invited', 'active') and b.username in (x.p0, x.p1))
+    and b.username not in (select case when x.p0 = p_me then x.p1 else x.p0 end from matches x
+                           where (x.p0 = p_me or x.p1 = p_me) and x.bot_seat is not null
+                           order by x.id desc limit 3)
+  order by random() limit 1;
+  if who is null then select b.username into who from bot_people b order by random() limit 1; end if;
+  lvl := bot_level_for(p_me, 0);
+  if who is null then who := bot_for_level(lvl); end if;
+  new_id := play_make_match(p_me, who, mine.rules, 1, lvl);
+  delete from ranked_queue where username = p_me;
+  return new_id;
+end;
+$$;
+
+-- Встать в очередь с правилами. Идёт своя партия — вернуть её
+create or replace function play_join(p_username text, p_pin text, p_rules jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; my_elo int; mid bigint; r jsonb; mine ranked_queue;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  perform expire_stale_matches();
+
+  select id into mid from matches
+  where ranked and status = 'active' and (p0 = me or p1 = me)
+  order by id desc limit 1;
+  if mid is not null then
+    delete from ranked_queue where username = me;
+    return jsonb_build_object('matchId', mid);
+  end if;
+  select * into mine from ranked_queue where username = me;
+  if mine.match_id is not null then
+    delete from ranked_queue where username = me;
+    return jsonb_build_object('matchId', mine.match_id);
+  end if;
+
+  delete from ranked_queue
+  where username <> me
+    and ((match_id is null and joined_at < now() - interval '5 minutes')
+      or (match_id is not null and joined_at < now() - interval '30 minutes'));
+
+  r := play_rules(coalesce(p_rules, '{}'::jsonb));
+  select coalesce(e.elo, 1000) into my_elo from (select 1) x
+  left join elo_ratings e on e.username = me and e.mode = 0;
+  -- Другие правила — ожидание начинается заново
+  delete from ranked_queue where username = me and rkey is distinct from play_key(r);
+  insert into ranked_queue(username, elo, mode, rules, rkey)
+  values (me, my_elo, case when (r ->> 'daily')::boolean then 4 else 0 end, r, play_key(r))
+  on conflict (username) do nothing;
+
+  mid := play_pair(me);
+  return jsonb_build_object('matchId', mid, 'waiting', mid is null, 'rules', r);
+end;
+$$;
+
+-- Что видит игрок: своя партия или очередь, сколько ждёт, кто ждёт с другими
+-- правилами (позвать к нему — встать в очередь с его правилами)
+create or replace function play_status(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; mine ranked_queue; mid bigint; same int; offers jsonb; last_at timestamptz; e elo_ratings;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  perform expire_stale_matches();
+
+  select id into mid from matches
+  where ranked and status = 'active' and (p0 = me or p1 = me)
+  order by id desc limit 1;
+  if mid is null then mid := play_pair(me); end if;
+  select * into mine from ranked_queue where username = me;
+  if mid is null and mine.match_id is not null then mid := mine.match_id; end if;
+  if mid is not null then delete from ranked_queue where username = me; mine := null; end if;
+
+  select count(*) into same from ranked_queue q
+  where q.match_id is null and q.rkey is not null and q.rkey = mine.rkey and q.joined_at > now() - interval '5 minutes';
+
+  -- Ждут с другими правилами: живые люди, не заблокированные, свежие
+  select coalesce(jsonb_agg(jsonb_build_object('username', q.username, 'rules', q.rules,
+                                               'waited', floor(extract(epoch from (now() - q.joined_at)))::int)
+                            order by q.joined_at), '[]'::jsonb)
+    into offers
+  from (select * from ranked_queue q
+        where q.username <> me and q.match_id is null and q.rkey is not null
+          and q.rkey is distinct from mine.rkey
+          and q.joined_at > now() - interval '5 minutes'
+          and not players_blocked(q.username, me)
+        order by q.joined_at limit 3) q;
+
+  select max(updated_at) into last_at from matches m
+  where m.ranked and not match_legacy_bot(m) and m.bot_seat is null;
+  select * into e from elo_ratings where username = me and mode = 0;
+
+  return jsonb_build_object(
+    'matchId', mid,
+    'inQueue', mine.username is not null and mine.match_id is null and mid is null,
+    'rules', mine.rules,
+    'waited', case when mine.username is null then 0
+                   else floor(extract(epoch from (now() - mine.joined_at)))::int end,
+    'queue', same,
+    'offers', offers,
+    'elo', coalesce(e.elo, 1000),
+    'games', coalesce(e.games, 0),
+    'lastAgo', case when last_at is null then null
+                    else floor(extract(epoch from (now() - last_at)))::int end);
+end;
+$$;
+
+-- ============ 4. Права ============
+revoke execute on function play_make_match(text, text, jsonb, int, real) from public, anon;
+revoke execute on function play_pair(text) from public, anon;
+revoke execute on function apply_elo(bigint, int) from public, anon;
+revoke execute on function ach_modes(text) from public, anon;
+grant execute on function play_rules(jsonb) to anon;
+grant execute on function play_join(text, text, jsonb) to anon;
+grant execute on function play_status(text, text) to anon;

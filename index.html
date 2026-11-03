@@ -399,6 +399,8 @@
     <div id="olRanked">
       <button class="rk-daily hidden" id="rkDaily" onclick="setRankedMode(DAILY_MODE)"></button>
       <div class="rk-modes" id="rkModes"></div>
+      <!-- Правила: «Быстрая игра» или свои; «Своя игра» — окно с переключателями (миграция 056) -->
+      <div class="rk-rules" id="rkRules"></div>
       <div class="rk-hero" id="rkHero" onclick="if (ladderInfo) openPath()">
         <div class="rk-emblem hidden" id="rkEmblem"></div>
         <div class="rk-elo" id="rkElo"></div>
@@ -411,6 +413,7 @@
       <!-- «Играть» — всегда на виду, над нижним меню: сундук, путь и турнир
            выше не должны уводить её за край экрана -->
       <div class="rk-play-bar" id="rkPlayBar">
+        <div class="rk-offers hidden" id="rkOffers"></div>
         <button class="btn btn-block" id="tRkPlay" onclick="startRanked()"></button>
         <div class="rk-wait hidden" id="rkWaitBox">
           <div class="rk-wait-text" id="rkWaitText"></div>
@@ -646,6 +649,15 @@
     <div class="pl-list" id="passList"></div>
     <div class="pl-list" id="passStreak"></div>
     <button class="btn btn-block" style="margin-top:14px" id="passOk" onclick="closePassModal()"></button>
+  </div>
+</div>
+
+<!-- «Своя игра»: диапазон, бонусы, до скольки побед, время, правила дня -->
+<div class="modal-backdrop hidden" id="rulesModal" onclick="if (event.target === this) closeRulesModal()">
+  <div class="modal-card pass-card">
+    <div class="ps-title" id="rulesTitle"></div>
+    <div id="rulesBody"></div>
+    <button class="btn btn-block" style="margin-top:14px" id="rulesOk" onclick="saveRulesModal()"></button>
   </div>
 </div>
 

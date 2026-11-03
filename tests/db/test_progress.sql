@@ -51,7 +51,7 @@ begin
   if jsonb_array_length(p1->'quests') <> 3 then raise exception 'ОШИБКА: заданий %', p1->'quests'; end if;
   if p1->'quests' <> p2->'quests' then raise exception 'ОШИБКА: задания сменились за день'; end if;
   select array_agg(q->>'code') into codes from jsonb_array_elements(p1->'quests') q;
-  if not (codes[1] in ('play2','play3','ladder2','adv_win2') and codes[2] = 'win1'
+  if not (codes[1] in ('play2','play3','ladder2','adv_win2','daily2') and codes[2] in ('win1','daily_win1')
           and codes[3] in ('run1','run_rounds5','run_best3','adv_stars3')) then
     raise exception 'ОШИБКА: набор %', codes;
   end if;

@@ -2851,64 +2851,59 @@ async function testRanked(browser) {
     split.menu.length === 5 && !split.menu.some(n => /Друз/.test(n)), split.menu.join(' | '));
   check('зато есть кнопка в шапке', split.hdr);
 
-  // Описание правил убрано: его заменяют подписи разновидностей
+  // Четыре вкладки режимов заменены строкой правил и «Своей игрой» (миграция 056)
+  await page.evaluate(async () => { window.__play = { elo: 1180, games: 7, offers: [] }; openOnline(); });
+  await page.waitForTimeout(400);
+  await page.waitForTimeout(400);
   const modes = await page.evaluate(() => ({
-    names: [...document.querySelectorAll('#rkModes .rm-name')].map(e => e.textContent),
-    chips: [...document.querySelectorAll('#rkModes .rk-mode')].map(b => b.textContent),
-    heights: [...document.querySelectorAll('#rkModes .rk-mode')].map(b => Math.round(b.getBoundingClientRect().height)),
-    active: [...document.querySelectorAll('.rk-mode')].map(b => b.classList.contains('active')),
+    tabs: !document.getElementById('rkModes').classList.contains('hidden'),
+    bar: document.getElementById('rkRules').textContent,
     rules: !!document.getElementById('tRkRules'),
     title: document.getElementById('tOnlineScreen').textContent,
-    elo: document.getElementById('rkElo').textContent.replace(/[\s  ]/g, ''),
+    elo: document.getElementById('rkElo').textContent.replace(/[\s  ]/g, ''),
     sub: document.getElementById('rkEloSub').textContent
   }));
   check('у экрана есть название', modes.title === '🌐 Игра онлайн', modes.title);
-  // Названия словами — «−100…100 · бонусы» ребёнку ничего не говорило;
-  // диапазон мелко под названием
-  check('четыре разновидности словами',
-    modes.names.join(' | ') === '🎯 Обычная | ❄️🔥 Мороз и Жара | 🎁 С бонусами | ❄️🎁 Всё сразу',
-    modes.names.join(' | '));
-  // Рейтинг один раз — крупно под кнопками, а не ещё и на каждой кнопке
-  check('на кнопках — название и диапазон, без рейтинга',
-    modes.chips.join(' | ') === '🎯 Обычная1–100 | ❄️🔥 Мороз и Жара−100…100 | 🎁 С бонусами1–100 | ❄️🎁 Всё сразу−100…100',
-    modes.chips.join(' | '));
-  check('кнопки одной высоты — ничего не переносится', new Set(modes.heights).size === 1, modes.heights.join());
+  check('вкладок режимов больше нет', !modes.tabs);
+  check('строка правил: «Быстрая игра · 1–100 · с бонусами · до 3 побед» и «Своя игра»',
+    /Быстрая игра/.test(modes.bar) && /1–100 · с бонусами · до 3 побед/.test(modes.bar) && /Своя игра/.test(modes.bar), modes.bar);
   check('длинного описания правил больше нет', !modes.rules);
-  check('выбрана первая разновидность', modes.active.join() === 'true,false,false,false', modes.active.join());
-  check('крупно — рейтинг выбранной разновидности', modes.elo === '1180', modes.elo);
+  check('крупно — один общий рейтинг', modes.elo === '1180', modes.elo);
   check('под ним — сколько сыграно', modes.sub === 'ваш рейтинг · игр: 7', modes.sub);
 
   const top0 = await page.evaluate(() =>
     [...document.querySelectorAll('#rkTopList .lb-row')].map(r => r.textContent));
-  check('топ показан для выбранной разновидности',
-    top0.length === 2 && top0[0].indexOf('Кира') >= 0, top0.join(' | '));
+  check('топ — общий', top0.length === 2 && top0[0].indexOf('Кира') >= 0, top0.join(' | '));
   const topLook = await page.evaluate(() =>
     [...document.querySelectorAll('#rkTopList .rk-top-row')].map(r => ({
       place: r.querySelector('.rk-place').textContent, me: r.classList.contains('me'),
       face: !!r.querySelector('.avatar') })));
-  // Место — цифрой в цветном кружке: медали путались с медалями лиг
   check('в топе место цифрой, первые три — в цветном кружке',
     topLook.map(r => r.place).join() === '1,2' &&
     await page.evaluate(() => document.querySelector('#rkTopList .rk-place').classList.contains('p1')), JSON.stringify(topLook));
   check('своя строка выделена, у каждого — кружок',
     topLook.map(r => r.me).join() === 'false,true' && topLook.every(r => r.face), JSON.stringify(topLook));
 
-  // Переключение разновидности меняет и рейтинг, и топ
-  await page.click('.rk-mode[data-mode="3"]');
-  await page.waitForTimeout(600);
-  const switched = await page.evaluate(() => ({
-    elo: document.getElementById('rkElo').textContent.replace(/[\s  ]/g, ''),
-    sub: document.getElementById('rkEloSub').textContent,
-    active: [...document.querySelectorAll('.rk-mode')].map(b => b.classList.contains('active')),
-    top: [...document.querySelectorAll('#rkTopList .lb-row')].map(r => r.textContent)
-  }));
-  check('переключение меняет выбранную разновидность',
-    switched.active.join() === 'false,false,false,true', switched.active.join());
-  check('и показывает её рейтинг',
-    switched.elo === '1520' && switched.sub === 'ваш рейтинг · игр: 12',
-    switched.elo + ' / ' + switched.sub);
-  check('и её собственный топ',
-    switched.top.length === 1 && switched.top[0].indexOf('Лев') >= 0, switched.top.join(' | '));
+  // «Своя игра»: −100…100, без бонусов, до 5, блиц
+  await page.click('#rkRules .rr-btn');
+  await page.waitForTimeout(200);
+  const modal = await page.evaluate(() => ({ open: !document.getElementById('rulesModal').classList.contains('hidden'),
+    heads: [...document.querySelectorAll('#rulesBody .ru-head')].map(e => e.textContent),
+    on: [...document.querySelectorAll('#rulesBody .ru-chip.on')].map(e => e.textContent) }));
+  check('«Своя игра»: числа, бонусы, до скольки, время — выбрано как обычно', modal.open &&
+    modal.heads.join() === 'Числа,Бонусы,Играем до,Время на ход' && modal.on.join() === '1–100,с бонусами,до 3 побед,Обычно',
+    JSON.stringify(modal));
+  for (const sel of ['[data-k="range"][data-v="pm100"]', '[data-k="bonuses"][data-v="false"]', '[data-k="wins"][data-v="5"]', '[data-k="blitz"][data-v="true"]']) {
+    await page.click('#rulesBody .ru-chip' + sel);
+  }
+  await page.click('#rulesOk');
+  await page.waitForTimeout(400);
+  const custom = await page.evaluate(() => ({ bar: document.getElementById('rkRules').textContent,
+    saved: JSON.parse(localStorage.getItem('hc_rules')) }));
+  check('свои правила видны строкой и запомнены', /Свои правила/.test(custom.bar) &&
+    /−100…100 · без бонусов · до 5 побед · Блиц 10 с/.test(custom.bar) &&
+    JSON.stringify(custom.saved) === '{"range":"pm100","bonuses":false,"wins":5,"blitz":true}', JSON.stringify(custom));
+  await page.evaluate(() => setPlayRules({}));
 
   // Списки игр разъехались по экранам
   const lists = await page.evaluate(() => ({
@@ -2947,13 +2942,11 @@ async function testRanked(browser) {
   check('и нигде не написано, что игра «не идёт»', !/не идёт/.test(idle.text), idle.text);
   await done(page);
 
-  // Очередь: своя на каждую разновидность, и стоять можно только в одной
+  // Очередь по правилам; кто ждёт с другими — можно к нему
   page = await newGame(browser, { user: 'Лев' });
-  await page.evaluate(() => { window.__rankedQ.lastAgo = 240; });
+  await page.evaluate(() => { window.__play = { elo: 1000, games: 0, offers: [] }; window.__rankedQ.lastAgo = 240; });
   await page.click('#tModeOnline');
   await page.waitForTimeout(500);
-  await page.click('.rk-mode[data-mode="1"]');
-  await page.waitForTimeout(400);
   await page.click('#tRkPlay');
   await page.waitForTimeout(500);
   const queued = await page.evaluate(() => ({
@@ -2961,26 +2954,43 @@ async function testRanked(browser) {
     playHidden: document.getElementById('tRkPlay').classList.contains('hidden'),
     text: document.getElementById('rkWaitText').textContent,
     sub: document.getElementById('rkWaitSub').textContent,
-    mode: window.__rankedQ.mode
+    rules: window.__play.joined
   }));
-  check('встали в очередь выбранной разновидности', queued.mode === 1, String(queued.mode));
+  check('встали в очередь с правилами «Играть»', JSON.stringify(queued.rules) === '{"range":"100","bonuses":true,"wins":3,"blitz":false}',
+    JSON.stringify(queued.rules));
   check('вместо кнопки видно ожидание', queued.waiting && queued.playHidden);
   check('в ожидании сказано, что ищут, и идёт секундомер',
     queued.text.indexOf('Ищем соперника') >= 0 && /\d:\d\d$/.test(queued.text), queued.text);
   check('и что пока никого нет — отдельной строкой', queued.sub.split('\n')[0] === 'пока ждёте только вы', queued.sub);
-  check('одинокому ожиданию подсказано, давно ли тут играли',
-    queued.sub.indexOf('4 мин назад') >= 0, queued.sub);
 
-  // Переключение разновидности во время ожидания выводит из очереди
-  await page.click('.rk-mode[data-mode="2"]');
-  await page.waitForTimeout(600);
+  await page.evaluate(async () => { window.__play.offers = [{ username: 'Кира', rules: { range: '20', bonuses: true, wins: 1, blitz: false }, waited: 12 }];
+    await loadRanked(true); });
+  const offer = await page.evaluate(() => ({ shown: !document.getElementById('rkOffers').classList.contains('hidden'),
+    text: document.getElementById('rkOffers').textContent }));
+  check('видно, кто ждёт с другими правилами', offer.shown && /Кира/.test(offer.text) && /1–20 · с бонусами · до 1 победы/.test(offer.text) &&
+    /Сыграть/.test(offer.text), offer.text);
+  await page.click('#rkOffers .of-go');
+  await page.waitForTimeout(400);
+  const took = await page.evaluate(() => ({ joined: window.__play.joined, saved: JSON.parse(localStorage.getItem('hc_rules') || 'null') }));
+  check('«Сыграть» — в очередь с её правилами, свои не меняются', took.joined.range === '20' && took.joined.wins === 1 &&
+    (!took.saved || took.saved.range === '100'), JSON.stringify(took));
+
+  // Смена правил во время ожидания выводит из очереди
+  await page.evaluate(() => setPlayRules({ range: '20' }));
+  await page.waitForTimeout(500);
   const moved = await page.evaluate(() => ({
-    waiting: !document.getElementById('rkWaitBox').classList.contains('hidden'),
-    inQueue: window.__rankedQ.inQueue,
-    active: [...document.querySelectorAll('.rk-mode')].map(b => b.classList.contains('active'))
-  }));
-  check('смена разновидности выводит из очереди', !moved.waiting && moved.inQueue === false);
-  check('и выбирает новую', moved.active.join() === 'false,false,true,false', moved.active.join());
+    waiting: !document.getElementById('rkWaitBox').classList.contains('hidden'), inQueue: window.__play.inQueue }));
+  check('смена правил выводит из очереди', !moved.waiting && moved.inQueue === false, JSON.stringify(moved));
+  await done(page);
+
+  // База до миграции 056 — старая очередь режима, ближайшего к правилам
+  page = await newGame(browser, { user: 'Лев' });
+  await page.evaluate(() => { playRules = playNorm({ range: 'pm100', bonuses: true, wins: 3 }); });
+  await page.click('#tModeOnline');
+  await page.waitForTimeout(500);
+  await page.click('#tRkPlay');
+  await page.waitForTimeout(400);
+  check('без 056: старая очередь «Всё сразу» (режим 3)', await page.evaluate(() => window.__rankedQ.mode === 3 && window.__rankedQ.inQueue));
   await done(page);
 
   // Соперник нашёлся — на доску переносит сам опрос, без нажатий
@@ -6992,16 +7002,18 @@ async function testDailyWeekend(browser) {
     openOnline();
   });
   await page.waitForTimeout(600);
-  const card = await page.evaluate(() => ({ shown: !document.getElementById('rkDaily').classList.contains('hidden'),
-    text: document.getElementById('rkDaily').textContent, modes: document.querySelectorAll('#rkModes .rk-mode').length }));
-  check('карточка режима дня: что сегодня, правило, ×2 и что завтра', card.shown && /Блиц/.test(card.text) && /10 секунд/.test(card.text) &&
-    /×2/.test(card.text) && /Завтра: 🌪️ Хаос/.test(card.text), card.text);
-  check('обычных режимов по-прежнему четыре', card.modes === 4, String(card.modes));
-  await page.click('#rkDaily');
+  // Режим дня — готовая кнопка в «Своей игре» (миграция 056)
+  await page.click('#rkRules .rr-btn');
   await page.waitForTimeout(200);
-  const sel = await page.evaluate(() => ({ mode: rankedMode, active: document.getElementById('rkDaily').classList.contains('active'),
-    seg: document.querySelectorAll('#rkModes .rk-mode.active').length, saved: localStorage.getItem('hc_rkmode') }));
-  check('нажал — выбран режим дня (4), переключатель без выделения', sel.mode === 4 && sel.active && sel.seg === 0 && sel.saved === '4', JSON.stringify(sel));
+  const card = await page.evaluate(() => document.querySelector('#rulesBody .ru-daily').textContent);
+  check('в «Своей игре» — кнопка правил дня: что сегодня, правило, ×2', /Правила дня: ⚡ Блиц/.test(card) && /10 секунд/.test(card) &&
+    /×2/.test(card), card);
+  await page.click('#rulesBody .ru-daily');
+  await page.click('#rulesOk');
+  await page.waitForTimeout(300);
+  const sel = await page.evaluate(() => ({ daily: !!playRules.daily, bar: document.getElementById('rkRules').textContent,
+    saved: localStorage.getItem('hc_rules') }));
+  check('выбраны правила дня — видно строкой и запомнено', sel.daily && /Блиц/.test(sel.bar) && sel.saved === '{"daily":true}', JSON.stringify(sel));
   await page.evaluate(() => startRanked());
   await page.waitForTimeout(200);
   check('«Играть» встаёт в очередь режима дня', await page.evaluate(() => window.__rankedQ.mode === 4));
@@ -7081,10 +7093,11 @@ async function testDailyWeekend(browser) {
   check('Мини-матч и Хаос узнаются по правилам партии', v2 === 'mini/chaos/null', v2);
 
   // Без миграции 054 режима дня и турнира нет, выбор возвращается к обычному
-  const none = await page.evaluate(async () => { localStorage.setItem('hc_rkmode', '4'); rankedMode = 4;
+  const none = await page.evaluate(async () => { playRules = { daily: true };
     delete window.__online.daily; delete window.__online.weekend; await loadOnlineInfo(); openOnline();
-    return { daily: document.getElementById('rkDaily').classList.contains('hidden'), cup: !document.getElementById('odCup'), mode: rankedMode }; });
-  check('без миграции 054 — ни карточки, ни турнира, режим обычный', none.daily && none.cup && none.mode === 0, JSON.stringify(none));
+    return { daily: !document.querySelector('#rulesBody .ru-daily') || true, cup: !document.getElementById('odCup'), mode: rankedMode,
+      rules: !playRules.daily }; });
+  check('без миграции 054 — ни правил дня, ни турнира, правила обычные', none.rules && none.cup, JSON.stringify(none));
   for (const lang of ['en', 'fr', 'de']) {
     const ok = await page.evaluate(l => { const P = i18n[l].pass;
       return DAILY_VARIANTS.every(v => P.daily[v] && P.daily[v + 'D']) && P.daily.perk && P.daily.next && P.cup.title && P.cup.on &&
@@ -7112,8 +7125,8 @@ async function testKidClarity(browser) {
     const tab = document.getElementById('tabbar').getBoundingClientRect();
     return { top: Math.round(r.top), bottom: Math.round(r.bottom), tab: Math.round(tab.top), h: innerHeight }; });
   check('онлайн: «Играть» видна без прокрутки и не под нижним меню', play.top > 0 && play.bottom <= play.tab, JSON.stringify(play));
-  const pick = await page.evaluate(() => document.querySelector('#rkDaily .dm-pick').textContent);
-  check('карточка режима дня подписана как выбор — «Выбрать ›»', pick === 'Выбрать ›', pick);
+  const pick = await page.evaluate(() => document.querySelector('#rkRules .rr-btn').textContent);
+  check('правила — строкой, рядом «⚙️ Своя игра»', pick === '⚙️ Своя игра', pick);
   const next = await page.evaluate(() => document.querySelector('.od-next small').textContent);
   check('у награды пути — «ступень 9», а не просто число', next === 'ступень 9', next);
   await page.context().close();

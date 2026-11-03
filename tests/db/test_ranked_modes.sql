@@ -64,7 +64,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 3. рейтинги режимов не перетекают друг в друга
+\echo === 3. рейтинг один на все режимы (с миграции 056) — режим 2 пишет в общий
 do $$
 declare mid bigint; m matches; n int;
 begin
@@ -77,11 +77,11 @@ begin
   select * into m from matches where id = mid;
   perform match_guess('Лев','1234', mid, m.secret);
 
-  if (select elo from elo_ratings where username = 'Лев' and mode = 2) is distinct from 1020 then
-    raise exception 'ОШИБКА: рейтинг режима 2 не начислен';
+  if (select elo from elo_ratings where username = 'Лев' and mode = 0) is distinct from 1020 then
+    raise exception 'ОШИБКА: общий рейтинг не начислен';
   end if;
-  select count(*) into n from elo_ratings where mode <> 2;
-  if n is distinct from 0 then raise exception 'ОШИБКА: задело чужие режимы (% строк)', n; end if;
+  select count(*) into n from elo_ratings where mode <> 0;
+  if n is distinct from 0 then raise exception 'ОШИБКА: появились отдельные рейтинги режимов (% строк)', n; end if;
 end $$;
 \echo ok
 

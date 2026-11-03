@@ -57,7 +57,7 @@ begin
   select * into m from matches where id = mid;
   if m.variant is not null or m.range_min <> -100 then raise exception 'ОШИБКА: обычный режим изменился'; end if;
   update matches set status = 'finished' where id = mid;
-  perform set_config('hc.now', '', true);
+  perform set_config('hc.now', '2026-11-04 12:00+00', true);  -- обычная среда, как во всех сценариях
 end $$;
 \echo ok
 
@@ -97,7 +97,7 @@ begin
     perform set_config('hc.now', '2026-11-04 12:00+00', true);
   end if;
   insert into matches(p0, p1, status, ranked, ranked_mode) values ('Лев', 'Кира', 'active', true, 4) returning id into mid;
-  perform set_config('hc.now', '', true);
+  perform set_config('hc.now', '2026-11-04 12:00+00', true);  -- обычная среда, как во всех сценариях
   perform start_match_round(mid);
   update matches set start_at = null, lobby = false where id = mid;
   update matches set turn_deadline = now() - interval '1 second' where id = mid;
@@ -199,7 +199,7 @@ begin
   insert into weekend_cup(username, week, wins) values ('Лев', weekend_key(), 5);
   r := weekend_claim('Лев', '1234', 5);
   if (r->>'xp')::int <> 100 or r->>'frame' is not null then raise exception 'ОШИБКА: большой сундук %', r; end if;
-  perform set_config('hc.now', '', true);
+  perform set_config('hc.now', '2026-11-04 12:00+00', true);  -- обычная среда, как во всех сценариях
 end $$;
 \echo ok
 
