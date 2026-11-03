@@ -2567,7 +2567,9 @@ body.on-online #screenOnline { padding-bottom: 120px; } /* точнее — fitP
 .feedback-panel .fb-label { white-space: nowrap; }
 .feedback-panel .fb-label.long { font-size: clamp(21px, 6.4vw, 28px) !important; }
 /* Карточки игроков одной высоты; длинное имя — в одну строку, мельче */
-.board.duel { align-items: stretch; }
+/* Только когда карточки стоят рядом над доской; на широком экране (три колонки)
+   они по бокам — растягивать их на всю высоту доски незачем */
+@media (max-width: 859px) { .board.duel { align-items: stretch; } }
 .board.duel .pcard .p-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(13px, 3.9vw, 16px); }
 /* Кнопки в полосе над доской — под палец: не меньше 38×34 */
 .info-bar .mini-toggle, .info-bar #tMenu { min-width: 38px; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
@@ -2576,3 +2578,18 @@ body.on-online #screenOnline { padding-bottom: 120px; } /* точнее — fitP
 .ru-reset { padding: 10px 14px; }
 .friend-row button.x { min-width: 38px; min-height: 36px; }
 .fr-btn.more, #chatMore, .chat-more { min-width: 40px; min-height: 36px; }
+
+/* ---- iPad и большие планшеты: та же вёрстка, что на телефоне, но крупнее ----
+   Узкая колонка посреди планшета оставляла пустоту по бокам и мелкие кнопки.
+   Вся игра масштабируется целиком: шрифты, кнопки, поле ввода, окна и нижнее
+   меню растут вместе, раскладка остаётся проверенной телефонной. Только на
+   сенсорных экранах: на компьютере всё как было */
+@media (min-width: 744px) and (pointer: coarse) {
+  html { zoom: 1.3; }
+}
+@media (min-width: 1024px) and (pointer: coarse) {
+  html { zoom: 1.25; }
+}
+/* Закреплённая «Играть» — по центру и шириной как поле ввода в партии: на
+   масштабированном планшете растянутая на всю ширину панель съезжала влево */
+body.on-online #rkPlayBar { max-width: 560px; margin: 0 auto; }

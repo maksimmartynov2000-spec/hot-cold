@@ -7257,6 +7257,39 @@ async function testNoJumps(browser) {
   await page.context().close();
 }
 
+// iPad: та же вёрстка, только крупнее (масштаб на сенсорных экранах от 744 px)
+async function testTablet(browser) {
+  console.log('\niPad: крупнее и без пустот');
+  for (const [w, h, z] of [[820, 1180, '1.3'], [1180, 820, '1.25']]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => check('без ошибок JS', false, e.message));
+    await applyStub(page, { user: 'Лев' });
+    await page.addInitScript(() => { window.__play = { elo: 1000, games: 0, offers: [] }; });
+    await page.goto(GAME_URL);
+    await page.waitForTimeout(400);
+    const r = await page.evaluate(() => ({ zoom: getComputedStyle(document.documentElement).zoom, hs: document.documentElement.scrollWidth > innerWidth + 1 }));
+    check(w + '×' + h + ': игра крупнее (×' + z + '), без прокрутки вбок', r.zoom === z && !r.hs, JSON.stringify(r));
+    await page.click('.mode-btn.solo');
+    await page.evaluate(() => { document.getElementById('rangeMax').value = '100'; onRangeChange(); });
+    await page.click('#tStartMatch');
+    await page.evaluate(() => { secret = 63; });
+    await page.fill('#guessInput', '50'); await page.click('#tSubmitGuess'); await page.waitForTimeout(300);
+    const g = await page.evaluate(() => ({ hs: document.documentElement.scrollWidth > innerWidth + 1, hist: document.querySelectorAll('#historyList > *').length }));
+    check(w + '×' + h + ': партия идёт, ход записан', !g.hs && g.hist >= 1, JSON.stringify(g));
+    await ctx.close();
+  }
+  // Компьютер (мышь) — без масштаба
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  await applyStub(page, {});
+  await page.goto(GAME_URL);
+  await page.waitForTimeout(300);
+  const z = await page.evaluate(() => getComputedStyle(document.documentElement).zoom);
+  check('компьютер: масштаба нет', z === '1' || z === 'normal', z);
+  await ctx.close();
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -8189,6 +8222,7 @@ async function testKeyPage(browser) {
     await testOnlineAdvBonuses(browser);
     await testLocalAdvBonuses(browser);
     await testNoJumps(browser);
+    await testTablet(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без
