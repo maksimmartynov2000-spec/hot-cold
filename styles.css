@@ -2561,3 +2561,18 @@ body.on-online #screenOnline { padding-bottom: 120px; } /* точнее — fitP
 #screenOnline #rkModes.hidden { display: none !important; }
 /* Название бонуса — в одну строку: при длинном описании «◐ Половина» переносилась */
 .bonus-line .b-name { white-space: nowrap; flex-shrink: 0; }
+
+/* ---- Проверка «что дёргается и куда не попасть» ---- */
+/* Подпись подсказки в одну строку: длинную — мельче, без переноса */
+.feedback-panel .fb-label { white-space: nowrap; }
+.feedback-panel .fb-label.long { font-size: clamp(21px, 6.4vw, 28px) !important; }
+/* Карточки игроков одной высоты; длинное имя — в одну строку, мельче */
+.board.duel { align-items: stretch; }
+.board.duel .pcard .p-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(13px, 3.9vw, 16px); }
+/* Кнопки в полосе над доской — под палец: не меньше 38×34 */
+.info-bar .mini-toggle, .info-bar #tMenu { min-width: 38px; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
+/* «?» у переключателей и мелкие ссылки-кнопки — с запасом вокруг */
+.hint-q { flex-basis: 32px; height: 32px; line-height: 32px; }
+.ru-reset { padding: 10px 14px; }
+.friend-row button.x { min-width: 38px; min-height: 36px; }
+.fr-btn.more, #chatMore, .chat-more { min-width: 40px; min-height: 36px; }

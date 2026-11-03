@@ -1489,6 +1489,9 @@ function renderFeedback() {
   panel.classList.remove('hidden');
   const label = document.getElementById('feedbackLabel');
   label.innerHTML = getFbHtml(last.meta);
+  // Длинная подпись («Очень горячо», «Sehr heiß») — шрифтом поменьше и в одну
+  // строку: перенос делал карточку выше, и всё, что ниже, прыгало на ходе
+  label.classList.toggle('long', label.textContent.trim().length > 9);
   // Пояс — помощь для тренировки: там учатся. В игре с другом и в рейтинге его
   // нет, иначе это преимущество, а не учёба
   const band = document.getElementById('feedbackBand');
@@ -2917,7 +2920,8 @@ function openReview() {
     row.append(num, guess, gradeLine(m, 'rv-grade'));
     // Тренировка: сколько чисел было и сколько осталось после хода. Каким
     // был лучший ход, разбор не говорит: это оценка, а не готовый ответ
-    if (!rv.duel && !m.final && m.before) {
+    // У угадывающего хода «было 1 → осталось 1» ничего не говорит
+    if (!rv.duel && !m.final && m.before && m.grade !== 'hit') {
       const info = document.createElement('span');
       info.className = 'rv-left';
       info.textContent = t().train.leftShort.replace('{a}', formatNum(m.before)).replace('{b}', formatNum(m.after));
