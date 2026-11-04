@@ -139,7 +139,13 @@ function serve() {
   await page.evaluate(() => quitToMenu());
   await page.click('.mode-btn.bot');
   await page.waitForTimeout(300);
-  check('без сети карта Приключения открывается', await page.locator('#advMap .adv-tile').count() === 50);
+  // Раскрыт мир, где вы сейчас; тексты миров 6+ — своим файлом, он в кеше
+  await page.waitForTimeout(300);
+  const advMap = await page.evaluate(() => ({ worlds: document.querySelectorAll('#advMap .adv-world').length,
+    tiles: document.querySelectorAll('#advMap .adv-tile').length,
+    w6: (document.querySelector('#advMap .adv-world[data-w="5"] .aw-name') || {}).textContent }));
+  check('без сети карта Приключения открывается, и имена новых миров на месте',
+    advMap.worlds === 15 && advMap.tiles === 10 && advMap.w6 === 'Сладкое королевство', JSON.stringify(advMap));
   await page.click('.adv-tile[data-n="0"]');
   await page.waitForTimeout(150);
   await page.evaluate(() => { BOT_SPEED = 0; });

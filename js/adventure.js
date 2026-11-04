@@ -446,7 +446,7 @@ const ADV_HEROES = [
   { icon: '🥚', on: ['meN:1', 'skipMe', 1], level: 0.22 },
   { icon: '🎺', on: ['youCold', 'tellDir', 0], level: 0.04 },
   { icon: '🌊', on: ['meWarm', 'hide', 1], level: -0.03 },
-  { boss: true, icon: '👑', a1icon: '🦖', a1: ['meHot', 'freezeYou', 1], a2icon: '👣', a2: ['meN:4', 'double', 1], level: 0.03 },
+  { boss: true, icon: '👑', a1icon: '🦖', a1: ['meHot', 'freezeYou', 1], a2icon: '👣', a2: ['meN:4', 'double', 1], level: -0.02 },
   // 13 · Пиратский остров (121–130)
   { icon: '📢', on: ['meColder', 'tellDir', 0] },
   { icon: '🏴‍☠️', on: ['youHot', 'steal', 1], level: -0.14 },
@@ -476,10 +476,10 @@ const ADV_HEROES = [
   { icon: '🩰', on: ['meCloser', 'hide', 1], level: -0.13 },
   { icon: '🦚', on: ['meN:1', 'tellHalf', 1], level: 0.12 },
   { icon: '🧲', on: ['meCloser', 'steal', 1], level: -0.16 },
-  { icon: '🤺', on: ['meHot', 'burn', 1], level: -0.04 },
+  { icon: '🤺', on: ['meHot', 'burn', 1], level: -0.12 },
   { icon: '♞', on: ['meN:2', 'tellParity', 1], first: true, level: 0.52 },
-  { icon: '🌉', on: ['youN:2', 'steal', 1], level: -0.16 },
-  { boss: true, icon: '👑', a1icon: '🦁', a1: ['youVeryHot', 'memoryYou', 1], a2icon: '👑', a2: ['meWarm', 'double', 1], level: -0.14 }
+  { icon: '🌉', on: ['youN:2', 'steal', 1], level: -0.24 },
+  { boss: true, icon: '👑', a1icon: '🦁', a1: ['youVeryHot', 'memoryYou', 1], a2icon: '👑', a2: ['meWarm', 'double', 1], level: -0.2 }
 ];
 const advHeroRules = [];
 function advHeroRule(n) {
@@ -538,7 +538,7 @@ function advLoadPack(lang) {
 // мира — поправка мира, а у героя — своя (level в ADV_HEROES): правило, что
 // помогает вам, — соперник умнее, и наоборот. Цель «среднего игрока» на
 // «Нормально» — в первом мире волны около 57% побед, к пятому — около 33%
-const ADV_BRAIN_SHIFT = [-0.03, -0.04, -0.1, -0.11, 0, 0.11, -0.07, -0.05, -0.1, -0.05, 0.04, -0.04, -0.04, -0.17, -0.12];
+const ADV_BRAIN_SHIFT = [-0.03, -0.04, -0.1, -0.11, 0, 0.11, -0.07, -0.08, -0.1, -0.05, 0.04, -0.04, -0.04, -0.17, -0.12];
 // С шестого мира — волны по пять миров: внутри волны сильнее, первый мир
 // волны — передышка, от волны к волне чуть сильнее
 function advWaveBase(w) {

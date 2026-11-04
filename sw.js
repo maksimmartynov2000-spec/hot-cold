@@ -19,6 +19,12 @@ const CORE = [
   './js/trial.js',
   './js/pass.js',
   './js/main.js',
+  // Тексты миров 6+ — по файлу на язык: игра грузит свой, когда нужен, а в
+  // кеше — все, чтобы Приключение открылось без сети и на другом языке
+  './js/adv-ru.js',
+  './js/adv-en.js',
+  './js/adv-fr.js',
+  './js/adv-de.js',
   './vendor/qrcode.js',
   './vendor/supabase.js',
   './fonts/nunito-latin.woff2',

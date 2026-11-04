@@ -5843,7 +5843,7 @@ async function testProgress(browser) {
   const qMig = fs.readdirSync(migDir).sort().reverse().map(f => fs.readFileSync(path.join(migDir, f), 'utf8'))
     .find(x => /function quest_pool\(\)/.test(x));
   const dbQuests = [...qMig.match(/create or replace function quest_pool\(\)[\s\S]*?\$\$;/)[0].matchAll(/'([a-z_0-9]+)'/g)].map(m => m[1]);
-  check('достижения: 61 код лестницами, те же, что в базе, в том же порядке', js.ach.length === 61 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
+  check('достижения: 71 код лестницами, те же, что в базе, в том же порядке', js.ach.length === 71 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
   check('иконки за серию — те же, что в базе', js.icons.join() === dbIcons.join(), js.icons.join() + ' / ' + dbIcons.join());
   check('у каждого задания из базы есть текст', dbQuests.length === 11 && dbQuests.every(c => js.q.includes(c)), dbQuests.join());
   check('тексты заданий и достижений есть на всех 4 языках', js.langs.every(Boolean), JSON.stringify(js.langs));
