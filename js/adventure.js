@@ -62,11 +62,11 @@ function advFirstBotMove(R, m) { return m.p === 1 && R.count(1) === 1; }
 const ADV_RULES = {
   // ---- Волшебный лес ----
   apple: { icon: '🍎', after(R, m) { if (m.p === 0 && advHot(R, m) && R.once('apple')) { R.give(0, 1); R.fire('rule'); } } },
-  acorns: { icon: '🌰', tokens: [0, 1], arm(R, p) { if (p === 1) R.fire('rule'); } },
+  acorns: { icon: '🌰', level: -0.05, tokens: [0, 1], arm(R, p) { if (p === 1) R.fire('rule'); } },
   thief: { icon: '🧣', after(R, m) {
     if (m.p === 0 && R.tier(m) <= ADV_COLD && D.tokens[0] > 0) { R.take(0, 1); R.give(1, 1); R.fire('rule'); } } },
   hop: { icon: '🥕', first: true, after(R, m) { if (advFirstBotMove(R, m)) { R.again(); R.fire('rule'); } } },
-  specs: { icon: '👓', start(R) { R.know(0, 'parity'); R.know(1, 'parity'); R.fire('rule', { k: R.word('parity') }); } },
+  specs: { icon: '👓', level: -0.1, start(R) { R.know(0, 'parity'); R.know(1, 'parity'); R.fire('rule', { k: R.word('parity') }); } },
   shy: { icon: '🌼', after(R, m) { if (m.p === 0 && advVeryHot(R, m) && R.once('shy')) { R.skip(1); R.fire('rule'); } } },
   cloak: { icon: '🦊', after(R, m) { if (advFirstBotMove(R, m)) { R.hide(m); R.fire('rule'); } } },
   sleepy: { icon: '🍯', after(R, m) { if (m.p === 1 && R.count(1) % 2 === 0) { R.skip(1); R.fire('rule'); } } },
@@ -90,7 +90,7 @@ const ADV_RULES = {
     history.forEach(h => { if (h.p === 1 && h !== m) R.hide(h); });
     if (R.count(1) === 2) R.fire('rule'); } },
   sloth: { icon: '🤔', level: 0.08, think: [3, 5], after(R, m) { if (advFirstBotMove(R, m)) R.fire('rule'); } },
-  banana: { icon: '🍌', after(R, m) {
+  banana: { icon: '🍌', level: 0.06, after(R, m) {
     if (m.p === 0 && R.tier(m) < 8 && R.nearBot(m.guess, 2) && R.once('banana')) { R.skip(0); R.fire('rule'); } } },
   snake: { icon: '🎀', arm(R, p) { if (p === 0) { R.give(1, 1); R.fire('rule'); } } },
   zebra: { icon: '🎧', level: -0.08, think: [0.6, 1.3], after(R, m) { if (advFirstBotMove(R, m)) R.fire('rule'); } },
@@ -99,12 +99,13 @@ const ADV_RULES = {
     if (b === null || Math.random() > 0.7) return null;
     R.fire('rule');
     return b; } },
-  elephant: { icon: '🐘', after(R, m) { if (m.p === 1 && advHot(R, m) && R.once('elephant')) { R.skip(0); R.fire('rule'); } } },
+  // Его «Топот» даёт два хода подряд у самого ответа — сам играет попроще
+  elephant: { icon: '🐘', level: -0.15, after(R, m) { if (m.p === 1 && advHot(R, m) && R.once('elephant')) { R.skip(0); R.fire('rule'); } } },
   gorilla: { icon: '👑', a1icon: '🔊', a2icon: '🍌', boss: true,
     start(R) { if (D.tokens[0] > 0) { R.take(0, 1); R.give(1, 1); R.fire('a2'); } },
     after(R, m) { if (m.p === 0 && advHot(R, m) && R.once('a1')) { R.skip(0, true); R.fire('a1'); } } },
   // ---- Морская глубина ----
-  clown: { icon: '🤡', gamble: 0.3 },
+  clown: { icon: '🤡', level: -0.1, gamble: 0.3 },
   seahorse: { icon: '🔮', start(R) { R.know(0, 'half'); R.fire('rule', { k: R.word('half') }); } },
   crab: { icon: '🦀', after(R, m) {
     if (m.p !== 0) return;
@@ -113,10 +114,10 @@ const ADV_RULES = {
   jelly: { icon: '🪼', forget: true, after(R, m) { if (m.p === 1 && R.count(1) === 3) R.fire('rule'); } },
   seal: { icon: '🍦', frost: true, start(R) { if (D.round === 1) R.fire('rule'); } },
   turtle: { icon: '🐢', immune: ['fog', 'blind', 'freeze'] },
-  penguin: { icon: '🐧', first: true, start(R) { R.fire('rule'); } },
+  penguin: { icon: '🐧', level: -0.12, first: true, start(R) { R.fire('rule'); } },
   octopus: { icon: '🤹', bonus: 'magic', start(R) { R.fire('rule'); } },
   shark: { icon: '🦈', start(R) { R.know(1, 'parity'); R.fire('rule'); } },
-  kraken: { icon: '👑', a1icon: '🌑', a2icon: '🏴‍☠️', boss: true,
+  kraken: { icon: '👑', a1icon: '🌑', a2icon: '🏴‍☠️', boss: true, level: -0.15,
     // Абордаж: взведённый «+1 ход» игрока уходит кракену
     arm(R, p) { if (p === 0 && R.once('a2')) { R.give(1, 1); R.fire('a2'); return true; } },
     after(R, m) { if (m.p === 0 && advHot(R, m) && R.once('a1')) { R.memory(0); R.fire('a1'); } } },
@@ -129,12 +130,12 @@ const ADV_RULES = {
       if (v >= RANGE_MIN && !R.named(v) && cand[v - RANGE_MIN]) { if (R.once('miner')) R.fire('rule'); return v; }
     }
     return null; } },
-  ember: { icon: '🔥', arm(R, p) { if (p === 1) { D.armedExtra = 1; R.fire('rule'); } } },
+  ember: { icon: '🔥', level: -0.2, arm(R, p) { if (p === 1) { D.armedExtra = 1; R.fire('rule'); } } },
   // Дальние её ходы («Прохладно» и холоднее) — в темноте, близкие видно
   bat: { icon: '🦇', after(R, m) { if (m.p === 1 && R.tier(m) <= 2) { R.hide(m); if (R.once('bat')) R.fire('rule'); } } },
   bell: { icon: '🔔', after(R, m) {
     if (m.p === 0 && advHot(R, m)) { const k = R.dir(m.guess); R.know(0, k, m.guess); R.fire('rule', { k: R.word(k, m.guess) }); } } },
-  phoenix: { icon: '🐣', after(R, m) { if (m.p === 1 && R.tier(m) <= ADV_COLD && R.once('phoenix')) { R.again(); R.fire('rule'); } } },
+  phoenix: { icon: '🐣', level: -0.15, after(R, m) { if (m.p === 1 && R.tier(m) <= ADV_COLD && R.once('phoenix')) { R.again(); R.fire('rule'); } } },
   beetle: { icon: '🪲', after(R, m) { if (m.p === 1 && R.tier(m) <= ADV_COLD && D.tokens[1] < 3) { R.give(1, 1); R.fire('rule'); } } },
   knight: { icon: '🛡️', bonus: 'knight', noTokens: true, start(R) { R.fire('rule'); },
     pick(R, cand, plan) {
@@ -169,14 +170,14 @@ const ADV_RULES = {
     }
     if (best !== null && R.once('cat')) R.fire('rule');
     return best; } },
-  moon: { icon: '🌙', after(R, m) { if (m.p === 1 && R.count(1) % 2 === 0) { R.hide(m); if (R.once('moon')) R.fire('rule'); } } },
+  moon: { icon: '🌙', level: -0.25, after(R, m) { if (m.p === 1 && R.count(1) % 2 === 0) { R.hide(m); if (R.once('moon')) R.fire('rule'); } } },
   meteor: { icon: '☄️', after(R, m) {
     // Каждый третий ход — метеорит: следующий ход, чей бы он ни был, делается сам
     if (history.length % 3 === 0 && R.tier(m) < 8) { D.lavaNext = true; R.fire('rule'); } } },
-  whale: { icon: '🐋', start(R) { R.know(0, 'half'); R.know(1, 'half'); R.fire('rule', { k: R.word('half') }); } },
+  whale: { icon: '🐋', level: -0.08, start(R) { R.know(0, 'half'); R.know(1, 'half'); R.fire('rule', { k: R.word('half') }); } },
   // Обмен: сам знает половину, а вам говорит чётность
-  eyes: { icon: '👁️', start(R) { R.know(1, 'half'); R.know(0, 'parity'); R.fire('rule', { k: R.word('parity') }); } },
-  comet: { icon: '💫', level: 0.12, think: [0.3, 0.8], after(R, m) { if (advFirstBotMove(R, m)) R.fire('rule'); } },
+  eyes: { icon: '👁️', level: -0.25, start(R) { R.know(1, 'half'); R.know(0, 'parity'); R.fire('rule', { k: R.word('parity') }); } },
+  comet: { icon: '💫', level: -0.15, think: [0.3, 0.8], after(R, m) { if (advFirstBotMove(R, m)) R.fire('rule'); } },
   blackhole: { icon: '🌀', frost: true, after(R, m) { if (m.p === 0 && R.tier(m) === 0) { R.hide(m); R.fire('rule'); } } },
   ufo: { icon: '👑', a1icon: '🛸', a2icon: '🚀', boss: true,
     turn(R) { if (R.round.teleport) { R.round.teleport = false; D.armed = true; } },
@@ -198,9 +199,12 @@ function advName(n) { return t().adv.names[n]; }
 // Сила соперника растёт от мира к миру и чуть-чуть внутри мира. От
 // сложности не зависит: соперник — один и тот же характер, сложность меняет
 // только, у кого сколько «⚡ +1 ход» (см. advTokens)
+// Соперники умнее тратят «⚡ +1 ход» и не делают глупых ходов — «голову» чуть
+// убавили, чтобы доля побед осталась прежней (подобрано симуляцией)
+const ADV_BRAIN_SHIFT = [-0.03, -0.04, -0.1, -0.11, 0];
 function advLevel(c) {
   if (c.R.levelSet) return c.R.levelSet;
-  const L = 0.08 + c.w * 0.18 + c.i * 0.012 + (c.boss ? 0.06 : 0) + (c.R.level || 0);
+  const L = 0.08 + c.w * 0.18 + c.i * 0.012 + (c.boss ? 0.06 : 0) + (c.R.level || 0) + ADV_BRAIN_SHIFT[c.w];
   return Math.max(0.02, Math.min(0.98, L));
 }
 function advThink(c) {
@@ -323,8 +327,9 @@ function advRoundStart() {
   setTimeout(() => {
     if (!alive()) return;
     if (hi) advSay('hi');
+    // Вспышки по очереди — каждая успевает показаться целиком
     queue.forEach(([kind, text, big], i) => setTimeout(() => { if (alive()) advShowFire(kind, text, big); },
-                                                       (hi ? 1600 : 0) + i * 1800));
+                                                       (hi ? 1600 : 0) + i * (BONUS_FX_MS + 200)));
   }, 650);
 }
 function advAfterMove(m) {

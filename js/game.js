@@ -662,6 +662,7 @@ function quitToMenu() {
   hideBarTip();
   // Вспышка бонуса или правила соперника не доигрывает поверх меню и нового боя
   clearTimeout(bonusFxTimer);
+  bonusFxUntil = 0;
   const flash = document.getElementById('bonusFlash');
   if (flash) flash.classList.remove('show');
   stopBot();
@@ -3651,24 +3652,49 @@ function renderBotPick() {
 }
 
 // ---------- как бот выбирает ход ----------
-// Та же логика — в базе (bot_pick), для рейтинга. Бот видит только ответы
-// на ходы, загаданного не знает. Под туманом не видит чужих ходов, под
-// слепотой — своих, при короткой памяти — только два последних.
-// Сила L от 0 до 1: с вероятностью 0,9·(1−L)² бот рассеян и помнит только
-// последний ход; с вероятностью 0,05 + 0,9·L берёт лучший ход (сначала —
-// такой, что может сразу попасть), иначе любой не хуже 0,85·L от лучшего
+// Бот видит только ответы на ходы, загаданного не знает. Под туманом не видит
+// чужих ходов, под слепотой — своих, при короткой памяти — только два
+// последних. В базе (bot_pick, для рейтинга) — прежний вариант этой логики.
+// Сила L от 0 до 1: с вероятностью 0,9·(1−L)² бот рассеян и держится только
+// за последний ответ и самый горячий; с вероятностью 0,05 + 0,9·L берёт
+// лучший ход, иначе любой не хуже 0,85·L от лучшего. Названное число бот не
+// повторяет, и ходит, пока можно, по числам, которые ещё могут быть
+// загаданным: «мимо всех возможных» со стороны выглядит глупо
+
+// Какие ходы бот видит. Номер хода — по исходному списку, до отсева, иначе
+// отметка помехи съедет
+function botVisible(moves, seat, flags) {
+  const seen = moves.filter((m, i) => !m.timeout && typeof m.guess === 'number' &&
+                                 m.labelIndex !== null && m.labelIndex !== undefined &&
+                                 !(flags.fog && m.p !== seat && i >= (flags.fogFrom || 0)) &&
+                                 !(flags.blind && m.p === seat && i >= (flags.blindFrom || 0)));
+  return flags.shortMemory ? seen.slice(-2) : seen;
+}
+
 function botCandidates(moves, seat, flags, careless) {
-  // Бот под помехой не видит ходы после неё — как человек. Номер хода — по
-  // исходному списку, до отсева, иначе отметка съедет
-  let seen = moves.filter((m, i) => !m.timeout && typeof m.guess === 'number' &&
-                               m.labelIndex !== null && m.labelIndex !== undefined &&
-                               !(flags.fog && m.p !== seat && i >= (flags.fogFrom || 0)) &&
-                               !(flags.blind && m.p === seat && i >= (flags.blindFrom || 0)));
-  const keep = careless ? 1 : (flags.shortMemory ? 2 : seen.length);
-  seen = seen.slice(Math.max(0, seen.length - keep));
+  const seen = botVisible(moves, seat, flags);
+  // Рассеянный помнит последний ответ и самый горячий — как ребёнок, который
+  // держится за своё «Горячо». Раньше помнил только последний и мог уйти
+  // от горячего ответа на другой конец прямой
+  let use = seen;
+  if (careless && seen.length > 1) {
+    const last = seen[seen.length - 1];
+    const hot = seen.reduce((a, m) => (m.labelIndex > a.labelIndex ? m : a), seen[0]);
+    use = hot === last ? [last] : [hot, last];
+  }
   const bands = reviewBands(FEEDBACK_META);
   const cand = new Uint8Array(RANGE_MAX - RANGE_MIN + 1).fill(1);
-  seen.forEach(m => narrow(cand, RANGE_MIN, bands, m.guess, m.labelIndex));
+  // Неточный (fuzz) помнит ответ с запасом: «Тепло» может спутать с
+  // соседним поясом — ходит рядом с верным местом, но не точно
+  const fz = flags.fuzz || 0;
+  use.forEach(m => {
+    if (!fz) return narrow(cand, RANGE_MIN, bands, m.guess, m.labelIndex);
+    for (let i = 0; i < cand.length; i++) {
+      if (cand[i] && Math.abs(bandOf(Math.abs(m.guess - (i + RANGE_MIN)), bands) - m.labelIndex) > fz) cand[i] = 0;
+    }
+  });
+  // Названные числа — не загаданное: их видно в списке ходов
+  seen.forEach(m => { const i = m.guess - RANGE_MIN; if (i >= 0 && i < cand.length) cand[i] = 0; });
   // Знание из бонусов (рентген, половина) бот тоже использует
   const k = flags.know;
   if (k && (k.parity !== undefined || k.half)) {
@@ -3685,28 +3711,62 @@ function botCandidates(moves, seat, flags, careless) {
   return cand;
 }
 
-function botPool(cand, best, thr) {
+// Из каких чисел бот выбирает. named — уже названные: их не повторяет
+function botPool(cand, best, thr, named) {
   const scan = infoScan(cand, RANGE_MIN, RANGE_MAX, reviewBands(FEEDBACK_META));
+  const free = x => !(named && named.has(x));
+  const hs = new Float64Array(RANGE_MAX - RANGE_MIN + 1);
+  let hBest = 0;
+  for (let x = RANGE_MIN; x <= RANGE_MAX; x++) {
+    if (!free(x)) continue;
+    const h = hs[x - RANGE_MIN] = scan.H(x);
+    if (h > hBest) hBest = h;
+  }
   let pool = [];
   for (let x = RANGE_MIN; x <= RANGE_MAX; x++) {
-    const h = scan.H(x);
-    if (best ? h >= scan.hBest - 1e-9 : h >= thr * scan.hBest - 1e-9) pool.push(x);
+    if (!free(x)) continue;
+    const h = hs[x - RANGE_MIN];
+    if (best ? h >= hBest - 1e-9 : h >= thr * hBest - 1e-9) pool.push(x);
   }
-  if (best) {
-    const hit = pool.filter(x => cand[x - RANGE_MIN]);
-    if (hit.length) pool = hit;
-  }
+  // Сначала — числа, которые ещё могут быть загаданным
+  const hit = pool.filter(x => cand[x - RANGE_MIN]);
+  if (hit.length) pool = hit;
+  if (!pool.length) for (let x = RANGE_MIN; x <= RANGE_MAX; x++) if (cand[x - RANGE_MIN] && free(x)) pool.push(x);
+  if (!pool.length) for (let x = RANGE_MIN; x <= RANGE_MAX; x++) if (free(x)) pool.push(x);
   return pool;
+}
+
+// Насколько неточно слабый бот помнит ответы: 0 — точно, 1 — путает соседние
+// пояса, 2 — через один. Так слабый ошибается по-человечески — рядом, а не
+// повтором и не на другом конце прямой
+function botFuzz(level, rnd) {
+  const s = 1 - level;
+  return rnd() < s * s ? (rnd() < s * s ? 2 : 1) : 0;
 }
 
 function botPick(moves, seat, flags, level, rnd) {
   rnd = rnd || Math.random;
+  const fuzz = botFuzz(level, rnd);
+  if (fuzz) flags = Object.assign({}, flags, { fuzz });
   const cand = botCandidates(moves, seat, flags, rnd() < 0.9 * (1 - level) * (1 - level));
   const left = [];
   for (let i = 0; i < cand.length; i++) if (cand[i]) left.push(i + RANGE_MIN);
   if (left.length === 1) return left[0];
-  const pool = botPool(cand, rnd() < 0.05 + 0.9 * level, 0.85 * level);
+  const named = new Set(botVisible(moves, seat, flags).map(m => m.guess));
+  const pool = botPool(cand, rnd() < 0.05 + 0.9 * level, 0.85 * level, named);
   return pool[Math.floor(rnd() * pool.length)];
+}
+
+// «⚡ +1 ход» — с толком, а не только в самом конце. Осталось два числа —
+// два хода подряд выигрывают наверняка. Два «⚡» и больше — тратит раньше:
+// в конце раунда они сгорают. Соперник уже «Горячо» — тоже раньше, чтобы
+// успеть первым. Одно число — «⚡» не нужен, хватит одного хода
+function botWantsToken(left, tokens, danger, level, rnd) {
+  rnd = rnd || Math.random;
+  if (left <= 1) return false;
+  if (left === 2) return rnd() < 0.75 + 0.25 * level;
+  const reach = 4 + (tokens >= 2 ? 6 : 0) + (danger ? 4 : 0);
+  return left <= reach && rnd() < 0.35 + 0.5 * level;
 }
 
 // Ход бота в игре без интернета: после «раздумий», как у человека
@@ -3714,7 +3774,9 @@ function botTick() {
   if (!vsBot || online || mode !== 'duel' || screen !== 'game') return;
   if (D.roundOver || D.matchOver || D.cur !== 1 || botTimer) return;
   const [lo, hi] = vsBot.bot.think;
-  botTimer = setTimeout(botMove, (lo + Math.random() * (hi - lo)) * 1000 * BOT_SPEED);
+  // Под вспышкой бонуса бот ждёт, пока её дочитают: его ход не прячется за ней
+  const wait = Math.max(0, bonusFxUntil - Date.now()) * Math.min(1, BOT_SPEED);
+  botTimer = setTimeout(botMove, Math.max((lo + Math.random() * (hi - lo)) * 1000 * BOT_SPEED, wait ? wait + 300 : 0));
 }
 
 function stopBot() {
@@ -3733,10 +3795,12 @@ function botMove() {
   const flags = { fog: D.fog[1], blind: D.blind[1], shortMemory: D.shortMemory[1] || !!(rule && rule.forget),
                   fogFrom: D.fogFrom[1], blindFrom: D.blindFrom[1], know: D.know && D.know[1] };
   const level = vsBot.bot.level;
-  // Жетон: когда осталось два числа, два хода подряд выигрывают наверняка
+  // «⚡ +1 ход» — когда выгодно (botWantsToken). Опасность — последний
+  // видимый ход соперника «Горячо» или ближе
   if (!D.armed && D.tokens[1] > 0 && history.length > 0 && !(rule && rule.noTokens)) {
     const left = botCandidates(moves, 1, flags, false).reduce((a, c) => a + c, 0);
-    if ((left === 2 && Math.random() < 0.2 + 0.8 * level) || (left === 3 && Math.random() < 0.5 * level)) {
+    const foe = botVisible(moves, 1, flags).filter(m => m.p === 0).pop();
+    if (botWantsToken(left, D.tokens[1], !!foe && foe.labelIndex >= 5, level)) {
       D.tokens[1]--;
       D.armed = true;
       if (rule && typeof advArm === 'function') advArm(1);
@@ -3903,6 +3967,10 @@ function soundForBonus(kind) {
 // вместо вспышки объясняет себя карточкой — её и так видно крупно
 let bonusFxKey = null;
 let bonusFxTimer = null;
+// Вспышка бонуса и правила соперника — 3 с: за 1,7 с младшие не успевали
+// дочитать. Пока она на экране, бот не ходит (botTick)
+const BONUS_FX_MS = 3000;
+let bonusFxUntil = 0;
 function checkBonusFx() {
   if (mode !== 'duel' || screen !== 'game' || !D.lastBonus) return;
   const key = (online ? online.id : 'l') + '|' + D.round + '|' + history.length + '|' + D.lastBonus;
@@ -3933,7 +4001,8 @@ function showBonusFlash(kind, by) {
   void box.offsetWidth;
   box.classList.add('show');
   clearTimeout(bonusFxTimer);
-  bonusFxTimer = setTimeout(() => box.classList.remove('show'), 1700);
+  bonusFxUntil = Date.now() + BONUS_FX_MS;
+  bonusFxTimer = setTimeout(() => box.classList.remove('show'), BONUS_FX_MS);
 }
 
 // Правило соперника в Приключении сработало — та же вспышка, что у бонуса:
@@ -3949,7 +4018,8 @@ function showRuleFlash(c, title, text) {
   void box.offsetWidth;
   box.classList.add('show');
   clearTimeout(bonusFxTimer);
-  bonusFxTimer = setTimeout(() => box.classList.remove('show'), 1700);
+  bonusFxUntil = Date.now() + BONUS_FX_MS;
+  bonusFxTimer = setTimeout(() => box.classList.remove('show'), BONUS_FX_MS);
 }
 
 // Фанфары: рекорд, выигранная партия, новая лига
