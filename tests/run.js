@@ -4531,7 +4531,8 @@ async function testBots(browser) {
     const m1 = [mk(50, 0, 37), mk(20, 1, 37), mk(30, 0, 37)];
     // Ходы подобраны так, что каждая помеха меняет итог: иначе проверка
     // прошла бы и без неё
-    const m2 = [mk(40, 0, 1), mk(27, 1, 1), mk(38, 0, 1), mk(60, 1, 1)];
+    // Самый горячий здесь — первый ход (35), последний — 51
+    const m2 = [mk(35, 0, 1), mk(69, 1, 1), mk(56, 0, 1), mk(51, 1, 1)];
     const full = list(botCandidates(m2, 1, {}, false));
     const views = [list(botCandidates(m2, 1, { fog: true }, false)), list(botCandidates(m2, 1, { blind: true }, false)),
                    list(botCandidates(m2, 1, { shortMemory: true }, false)), list(botCandidates(m2, 1, {}, true))];
@@ -4542,14 +4543,17 @@ async function testBots(browser) {
       fog: list(botCandidates(m2, 1, { fog: true }, false)) === brute(m2.filter(m => m.p === 1), 1),
       blind: list(botCandidates(m2, 1, { blind: true }, false)) === brute(m2.filter(m => m.p === 0), 1),
       memory: list(botCandidates(m2, 1, { shortMemory: true }, false)) === brute(m2.slice(-2), 1),
-      careless: list(botCandidates(m2, 1, {}, true)) === brute(m2.slice(-1), 1),
+      // Рассеянный держится за последний ответ и самый горячий (35), а
+      // остальные названные числа (69, 56) всё равно видит в списке и не предлагает
+      careless: list(botCandidates(m2, 1, {}, true)) ===
+        brute([m2[0], m2[3]], 1).split(',').filter(v => v !== '69' && v !== '56').join(),
       timeouts: list(botCandidates(m1.concat([{ timeout: true, p: 1 }]), 1, {}, false)) === brute(m1, 37)
     };
   });
   check('бот считает возможные числа так же, как перебор', eng.plain && eng.secretIn && eng.timeouts, JSON.stringify(eng));
   check('под туманом бот не видит чужих ходов, под слепотой — своих',
     eng.fog && eng.blind, JSON.stringify(eng));
-  check('короткая память — два последних хода, рассеянность — один', eng.memory && eng.careless, JSON.stringify(eng));
+  check('короткая память — два последних хода, рассеянность — последний и самый горячий', eng.memory && eng.careless, JSON.stringify(eng));
   check('каждая помеха в этом примере меняет то, что видит бот', eng.differ, JSON.stringify(eng));
 
   const pool = await page.evaluate(() => {
@@ -4578,6 +4582,45 @@ async function testBots(browser) {
   check('лучший ход бота — самый информативный и может сразу попасть', pool.best, JSON.stringify(pool));
   check('«неплохие» ходы не хуже заданной доли от лучшего', pool.ok, JSON.stringify(pool));
   check('когда число одно, бот его и называет', pool.single);
+
+  // Глупых ходов нет: названное число бот не повторяет — ни сильный, ни
+  // слабый; после «Горячо» не уходит от этого ответа на другой конец прямой
+  const sane = await page.evaluate(() => {
+    RANGE_MIN = 1; RANGE_MAX = 100; FEEDBACK_META = buildFeedbackMeta(100);
+    const bands = reviewBands(FEEDBACK_META);
+    let seed = 777;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    let rep = 0, far = 0, total = 0;
+    for (let g = 0; g < 300; g++) {
+      const sec = 1 + Math.floor(rnd() * 100), moves = [], L = [0, 0.3, 1][g % 3];
+      for (let n = 0; n < 12; n++) {
+        const x = botPick(moves, 1, {}, L, rnd);
+        total++;
+        if (moves.some(m => m.guess === x)) rep++;
+        const hot = moves.reduce((a, m) => (!a || m.labelIndex > a.labelIndex ? m : a), null);
+        if (hot && hot.labelIndex >= 5 && bandOf(Math.abs(x - hot.guess), bands) < hot.labelIndex - 2) far++;
+        const li = bandOf(Math.abs(x - sec), bands);
+        moves.push({ guess: x, labelIndex: li, p: 1 });
+        if (li === 8) break;
+      }
+    }
+    return { rep, far, total };
+  });
+  check('бот не повторяет названные числа — ни слабый, ни сильный', sane.rep === 0, JSON.stringify(sane));
+  check('после «Горячо» бот не уходит далеко от горячего ответа', sane.far === 0, JSON.stringify(sane));
+  // «⚡ +1 ход» — с толком: при двух числах почти всегда, при двух «⚡» и
+  // когда соперник уже «Горячо» — раньше; при одном числе не нужен
+  const tok = await page.evaluate(() => {
+    const r = v => () => v;
+    return {
+      one: !botWantsToken(1, 3, true, 1, r(0)),
+      two: botWantsToken(2, 1, false, 0, r(0.7)) && !botWantsToken(2, 1, false, 0, r(0.8)),
+      waits: !botWantsToken(8, 1, false, 1, r(0)),
+      twoTokens: botWantsToken(8, 2, false, 1, r(0)),
+      danger: botWantsToken(7, 1, true, 1, r(0)) && !botWantsToken(7, 1, false, 1, r(0))
+    };
+  });
+  check('«⚡» бот тратит с толком: при двух числах, при двух «⚡» и под угрозой — раньше', Object.values(tok).every(Boolean), JSON.stringify(tok));
 
   // Сила: партии бот против бота. Уровни подобраны перебором, здесь — что
   // порядок сохранился: сильный обыгрывает слабого, равные — поровну
@@ -7476,6 +7519,22 @@ async function testAdvRules(browser) {
   check('Мишка выиграл вторым ходом — «выиграл», а не «Соня»', bear.fires.length === 1 && bear.fires[0] === 'S ' + bear.win && !bear.skip,
     JSON.stringify(bear));
   await done(page);
+
+  // Вспышка правила держится 3 с, и бот под ней не ходит: его ход не
+  // прячется за карточкой
+  {
+    const pg = await newGame(browser, { user: 'Максим' });
+    await pg.evaluate(() => { localStorage.setItem(advKey(), '50'); setAdvDiff('normal'); });
+    await pg.evaluate(() => { startAdventure(2); stopBot(); secret = 17; D.bonuses = []; BOT_SPEED = 1; D.cur = 0; duelPlay(2); });
+    await pg.waitForTimeout(2500);
+    const mid = await pg.evaluate(() => ({ show: document.getElementById('bonusFlash').classList.contains('show'),
+      moves: history.length, ms: BONUS_FX_MS }));
+    await pg.waitForTimeout(2600);
+    const after = await pg.evaluate(() => ({ show: document.getElementById('bonusFlash').classList.contains('show'), moves: history.length }));
+    check('вспышка правила — 3 с, через 2,5 с ещё на экране', mid.ms === 3000 && mid.show, JSON.stringify(mid));
+    check('под вспышкой бот ждёт, а после неё ходит', mid.moves === 1 && !after.show && after.moves >= 2, JSON.stringify({ mid, after }));
+    await done(pg);
+  }
 
   // Карточка босса длиннее экрана: описание прокручивается, а «В бой!» и
   // «Назад» на виду везде — на iPhone, маленьком iPhone, набок и на iPad
