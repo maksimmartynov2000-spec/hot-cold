@@ -4103,7 +4103,8 @@ async function testAvatarColor(browser) {
     tiles: document.querySelectorAll('#avGrid .av-tile').length }));
   check('в выборе двадцать цветов четырьмя рядами, последние — градиенты',
     pick.colors.length === 20 && pick.rows === 4 && pick.colors.slice(-4).every(c => /^grad-/.test(c)), JSON.stringify(pick));
-  check('и по-прежнему буква, 40 иконок и 5 боссов', pick.tiles === 46, String(pick.tiles));
+  // Иконки за боссов — по одной на мир: 15 миров
+  check('и по-прежнему буква, 40 иконок и 15 боссов', pick.tiles === 56, String(pick.tiles));
 
   await page.click('#avGrid .av-color[data-color="#a78bfa"]');
   await page.waitForTimeout(300);
@@ -4150,7 +4151,7 @@ async function testAvatarColor(browser) {
     tiles: document.querySelectorAll('#avGrid .av-tile').length,
     label: document.getElementById('tAvatarStart').textContent }));
   check('без миграции цвета выбора цвета нет, иконки на месте',
-    old.colors === 0 && old.tiles === 46 && old.label === 'Сменить иконку', JSON.stringify(old));
+    old.colors === 0 && old.tiles === 56 && old.label === 'Сменить иконку', JSON.stringify(old));
   await done(page);
 }
 
@@ -5045,7 +5046,8 @@ async function testLeagues(browser) {
     locked: [...document.querySelectorAll('#avGrid .av-tile.locked')].map(e => e.dataset.icon).join(''),
     colorsLocked: [...document.querySelectorAll('#avGrid .av-color.locked')].map(e => e.dataset.color).join(',') }));
   check('награды видны все, закрыты — лиги выше достигнутой',
-    grid.icons === 46 + 10 && grid.locked === '🦩🐳🦖🦜👑🌟🧙🦍🦑🐲🛸' && grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
+    grid.icons === 56 + 10 && grid.locked === '🦩🐳🦖🦜👑🌟🧙🦍🦑🐲🛸' + Array.from({ length: 10 }, (_, w) => 'adv-' + (w + 6) * 10).join('') &&
+    grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
     JSON.stringify(grid));
   const before = await page.evaluate(() => window.__profile.calls.length);
   await page.click('.av-tile[data-icon="🦖"]');
@@ -5073,7 +5075,7 @@ async function testLeagues(browser) {
   await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   check('сервер без лиг: сетка как раньше, лиги в профиле нет', await page.evaluate(() =>
-    document.querySelectorAll('#avGrid .av-tile').length === 46 &&
+    document.querySelectorAll('#avGrid .av-tile').length === 56 &&
     document.getElementById('pfLeague').classList.contains('hidden')));
   await done(page);
 }
@@ -5879,8 +5881,8 @@ async function testProgress(browser) {
     rows: [...document.querySelectorAll('#pfAchGrid .lad-row')].map(x => x.dataset.ladder + ':' + x.dataset.tier),
     wins: (document.querySelector('#pfAchGrid .lad-row[data-ladder="wins"]') || {}).textContent || '' }));
   check('профиль: серия заданий и лучшая', pf.streakShown && pf.streak === '📅 Серия заданий: 3 дн. · лучшая 4', pf.streak);
-  check('профиль: «🏅 Достижения: 2 из 61», по строке на лестницу со ступенью',
-    pf.head === '🏅 Достижения: 2 из 61' && pf.rows.join() === 'wins:1,games:0,streak:0,firstTry:0,modes:0,league:0,quests:0,run:0,friends:0,rivals:0,tutorial:1,advStars:0,advWorlds:0,advGold:0',
+  check('профиль: «🏅 Достижения: 2 из 71», по строке на лестницу со ступенью',
+    pf.head === '🏅 Достижения: 2 из 71' && pf.rows.join() === 'wins:1,games:0,streak:0,firstTry:0,modes:0,league:0,quests:0,run:0,friends:0,rivals:0,tutorial:1,advStars:0,advWorlds:0,advGold:0',
     JSON.stringify(pf));
   check('у лестницы — что открыто и что дальше', /Первая победа/.test(pf.wins) && /Дальше: 5 побед/.test(pf.wins), pf.wins);
   // Новые лестницы и верх старых: сколько до следующей ступени
@@ -6433,16 +6435,26 @@ async function testAdventure(browser) {
   const map = await page.evaluate(() => ({
     shown: !document.getElementById('screenAdventure').classList.contains('hidden'),
     worlds: document.querySelectorAll('#advMap .adv-world').length,
+    open: [...document.querySelectorAll('#advMap .adv-world.shown')].map(e => +e.dataset.w).join(),
     tiles: document.querySelectorAll('#advMap .adv-tile').length,
     next: [...document.querySelectorAll('#advMap .adv-tile.next')].map(e => +e.dataset.n),
     locked: document.querySelectorAll('#advMap .adv-tile.locked').length,
     bosses: [...document.querySelectorAll('#advMap .adv-tile.boss')].map(e => +e.dataset.n),
     art: document.querySelectorAll('#advMap .adv-tile svg.icon-art').length,
     diff: (document.querySelector('#advDiff .ad-btn.on') || {}).dataset.diff }));
-  check('карта: 5 миров по 10 соперников, у каждого портрет', map.shown && map.worlds === 5 && map.tiles === 50 && map.art === 50,
-    JSON.stringify(map));
-  check('открыт только первый, остальные под замком', map.next.join() === '0' && map.locked === 49, JSON.stringify(map));
-  check('десятый в каждом мире — босс', map.bosses.join() === '9,19,29,39,49', map.bosses.join());
+  check('карта: 15 миров, раскрыт первый — 10 соперников с портретами', map.shown && map.worlds === 15 && map.open === '0' &&
+    map.tiles === 10 && map.art === 10, JSON.stringify(map));
+  check('открыт только первый, остальные под замком', map.next.join() === '0' && map.locked === 9, JSON.stringify(map));
+  // Раскрыть все миры: 150 соперников, десятый в каждом — босс
+  const all = await page.evaluate(() => {
+    for (let w = 1; w < ADV_WORLDS.length; w++) advToggleWorld(w);
+    const r = { tiles: document.querySelectorAll('#advMap .adv-tile').length,
+                bosses: [...document.querySelectorAll('#advMap .adv-tile.boss')].map(e => +e.dataset.n) };
+    for (let w = 1; w < ADV_WORLDS.length; w++) advToggleWorld(w);
+    return r;
+  });
+  check('десятый в каждом мире — босс', all.tiles === 150 && all.bosses.join() === Array.from({ length: 15 }, (_, w) => w * 10 + 9).join(),
+    JSON.stringify(all));
   check('сложность по умолчанию — нормальная', map.diff === 'normal');
 
   // Закрытый соперник: карточка есть, а в бой нельзя
@@ -8533,7 +8545,7 @@ async function testProfile(browser) {
     return { n: tiles.length, first: tiles[0].textContent, firstLetter: tiles[0].classList.contains('letter'),
              sel: tiles.filter(t => t.classList.contains('sel')).map(t => t.dataset.icon) };
   });
-  check('в профиле буква, 40 иконок и 5 иконок боссов', grid.n === 46 && grid.firstLetter && grid.first === 'М',
+  check('в профиле буква, 40 иконок и 15 иконок боссов', grid.n === 56 && grid.firstLetter && grid.first === 'М',
     JSON.stringify(grid));
   check('выбранная иконка отмечена', grid.sel.join() === '🦊', grid.sel.join());
 
@@ -8566,7 +8578,7 @@ async function testProfile(browser) {
     const tops = new Set([...document.querySelectorAll('#avGrid .av-tile')].map(t => Math.round(t.getBoundingClientRect().top)));
     return { w: r.width, h: r.height, rows: tops.size };
   });
-  check('клетки иконок крупные, по пять в ряд', tile.w >= 44 && tile.h >= 44 && tile.rows === Math.ceil(46 / 5),
+  check('клетки иконок крупные, по пять в ряд', tile.w >= 44 && tile.h >= 44 && tile.rows === Math.ceil(56 / 5),
     JSON.stringify(tile));
 
   // Закрыл профиль с раскрытой сеткой — в следующий раз она снова свёрнута
