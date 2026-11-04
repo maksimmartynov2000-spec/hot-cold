@@ -4,7 +4,7 @@
 
 // Версию поднимаем, когда меняется что-то из CORE: старый кеш отдаётся сразу,
 // и без смены имени телефон продолжил бы брать прежний manifest
-const CACHE = 'hot-cold-v41';
+const CACHE = 'hot-cold-v42';
 
 // Своё, что нужно для запуска
 const CORE = [
@@ -19,6 +19,12 @@ const CORE = [
   './js/trial.js',
   './js/pass.js',
   './js/main.js',
+  // Тексты миров 6+ — по файлу на язык: игра грузит свой, когда нужен, а в
+  // кеше — все, чтобы Приключение открылось без сети и на другом языке
+  './js/adv-ru.js',
+  './js/adv-en.js',
+  './js/adv-fr.js',
+  './js/adv-de.js',
   './vendor/qrcode.js',
   './vendor/supabase.js',
   './fonts/nunito-latin.woff2',
@@ -30,9 +36,12 @@ const CORE = [
 ];
 
 // Картинки иконок: их список и имена файлов — в js/art.js, там же, где их
-// рисует игра, чтобы не держать второй список здесь
+// рисует игра, чтобы не держать второй список здесь. Портреты соперников —
+// только первых пяти миров: остальные (сотни) кладутся в кеш, когда их
+// впервые покажут, — иначе установка тянула бы мегабайты сразу
 importScripts('./js/art.js');
-CORE.push(...[...ICON_ART].concat(NAMED_ART).map(code => './' + iconFile(code)));
+CORE.push(...[...ICON_ART].concat(NAMED_ART.filter(code => !/^adv-/.test(code) || +code.slice(4) <= 50))
+  .map(code => './' + iconFile(code)));
 
 self.addEventListener('install', event => {
   // addAll падает целиком, если хоть один файл не отдался, — кладём по одному

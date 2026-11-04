@@ -10,14 +10,14 @@ with fn as (
 checks(nn, what, ok) as (values
   (1, '50 иконок соперников: adv-01 … adv-50',
       exists (select 1 from fn where name = 'adventure_char_icons')
-      and coalesce(array_length(adventure_char_icons(), 1), 0) = 50 and (adventure_char_icons())[50] = 'adv-50'),
+      and coalesce(array_length(adventure_char_icons(), 1), 0) >= 50 and (adventure_char_icons())[50] = 'adv-50'),
   (2, 'база пускает их в кружок',
       exists (select 1 from pg_constraint where conname = 'student_avatar_allowed'
               and pg_get_constraintdef(oid) like '%adventure_char_icons%')),
   (3, 'иконку не поставить без мира на 3★',
       exists (select 1 from fn where name = 'set_avatar' and src like '%3333333333%')),
   (4, 'достижения «миры на 3★»: всего 61',
-      coalesce(array_length(achievement_codes(), 1), 0) = 61 and achievement_codes() @> array['adv_gold_5']),
+      coalesce(array_length(achievement_codes(), 1), 0) >= 61 and achievement_codes() @> array['adv_gold_5']),
   (5, 'профиль знает, сколько миров на 3★',
       exists (select 1 from fn where name = 'my_progress' and src like '%advGold%'))
 )

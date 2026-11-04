@@ -2798,3 +2798,23 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
 @media (min-width: 1024px) and (pointer: coarse) {
   .adv-card { max-height: calc(100dvh / 1.25 - 40px); }
 }
+
+/* ---- Приключение: 50 миров ----
+   Мир — строкой-кнопкой; раскрыт тот, где вы сейчас, остальные — по нажатию.
+   Закрытый мир говорит, почему закрыт: нужен босс или звёзды в прошлом мире */
+.aw-head { -webkit-appearance: none; appearance: none; background: none; border: 0; padding: 0; font: inherit; color: inherit;
+  width: 100%; text-align: left; cursor: pointer; margin-bottom: 0; -webkit-tap-highlight-color: transparent; }
+.adv-world.shown .aw-head { margin-bottom: 10px; }
+.aw-fold { flex: none; width: 18px; text-align: center; font-size: 14px; color: var(--muted); }
+.adv-world.locked { opacity: 1; }
+.adv-world.locked .aw-head, .adv-world.locked .aw-grid { opacity: 0.6; }
+.aw-gate { margin-top: 8px; font-size: 13px; font-weight: 800; color: var(--muted); line-height: 1.35; }
+.adv-world.shown .aw-gate { margin: 0 0 10px; }
+.aw-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.aw-title .aw-count { margin-left: 0; font-size: 13px; }
+.aw-stars { white-space: nowrap; }
+.adv-world:not(.shown) { contain-intrinsic-size: auto 72px; }
+/* iPad набок — миры в две колонки, «ещё N миров» — во всю ширину */
+#advMap .adv-soon { grid-column: 1 / -1; }
+.adv-soon { margin: 4px 0 8px; padding: 12px; border-radius: 18px; text-align: center; font-weight: 800; color: var(--muted);
+  border: 2px dashed rgb(var(--ink) / 0.15); }

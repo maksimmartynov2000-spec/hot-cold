@@ -11,7 +11,7 @@ checks(nn, what, ok) as (values
   (1, 'у ученика есть счётчик Приключения',
       exists (select 1 from information_schema.columns where table_name = 'students' and column_name = 'adventure')),
   (2, 'иконки боссов: 🧙 🦍 🦑 🐲 🛸',
-      exists (select 1 from fn where name = 'adventure_icons') and adventure_icons() = array['🧙','🦍','🦑','🐲','🛸']),
+      exists (select 1 from fn where name = 'adventure_icons') and (adventure_icons())[1:5] = array['🧙','🦍','🦑','🐲','🛸']),
   (3, 'есть функция записи прогресса',
       exists (select 1 from fn where name = 'adventure_save')),
   (4, 'иконку босса нельзя поставить, не пройдя мир',

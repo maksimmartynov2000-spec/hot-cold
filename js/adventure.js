@@ -1,11 +1,12 @@
 // ================= ПРИКЛЮЧЕНИЕ =================
-// Вместо «Игры с ботом» — путь через пять миров, по десять соперников в
-// каждом. Соперник — персонаж со своей особенностью: кто-то торопится, кто-то
-// забывает ходы, кто-то ходит первым. Обыграл — открылся следующий. Десятый в
-// мире — босс: играем до двух побед, а за него игрок получает иконку босса.
-// Сложность — общий переключатель (легко / нормально / трудно), а не выбор бота.
+// Вместо «Игры с ботом» — путь через миры (в замысле 50), по десять
+// соперников в каждом. Соперник — персонаж со своим правилом: кто-то
+// торопится, кто-то прячет ходы, кто-то ходит первым. Обыграл — открылся
+// следующий. Десятый в мире — босс: играем до двух побед, а за него игрок
+// получает иконку босса. Сложность — общий переключатель (легко / нормально /
+// трудно), а не выбор бота.
 //
-// Прогресс — число обыгранных соперников подряд (0…50). Хранится в телефоне,
+// Прогресс — число обыгранных соперников подряд (0…500). Хранится в телефоне,
 // а у вошедшего ещё и в базе (adventure_sync): так он переезжает на другой
 // телефон и база знает, какие иконки боссов открыты.
 //
@@ -17,17 +18,40 @@
 // рентген, лава, заморозка), обычные соперники играют без ловушек, босс и
 // «Фокусник» — с ловушками
 
+// Всего миров в замысле — 50; выходят партиями, готовые — в ADV_WORLDS.
+// С шестого мира — волны по пять миров (см. advLevel), у героев — правила-данные
+// (ADV_HEROES), тексты — отдельным файлом на язык (js/adv-<язык>.js).
+// frost — у всех соперников мира числа с минусом
+const ADV_WORLD_MAX = 50;
 const ADV_WORLDS = [
   { key: 'forest', range: 20, color: '#2bd18f', boss: '🧙', bonus: 'shield' },
   { key: 'jungle', range: 50, color: '#a3e635', boss: '🦍', bonus: 'half' },
   { key: 'sea', range: 100, color: '#42c8ff', boss: '🦑', bonus: 'xray' },
   { key: 'fire', range: 200, color: '#ff8a3d', boss: '🐲', bonus: 'lava' },
-  { key: 'space', range: 500, color: '#a66bff', boss: '🛸', bonus: 'freeze' }
+  { key: 'space', range: 500, color: '#a66bff', boss: '🛸', bonus: 'freeze' },
+  // Волна 2
+  { key: 'candy', range: 50, color: '#ff6fb1', bonus: 'shield' },
+  { key: 'arctic', range: 100, color: '#5aa9ff', bonus: 'freeze', frost: true },
+  { key: 'desert', range: 150, color: '#e0a23a', bonus: 'half' },
+  { key: 'farm', range: 200, color: '#6fc04a', bonus: 'xray' },
+  { key: 'sky', range: 300, color: '#8f9dff', bonus: 'lava' },
+  // Волна 3
+  { key: 'garden', range: 100, color: '#d66bff', bonus: 'shield' },
+  { key: 'dino', range: 150, color: '#a8b83a', bonus: 'freeze' },
+  { key: 'pirate', range: 200, color: '#e0574f', bonus: 'half' },
+  { key: 'spooky', range: 300, color: '#5b5bd6', bonus: 'xray' },
+  { key: 'castle', range: 500, color: '#e6b422', bonus: 'lava' }
 ];
-// Копия иконок боссов — в базе (adventure_icons), сверяется тестом
-const ADV_ICONS = ADV_WORLDS.map(w => w.boss);
+// Иконка за босса: у первых пяти миров — эмодзи, дальше — портрет самого
+// босса. Список — на все 50 миров. Копия — в базе (adventure_icons), сверяется тестом
+const ADV_ICONS = Array.from({ length: ADV_WORLD_MAX }, (_, w) => (w < 5 ? ADV_WORLDS[w].boss : 'adv-' + (w + 1) * 10));
+ADV_WORLDS.forEach((W, w) => { if (!W.boss) W.boss = ADV_ICONS[w]; });
 const ADV_PER_WORLD = 10;
+// Сколько соперников уже можно сыграть
 const ADV_TOTAL = ADV_WORLDS.length * ADV_PER_WORLD;
+// С шестого мира новый мир открывает не только победа над боссом, но и
+// звёзды в прошлом мире: стимул переиграть на «Нормально» и «Трудно»
+const ADV_GATE_FROM = 5, ADV_GATE_STARS = 20;
 const ADV_DIFFS = ['easy', 'normal', 'hard'];
 
 // ---------- характеры ----------
@@ -187,24 +211,344 @@ const ADV_RULES = {
       else if (R.tier(m) <= ADV_COLD && R.once('a2')) { R.round.teleport = true; R.fire('a2'); } } }
 };
 
+// ---------- герои с шестого мира: правило — данными ----------
+// Первые 50 соперников — правила-функции выше. С шестого мира герой — запись
+// в ADV_HEROES: on: [когда, что, раз за раунд (1) или каждый раз (0)] и черты
+// (level, think, tokens, first, forget, gamble, immune, noTokens, pick).
+// У босса вместо on — две способности, a1 и a2. Так 450 героев — таблица, а не
+// 450 функций, и тест проверяет, что сочетания не повторяются.
+//   когда, после хода: youHot / youVeryHot / youWarm / youCold / youVeryCold —
+//     пояс вашего хода («Горячо», «Очень горячо», «Тепло» и ближе; «Холодно»,
+//     «Очень холодно» и дальше); youCloser / youColder — вы теплее или холоднее,
+//     чем своим прошлым ходом; me… — то же про ход соперника; meN:k / youN:k —
+//     его (ваш) k-й ход в раунде; meEvery:k / youEvery:k / every:k — каждый
+//     k-й ход: его, ваш, любой. Без хода: start — начало раунда; youArm / meArm
+//     — взвели «⚡ +1 ход»
+//   что: giveYou / giveMe — «⚡ +1 ход» вам или ему; steal — ваш «⚡» уходит
+//     ему; burn — ваш «⚡» пропадает; skipYou / freezeYou / skipMe — пропуск
+//     хода (freeze — ещё и 🧊); again — тот, кто сходил, ходит ещё раз;
+//     double — следующий ход соперника двойной; hide — этот ход не видно;
+//     fogYou — до конца раунда не видно его ходов; memoryYou — видны только два
+//     последних хода; lavaYou — ваш следующий ход — шальной бросок; tellDir /
+//     tellParity / tellHalf — говорит вам «больше/меньше», чётность, половину;
+//     knowParity / knowHalf — знает сам
+function advTrend(R, m) {
+  const mine = history.filter(h => h.p === m.p && !h.timeout);
+  const i = mine.indexOf(m);
+  return i < 1 ? 0 : Math.sign(R.tier(m) - R.tier(mine[i - 1]));
+}
+const advWarm = (R, m) => R.tier(m) >= 3 && R.tier(m) < 8;
+const ADV_WHEN = {
+  youHot: (R, m) => m.p === 0 && advHot(R, m),
+  youVeryHot: (R, m) => m.p === 0 && advVeryHot(R, m),
+  youWarm: (R, m) => m.p === 0 && advWarm(R, m),
+  youCold: (R, m) => m.p === 0 && R.tier(m) <= ADV_COLD,
+  youVeryCold: (R, m) => m.p === 0 && R.tier(m) === 0,
+  youCloser: (R, m) => m.p === 0 && R.tier(m) < 8 && advTrend(R, m) > 0,
+  youColder: (R, m) => m.p === 0 && advTrend(R, m) < 0,
+  meHot: (R, m) => m.p === 1 && advHot(R, m),
+  meVeryHot: (R, m) => m.p === 1 && advVeryHot(R, m),
+  meWarm: (R, m) => m.p === 1 && advWarm(R, m),
+  meCold: (R, m) => m.p === 1 && R.tier(m) <= ADV_COLD,
+  meVeryCold: (R, m) => m.p === 1 && R.tier(m) === 0,
+  meCloser: (R, m) => m.p === 1 && R.tier(m) < 8 && advTrend(R, m) > 0,
+  meColder: (R, m) => m.p === 1 && advTrend(R, m) < 0,
+  meN: (R, m, k) => m.p === 1 && R.count(1) === k,
+  youN: (R, m, k) => m.p === 0 && R.count(0) === k,
+  meEvery: (R, m, k) => m.p === 1 && R.count(1) % k === 0,
+  youEvery: (R, m, k) => m.p === 0 && R.count(0) % k === 0,
+  every: (R, m, k) => history.length % k === 0
+};
+// false — не вышло (нечего забрать): правило молчит и не тратит «раз за раунд»;
+// объект — слова для реплики ({k})
+const ADV_ACT = {
+  giveYou: R => { R.give(0, 1); },
+  giveMe: R => { if (D.tokens[1] >= 3) return false; R.give(1, 1); },
+  steal: R => { if (!D.tokens[0]) return false; R.take(0, 1); R.give(1, 1); },
+  burn: R => { if (!D.tokens[0]) return false; R.take(0, 1); },
+  skipYou: R => { R.skip(0); },
+  freezeYou: R => { R.skip(0, true); },
+  skipMe: R => { R.skip(1); },
+  again: R => { R.again(); },
+  double: R => { R.round.double = true; },
+  hide: (R, m) => { R.hide(m); },
+  fogYou: R => { if (D.fog[0]) return false; R.fog(0); },
+  memoryYou: R => { if (D.shortMemory[0]) return false; R.memory(0); },
+  lavaYou: R => { R.lava(0); },
+  tellDir: (R, m) => { const k = R.dir(m.guess); R.know(0, k, m.guess); return { k: R.word(k, m.guess) }; },
+  tellParity: R => { R.know(0, 'parity'); return { k: R.word('parity') }; },
+  tellHalf: R => { R.know(0, 'half'); return { k: R.word('half') }; },
+  knowParity: R => { R.know(1, 'parity'); },
+  knowHalf: R => { R.know(1, 'half'); }
+};
+// Свой способ выбирать число: null — как обычно
+const ADV_PICKS = {
+  // Круглые, на 0, пока возможных много
+  tens: (R, cand, plan) => {
+    if (R.left(cand) <= 6) return null;
+    for (let d = 0; d <= RANGE_MAX - RANGE_MIN; d += 10) {
+      for (const v of [Math.round(plan / 10) * 10 - d, Math.round(plan / 10) * 10 + d]) {
+        if (v >= RANGE_MIN && v <= RANGE_MAX && cand[v - RANGE_MIN] && !R.named(v)) return v;
+      }
+    }
+    return null;
+  },
+  // Зеркально вашему последнему числу, если оно ещё может быть загаданным
+  mirror: (R, cand) => {
+    const mine = history.filter(h => h.p === 0);
+    if (!mine.length) return null;
+    const v = RANGE_MIN + RANGE_MAX - mine[mine.length - 1].guess;
+    return v >= RANGE_MIN && v <= RANGE_MAX && cand[v - RANGE_MIN] && !R.named(v) ? v : null;
+  },
+  // Маленькими шажками рядом со своим прошлым числом
+  creep: (R, cand) => {
+    const me = history.filter(h => h.p === 1);
+    if (!me.length) return null;
+    const x = me[me.length - 1].guess;
+    for (let d = 1; d <= 3; d++) {
+      for (const v of [x - d, x + d]) {
+        if (v >= RANGE_MIN && v <= RANGE_MAX && cand[v - RANGE_MIN] && !R.named(v)) return v;
+      }
+    }
+    return null;
+  }
+};
+// Запись героя → правило с теми же крючками, что у первых пятидесяти
+function advCompile(spec) {
+  const R = Object.assign({}, spec);
+  const list = spec.boss ? [['a1', spec.a1], ['a2', spec.a2]] : spec.on ? [['rule', spec.on]] : [];
+  const run = (Rc, kind, on, m, act) => {
+    if (on[2] && Rc.round.once[kind]) return false;
+    const v = (act || ADV_ACT[on[1]])(Rc, m);
+    if (v === false) return false;
+    if (on[2]) Rc.round.once[kind] = true;
+    Rc.fire(kind, v || undefined);
+    return true;
+  };
+  const key = on => on[0].split(':')[0], arg = on => +(on[0].split(':')[1] || 0);
+  const starts = list.filter(([, on]) => key(on) === 'start');
+  const arms = list.filter(([, on]) => key(on) === 'youArm' || key(on) === 'meArm');
+  const afters = list.filter(([, on]) => ADV_WHEN[key(on)]);
+  // Черта без «когда» (первым ходит, минус-числа, свой способ ходить…) —
+  // говорит о себе в начале боя
+  R.start = Rc => {
+    starts.forEach(([kind, on]) => run(Rc, kind, on, null));
+    if (!list.length && !spec.pick && D.round === 1) Rc.fire('rule');
+  };
+  if (afters.length) {
+    R.after = (Rc, m) => {
+      for (const [kind, on] of afters) if (ADV_WHEN[key(on)](Rc, m, arg(on)) && run(Rc, kind, on, m)) break;
+    };
+  }
+  if (arms.length) {
+    // Взведённый «⚡» уже списан со счёта: steal отдаёт его сопернику, burn —
+    // просто гасит. Обычные steal/burn забрали бы второй, ещё не взведённый
+    const onArm = { steal: Rc => { Rc.give(1, 1); }, burn: () => {} };
+    R.arm = (Rc, p) => {
+      for (const [kind, on] of arms) {
+        if ((key(on) === 'youArm') !== (p === 0)) continue;
+        const cut = p === 0 ? onArm[on[1]] : null;
+        // Ваш «⚡» перехвачен или сгорел: двух ходов подряд не будет
+        if (run(Rc, kind, on, null, cut) && cut) return true;
+      }
+      return false;
+    };
+  }
+  if (list.some(([, on]) => on[1] === 'double')) {
+    R.turn = Rc => { if (Rc.round.double) { Rc.round.double = false; D.armed = true; } };
+  }
+  if (typeof spec.pick === 'string') {
+    const how = ADV_PICKS[spec.pick];
+    R.pick = (Rc, cand, plan) => {
+      const v = how(Rc, cand, plan);
+      if (v !== null && Rc.once('pick')) Rc.fire('rule');
+      return v;
+    };
+  }
+  return R;
+}
+// Герои миров 6–50: правило — запись, а не функция (см. advCompile). Номер
+// героя n = 50 + индекс; тексты — в js/adv-<язык>.js в том же порядке
+const ADV_HEROES = [
+  // 6 · Сладкое королевство (51–60)
+  { icon: '🍬', on: ['youCold', 'skipYou', 1], level: -0.21 },
+  { icon: '🍒', on: ['meHot', 'giveYou', 1], level: -0.12 },
+  { icon: '🍭', on: ['youN:1', 'fogYou', 1], level: -0.23 },
+  { icon: '🏃', on: ['youHot', 'double', 1], level: -0.17 },
+  { icon: '🥮', on: ['meN:2', 'giveMe', 1], level: -0.02 },
+  { icon: '🎂', on: ['youN:1', 'tellParity', 1], level: 0.13 },
+  { icon: '🍩', on: ['youCloser', 'skipMe', 1], level: 0.29 },
+  { icon: '💤', on: ['youN:2', 'skipMe', 1], level: 0.29 },
+  { icon: '🍦', on: ['youWarm', 'memoryYou', 1], level: 0.06 },
+  { boss: true, icon: '👑', a1icon: '🍫', a1: ['youCloser', 'steal', 1], a2icon: '💰', a2: ['every:4', 'giveMe', 1], level: 0.29 },
+  // 7 · Ледяная Арктика (61–70)
+  { icon: '⛄', on: ['youN:1', 'lavaYou', 1], level: 0.05 },
+  { icon: '🌨️', on: ['youColder', 'fogYou', 1], level: -0.09 },
+  { icon: '🎣', on: ['meColder', 'giveMe', 1], level: 0.02 },
+  { icon: '🧭', on: ['meHot', 'tellDir', 1], level: 0.05 },
+  { icon: '🌙', on: ['meEvery:3', 'hide', 0], level: 0.04 },
+  { icon: '🔔', on: ['youWarm', 'tellDir', 1], level: 0.06 },
+  { icon: '❄️', on: ['youVeryHot', 'freezeYou', 1], level: -0.06 },
+  { icon: '🐟', on: ['youColder', 'giveMe', 1], level: 0.02 },
+  { icon: '🛷', on: ['meN:2', 'double', 1], level: -0.06 },
+  { boss: true, icon: '👑', a1icon: '🌪️', a1: ['youN:2', 'fogYou', 1], a2icon: '🥶', a2: ['youCloser', 'freezeYou', 1], level: -0.17 },
+  // 8 · Жаркая пустыня (71–80)
+  { icon: '💦', on: ['youHot', 'burn', 1], level: -0.14 },
+  { icon: '👂', on: ['youN:2', 'tellHalf', 1], level: -0.02 },
+  { icon: '🔭', on: ['meEvery:2', 'tellDir', 0], level: 0.01 },
+  { icon: '🦂', on: ['youCloser', 'lavaYou', 1], level: -0.11 },
+  { icon: '😎', on: ['meWarm', 'skipMe', 1], level: 0.29 },
+  { icon: '🥎', on: ['meColder', 'again', 1], level: -0.05 },
+  { icon: '🔁', pick: 'mirror' },
+  { icon: '🌵', on: ['youWarm', 'hide', 1], level: -0.09 },
+  { icon: '😱', on: ['meN:1', 'skipYou', 1], level: 0.09 },
+  { boss: true, icon: '👑', a1icon: '🏜️', a1: ['youN:3', 'memoryYou', 1], a2icon: '🏺', a2: ['youVeryHot', 'lavaYou', 1], level: -0.38 },
+  // 9 · Весёлая ферма (81–90)
+  { icon: '🥛', on: ['youCold', 'giveYou', 1], level: 0.01 },
+  { icon: '🐽', on: ['youColder', 'memoryYou', 1], level: -0.27 },
+  { icon: '🛑', on: ['meN:2', 'skipMe', 1], level: 0.41 },
+  { icon: '📣', on: ['meN:1', 'tellDir', 1], level: 0.02 },
+  { icon: '🎯', pick: 'tens', level: -0.01 },
+  { icon: '🐎', on: ['meHot', 'double', 1], level: -0.14 },
+  { icon: '🐕', on: ['youColder', 'skipYou', 1], level: -0.03 },
+  { icon: '🎴', on: ['meN:2', 'hide', 1], level: -0.1 },
+  { icon: '🧀', on: ['youVeryCold', 'giveMe', 1], level: 0.1 },
+  { boss: true, icon: '👑', a1icon: '🐦', a1: ['youWarm', 'steal', 1], a2icon: '🌾', a2: ['meColder', 'double', 1], level: -0.19 },
+  // 10 · Облачный город (91–100)
+  { icon: '🦜', on: ['youVeryHot', 'tellDir', 1], level: -0.18 },
+  { icon: '🌺', on: ['meN:1', 'again', 1], level: -0.05 },
+  { icon: '🦩', on: ['every:5', 'skipMe', 1], level: 0.32 },
+  { icon: '🦅', on: ['meN:2', 'knowParity', 1], level: -0.25 },
+  { icon: '🌫️', on: ['youN:3', 'hide', 1], level: -0.18 },
+  { icon: '🎈', on: ['meCloser', 'again', 1], level: -0.08 },
+  { icon: '✉️', on: ['youColder', 'giveYou', 1], level: 0.07 },
+  { icon: '🪂', on: ['meColder', 'hide', 0], level: 0.19 },
+  { icon: '📦', on: ['youN:2', 'giveYou', 1], level: 0.2 },
+  { boss: true, icon: '👑', a1icon: '🌩️', a1: ['youCloser', 'skipYou', 1], a2icon: '🌧️', a2: ['every:4', 'hide', 1], level: -0.28 },
+  // 11 · Цветочный сад (101–110)
+  { icon: '🍯', on: ['meHot', 'giveMe', 1], level: -0.05 },
+  { icon: '🌈', on: ['youWarm', 'tellParity', 1], level: 0.08 },
+  { icon: '📖', on: ['meN:3', 'knowHalf', 1], level: -0.01 },
+  { icon: '🐌', pick: 'creep', think: [2.5, 4], level: -0.12 },
+  { icon: '🎻', on: ['every:3', 'tellParity', 1], level: 0.12 },
+  { icon: '🚁', on: ['meWarm', 'again', 1], level: -0.1 },
+  { icon: '💪', on: ['youArm', 'skipMe', 1], level: 0.05 },
+  { icon: '🌸', on: ['meCloser', 'giveYou', 1], level: 0.08 },
+  { icon: '🕳️', on: ['meN:3', 'again', 1] },
+  { boss: true, icon: '👑', a1icon: '🐝', a1: ['youCloser', 'fogYou', 1], a2icon: '🪤', a2: ['youVeryHot', 'skipYou', 1], level: -0.12 },
+  // 12 · Долина динозавров (111–120)
+  { icon: '🦏', on: ['meVeryHot', 'skipYou', 1], level: -0.04 },
+  { icon: '🦔', on: ['youArm', 'burn', 1], level: -0.05 },
+  { icon: '🪶', on: ['youColder', 'double', 1], level: -0.06 },
+  { icon: '🦒', on: ['meN:3', 'tellHalf', 1], level: 0.05 },
+  { icon: '🔨', on: ['youVeryHot', 'burn', 1], level: -0.03 },
+  { icon: '💨', on: ['meN:2', 'again', 1], think: [0.5, 1.2], level: -0.06 },
+  { icon: '🥚', on: ['meN:1', 'skipMe', 1], level: 0.22 },
+  { icon: '🎺', on: ['youCold', 'tellDir', 0], level: 0.04 },
+  { icon: '🌊', on: ['meWarm', 'hide', 1], level: -0.03 },
+  { boss: true, icon: '👑', a1icon: '🦖', a1: ['meHot', 'freezeYou', 1], a2icon: '👣', a2: ['meN:4', 'double', 1], level: -0.02 },
+  // 13 · Пиратский остров (121–130)
+  { icon: '📢', on: ['meColder', 'tellDir', 0] },
+  { icon: '🏴‍☠️', on: ['youHot', 'steal', 1], level: -0.14 },
+  { icon: '💎', on: ['youVeryHot', 'giveYou', 1], level: 0.03 },
+  { icon: '⭐', on: ['start', 'tellParity', 0], level: 0.4 },
+  { icon: '📯', on: ['meN:3', 'freezeYou', 1], level: -0.16 },
+  { icon: '🦞', on: ['youCloser', 'hide', 1], level: -0.14 },
+  { icon: '🗺️', on: ['meN:2', 'tellHalf', 1], level: 0.13 },
+  { icon: '🗝️', on: ['youColder', 'steal', 1], level: -0.03 },
+  { icon: '💥', on: ['meVeryHot', 'lavaYou', 1], level: -0.1 },
+  { boss: true, icon: '👑', a1icon: '⚔️', a1: ['youVeryHot', 'steal', 1], a2icon: '💣', a2: ['every:5', 'skipYou', 1], level: -0.18 },
+  // 14 · Деревня Хэллоуин (131–140)
+  { icon: '👻', on: ['meHot', 'hide', 1], level: -0.06 },
+  { icon: '🎃', on: ['youN:2', 'tellDir', 1], level: 0.03 },
+  { icon: '🧹', on: ['meVeryHot', 'again', 1], level: 0.09 },
+  { icon: '🩹', on: ['youN:3', 'skipYou', 1], level: -0.1 },
+  { icon: '🔌', on: ['meN:2', 'lavaYou', 1], level: -0.04 },
+  { icon: '🕸️', on: ['youWarm', 'skipYou', 1], level: -0.05 },
+  { icon: '😵', on: ['youColder', 'lavaYou', 1], level: -0.01 },
+  { icon: '🌕', on: ['every:6', 'double', 1], level: 0.1 },
+  { icon: '🫧', on: ['meCloser', 'skipYou', 1], level: 0.07 },
+  { boss: true, icon: '👑', a1icon: '🦇', a1: ['meVeryHot', 'fogYou', 1], a2icon: '🧛', a2: ['youCloser', 'burn', 1], level: -0.31 },
+  // 15 · Королевский замок (141–150)
+  { icon: '🐸', on: ['youVeryCold', 'again', 1], level: 0.05 },
+  { icon: '📜', on: ['youN:1', 'skipYou', 1], level: 0.02 },
+  { icon: '🃏', on: ['every:3', 'lavaYou', 1], level: -0.22 },
+  { icon: '🩰', on: ['meCloser', 'hide', 1], level: -0.13 },
+  { icon: '🦚', on: ['meN:1', 'tellHalf', 1], level: 0.12 },
+  { icon: '🧲', on: ['meCloser', 'steal', 1], level: -0.16 },
+  { icon: '🤺', on: ['meHot', 'burn', 1], level: -0.12 },
+  { icon: '♞', on: ['meN:2', 'tellParity', 1], first: true, level: 0.52 },
+  { icon: '🌉', on: ['youN:2', 'steal', 1], level: -0.24 },
+  { boss: true, icon: '👑', a1icon: '🦁', a1: ['youVeryHot', 'memoryYou', 1], a2icon: '👑', a2: ['meWarm', 'double', 1], level: -0.2 }
+];
+const advHeroRules = [];
+function advHeroRule(n) {
+  const i = n - 50;
+  return advHeroRules[i] || (advHeroRules[i] = advCompile(ADV_HEROES[i]));
+}
+
 function advChar(n) {
   const w = Math.floor(n / ADV_PER_WORLD), i = n % ADV_PER_WORLD;
   const boss = i === ADV_PER_WORLD - 1;
-  const rule = ADV_CAST[n];
-  return { n: n, w: w, i: i, boss: boss, world: ADV_WORLDS[w], rule: rule, R: ADV_RULES[rule],
-           icon: 'adv-' + String(n + 1).padStart(2, '0') };
+  const rule = n < 50 ? ADV_CAST[n] : 'h' + (n + 1);
+  return { n: n, w: w, i: i, boss: boss, world: ADV_WORLDS[w], rule: rule,
+           R: n < 50 ? ADV_RULES[rule] : advHeroRule(n), icon: 'adv-' + String(n + 1).padStart(2, '0') };
 }
-function advName(n) { return t().adv.names[n]; }
+
+// ---------- тексты миров 6+ ----------
+// Лежат отдельным файлом на язык (js/adv-ru.js …): 450 героев на четырёх
+// языках раздули бы загрузку игры. Файл кладёт свои тексты в ADV_PACKS.
+// Пока он не пришёл — «…», и карта перерисуется, когда придёт
+const ADV_PACKS = {};
+function advPack() { return ADV_PACKS[currentLang] || ADV_PACKS.en || null; }
+function advWorldName(w) {
+  if (w < 5) return t().adv.worlds[w];
+  const P = advPack();
+  return (P && P.worlds[w - 5]) || '…';
+}
+function advName(n) {
+  if (n < 50) return t().adv.names[n];
+  const P = advPack();
+  return (P && P.names[n - 50]) || '…';
+}
+function advCast(n) {
+  if (n < 50) return t().adv.cast[n] || {};
+  const P = advPack();
+  return (P && P.cast[n - 50]) || {};
+}
+const advPackWait = {};
+function advLoadPack(lang) {
+  lang = lang || currentLang;
+  if (ADV_TOTAL <= 50 || ADV_PACKS[lang]) return Promise.resolve();
+  if (advPackWait[lang]) return advPackWait[lang];
+  return (advPackWait[lang] = new Promise(done => {
+    const s = document.createElement('script');
+    s.src = 'js/adv-' + lang + '.js';
+    // Без сети и без копии — не беда: попробуем в следующий раз
+    s.onload = s.onerror = () => { delete advPackWait[lang]; done(); };
+    document.head.appendChild(s);
+  }));
+}
 
 // Сила соперника растёт от мира к миру и чуть-чуть внутри мира. От
 // сложности не зависит: соперник — один и тот же характер, сложность меняет
 // только, у кого сколько «⚡ +1 ход» (см. advTokens)
 // Соперники умнее тратят «⚡ +1 ход» и не делают глупых ходов — «голову» чуть
-// убавили, чтобы доля побед осталась прежней (подобрано симуляцией)
-const ADV_BRAIN_SHIFT = [-0.03, -0.04, -0.1, -0.11, 0];
+// убавили, чтобы доля побед осталась прежней (подобрано симуляцией). С шестого
+// мира — поправка мира, а у героя — своя (level в ADV_HEROES): правило, что
+// помогает вам, — соперник умнее, и наоборот. Цель «среднего игрока» на
+// «Нормально» — в первом мире волны около 57% побед, к пятому — около 33%
+const ADV_BRAIN_SHIFT = [-0.03, -0.04, -0.1, -0.11, 0, 0.11, -0.07, -0.08, -0.1, -0.05, 0.04, -0.04, -0.04, -0.17, -0.12];
+// С шестого мира — волны по пять миров: внутри волны сильнее, первый мир
+// волны — передышка, от волны к волне чуть сильнее
+function advWaveBase(w) {
+  const wave = Math.floor(w / 5), pos = w % 5;
+  return Math.min(0.9, 0.17 + 0.03 * wave + 0.14 * pos);
+}
 function advLevel(c) {
   if (c.R.levelSet) return c.R.levelSet;
-  const L = 0.08 + c.w * 0.18 + c.i * 0.012 + (c.boss ? 0.06 : 0) + (c.R.level || 0) + ADV_BRAIN_SHIFT[c.w];
+  const base = c.w < 5 ? 0.08 + c.w * 0.18 : advWaveBase(c.w);
+  const L = base + c.i * 0.012 + (c.boss ? 0.06 : 0) + (c.R.level || 0) + (ADV_BRAIN_SHIFT[c.w] || 0);
   return Math.max(0.02, Math.min(0.98, L));
 }
 function advThink(c) {
@@ -286,14 +630,14 @@ function advCtx() {
 
 // Реплика соперника: hi, rule, a1, a2, luck, worry, win, lose
 function advLine(n, kind, vars) {
-  const cast = t().adv.cast[n] || {};
+  const cast = advCast(n);
   let text = cast[kind] || '';
   if (vars) Object.keys(vars).forEach(k => { text = text.split('{' + k + '}').join(vars[k]); });
   return text;
 }
 // Название сработавшего: правило — его имя, способность босса — её имя
 function advFireTitle(n, kind) {
-  const cast = t().adv.cast[n] || {};
+  const cast = advCast(n);
   return kind === 'a1' ? cast.a1t : kind === 'a2' ? cast.a2t : cast.t;
 }
 function advShowFire(kind, text, big) {
@@ -423,13 +767,13 @@ function advStarsKey() { return advKey().replace('hc_adv_', 'hc_advs_'); }
 function advStars() {
   try {
     const v = localStorage.getItem(advStarsKey()) || '';
-    return /^[0-3]{0,50}$/.test(v) ? v : '';
+    return /^[0-3]{0,500}$/.test(v) ? v : '';
   } catch (e) { return ''; }
 }
 function advStarAt(n) { return +(advStars()[n] || 0); }
 // Слить со звёздами из базы: на каждом месте — лучшее
 function advMergeStars(other) {
-  if (typeof other !== 'string' || !/^[0-3]{0,50}$/.test(other)) return;
+  if (typeof other !== 'string' || !/^[0-3]{0,500}$/.test(other)) return;
   const a = advStars(), len = Math.max(a.length, other.length);
   let out = '';
   for (let i = 0; i < len; i++) out += Math.max(+(a[i] || 0), +(other[i] || 0));
@@ -501,10 +845,37 @@ function advReport(n, k) {
     .catch(() => advSync());
 }
 function advWorldDone(w) { return advDone() >= (w + 1) * ADV_PER_WORLD; }
+// Мир открыт: побеждён босс прошлого мира, а с шестого мира — ещё и
+// ADV_GATE_STARS звёзд в прошлом мире. Начатый мир уже не закрывается
+function advWorldOpen(w) {
+  if (w <= 0) return true;
+  const done = advDone();
+  if (done < w * ADV_PER_WORLD) return false;
+  if (w < ADV_GATE_FROM || done > w * ADV_PER_WORLD) return true;
+  return advWorldStars(w - 1) >= ADV_GATE_STARS;
+}
+function advOpenN(n) { return n >= 0 && n < ADV_TOTAL && n <= advDone() && advWorldOpen(Math.floor(n / ADV_PER_WORLD)); }
+// Мир, где вы сейчас: в нём следующий соперник. Если следующий мир ещё
+// закрыт звёздами — прошлый, где их добирать
+function advCurrentWorld() {
+  const w = Math.min(ADV_WORLDS.length - 1, Math.floor(advDone() / ADV_PER_WORLD));
+  return advWorldOpen(w) ? w : Math.max(0, w - 1);
+}
+// Почему мир закрыт: нужен босс прошлого мира или звёзды в нём
+function advGateText(w) {
+  const A = t().adv;
+  if (advDone() < w * ADV_PER_WORLD) return A.gateBoss.replace('{w}', advWorldName(w - 1));
+  return A.gateStars.replace('{m}', ADV_GATE_STARS).replace('{w}', advWorldName(w - 1)).replace('{n}', advWorldStars(w - 1));
+}
 
 // Иконки соперников — в кружок, когда весь их мир пройден на ★★★. Копия
 // списка — в базе (adventure_char_icons)
 const ADV_CHAR_ICONS = Array.from({ length: ADV_TOTAL }, (_, i) => 'adv-' + String(i + 1).padStart(2, '0'));
+// Для выбора в профиле: портрет босса нового мира — иконка за босса (ADV_ICONS),
+// второй раз среди соперников он не нужен. Иконки за боссов — только готовых миров
+const ADV_PICK_CHARS = ADV_CHAR_ICONS.filter(icon => ADV_ICONS.indexOf(icon) < 0);
+const ADV_PICK_BOSSES = ADV_ICONS.slice(0, ADV_WORLDS.length);
+function advCharOpenCount() { return ADV_PICK_CHARS.filter(advCharIconOpen).length; }
 function advWorldThree(w) {
   return [...advStars().slice(w * ADV_PER_WORLD, (w + 1) * ADV_PER_WORLD)].filter(c => c === '3').length;
 }
@@ -523,14 +894,25 @@ function advIconOpen(icon) {
 function openAdventure() {
   endLessonMode();
   showScreen('adventure');
-  renderAdventure();
-  // Карту перерисовываем, только если база что-то поменяла: 50 соперников с
-  // картинками заново — заметная пауза на слабом телефоне
+  advOpenWorlds = null;
+  renderAdventure(true);
+  // Тексты миров 6+ — своим файлом: пришёл — перерисовать имена
+  if (!ADV_PACKS[currentLang]) advLoadPack().then(() => { if (screen === 'adventure') renderAdventure(); });
+  // Карту перерисовываем, только если база что-то поменяла
   const was = advDone() + '|' + advStars();
   advSync().then(() => { if (screen === 'adventure' && advDone() + '|' + advStars() !== was) renderAdventure(); });
 }
 
-function renderAdventure() {
+// Какие миры раскрыты на карте: сначала — тот, где вы сейчас. Остальные —
+// одной строкой, раскрываются нажатием: 50 миров с картинками сразу — долгая
+// карта и заметная пауза на слабом телефоне
+let advOpenWorlds = null;
+function advToggleWorld(w) {
+  if (advOpenWorlds.has(w)) advOpenWorlds.delete(w); else advOpenWorlds.add(w);
+  renderAdventure();
+}
+
+function renderAdventure(scroll) {
   const A = t().adv;
   document.getElementById('tAdvTitle').innerHTML = artSpan('icons/m-adventure.webp', '🗺️') + ' ' + escapeHtml(A.title);
   document.getElementById('tAdvHint').textContent = A.hint;
@@ -543,26 +925,45 @@ function renderAdventure() {
   document.getElementById('advStarsTotal').innerHTML = '<b>⭐ ' + advStarTotal() + '</b><span> / ' + ADV_TOTAL * 3 + '</span>' +
     '<small>' + escapeHtml(A.starsHint) + '</small>';
 
-  const done = advDone();
-  document.getElementById('advMap').replaceChildren(...ADV_WORLDS.map((W, w) => {
+  const done = advDone(), cur = advCurrentWorld();
+  if (!advOpenWorlds) advOpenWorlds = new Set([cur]);
+  const worlds = ADV_WORLDS.map((W, w) => {
+    const open = advWorldOpen(w), shown = advOpenWorlds.has(w);
     const sec = document.createElement('section');
-    sec.className = 'adv-world' + (done < w * ADV_PER_WORLD ? ' locked' : '');
+    sec.className = 'adv-world' + (open ? '' : ' locked') + (shown ? ' shown' : '');
+    sec.dataset.w = w;
     sec.style.setProperty('--wc', W.color);
     const beaten = Math.max(0, Math.min(ADV_PER_WORLD, done - w * ADV_PER_WORLD));
-    const head = document.createElement('div');
+    // Строка мира — кнопка: раскрыть и свернуть
+    const head = document.createElement('button');
+    head.type = 'button';
     head.className = 'aw-head';
-    head.innerHTML = '<span class="aw-name">' + escapeHtml(A.worlds[w]) + '</span>' +
-      '<span class="aw-count">' + A.progress.replace('{n}', beaten) +
-        ' · <span class="aw-stars">⭐ ' + advWorldStars(w) + '/' + ADV_PER_WORLD * 3 + '</span></span>' +
+    head.setAttribute('aria-expanded', shown ? 'true' : 'false');
+    head.onclick = () => advToggleWorld(w);
+    // Имя сверху, счёт под ним: длинное имя не рвёт счёт на куски. У закрытого
+    // мира счёта нет (там всегда 0) — что его откроет, сказано строкой ниже
+    head.innerHTML = '<span class="aw-title"><span class="aw-name">' + escapeHtml(advWorldName(w)) + '</span>' +
+      (open ? '<span class="aw-count">' + A.progress.replace('{n}', beaten) +
+        ' · <span class="aw-stars">⭐ ' + advWorldStars(w) + '/' + ADV_PER_WORLD * 3 + '</span></span>' : '') + '</span>' +
       '<span class="aw-reward' + (advWorldDone(w) ? ' got' : '') + '" title="' + escapeHtml(A.reward) + '">' +
-      (iconArt(W.boss, 0) || W.boss) + '</span>';
+      (iconArt(W.boss, 0) || W.boss) + '</span>' +
+      '<span class="aw-fold">' + (shown ? '▾' : '▸') + '</span>';
+    sec.appendChild(head);
+    // Закрытый мир — почему: босс прошлого мира или звёзды в нём
+    if (!open) {
+      const gate = document.createElement('div');
+      gate.className = 'aw-gate';
+      gate.textContent = advGateText(w);
+      sec.appendChild(gate);
+    }
+    if (!shown) return sec;
     const grid = document.createElement('div');
     grid.className = 'aw-grid';
     for (let i = 0; i < ADV_PER_WORLD; i++) {
       const n = w * ADV_PER_WORLD + i;
       const c = advChar(n);
       const b = document.createElement('button');
-      const state = n < done ? 'done' : n === done ? 'next' : 'locked';
+      const state = n < done ? 'done' : n === done && open ? 'next' : 'locked';
       b.className = 'adv-tile ' + state + (c.boss ? ' boss' : '');
       b.dataset.n = n;
       const st = advStarAt(n);
@@ -573,15 +974,23 @@ function renderAdventure() {
       b.onclick = () => openAdvCard(n);
       grid.appendChild(b);
     }
-    // Цель мира: ★★★ у всех — их иконки в профиль
+    // Цель мира: ★★★ у всех — их иконки в профиль. У закрытого мира не видна
     const goal = document.createElement('div');
-    // У закрытого мира цели не видно: пять одинаковых строк подряд только мешали
-    goal.className = 'aw-goal' + (advWorldGold(w) ? ' got' : '') + (done < w * ADV_PER_WORLD ? ' hidden' : '');
+    goal.className = 'aw-goal' + (advWorldGold(w) ? ' got' : '') + (open ? '' : ' hidden');
     goal.textContent = advWorldGold(w) ? A.goldDone : A.goldGoal.replace('{n}', advWorldThree(w));
-    sec.append(head, grid, goal);
+    sec.append(grid, goal);
     return sec;
-  }));
-  const next = document.querySelector('#advMap .adv-tile.next');
+  });
+  // Миры выходят партиями: сколько ещё впереди
+  if (ADV_WORLDS.length < ADV_WORLD_MAX) {
+    const soon = document.createElement('div');
+    soon.className = 'adv-soon';
+    soon.textContent = A.soon.replace('{n}', ADV_WORLD_MAX - ADV_WORLDS.length);
+    worlds.push(soon);
+  }
+  document.getElementById('advMap').replaceChildren(...worlds);
+  if (!scroll) return;
+  const next = document.querySelector('#advMap .adv-tile.next') || document.querySelector('#advMap .adv-world.shown');
   if (next && next.scrollIntoView && done > 0) next.scrollIntoView({ block: 'center' });
 }
 
@@ -611,16 +1020,16 @@ function openAdvCard(n) {
   face.innerHTML = iconArt(c.icon, 0);
   face.style.background = c.world.color;
   document.querySelector('#advCard .adv-card').style.setProperty('--wc', c.world.color);
-  document.getElementById('acWorld').textContent = A.worlds[c.w] + ' · ' + (c.i + 1) + '/' + ADV_PER_WORLD;
+  document.getElementById('acWorld').textContent = advWorldName(c.w) + ' · ' + (c.i + 1) + '/' + ADV_PER_WORLD;
   document.getElementById('acName').textContent = advName(n);
-  const cast = A.cast[n] || {};
+  const cast = advCast(n);
   document.getElementById('acQuirk').innerHTML = c.boss
     ? '<b>👑 ' + escapeHtml(A.bossTitle) + '</b><span>' + escapeHtml(A.bossNote) + '</span>' +
       '<span class="ac-ab"><b>' + c.R.a1icon + ' ' + escapeHtml(cast.a1t) + '</b>' + escapeHtml(cast.a1d) + '</span>' +
       '<span class="ac-ab"><b>' + c.R.a2icon + ' ' + escapeHtml(cast.a2t) + '</b>' + escapeHtml(cast.a2d) + '</span>'
     : '<b>' + c.R.icon + ' ' + escapeHtml(cast.t) + '</b><span>' + escapeHtml(cast.d) + '</span>';
   const half = Math.floor(c.world.range / 2);
-  const range = c.R.frost ? L.placeholderTpl.replace('{a}', formatNum(-half)).replace('{b}', formatNum(half))
+  const range = (c.R.frost || c.world.frost) ? L.placeholderTpl.replace('{a}', formatNum(-half)).replace('{b}', formatNum(half))
     : L.placeholderTpl.replace('{a}', '1').replace('{b}', formatNum(c.world.range));
   const best = advStarAt(n);
   const bk = c.world.bonus;
@@ -633,8 +1042,9 @@ function openAdvCard(n) {
       (c.boss || c.R.bonus === 'magic' ? ' · ' + escapeHtml(A.traps) : '') + '</button>' +
     '<span class="ac-gold">' + escapeHtml(advWorldGold(c.w) ? A.goldDone : A.cardGold.replace('{n}', advWorldThree(c.w))) + '</span>';
   const go = document.getElementById('acGo');
-  const open = n <= done;
-  go.textContent = open ? A.fight : A.locked;
+  // Закрыт: не обыгран прошлый соперник — или мир ждёт звёзд в прошлом мире
+  const open = advOpenN(n);
+  go.textContent = open ? A.fight : n <= done ? advGateText(c.w) : A.locked;
   go.disabled = !open;
   go.onclick = () => startAdventure(n);
   document.getElementById('acBack').textContent = L.back;
@@ -665,7 +1075,7 @@ function startAdventure(n) {
   mode = 'duel';
   setupBot = false;
   stopBot();
-  frostMode = !!c.R.frost;
+  frostMode = !!(c.R.frost || c.world.frost);
   bonusCountChoice = 0;
   applyBounds(c.world.range);
   applyRangeToInputs();
@@ -739,8 +1149,10 @@ function advResultLine() {
     }
     if (c.n + 1 >= ADV_TOTAL && w.was === 0) parts.push(escapeHtml(A.allDone));
     else if (c.boss && w.was === 0) {
-      parts.push(escapeHtml(A.worldDone.replace('{w}', A.worlds[c.w])) + ' ' + (iconArt(c.world.boss, 22) || ''));
+      parts.push(escapeHtml(A.worldDone.replace('{w}', advWorldName(c.w))) + ' ' + (iconArt(c.world.boss, 22) || ''));
     }
+    // Следующий мир ждёт звёзд в этом — сказать сразу, сколько не хватает
+    if (c.n + 1 < ADV_TOTAL && !advOpenN(c.n + 1) && c.n + 1 <= advDone()) parts.push(escapeHtml(advGateText(c.w + 1)));
     line.innerHTML = parts.map(x => '<div>' + x + '</div>').join('');
   } else {
     line.textContent = A.lose;
@@ -755,7 +1167,7 @@ function advActionsHtml() {
   if (advWon()) advAward();
   const again = advWon() && advStarAt(c.n) < 3
     ? '<button class="btn-ghost" onclick="startAdventure(' + c.n + ')">' + escapeHtml(A.again) + '</button>' : '';
-  if (advWon() && c.n + 1 < ADV_TOTAL) {
+  if (advWon() && advOpenN(c.n + 1)) {
     return '<button class="btn" onclick="advNext()">' + escapeHtml(A.next.replace('{name}', advName(c.n + 1))) + '</button>' +
       again + '<button class="btn-ghost" onclick="quitToMenu()">' + escapeHtml(A.toMap) + '</button>';
   }

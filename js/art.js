@@ -50,11 +50,13 @@ const ICON_ART = new Set([
   '🔥', '🚀', '🌋', '🌈', '🎓', '🧙', '🦍', '🦑', '🐲', '🛸'
 ]);
 // Остальные картинки — по имени, а не по эмодзи: соперники Приключения
-// (adv-01…adv-50), значки режимов (m-…), поясов подсказки (t-0…t-8) и бонусов (b-…)
+// (adv-01…), значки режимов (m-…), поясов подсказки (t-0…t-8) и бонусов (b-…).
+// Портретов соперников — сколько их уже нарисовано: миры выходят партиями
+const ADV_ART = 150;
 const NAMED_ART = ['m-solo', 'm-duel', 'm-adventure', 'm-run', 'm-online', 'm-play', 'm-friends', 'm-settings',
   't-0', 't-1', 't-2', 't-3', 't-4', 't-5', 't-6', 't-7', 't-8',
   'b-extra', 'b-fog', 'b-blind', 'b-rush', 'b-skip', 'b-gift', 'b-memory', 'b-token']
-  .concat(Array.from({ length: 50 }, (_, i) => 'adv-' + String(i + 1).padStart(2, '0')));
+  .concat(Array.from({ length: ADV_ART }, (_, i) => 'adv-' + String(i + 1).padStart(2, '0')));
 function isNamedArt(code) { return NAMED_ART.indexOf(code) >= 0; }
 
 function iconFile(code) {
