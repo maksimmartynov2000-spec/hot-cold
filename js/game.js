@@ -3700,15 +3700,18 @@ function botCandidates(moves, seat, flags, careless) {
   });
   // Названные числа — не загаданное: их видно в списке ходов
   seen.forEach(m => { const i = m.guess - RANGE_MIN; if (i >= 0 && i < cand.length) cand[i] = 0; });
-  // Знание из бонусов (рентген, половина) бот тоже использует
+  // Знание из бонусов (рентген, половина) и от правил Приключения («больше/
+  // меньше» — k.gt / k.lt) бот тоже использует
   const k = flags.know;
-  if (k && (k.parity !== undefined || k.half)) {
+  if (k && (k.parity !== undefined || k.half || k.gt !== undefined || k.lt !== undefined)) {
     const mid = halfMark();
     for (let i = 0; i < cand.length; i++) {
       const v = i + RANGE_MIN;
       if (k.parity !== undefined && Math.abs(v) % 2 !== k.parity) cand[i] = 0;
       if (k.half === 'low' && v > mid) cand[i] = 0;
       if (k.half === 'high' && v <= mid) cand[i] = 0;
+      if (k.gt !== undefined && v <= k.gt) cand[i] = 0;
+      if (k.lt !== undefined && v >= k.lt) cand[i] = 0;
     }
   }
   // Ответы честные, загаданное всегда среди возможных. На всякий случай

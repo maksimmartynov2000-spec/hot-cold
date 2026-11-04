@@ -1,0 +1,137 @@
+ПОРТРЕТЫ, ПАРТИЯ 1 — миры 6–15, 5 листов по 20 героев
+
+Как сделать каждый лист:
+1. Откройте Gemini, приложите картинку style-ref.png (образец стиля).
+2. Вставьте текст листа целиком — от «Match» до последней строки.
+3. Готовую картинку пришлите сюда. Нарежу и подключу сам.
+Если какой-то герой вышел плохо — пришлите как есть и скажите, кого переделать: дам подсказку на него одного.
+
+
+=============== ЛИСТ 1 из 5 — миры 6 и 7 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a translucent raspberry-red gummy bear with a shiny jelly body
+Row 1, column 2: a cupcake creature with pink frosting, a cherry on top and tiny arms
+Row 1, column 3: a pink poodle whose curly fur looks like cotton candy
+Row 1, column 4: a gingerbread man with a white icing smile and gumdrop buttons
+Row 1, column 5: a chubby hamster hugging a big pastel macaron
+Row 2, column 1: a baby hippo wearing a little layered birthday cake as a hat
+Row 2, column 2: a puppy wearing a pink sprinkled donut as a collar
+Row 2, column 3: a sheep with fluffy marshmallow-white wool and a candy bow
+Row 2, column 4: an ice cream cone creature with three colorful scoops and a happy face
+Row 2, column 5: a regal pink cat queen with a crown made of candies and a lollipop scepter, slightly bigger and grander than the others
+Row 3, column 1: a polar bear cub in a knitted blue hat with a pompom
+Row 3, column 2: an arctic fox with a fluffy white tail and a blue scarf
+Row 3, column 3: a walrus with big tusks and a bushy mustache, holding a small fishing rod
+Row 3, column 4: a narwhal with a long spiral horn, shown from the front
+Row 3, column 5: a snowy owl wearing fluffy earmuffs
+Row 4, column 1: a reindeer with antlers and a little golden bell on a red ribbon
+Row 4, column 2: a white ermine with a black tail tip and frosty sparkles
+Row 4, column 3: a puffin with a colorful striped beak and a tiny backpack
+Row 4, column 4: a husky puppy with blue eyes and snow goggles on its head
+Row 4, column 5: a big friendly white yeti with a crown of icicles, slightly bigger and grander than the others
+
+
+=============== ЛИСТ 2 из 5 — миры 8 и 9 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a camel with a striped saddle blanket and tassels
+Row 1, column 2: a fennec fox with huge ears
+Row 1, column 3: a meerkat standing tall holding tiny binoculars
+Row 1, column 4: a friendly orange scorpion wearing a tiny turban
+Row 1, column 5: a gecko wearing round sunglasses
+Row 2, column 1: an armadillo half curled up, with a shiny banded shell
+Row 2, column 2: a jerboa with long legs and a long tufted tail
+Row 2, column 3: a cactus character with a pink flower on top and a smiling face
+Row 2, column 4: a frilled lizard with its colorful neck frill spread open
+Row 2, column 5: a cute sphinx cat wearing a golden striped pharaoh headdress, slightly bigger and grander than the others
+Row 3, column 1: a cow with a flower behind its ear and a cowbell
+Row 3, column 2: a piglet in little rubber boots with a mud splash on its nose
+Row 3, column 3: a donkey in a straw hat, chewing a piece of straw
+Row 3, column 4: a rooster with a big red comb
+Row 3, column 5: a duck in yellow rain boots
+Row 4, column 1: a pony with a braided rainbow mane
+Row 4, column 2: a border collie with a red bandana
+Row 4, column 3: a turkey with a big colorful fan tail
+Row 4, column 4: a field mouse hugging a wedge of cheese
+Row 4, column 5: a friendly scarecrow with a patched straw hat and a little crow on its shoulder, slightly bigger and grander than the others
+
+
+=============== ЛИСТ 3 из 5 — миры 10 и 11 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a parrot wearing aviator goggles and a white scarf
+Row 1, column 2: a hummingbird holding a tiny flower
+Row 1, column 3: a pink flamingo wearing heart-shaped sunglasses
+Row 1, column 4: an eaglet wearing a leather aviator cap
+Row 1, column 5: a fluffy white cloud creature with rosy cheeks
+Row 2, column 1: a hot-air balloon character with a smiling face and a little basket
+Row 2, column 2: a swallow holding a kite string
+Row 2, column 3: a flying squirrel gliding with its arms spread, wearing goggles
+Row 2, column 4: a stork with a postman cap and a mailbag
+Row 2, column 5: a thunder cloud king with a lightning-bolt crown, slightly bigger and grander than the others
+Row 3, column 1: a honeybee with a tiny backpack
+Row 3, column 2: a butterfly with rainbow wings
+Row 3, column 3: a caterpillar with round glasses reading a tiny book
+Row 3, column 4: a snail with a daisy growing on top of its shell
+Row 3, column 5: a grasshopper playing a little violin
+Row 4, column 1: a dragonfly wearing aviator goggles
+Row 4, column 2: an ant lifting a big green leaf above its head
+Row 4, column 3: a round fluffy bumblebee with a flower crown
+Row 4, column 4: a mole with a watering can and gardening gloves
+Row 4, column 5: a queen bee with a golden crown and a honey-dipper scepter, slightly bigger and grander than the others
+
+
+=============== ЛИСТ 4 из 5 — миры 12 и 13 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a baby triceratops
+Row 1, column 2: a stegosaurus with colorful back plates
+Row 1, column 3: a pterodactyl wearing a leaf as a hat
+Row 1, column 4: a baby brachiosaurus with a long neck
+Row 1, column 5: an ankylosaurus with a club tail
+Row 2, column 1: a cute velociraptor wearing a bandana
+Row 2, column 2: a baby dinosaur hatching, with a piece of eggshell on its head
+Row 2, column 3: a parasaurolophus with a tall crest, playing a little horn
+Row 2, column 4: a plesiosaur peeking out of the water
+Row 2, column 5: a T-rex with a golden crown and tiny arms, slightly bigger and grander than the others
+Row 3, column 1: a seagull wearing a sailor cap
+Row 3, column 2: a pug with a pirate bandana and an eyepatch
+Row 3, column 3: a cute treasure chest with big eyes, full of pearls
+Row 3, column 4: a starfish with a sailor collar
+Row 3, column 5: a friendly rat in a striped sailor shirt with a whistle
+Row 4, column 1: a lobster holding a toy cutlass
+Row 4, column 2: a pelican with a rolled map in its beak
+Row 4, column 3: a ginger cat in a pirate tricorn hat
+Row 4, column 4: an iguana with a tiny toy cannon
+Row 4, column 5: a tiger pirate captain with a big feathered hat and a long coat, slightly bigger and grander than the others
+
+
+=============== ЛИСТ 5 из 5 — миры 14 и 15 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything friendly and funny. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a friendly little ghost holding a glowing lantern
+Row 1, column 2: a jack-o'-lantern pumpkin with a big happy smile
+Row 1, column 3: a black cat in a purple witch hat
+Row 1, column 4: a cute mummy wrapped in bandages with one big eye peeking out
+Row 1, column 5: a cute green stitched monster with small bolts on its head
+Row 2, column 1: a cute spider wearing a top hat
+Row 2, column 2: a raven wearing a tiny crown
+Row 2, column 3: a werewolf pup howling happily at a tiny moon
+Row 2, column 4: a bubbling witch's cauldron with a happy face
+Row 2, column 5: a cute vampire count with a high-collared cape and tiny fangs, slightly bigger and grander than the others
+Row 3, column 1: a frog prince with a tiny golden crown
+Row 3, column 2: a corgi wearing a tiara and a royal cape
+Row 3, column 3: a ferret jester in a hat with bells
+Row 3, column 4: a white swan ballerina with a tiny tutu
+Row 3, column 5: a peacock herald blowing a golden trumpet
+Row 4, column 1: a baby griffin
+Row 4, column 2: a beagle musketeer in a feathered hat
+Row 4, column 3: a living chess knight piece with a friendly face
+Row 4, column 4: a cute small troll with a mossy hat
+Row 4, column 5: a lion king with a golden crown and a royal red cape, slightly bigger and grander than the others

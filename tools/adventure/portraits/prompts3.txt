@@ -1,0 +1,149 @@
+ПОРТРЕТЫ, ПАРТИЯ 3 — миры 26–35, 5 листов по 20 героев
+
+Как сделать каждый лист (так же, как партию 2):
+1. Откройте Gemini, приложите ту же картинку-образец стиля, что и для партии 2 (style-ref).
+2. Вставьте текст листа целиком — от «Match» до последней строки.
+3. Готовую картинку пришлите сюда. Если Gemini дал два варианта — присылайте оба. Нарежу и подключу сам.
+Если какой-то герой вышел плохо — скажите, кого переделать: дам подсказку на него одного.
+
+Кто есть кто (ряды 1–2 — первый мир листа, ряды 3–4 — второй; 5-й в ряду 2 и 4 — босс):
+Лист 1. 26 · Болото: Ондатра Камышинка, Выпь Гудок, Мухоловка Хлоп, Головастик Юрк, Водомерка Скользяшка, Нутрия Плюх, Кикимора Тинка, Маримо Мшинка, Выхухоль Хоботок, 👑 Царь Водяной.
+        27 · Музыкальная долина: Соловей Трель, Рояль Клавиша, Гитара Бренчалка, Саксофон Джазик, Маракасы Ча-Ча, Арфа Звонка, Нотка Соль, Аккордеон Гармошка, Лирохвост Эхо, 👑 Маэстро Скрипичный Ключ.
+Лист 2. 28 · Горные вершины: Як Лохматик, Сурок Толстячок, Баран Завиток, Эдельвейс Снежинка, Сенбернар Бочонок, Шиншилла Пуховка, Галка Чернушка, Комок Лавинка, Кабинка Подъёмник, 👑 Король Барсов.
+        29 · Фабрика роботов: Робопёс Болтик, Пылесос Шуршун, Дрон Летунчик, Магнит Тянучка, Батарейка Заряд, Робо-рука Хваталка, Принтер Печатка, Жестянка Бряк, Моноколёсик Юзик, 👑 Король Мегабот.
+Лист 3. 30 · Мир мифов: Кентаврик Копытце, Цербер Тройняшка, Циклопик Одноглазик, Русалочка Волна, Фавн Дудочка, Джинн Чудик, Овен Руно, Лепрекон Клеверок, Кицунэ Девятихвостка, 👑 Король Минотавр.
+        31 · Осенний лес: Бурундук Полосатик, Дятел Стукалка, Кленовый лист Багрянец, Куница Шубка, Кабанчик Копуша, Сойка Трещотка, Каштанчик Блестяш, Скунс Пушистик, Опоссум Висюлька, 👑 Король Лось.
+Лист 4. 32 · Волшебная кухня: Чайник Кипятоша, Сковородка Шкворчик, Блинчик Масленик, Венчик Взбивайка, Тостер Тостик, Солонка Щепотка, Яичко Желток, Брокколи Кудряш, Пельмешек Защипыш, 👑 Королева Печка.
+        33 · Атлантида: Дельфин Свистик, Манта Парусок, Рыба-ёж Надуйка, Ракушка Шёпот, Каракатица Чернилка, Наутилус Спиралька, Ламантин Тихоня, Рыба-попугай Кораллик, Меч-рыба Шпага, 👑 Царь Нептун.
+Лист 5. 34 · Страна снов: Баку Сладкосон, Подушка Мягуша, Ночник Ночка, Полчок Дрёма, Оле Зонтик, Летучая мышка Ушанка, Ловец снов Паутинка, Тапочек Топ, Кот Баюн, 👑 Королева Луна.
+        35 · Кузница гномов: Гномик Молоточек, Факел Пламешка, Наковальня Звон, Вагонетка Тачка, Мехи Пыхтун, Самородок Крупинка, Подкова Счастливка, Шлем Викинг, Колокол Бом, 👑 Король Гномов.
+
+
+=============== ЛИСТ 1 из 5 — миры 26 и 27 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Each character is shown from the chest up (small creatures and objects whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a muskrat hugging a fluffy brown cattail
+Row 1, column 2: a bittern bird with streaky brown feathers, beak pointing up, puffing out its chest
+Row 1, column 3: a friendly Venus flytrap plant with soft rounded leaf-jaws and a big smile, no teeth
+Row 1, column 4: a round tadpole with a wiggly tail and tiny back legs just sprouting
+Row 1, column 5: a water strider bug with very long thin legs and a cheerful face
+Row 2, column 1: a nutria with long whiskers, orange buck teeth and wet shiny fur
+Row 2, column 2: a friendly little swamp sprite made of soft green moss, wearing a water-lily hat
+Row 2, column 3: a round fluffy green marimo moss ball with a happy face
+Row 2, column 4: a Russian desman with a long wiggly trunk-like nose and a flat tail
+Row 2, column 5: a friendly old swamp king with a long green beard of water weeds, a crown of reeds and a water-lily cape, slightly bigger and grander than the others
+Row 3, column 1: a small brown nightingale with its beak open, singing happily
+Row 3, column 2: a little black grand piano creature with a happy face above its keys
+Row 3, column 3: an acoustic guitar creature with a happy face and a colorful strap
+Row 3, column 4: a shiny golden saxophone creature with a cool smile
+Row 3, column 5: a pair of colorful maracas with happy faces, side by side
+Row 4, column 1: a golden harp creature with a friendly face
+Row 4, column 2: a round black music note creature with a happy face and little arms
+Row 4, column 3: a red accordion creature stretching its bellows with a big smile
+Row 4, column 4: a lyrebird with a long lyre-shaped tail fanned out behind it
+Row 4, column 5: a golden treble clef king with a crown and a conductor’s baton, slightly bigger and grander than the others
+
+
+=============== ЛИСТ 2 из 5 — миры 28 и 29 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Each character is shown from the chest up (small creatures and objects whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a shaggy baby yak with long fur and small horns
+Row 1, column 2: a chubby marmot standing up on its hind legs
+Row 1, column 3: a bighorn sheep lamb with big curly horns
+Row 1, column 4: an edelweiss flower creature with white fuzzy star-shaped petals
+Row 1, column 5: a St. Bernard puppy with a little wooden barrel on its collar
+Row 2, column 1: a fluffy grey chinchilla with big round ears
+Row 2, column 2: an alpine chough, a black bird with a yellow beak and red legs
+Row 2, column 3: a round snowball creature with a happy face and a tiny knitted hat
+Row 2, column 4: a little red cable car cabin with a happy face and a cable hook on top
+Row 2, column 5: a snow leopard king with a crown of ice crystals and a long fluffy tail, slightly bigger and grander than the others
+Row 3, column 1: a robot puppy with metal ears and a wagging spring tail
+Row 3, column 2: a round robot vacuum cleaner with big eyes on top and little brushes
+Row 3, column 3: a small quadcopter drone with four propellers and a happy screen face
+Row 3, column 4: a red-and-silver horseshoe magnet creature with a few paperclips stuck to its ends
+Row 3, column 5: a battery creature with a lightning bolt on its side
+Row 4, column 1: a friendly robot arm with a three-finger claw waving hello
+Row 4, column 2: a cute 3D printer robot with a happy face
+Row 4, column 3: a little robot made from a tin can with spring arms and a big smile
+Row 4, column 4: a small robot balancing on one wheel with its arms stretched out
+Row 4, column 5: a big friendly robot king with a golden crown, glowing buttons and a cape, slightly bigger and grander than the others
+
+
+=============== ЛИСТ 3 из 5 — миры 30 и 31 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Each character is shown from the chest up (small creatures and objects whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a centaur foal holding a toy bow with a suction-cup arrow
+Row 1, column 2: a three-headed puppy, all three heads smiling, each with a different colored collar
+Row 1, column 3: a little cyclops kid with one big sparkly eye, wearing a toga
+Row 1, column 4: a little mermaid girl with a turquoise tail and a starfish in her hair
+Row 1, column 5: a young faun with tiny horns and goat legs, playing a pan flute
+Row 2, column 1: a blue genie coming out of a golden magic lamp, with a little topknot
+Row 2, column 2: a ram with a shiny golden fleece
+Row 2, column 3: a leprechaun with a green hat, a red beard and a pot of gold coins
+Row 2, column 4: a white fox with nine fluffy tails fanned out
+Row 2, column 5: a friendly minotaur king with small horns, a golden crown and a ball of red thread, slightly bigger and grander than the others
+Row 3, column 1: a striped chipmunk with cheeks full of nuts
+Row 3, column 2: a woodpecker with a bright red cap
+Row 3, column 3: a red maple leaf creature with a happy face
+Row 3, column 4: a pine marten with a creamy bib and a bushy tail
+Row 3, column 5: a striped wild boar piglet with a curious snout
+Row 4, column 1: a jay bird with bright blue wing feathers and a crest
+Row 4, column 2: a shiny brown chestnut creature peeking out of its spiky green shell
+Row 4, column 3: a cute skunk with a big fluffy striped tail
+Row 4, column 4: an opossum hanging by its tail from a little twig
+Row 4, column 5: a majestic moose king with big antlers decorated with autumn leaves and a crown, slightly bigger and grander than the others
+
+
+=============== ЛИСТ 4 из 5 — миры 32 и 33 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Each character is shown from the chest up (small creatures and objects whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a round teapot creature with steam puffing from its spout
+Row 1, column 2: a frying pan creature with a happy face and a long handle
+Row 1, column 3: a stack of pancakes with a pat of butter on top and a happy face
+Row 1, column 4: a whisk creature with a happy face
+Row 1, column 5: a shiny toaster with two toast slices popping up
+Row 2, column 1: a salt shaker creature with a few salt crystals around it
+Row 2, column 2: an egg with a happy face and a tiny chef hat
+Row 2, column 3: a broccoli creature with a curly green top
+Row 2, column 4: a dumpling creature with pinched edges and rosy cheeks
+Row 2, column 5: a friendly white Russian brick stove queen with a warm glowing fire in its little oven, a golden crown and an embroidered towel, slightly bigger and grander than the others
+Row 3, column 1: a smiling bottlenose dolphin
+Row 3, column 2: a manta ray with wide wing-like fins
+Row 3, column 3: a puffed-up round pufferfish with soft spikes
+Row 3, column 4: a pink spiral seashell creature with a happy face
+Row 3, column 5: a cuttlefish with wavy fins and colorful stripes
+Row 4, column 1: a nautilus with a striped spiral shell and little tentacles
+Row 4, column 2: a gentle grey manatee with a round nose
+Row 4, column 3: a rainbow parrotfish with a beak-like mouth
+Row 4, column 4: a small swordfish with a long sword-like nose and a heroic smile
+Row 4, column 5: a friendly bearded sea king with a golden trident and a crown of coral, ancient Atlantis style, slightly bigger and grander than the others
+
+
+=============== ЛИСТ 5 из 5 — миры 34 и 35 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Each character is shown from the chest up (small creatures and objects whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a baku, a tapir-like dream eater with a short trunk, pastel colors and sleepy eyes
+Row 1, column 2: a fluffy pillow creature with a sleepy smile
+Row 1, column 3: a little night-light lamp with a star-patterned shade, glowing softly
+Row 1, column 4: a dormouse curled up asleep with its fluffy tail around it
+Row 1, column 5: a little dream-keeper man in a nightcap holding a colorful umbrella
+Row 2, column 1: a cute fluffy bat with big ears and open wings
+Row 2, column 2: a dreamcatcher with a round web and feathers, with a happy face
+Row 2, column 3: a fluffy slipper creature with a pompom
+Row 2, column 4: a big fluffy grey storyteller cat in a nightcap with a little golden chain necklace
+Row 2, column 5: a sleepy crescent moon queen with a crown of stars and a nightcap, slightly bigger and grander than the others
+Row 3, column 1: a young dwarf with a red cap, a braided beard and a little hammer
+Row 3, column 2: a torch creature with a friendly flame on top
+Row 3, column 3: an iron anvil creature with a happy face
+Row 3, column 4: a mine cart creature full of shiny gems
+Row 3, column 5: a pair of bellows creature puffing out air
+Row 4, column 1: a sparkling gold nugget creature
+Row 4, column 2: a shiny iron horseshoe with a happy face
+Row 4, column 3: a horned helmet creature with a happy face
+Row 4, column 4: a bronze bell creature with a happy face
+Row 4, column 5: a dwarf king with a long white braided beard, a golden crown and a big hammer, slightly bigger and grander than the others

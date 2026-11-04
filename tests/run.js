@@ -4103,8 +4103,9 @@ async function testAvatarColor(browser) {
     tiles: document.querySelectorAll('#avGrid .av-tile').length }));
   check('в выборе двадцать цветов четырьмя рядами, последние — градиенты',
     pick.colors.length === 20 && pick.rows === 4 && pick.colors.slice(-4).every(c => /^grad-/.test(c)), JSON.stringify(pick));
-  // Иконки за боссов — по одной на мир: 15 миров
-  check('и по-прежнему буква, 40 иконок и 15 боссов', pick.tiles === 56, String(pick.tiles));
+  // Иконки за боссов — по одной на мир
+  const nW = await page.evaluate(() => ADV_WORLDS.length);
+  check('и по-прежнему буква, 40 иконок и по иконке за босса каждого мира', pick.tiles === 41 + nW, pick.tiles + ' / ' + nW);
 
   await page.click('#avGrid .av-color[data-color="#a78bfa"]');
   await page.waitForTimeout(300);
@@ -4151,7 +4152,7 @@ async function testAvatarColor(browser) {
     tiles: document.querySelectorAll('#avGrid .av-tile').length,
     label: document.getElementById('tAvatarStart').textContent }));
   check('без миграции цвета выбора цвета нет, иконки на месте',
-    old.colors === 0 && old.tiles === 56 && old.label === 'Сменить иконку', JSON.stringify(old));
+    old.colors === 0 && old.tiles === 41 + await page.evaluate(() => ADV_WORLDS.length) && old.label === 'Сменить иконку', JSON.stringify(old));
   await done(page);
 }
 
@@ -5042,11 +5043,13 @@ async function testLeagues(browser) {
   await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   const grid = await page.evaluate(() => ({
+    worlds: ADV_WORLDS.length,
     icons: [...document.querySelectorAll('#avGrid .av-tile')].length,
     locked: [...document.querySelectorAll('#avGrid .av-tile.locked')].map(e => e.dataset.icon).join(''),
     colorsLocked: [...document.querySelectorAll('#avGrid .av-color.locked')].map(e => e.dataset.color).join(',') }));
   check('награды видны все, закрыты — лиги выше достигнутой',
-    grid.icons === 56 + 10 && grid.locked === '🦩🐳🦖🦜👑🌟🧙🦍🦑🐲🛸' + Array.from({ length: 10 }, (_, w) => 'adv-' + (w + 6) * 10).join('') &&
+    grid.icons === 41 + grid.worlds + 10 &&
+    grid.locked === '🦩🐳🦖🦜👑🌟🧙🦍🦑🐲🛸' + Array.from({ length: grid.worlds - 5 }, (_, w) => 'adv-' + (w + 6) * 10).join('') &&
     grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
     JSON.stringify(grid));
   const before = await page.evaluate(() => window.__profile.calls.length);
@@ -5075,7 +5078,7 @@ async function testLeagues(browser) {
   await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   check('сервер без лиг: сетка как раньше, лиги в профиле нет', await page.evaluate(() =>
-    document.querySelectorAll('#avGrid .av-tile').length === 56 &&
+    document.querySelectorAll('#avGrid .av-tile').length === 41 + ADV_WORLDS.length &&
     document.getElementById('pfLeague').classList.contains('hidden')));
   await done(page);
 }
@@ -6442,7 +6445,8 @@ async function testAdventure(browser) {
     bosses: [...document.querySelectorAll('#advMap .adv-tile.boss')].map(e => +e.dataset.n),
     art: document.querySelectorAll('#advMap .adv-tile svg.icon-art').length,
     diff: (document.querySelector('#advDiff .ad-btn.on') || {}).dataset.diff }));
-  check('карта: 15 миров, раскрыт первый — 10 соперников с портретами', map.shown && map.worlds === 15 && map.open === '0' &&
+  const nWorlds = await page.evaluate(() => ADV_WORLDS.length);
+  check('карта: все миры, раскрыт первый — 10 соперников с портретами', map.shown && map.worlds === nWorlds && nWorlds >= 15 && map.open === '0' &&
     map.tiles === 10 && map.art === 10, JSON.stringify(map));
   check('открыт только первый, остальные под замком', map.next.join() === '0' && map.locked === 9, JSON.stringify(map));
   // Раскрыть все миры: 150 соперников, десятый в каждом — босс
@@ -6453,7 +6457,7 @@ async function testAdventure(browser) {
     for (let w = 1; w < ADV_WORLDS.length; w++) advToggleWorld(w);
     return r;
   });
-  check('десятый в каждом мире — босс', all.tiles === 150 && all.bosses.join() === Array.from({ length: 15 }, (_, w) => w * 10 + 9).join(),
+  check('десятый в каждом мире — босс', all.tiles === nWorlds * 10 && all.bosses.join() === Array.from({ length: nWorlds }, (_, w) => w * 10 + 9).join(),
     JSON.stringify(all));
   check('сложность по умолчанию — нормальная', map.diff === 'normal');
 
@@ -6739,12 +6743,13 @@ async function testAdventureBonus(browser) {
     closeLogoutModal();
     return r;
   });
-  // 150 соперников, но портреты боссов миров 6–15 — иконки за боссов: среди соперников их нет
-  check('в выборе — 140 иконок Приключения, открыт только мир на ★★★', icons.n === 140 && icons.open.length === 10 &&
-    icons.open[0] === 'adv-01' && icons.open[9] === 'adv-10' && /10 из 140/.test(icons.head), JSON.stringify(icons).slice(0, 300));
+  // Портреты боссов с шестого мира — иконки за боссов: среди соперников их нет
+  const nChar = await page.evaluate(() => ADV_TOTAL - (ADV_WORLDS.length - 5));
+  check('в выборе — все иконки соперников, открыт только мир на ★★★', icons.n === nChar && icons.open.length === 10 &&
+    icons.open[0] === 'adv-01' && icons.open[9] === 'adv-10' && icons.head.includes('10 из ' + nChar), JSON.stringify(icons).slice(0, 300));
   check('закрытая иконка говорит, что нужно', /Джунгли/.test(icons.note) && /6 из 10/.test(icons.note), icons.note);
   check('на карте — цель мира: открыто или сколько из 10', /в профиле/.test(icons.goals[0]) && /6\/10/.test(icons.goals[1]), icons.goals.join(' | '));
-  check('в профиле — счётчик иконок', /иконок 10 из 140/.test(icons.pf), icons.pf);
+  check('в профиле — счётчик иконок', icons.pf.includes('иконок 10 из ' + nChar), icons.pf);
 
   // Профиль и друзья
   const pf = await page.evaluate(async () => {
@@ -6754,7 +6759,8 @@ async function testAdventureBonus(browser) {
     closeFriendAch();
     return { friend };
   });
-  check('у друга видны звёзды и миры Приключения', pf.friend === '🗺️ Приключение: ⭐ 21 из 450 · миров 1 из 15', pf.friend);
+  const nW2 = await page.evaluate(() => ADV_WORLDS.length);
+  check('у друга видны звёзды и миры Приключения', pf.friend === '🗺️ Приключение: ⭐ 21 из ' + nW2 * 30 + ' · миров 1 из ' + nW2, pf.friend);
 
   // Переводы
   for (const lang of ['en', 'fr', 'de']) {
@@ -7628,13 +7634,14 @@ async function testAdvWorlds(browser) {
              bossIcons: ADV_ICONS.slice(5, ADV_WORLDS.length).join(), last: ADV_ICONS[ADV_WORLD_MAX - 1], art: art.length,
              files: art.map(iconFile), rules: new Set(Array.from({ length: ADV_TOTAL }, (_, n) => advChar(n).rule)).size };
   });
-  check('15 миров, 150 соперников; у героев 51–150 правила — записи из известных «когда» и «что»',
-    data.worlds === 15 && data.total === 150 && data.heroes === 100 && !data.bad.length && data.rules === 150, JSON.stringify(data.bad));
+  check('миры с шестого: у героев правила — записи из известных «когда» и «что»',
+    data.worlds >= 15 && data.total === data.worlds * 10 && data.heroes >= data.total - 50 && data.heroes % 100 === 0 &&
+    !data.bad.length && data.rules === data.total, JSON.stringify([data.worlds, data.total, data.heroes, data.bad]));
   check('сочетания «когда → что» у новых героев не повторяются', data.combos === data.uniq, data.combos + ' / ' + data.uniq);
-  check('иконки за боссов новых миров — их портреты adv-60 … adv-150', data.bossIcons === Array.from({ length: 10 }, (_, w) => 'adv-' + (w + 6) * 10).join() &&
+  check('иконки за боссов новых миров — их портреты adv-60, adv-70 …', data.bossIcons === Array.from({ length: data.worlds - 5 }, (_, w) => 'adv-' + (w + 6) * 10).join() &&
     data.last === 'adv-500', data.bossIcons);
   const missing = data.files.filter(f => !fs.existsSync(path.join(__dirname, '..', f)));
-  check('портреты всех 150 соперников — в icons/', data.art === 150 && !missing.length, missing.slice(0, 5).join());
+  check('портреты всех соперников открытых миров — в icons/', data.art === data.total && !missing.length, missing.slice(0, 5).join());
 
   // Открытие по звёздам: мир 6 — после босса Космоса и 20 ⭐ в Космосе
   const gate = await page.evaluate(() => {
@@ -7702,26 +7709,29 @@ async function testAdvWorlds(browser) {
     r.back = document.querySelectorAll('#advMap .adv-tile').length;
     return r;
   });
-  check('карта: 15 миров, раскрыт только текущий (Пустыня), в нём следующий — 74-й', map.worlds === 15 && map.shown === '7' &&
+  check('карта: все миры строками, раскрыт только текущий (Пустыня), в нём следующий — 74-й', map.worlds === data.worlds && map.shown === '7' &&
     map.tiles === 10 && map.next === '73' && map.head === 'true', JSON.stringify(map));
   check('нажатие на мир раскрывает и сворачивает его', map.two === 20 && map.back === 10 && map.badge === '🍬' &&
     map.name === 'Сладкое королевство', JSON.stringify(map));
-  check('у закрытых миров — что их откроет; внизу — «Ещё 35 миров — скоро»', map.gates === 7 && map.soon === '🌍 Ещё 35 миров — скоро',
+  check('у закрытых миров — что их откроет; внизу — сколько миров ещё впереди', map.gates === data.worlds - 8 &&
+    map.soon === '🌍 Ещё ' + (50 - data.worlds) + ' миров — скоро',
     JSON.stringify(map));
 
   // Сила волнами: внутри волны растёт, первый мир волны — передышка
-  const wave = await page.evaluate(() => Array.from({ length: 10 }, (_, k) => advWaveBase(k + 5)));
-  check('волны: мир 6 и мир 11 — передышка, внутри волны сильнее', wave.every((v, k) => k % 5 === 0 || v > wave[k - 1]) &&
-    wave[5] < wave[4] && wave[5] > wave[0], wave.join(' '));
-  const bonus = await page.evaluate(() => Array.from({ length: 10 }, (_, k) => {
+  const wave = await page.evaluate(() => Array.from({ length: 45 }, (_, k) => advWaveBase(k + 5)));
+  check('волны: первый мир волны — передышка, внутри волны сильнее, от волны к волне сильнее',
+    wave.every((v, k) => k % 5 === 0 ? !k || (v < wave[k - 1] && v > wave[k - 5]) : v > wave[k - 1] || v === 0.9), wave.join(' '));
+  const bonus = await page.evaluate(() => Array.from({ length: ADV_WORLDS.length - 5 }, (_, k) => {
     advTest((k + 5) * 10);
     const r = { w: k + 6, has: bonusMode && D.bonuses.length >= 0, min: RANGE_MIN, max: RANGE_MAX,
                 field: !!bonusSet && bonusSet.good[0] === ADV_WORLDS[k + 5].bonus };
     quitToMenu();
     return r;
   }));
-  check('числа миров 6–15 и бонус мира в наборе', bonus.map(b => b.min + '..' + b.max).join() ===
-    '1..50,-50..50,1..150,1..200,1..300,1..100,1..150,1..200,1..300,1..500' && bonus.every(b => b.has && b.field), JSON.stringify(bonus));
+  const RANGES = ['1..50', '-50..50', '1..150', '1..200', '1..300', '1..100', '1..150', '1..200', '1..300', '1..500',
+                  '1..100', '1..150', '-150..150', '1..300', '1..500', '1..150', '1..200', '1..300', '-200..200', '1..500'];
+  check('числа миров с шестого и бонус мира в наборе', bonus.length >= 10 &&
+    bonus.map(b => b.min + '..' + b.max).join() === RANGES.slice(0, bonus.length).join() && bonus.every(b => b.has && b.field), JSON.stringify(bonus));
 
   // Правила новых героев — на настоящей доске
   const r = await page.evaluate(() => {
@@ -7787,6 +7797,37 @@ async function testAdvWorlds(browser) {
     JSON.stringify([r.start, r.first, r.tens]));
   check('Сахарная Королева: забирает ваш «⚡», четвёртым ходом раунда берёт себе', r.queen === '1:1 0:2 0:3', r.queen);
 
+  // Новые действия и манеры хода партии 2 — прямо на идущей партии
+  const acts = await page.evaluate(() => {
+    advTest(50, 25);
+    const R = advCtx(), out = {};
+    out.blind = [ADV_ACT.blindYou(R) !== false && D.blind[0], ADV_ACT.blindYou(R) === false, ADV_ACT.fogYou(R) === false].join();
+    advTest(50, 25); const R2 = advCtx(); R2.fog(0);
+    out.blindAfterFog = ADV_ACT.blindYou(R2) === false && !D.blind[0];
+    D.tokens = [2, 0]; ADV_ACT.swapTokens(R2); out.swap = D.tokens.join(':');
+    D.tokens = [1, 1]; out.swapEqual = ADV_ACT.swapTokens(R2) === false;
+    ADV_ACT.giveBoth(R2); out.both = D.tokens.join(':');
+    D.tokens = [1, 1]; ADV_ACT.burnMe(R2); out.burnMe = D.tokens.join(':') + ' ' + (ADV_ACT.burnMe(R2) === false);
+    ADV_ACT.knowDir(R2, { guess: 10 });
+    const cand = botCandidates([], 1, { know: D.know[1] }, false);
+    out.knowDir = D.know[1].gt === 10 && !cand.slice(0, 10 - RANGE_MIN + 1).some(Boolean) && cand[25 - RANGE_MIN] === 1;
+    // Растёт вверх: ближайшее возможное выше своего прошлого; любит семёрки: число с 7
+    advTest(50, 40); D.cur = 1; duelPlay(12); stopBot();
+    const c2 = botCandidates(history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex, p: h.p })), 1, {}, false);
+    const up = ADV_PICKS.up(advCtx(), c2, 30);
+    out.up = up > 12 && c2[up - RANGE_MIN] === 1 && ![...Array(up - 13).keys()].some(i => c2[13 + i - RANGE_MIN]);
+    const c3 = new Array(RANGE_MAX - RANGE_MIN + 1).fill(1);
+    out.lucky = String(ADV_PICKS.lucky(advCtx(), c3, 30));
+    quitToMenu();
+    return out;
+  });
+  check('новые действия: слепота (не вместе с туманом), обмен «⚡», всем по «⚡», свой «⚡» — роняет',
+    acts.blind === 'true,true,true' && acts.blindAfterFog && acts.swap === '0:2' && acts.swapEqual && acts.both === '2:2' &&
+    acts.burnMe === '1:0 true', JSON.stringify(acts));
+  check('сам узнаёт «больше/меньше» — и бот этим пользуется', acts.knowDir === true, JSON.stringify(acts));
+  check('манеры хода: «растёт вверх» — ближайшее возможное выше, «любит семёрки» — число с 7', acts.up === true && /7/.test(acts.lucky),
+    JSON.stringify(acts));
+
   // Загаданное число правила не трогают, и ни одно правило не роняет игру
   const same = await page.evaluate(() => {
     let ok = true;
@@ -7811,9 +7852,11 @@ async function testAdvWorlds(browser) {
       await advLoadPack(l);
       const P = ADV_PACKS[l], bad = [];
       if (!P) { out.push(l + ':нет'); continue; }
-      if (P.worlds.length !== ADV_WORLDS.length - 5 || P.worlds.some(w => !w)) bad.push('worlds');
-      if (P.names.length !== ADV_TOTAL - 50 || new Set(i18n[l].adv.names.concat(P.names)).size !== ADV_TOTAL) bad.push('names');
-      if (P.cast.length !== ADV_TOTAL - 50) bad.push('cast');
+      // Тексты могут быть готовы раньше портретов: героев в файле — не меньше, чем открыто
+      if (P.worlds.length < ADV_WORLDS.length - 5 || P.worlds.length * 10 !== P.names.length || P.worlds.some(w => !w)) bad.push('worlds');
+      if (P.names.length < ADV_TOTAL - 50 || P.names.length > ADV_HEROES.length ||
+          new Set(i18n[l].adv.names.concat(P.names)).size !== 50 + P.names.length) bad.push('names');
+      if (P.cast.length !== P.names.length) bad.push('cast');
       P.cast.forEach((c, i) => {
         const h = ADV_HEROES[i];
         const keys = h.boss ? ['a1t', 'a1d', 'a2t', 'a2d', 'hi', 'a1', 'a2', 'luck', 'worry', 'win', 'lose'] : ['t', 'd', 'hi', 'rule', 'luck', 'worry', 'win', 'lose'];
@@ -8545,7 +8588,8 @@ async function testProfile(browser) {
     return { n: tiles.length, first: tiles[0].textContent, firstLetter: tiles[0].classList.contains('letter'),
              sel: tiles.filter(t => t.classList.contains('sel')).map(t => t.dataset.icon) };
   });
-  check('в профиле буква, 40 иконок и 15 иконок боссов', grid.n === 56 && grid.firstLetter && grid.first === 'М',
+  const nWb = await page.evaluate(() => ADV_WORLDS.length);
+  check('в профиле буква, 40 иконок и иконки боссов', grid.n === 41 + nWb && grid.firstLetter && grid.first === 'М',
     JSON.stringify(grid));
   check('выбранная иконка отмечена', grid.sel.join() === '🦊', grid.sel.join());
 
@@ -8578,7 +8622,7 @@ async function testProfile(browser) {
     const tops = new Set([...document.querySelectorAll('#avGrid .av-tile')].map(t => Math.round(t.getBoundingClientRect().top)));
     return { w: r.width, h: r.height, rows: tops.size };
   });
-  check('клетки иконок крупные, по пять в ряд', tile.w >= 44 && tile.h >= 44 && tile.rows === Math.ceil(56 / 5),
+  check('клетки иконок крупные, по пять в ряд', tile.w >= 44 && tile.h >= 44 && tile.rows === Math.ceil((41 + nWb) / 5),
     JSON.stringify(tile));
 
   // Закрыл профиль с раскрытой сеткой — в следующий раз она снова свёрнута
