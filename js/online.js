@@ -436,7 +436,7 @@ function renderAvatarGrid() {
   // Иконки за серию заданий — когда сервер знает задания (миграция 041)
   const questIcons = progressInfo ? QUEST_ICONS.map(q => q.icon) : [];
   // Иконки боссов Приключения — когда база о них знает (миграция 049)
-  const advIcons = advServer ? ADV_ICONS : [];
+  const advIcons = advServer ? ADV_PICK_BOSSES : [];
   const passIcons = onlineInfo ? PASS_ICONS : [];
   ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons, ...advIcons, ...passIcons].forEach((icon, i) => {
     // Награды — отдельным блоком после обычных: их не выбирают, а заслуживают
@@ -464,9 +464,9 @@ function renderAvatarGrid() {
   if (progressInfo && progressInfo.stats && 'advGold' in progressInfo.stats) {
     const head = document.createElement('div');
     head.className = 'av-head';
-    head.textContent = t().adv.pickHead.replace('{i}', advGoldCount() * ADV_PER_WORLD).replace('{m}', ADV_CHAR_ICONS.length);
+    head.textContent = t().adv.pickHead.replace('{i}', advCharOpenCount()).replace('{m}', ADV_PICK_CHARS.length);
     grid.appendChild(head);
-    ADV_CHAR_ICONS.forEach(icon => {
+    ADV_PICK_CHARS.forEach(icon => {
       const b = document.createElement('button');
       const locked = !advCharIconOpen(icon);
       b.className = 'av-tile has-art adv-icon' + (icon === current ? ' sel' : '') + (locked ? ' locked' : '');
@@ -526,12 +526,13 @@ async function chooseAvatar(icon) {
   if (PASS_ICONS.indexOf(icon) >= 0 && !passOwns('icon', icon)) {
     return setNote('avNote', t().pass.locked.replace('{w}', passWhere('icon', icon)), true);
   }
-  if (ADV_CHAR_ICONS.indexOf(icon) >= 0 && !advCharIconOpen(icon)) {
+  // Иконка за босса — раньше иконок соперников: с шестого мира портрет босса
+  // есть в обоих списках, а открывает его победа над боссом
+  if (ADV_ICONS.indexOf(icon) >= 0) {
+    if (!advIconOpen(icon)) return setNote('avNote', t().adv.iconLocked.replace('{w}', advWorldName(ADV_ICONS.indexOf(icon))), true);
+  } else if (ADV_CHAR_ICONS.indexOf(icon) >= 0 && !advCharIconOpen(icon)) {
     const w = Math.floor(ADV_CHAR_ICONS.indexOf(icon) / ADV_PER_WORLD);
-    return setNote('avNote', t().adv.charLocked.replace('{w}', t().adv.worlds[w]).replace('{n}', advWorldThree(w)), true);
-  }
-  if (ADV_ICONS.indexOf(icon) >= 0 && !advIconOpen(icon)) {
-    return setNote('avNote', t().adv.iconLocked.replace('{w}', t().adv.worlds[ADV_ICONS.indexOf(icon)]), true);
+    return setNote('avNote', t().adv.charLocked.replace('{w}', advWorldName(w)).replace('{n}', advWorldThree(w)), true);
   }
   if (icon === TUTORIAL_ICON) {
     if (!tutorialIconOpen()) return setNote('avNote', t().tut.tutIconLocked, true);

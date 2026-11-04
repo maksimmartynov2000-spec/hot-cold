@@ -6714,6 +6714,8 @@ async function testAdventureBonus(browser) {
     localStorage.setItem('hc_advs_максим', '3333333333' + '3333332111');
     progressInfo = Object.assign({ quests: [], achievements: [] }, progressInfo || {}, { stats: { advGold: 1 } });
     openAdventure();
+    // Раскрыт только мир, где вы сейчас; второй раскрываем сами
+    advToggleWorld(1);
     const goals = [...document.querySelectorAll('#advMap .aw-goal')].map(e => e.textContent);
     openLogoutModal(); showAvatarPicker(true); renderAvatarGrid();
     const tiles = [...document.querySelectorAll('#avGrid .av-tile.adv-icon')];
@@ -6725,11 +6727,12 @@ async function testAdventureBonus(browser) {
     closeLogoutModal();
     return r;
   });
-  check('в выборе — 50 иконок Приключения, открыт только мир на ★★★', icons.n === 50 && icons.open.length === 10 &&
-    icons.open[0] === 'adv-01' && icons.open[9] === 'adv-10' && /10 из 50/.test(icons.head), JSON.stringify(icons).slice(0, 300));
+  // 150 соперников, но портреты боссов миров 6–15 — иконки за боссов: среди соперников их нет
+  check('в выборе — 140 иконок Приключения, открыт только мир на ★★★', icons.n === 140 && icons.open.length === 10 &&
+    icons.open[0] === 'adv-01' && icons.open[9] === 'adv-10' && /10 из 140/.test(icons.head), JSON.stringify(icons).slice(0, 300));
   check('закрытая иконка говорит, что нужно', /Джунгли/.test(icons.note) && /6 из 10/.test(icons.note), icons.note);
   check('на карте — цель мира: открыто или сколько из 10', /в профиле/.test(icons.goals[0]) && /6\/10/.test(icons.goals[1]), icons.goals.join(' | '));
-  check('в профиле — счётчик иконок', /иконок 10 из 50/.test(icons.pf), icons.pf);
+  check('в профиле — счётчик иконок', /иконок 10 из 140/.test(icons.pf), icons.pf);
 
   // Профиль и друзья
   const pf = await page.evaluate(async () => {
@@ -6739,7 +6742,7 @@ async function testAdventureBonus(browser) {
     closeFriendAch();
     return { friend };
   });
-  check('у друга видны звёзды и миры Приключения', pf.friend === '🗺️ Приключение: ⭐ 21 из 150 · миров 1 из 5', pf.friend);
+  check('у друга видны звёзды и миры Приключения', pf.friend === '🗺️ Приключение: ⭐ 21 из 450 · миров 1 из 15', pf.friend);
 
   // Переводы
   for (const lang of ['en', 'fr', 'de']) {
@@ -7375,7 +7378,7 @@ async function testAdvRules(browser) {
 
   // Карточка: правило — вместо прежней «особенности»; у босса — две способности
   const card = await page.evaluate(() => {
-    openAdventure(); openAdvCard(2);
+    openAdventure(); advToggleWorld(0); openAdvCard(2);
     const reg = document.getElementById('acQuirk').textContent;
     closeAdvCard(); openAdvCard(9);
     const boss = { text: document.getElementById('acQuirk').textContent, ab: document.querySelectorAll('#acQuirk .ac-ab').length };
@@ -7560,6 +7563,270 @@ async function testAdvRules(browser) {
     check(w + '×' + h + ': следующая карточка открывается с начала', r.top === 0, JSON.stringify(r));
     await ctx.close();
   }
+}
+
+// Приключение, миры 6–50: герои — записи в ADV_HEROES, тексты — отдельными
+// файлами на язык, новый мир открывают босс прошлого и 20 ⭐ в нём, сила — волнами
+async function testAdvWorlds(browser) {
+  const fs = require('fs'), path = require('path');
+  console.log('\nПриключение: новые миры');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => {
+    localStorage.setItem(advKey(), String(ADV_TOTAL));
+    localStorage.setItem(advStarsKey(), '3'.repeat(ADV_TOTAL));
+    BOT_SPEED = 1000;
+    window.__fires = [];
+    window.showRuleFlash = (c, title, text) => { window.__fires.push('F ' + title + ' | ' + text); };
+    window.botSayText = text => { window.__fires.push('S ' + text); };
+    window.advTest = (n, s) => {
+      quitToMenu(); closeAdvCard(); setAdvDiff('normal'); startAdventure(n); stopBot();
+      if (s !== undefined) secret = s;
+      D.bonuses = [];
+      window.__fires = [];
+    };
+    window.atTier = k => {
+      const f = FEEDBACK_META[k];
+      for (let d = f.min; d <= f.max; d++) for (const v of [secret - d, secret + d]) {
+        if (v >= RANGE_MIN && v <= RANGE_MAX && v !== secret && !history.some(h => h.guess === v)) return v;
+      }
+      return null;
+    };
+    window.play = (p, k) => { const v = atTier(k); if (v === null) return; stopBot(); D.cur = p; duelPlay(v); stopBot(); };
+    // Номер героя по его правилу — не зависит от порядка в таблице
+    window.heroBy = (when, act) => 50 + ADV_HEROES.findIndex(h => h.on && h.on[0] === when && h.on[1] === act);
+  });
+  // Тексты миров 6–15 — отдельным файлом: дождаться его
+  await page.evaluate(() => advLoadPack());
+
+  // Таблица героев: всё из известного, сочетания не повторяются, портреты на месте
+  const data = await page.evaluate(() => {
+    const key = on => on[0].split(':')[0];
+    const ok = on => Array.isArray(on) && on.length === 3 && (ADV_WHEN[key(on)] || ['start', 'youArm', 'meArm'].includes(key(on))) &&
+      !!ADV_ACT[on[1]] && (on[2] === 0 || on[2] === 1);
+    const combos = [], bad = [];
+    ADV_HEROES.forEach((h, i) => {
+      const ons = h.boss ? [h.a1, h.a2] : h.on ? [h.on] : [];
+      ons.forEach(on => { if (!ok(on)) bad.push(i + 51); else combos.push(on[0] + '>' + on[1]); });
+      if (h.pick) { if (!ADV_PICKS[h.pick]) bad.push(i + 51); combos.push('pick>' + h.pick); }
+      if (!ons.length && !h.pick) bad.push(i + 51);
+      if (!h.icon || (h.boss && !(h.a1icon && h.a2icon)) || !!h.boss !== (i % 10 === 9)) bad.push(i + 51);
+    });
+    const art = NAMED_ART.filter(c => /^adv-/.test(c));
+    return { worlds: ADV_WORLDS.length, total: ADV_TOTAL, heroes: ADV_HEROES.length, bad, combos: combos.length, uniq: new Set(combos).size,
+             bossIcons: ADV_ICONS.slice(5, ADV_WORLDS.length).join(), last: ADV_ICONS[ADV_WORLD_MAX - 1], art: art.length,
+             files: art.map(iconFile), rules: new Set(Array.from({ length: ADV_TOTAL }, (_, n) => advChar(n).rule)).size };
+  });
+  check('15 миров, 150 соперников; у героев 51–150 правила — записи из известных «когда» и «что»',
+    data.worlds === 15 && data.total === 150 && data.heroes === 100 && !data.bad.length && data.rules === 150, JSON.stringify(data.bad));
+  check('сочетания «когда → что» у новых героев не повторяются', data.combos === data.uniq, data.combos + ' / ' + data.uniq);
+  check('иконки за боссов новых миров — их портреты adv-60 … adv-150', data.bossIcons === Array.from({ length: 10 }, (_, w) => 'adv-' + (w + 6) * 10).join() &&
+    data.last === 'adv-500', data.bossIcons);
+  const missing = data.files.filter(f => !fs.existsSync(path.join(__dirname, '..', f)));
+  check('портреты всех 150 соперников — в icons/', data.art === 150 && !missing.length, missing.slice(0, 5).join());
+
+  // Открытие по звёздам: мир 6 — после босса Космоса и 20 ⭐ в Космосе
+  const gate = await page.evaluate(() => {
+    const set = (done, stars) => { localStorage.setItem(advKey(), String(done)); localStorage.setItem(advStarsKey(), stars); };
+    const space = k => '3'.repeat(40) + '2'.repeat(k) + '1'.repeat(10 - k);   // в Космосе 10 + k ⭐
+    const r = {};
+    set(50, space(9));
+    r.locked = !advWorldOpen(5) && !advOpenN(50) && advCurrentWorld() === 4;
+    r.text = advGateText(5);
+    openAdventure();
+    r.shown = (document.querySelector('#advMap .adv-world[data-w="5"] .aw-gate') || {}).textContent;
+    r.cur = [...document.querySelectorAll('#advMap .adv-world.shown')].map(e => +e.dataset.w).join();
+    openAdvCard(50);
+    r.btn = document.getElementById('acGo').textContent; r.dis = document.getElementById('acGo').disabled;
+    closeAdvCard();
+    set(50, space(10));
+    r.open = advWorldOpen(5) && advOpenN(50) && advCurrentWorld() === 5;
+    set(51, space(0));
+    r.started = advWorldOpen(5);
+    set(60, '3'.repeat(50) + '1'.repeat(10));
+    r.w7 = advGateText(6);
+    r.w7locked = !advWorldOpen(6);
+    set(40, '3'.repeat(40));
+    r.boss = advGateText(5);
+    return r;
+  });
+  check('мир 6 закрыт, пока в Космосе меньше 20 ⭐: на карте и в карточке сказано, сколько нужно',
+    gate.locked && gate.text === '🔒 Нужно 20 ⭐ в мире «Космос» — сейчас 19' && gate.shown === gate.text && gate.cur === '4' &&
+    gate.btn === gate.text && gate.dis, JSON.stringify(gate));
+  check('20 ⭐ — мир 6 открыт; начатый мир не закрывается', gate.open && gate.started, JSON.stringify(gate));
+  check('мир 7 ждёт 20 ⭐ в Сладком королевстве; без босса — «Откроется после мира»', gate.w7locked &&
+    /Сладкое королевство/.test(gate.w7) && /сейчас 10/.test(gate.w7) && gate.boss === '🔒 Откроется после мира «Космос»', JSON.stringify(gate));
+
+  // Итог боя с боссом Космоса без нужных звёзд: «Дальше» нет, сказано, чего не хватает
+  const after = await page.evaluate(() => {
+    localStorage.setItem(advKey(), '49');
+    localStorage.setItem(advStarsKey(), '3'.repeat(40) + '1'.repeat(9));
+    window.__adventure = 49; window.__advStars = '3'.repeat(40) + '1'.repeat(9);
+    setAdvDiff('easy'); startAdventure(49); stopBot();
+    D.cur = 0; duelPlay(secret); nextRound(); stopBot(); D.cur = 0; duelPlay(secret);
+    const r = { done: advDone(), lines: [...document.querySelectorAll('#resultBox .adv-line')].map(e => e.textContent).join(' | '),
+                btns: [...document.querySelectorAll('#resultBox .r-actions button')].map(b => b.textContent) };
+    quitToMenu(); setAdvDiff('normal');
+    return r;
+  });
+  check('Космос пройден на 10 ⭐: «Дальше» нет, сказано про 20 ⭐', after.done === 50 && /Нужно 20 ⭐/.test(after.lines) &&
+    !after.btns.some(b => /Дальше/.test(b)), JSON.stringify(after));
+
+  // Карта: 15 миров одной строкой, раскрыт мир, где вы сейчас; внизу — сколько ещё впереди
+  const map = await page.evaluate(() => {
+    localStorage.setItem(advKey(), '73'); localStorage.setItem(advStarsKey(), '3'.repeat(73));
+    openAdventure();
+    const r = { worlds: document.querySelectorAll('#advMap .adv-world').length,
+      shown: [...document.querySelectorAll('#advMap .adv-world.shown')].map(e => +e.dataset.w).join(),
+      tiles: document.querySelectorAll('#advMap .adv-tile').length,
+      next: [...document.querySelectorAll('#advMap .adv-tile.next')].map(e => +e.dataset.n).join(),
+      gates: document.querySelectorAll('#advMap .aw-gate').length,
+      soon: (document.querySelector('#advMap .adv-soon') || {}).textContent,
+      head: document.querySelector('#advMap .adv-world[data-w="7"] .aw-head').getAttribute('aria-expanded') };
+    advToggleWorld(5);
+    r.two = document.querySelectorAll('#advMap .adv-tile').length;
+    r.badge = (document.querySelector('#advMap .adv-tile[data-n="50"] .at-quirk') || {}).textContent;
+    r.name = document.querySelector('#advMap .adv-world[data-w="5"] .aw-name').textContent;
+    advToggleWorld(5);
+    r.back = document.querySelectorAll('#advMap .adv-tile').length;
+    return r;
+  });
+  check('карта: 15 миров, раскрыт только текущий (Пустыня), в нём следующий — 74-й', map.worlds === 15 && map.shown === '7' &&
+    map.tiles === 10 && map.next === '73' && map.head === 'true', JSON.stringify(map));
+  check('нажатие на мир раскрывает и сворачивает его', map.two === 20 && map.back === 10 && map.badge === '🍬' &&
+    map.name === 'Сладкое королевство', JSON.stringify(map));
+  check('у закрытых миров — что их откроет; внизу — «Ещё 35 миров — скоро»', map.gates === 7 && map.soon === '🌍 Ещё 35 миров — скоро',
+    JSON.stringify(map));
+
+  // Сила волнами: внутри волны растёт, первый мир волны — передышка
+  const wave = await page.evaluate(() => Array.from({ length: 10 }, (_, k) => advWaveBase(k + 5)));
+  check('волны: мир 6 и мир 11 — передышка, внутри волны сильнее', wave.every((v, k) => k % 5 === 0 || v > wave[k - 1]) &&
+    wave[5] < wave[4] && wave[5] > wave[0], wave.join(' '));
+  const bonus = await page.evaluate(() => Array.from({ length: 10 }, (_, k) => {
+    advTest((k + 5) * 10);
+    const r = { w: k + 6, has: bonusMode && D.bonuses.length >= 0, min: RANGE_MIN, max: RANGE_MAX,
+                field: !!bonusSet && bonusSet.good[0] === ADV_WORLDS[k + 5].bonus };
+    quitToMenu();
+    return r;
+  }));
+  check('числа миров 6–15 и бонус мира в наборе', bonus.map(b => b.min + '..' + b.max).join() ===
+    '1..50,-50..50,1..150,1..200,1..300,1..100,1..150,1..200,1..300,1..500' && bonus.every(b => b.has && b.field), JSON.stringify(bonus));
+
+  // Правила новых героев — на настоящей доске
+  const r = await page.evaluate(() => {
+    const out = {};
+    let n = heroBy('youCold', 'skipYou'); advTest(n, 25); play(0, 1);
+    out.sticky = { n, skip: D.skip[0], fire: __fires[0] || '' };
+    n = heroBy('meHot', 'giveYou'); advTest(n, 25); let t0 = D.tokens[0]; play(1, 5); const t1 = D.tokens[0]; play(0, 1); play(1, 6);
+    out.gift = { gain: t1 - t0, once: D.tokens[0] === t1 };
+    n = heroBy('youHot', 'double'); advTest(n, 25); play(0, 5); stopBot(); D.cur = 1; advBotTurn();
+    out.double = D.armed;
+    n = heroBy('youN:1', 'tellParity'); advTest(n, 24); play(0, 1);
+    out.parity = { know: D.know[0].parity, fire: __fires.join() };
+    n = heroBy('meHot', 'tellDir'); advTest(n, 10); play(1, 5);
+    const k = D.know[0];
+    out.dir = { gt: k.gt, lt: k.lt, fire: __fires.join(), ok: (k.gt !== undefined && 10 > k.gt) || (k.lt !== undefined && 10 < k.lt) };
+    n = heroBy('youArm', 'burn'); advTest(n, 70); D.cur = 0; t0 = D.tokens.join(':'); useToken(0);
+    out.burn = { before: t0, after: D.tokens.join(':'), armed: D.armed, fire: !!__fires.length };
+    n = heroBy('youArm', 'skipMe'); advTest(n, 50); D.cur = 0; useToken(0);
+    out.ant = { armed: D.armed, skip: D.skip[1] };
+    n = heroBy('youHot', 'steal'); advTest(n, 100); t0 = D.tokens.join(':'); play(0, 5);
+    out.steal = { before: t0, after: D.tokens.join(':') };
+    n = heroBy('youWarm', 'memoryYou'); advTest(n, 25); play(0, 3);
+    out.memory = D.shortMemory[0];
+    n = heroBy('youCloser', 'lavaYou'); advTest(n, 140); play(0, 1); play(1, 1); play(0, 3);
+    out.lava = D.autoLava[0];
+    n = heroBy('youWarm', 'hide'); advTest(n, 75); play(0, 3);
+    out.hide = hiddenRow(0, history[history.length - 1]);
+    n = heroBy('youColder', 'fogYou'); advTest(n, 48); play(0, 5); play(1, 1); play(0, 1);
+    out.fog = D.fog[0];
+    n = heroBy('meN:2', 'giveMe'); advTest(n, 25); t0 = D.tokens[1]; play(1, 1); play(0, 1); play(1, 1);
+    out.stash = D.tokens[1] - t0;
+    n = heroBy('meN:1', 'again'); advTest(n, 150); play(1, 1);
+    out.again = D.cur;
+    n = heroBy('youVeryHot', 'freezeYou'); advTest(n, 0); play(0, 6);
+    out.freeze = D.skip[0] && D.frozen[0];
+    n = heroBy('start', 'tellParity'); advTest(n, 100); advRoundStart();
+    out.start = D.know[0].parity;
+    n = 50 + ADV_HEROES.findIndex(h => h.first); advTest(n, 50);
+    out.first = D.cur;
+    n = 50 + ADV_HEROES.findIndex(h => h.pick === 'tens'); advTest(n, 77); D.cur = 1; botMove(); stopBot();
+    out.tens = history[0] && history[0].guess % 10;
+    // Сахарная Королева: теплеете — забирает ваш «⚡», четвёртым ходом раунда — «⚡» себе
+    advTest(59, 25); play(0, 1); play(1, 1); const q1 = D.tokens.join(':'); play(0, 3); const q2 = D.tokens.join(':'); play(1, 1);
+    out.queen = [q1, q2, D.tokens.join(':')].join(' ');
+    quitToMenu();
+    return out;
+  });
+  check('Мишка Мармелад: вам «Холодно» — пропускаете ход, правило — карточкой', r.sticky.skip && /^F 🍬 Липучка/.test(r.sticky.fire),
+    JSON.stringify(r.sticky));
+  check('Кекс Вишенка: ему «Горячо» — дарит «⚡», раз за раунд', r.gift.gain === 1 && r.gift.once, JSON.stringify(r.gift));
+  check('Пряник: вам «Горячо» — его следующий ход двойной', r.double === true);
+  check('Бегемотик: после вашего первого хода — чётность словами', r.parity.know === 0 && /[Чч]исло чётное/.test(r.parity.fire), JSON.stringify(r.parity));
+  check('Нарвал: ему «Горячо» — больше или меньше его числа, и это правда', r.dir.ok && /(больше|меньше) /.test(r.dir.fire), JSON.stringify(r.dir));
+  check('Стегозавр: взвели «⚡» — он лопнул: взвода нет, второй жетон цел', r.burn.before === '1:1' && r.burn.after === '0:1' &&
+    !r.burn.armed && r.burn.fire, JSON.stringify(r.burn));
+  check('Муравей: взвели «⚡» — он растерялся и пропускает ход, а ваш «⚡» работает', r.ant.armed && r.ant.skip, JSON.stringify(r.ant));
+  check('Мопс: вам «Горячо» — ваш «⚡» уходит к нему', r.steal.before === '1:1' && r.steal.after === '0:2', JSON.stringify(r.steal));
+  check('Рожок, Скорпиончик, Кактус, Песец: память, шальной бросок, скрытый ход, туман', r.memory && r.lava && r.hide && r.fog,
+    JSON.stringify([r.memory, r.lava, r.hide, r.fog]));
+  check('Хомяк: на втором ходу — «⚡» себе; Колибри: первым ходом ходит ещё раз', r.stash === 1 && r.again === 1, JSON.stringify([r.stash, r.again]));
+  check('Горностай: вам «Очень горячо» — заморозка', r.freeze === true);
+  check('Звезда: в начале раунда — чётность; Шахматный Конь ходит первым; Утка — по круглым', r.start === 0 && r.first === 1 && r.tens === 0,
+    JSON.stringify([r.start, r.first, r.tens]));
+  check('Сахарная Королева: забирает ваш «⚡», четвёртым ходом раунда берёт себе', r.queen === '1:1 0:2 0:3', r.queen);
+
+  // Загаданное число правила не трогают, и ни одно правило не роняет игру
+  const same = await page.evaluate(() => {
+    let ok = true;
+    for (let n = 50; n < ADV_TOTAL; n++) {
+      advTest(n, n % 2 ? 17 : 23);
+      const s = secret;
+      for (let i = 0; i < 8 && !D.roundOver; i++) {
+        if (i === 2 && D.tokens[0] > 0) { D.cur = 0; useToken(0); }
+        play(i % 2, [1, 5, 3, 0, 6, 2][i % 6]);
+        if (secret !== s) ok = false;
+      }
+    }
+    quitToMenu();
+    return ok;
+  });
+  check('герои 51–150: правила не меняют загаданное число', same);
+
+  // Тексты — отдельным файлом на язык: всё на месте, {k} — там, где правило говорит
+  const packs = await page.evaluate(async () => {
+    const out = [];
+    for (const l of ['ru', 'en', 'fr', 'de']) {
+      await advLoadPack(l);
+      const P = ADV_PACKS[l], bad = [];
+      if (!P) { out.push(l + ':нет'); continue; }
+      if (P.worlds.length !== ADV_WORLDS.length - 5 || P.worlds.some(w => !w)) bad.push('worlds');
+      if (P.names.length !== ADV_TOTAL - 50 || new Set(i18n[l].adv.names.concat(P.names)).size !== ADV_TOTAL) bad.push('names');
+      if (P.cast.length !== ADV_TOTAL - 50) bad.push('cast');
+      P.cast.forEach((c, i) => {
+        const h = ADV_HEROES[i];
+        const keys = h.boss ? ['a1t', 'a1d', 'a2t', 'a2d', 'hi', 'a1', 'a2', 'luck', 'worry', 'win', 'lose'] : ['t', 'd', 'hi', 'rule', 'luck', 'worry', 'win', 'lose'];
+        if (keys.some(k => typeof c[k] !== 'string' || !c[k].trim())) bad.push(i + 51);
+        (h.boss ? [['a1', h.a1], ['a2', h.a2]] : h.on ? [['rule', h.on]] : []).forEach(([k, on]) => {
+          if (/^tell/.test(on[1]) !== c[k].includes('{k}')) bad.push('{k}' + (i + 51));
+        });
+      });
+      out.push(l + ':' + (bad.join(',') || 'ok'));
+    }
+    return out;
+  });
+  check('тексты героев 51–150 на 4 языках — полные, имена не повторяются', packs.every(x => /:ok$/.test(x)), packs.join(' '));
+  await done(page);
+
+  // Файл текстов грузится, только когда нужен, и только на своём языке
+  const de = await newGame(browser, { user: 'Максим', lang: 'de' });
+  await de.evaluate(() => { localStorage.setItem(advKey(), '60'); localStorage.setItem(advStarsKey(), '3'.repeat(60)); openAdventure(); });
+  await de.waitForTimeout(600);
+  const lazy = await de.evaluate(() => ({ scripts: [...document.querySelectorAll('script[src*="adv-"]')].map(s => s.getAttribute('src')),
+    head: document.querySelector('#advMap .adv-world[data-w="5"] .aw-name').textContent,
+    card: (openAdvCard(50), document.getElementById('acName').textContent) }));
+  check('немецкий: подгружен только js/adv-de.js, мир 6 и герой — по-немецки', lazy.scripts.join() === 'js/adv-de.js' &&
+    lazy.head === 'Süßigkeitenreich' && lazy.card === 'Gummibär Wackel', JSON.stringify(lazy));
+  await done(de);
 }
 
 // Сложность Приключения — только «⚡ +1 ход»: видно на карте, в карточке
@@ -8677,6 +8944,7 @@ async function testKeyPage(browser) {
     await testScreensEverywhere(browser);
     await testAdvDifficulty(browser);
     await testAdvRules(browser);
+    await testAdvWorlds(browser);
   } catch (e) {
     // Упавший прогон раньше не печатал ничего: результаты копятся и выводятся
     // в конце, а до конца дело не доходило. Молчание легко принять за «без

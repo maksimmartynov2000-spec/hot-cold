@@ -439,6 +439,8 @@ function changeLanguage() {
   currentLang = document.getElementById('langSwitcher').value;
   localStorage.setItem('hc_lang', currentLang);
   applyTranslations();
+  // Тексты миров 6+ — своим файлом на язык: на карте — дождаться и перерисовать
+  if (typeof advLoadPack === 'function') advLoadPack().then(() => { if (screen === 'adventure') renderAdventure(); });
   // Язык меняют в окне профиля — оно должно сразу заговорить по-новому
   if (!document.getElementById('logoutModal').classList.contains('hidden')) fillProfile();
   updateAccountChip();
@@ -3287,9 +3289,12 @@ const ACH_LADDERS = [
   { key: 'rivals', icon: '⚔️', stat: 'rivals', tiers: [[1, 'rivals_1'], [3, 'rivals_3'], [10, 'rivals_10']] },
   { key: 'tutorial', icon: '🎓', stat: 'tutorial', tiers: [[1, 'tutorial']] },
   { key: 'advStars', icon: '⭐', stat: 'advStars',
-    tiers: [[10, 'adv_stars_10'], [30, 'adv_stars_30'], [60, 'adv_stars_60'], [100, 'adv_stars_100'], [150, 'adv_stars_150']] },
-  { key: 'advWorlds', icon: '🗺️', stat: 'advWorlds', tiers: [[1, 'adv_worlds_1'], [3, 'adv_worlds_3'], [5, 'adv_worlds_5']] },
-  { key: 'advGold', icon: '🎨', stat: 'advGold', tiers: [[1, 'adv_gold_1'], [3, 'adv_gold_3'], [5, 'adv_gold_5']] }
+    tiers: [[10, 'adv_stars_10'], [30, 'adv_stars_30'], [60, 'adv_stars_60'], [100, 'adv_stars_100'], [150, 'adv_stars_150'],
+            [300, 'adv_stars_300'], [600, 'adv_stars_600'], [1000, 'adv_stars_1000'], [1500, 'adv_stars_1500']] },
+  { key: 'advWorlds', icon: '🗺️', stat: 'advWorlds',
+    tiers: [[1, 'adv_worlds_1'], [3, 'adv_worlds_3'], [5, 'adv_worlds_5'], [10, 'adv_worlds_10'], [25, 'adv_worlds_25'], [50, 'adv_worlds_50']] },
+  { key: 'advGold', icon: '🎨', stat: 'advGold',
+    tiers: [[1, 'adv_gold_1'], [3, 'adv_gold_3'], [5, 'adv_gold_5'], [10, 'adv_gold_10'], [25, 'adv_gold_25'], [50, 'adv_gold_50']] }
 ];
 const ACHIEVEMENTS = ACH_LADDERS.reduce((all, l) => all.concat(l.tiers.map(([n, code]) => ({ code, ladder: l, n }))), []);
 
@@ -3566,8 +3571,8 @@ function fillProgressProfile() {
   const advStarsN = Math.max(advStarTotal(), (I && I.stats && I.stats.advStars) || 0);
   adv.classList.toggle('hidden', !runAuth() || (advStarsN === 0 && advDone() === 0));
   adv.textContent = t().adv.pfLine.replace('{s}', advStarsN).replace('{m}', ADV_TOTAL * 3)
-    .replace('{w}', Math.floor(advDone() / ADV_PER_WORLD)) +
-    t().adv.pfIcons.replace('{i}', advGoldCount() * ADV_PER_WORLD).replace('{m}', ADV_CHAR_ICONS.length);
+    .replace('{w}', Math.floor(advDone() / ADV_PER_WORLD)).replace('{t}', ADV_WORLDS.length) +
+    t().adv.pfIcons.replace('{i}', advCharOpenCount()).replace('{m}', ADV_PICK_CHARS.length);
   const fold = document.getElementById('pfAchFold');
   fold.classList.toggle('hidden', !on);
   if (!on) return;
@@ -3598,7 +3603,7 @@ async function openFriendAch(name) {
     const a = await friendRpc('friend_adventure', { p_friend: name });
     if (a && typeof a.total === 'number') {
       line.textContent = t().adv.pfLine.replace('{s}', a.total).replace('{m}', ADV_TOTAL * 3)
-        .replace('{w}', Math.floor((a.done || 0) / ADV_PER_WORLD));
+        .replace('{w}', Math.floor((a.done || 0) / ADV_PER_WORLD)).replace('{t}', ADV_WORLDS.length);
       line.classList.remove('hidden');
     }
   } catch (e) {}

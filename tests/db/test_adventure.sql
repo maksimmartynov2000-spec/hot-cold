@@ -11,7 +11,7 @@ do $$ begin
   if adventure_save('Лев', '1234', 7) <> 7 then raise exception 'ОШИБКА: 7 не записалось'; end if;
   if adventure_save('Лев', '1234', 3) <> 7 then raise exception 'ОШИБКА: прогресс уменьшился'; end if;
   if adventure_save('Лев', '1234', 0) <> 7 then raise exception 'ОШИБКА: чтение вернуло не то'; end if;
-  if adventure_save('Лев', '1234', 999) <> 50 then raise exception 'ОШИБКА: больше 50 не обрезано'; end if;
+  if adventure_save('Лев', '1234', 999) <> 500 then raise exception 'ОШИБКА: больше 500 не обрезано'; end if;
 end $$;
 \echo ok
 

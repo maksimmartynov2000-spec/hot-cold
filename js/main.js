@@ -78,3 +78,6 @@ checkPendingInvite();
 
 checkRemoteConfig();
 setInterval(checkRemoteConfig, 60000);
+// Тексты миров 6+ на своём языке — заранее, когда игра уже нарисовалась:
+// service worker положит их в кеш, и Приключение откроется и без сети
+setTimeout(() => advLoadPack(), 3000);
