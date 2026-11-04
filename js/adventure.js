@@ -940,9 +940,11 @@ function renderAdventure(scroll) {
     head.className = 'aw-head';
     head.setAttribute('aria-expanded', shown ? 'true' : 'false');
     head.onclick = () => advToggleWorld(w);
-    head.innerHTML = '<span class="aw-name">' + escapeHtml(advWorldName(w)) + '</span>' +
-      '<span class="aw-count">' + (open ? A.progress.replace('{n}', beaten) : '🔒') +
-        ' · <span class="aw-stars">⭐ ' + advWorldStars(w) + '/' + ADV_PER_WORLD * 3 + '</span></span>' +
+    // Имя сверху, счёт под ним: длинное имя не рвёт счёт на куски. У закрытого
+    // мира счёта нет (там всегда 0) — что его откроет, сказано строкой ниже
+    head.innerHTML = '<span class="aw-title"><span class="aw-name">' + escapeHtml(advWorldName(w)) + '</span>' +
+      (open ? '<span class="aw-count">' + A.progress.replace('{n}', beaten) +
+        ' · <span class="aw-stars">⭐ ' + advWorldStars(w) + '/' + ADV_PER_WORLD * 3 + '</span></span>' : '') + '</span>' +
       '<span class="aw-reward' + (advWorldDone(w) ? ' got' : '') + '" title="' + escapeHtml(A.reward) + '">' +
       (iconArt(W.boss, 0) || W.boss) + '</span>' +
       '<span class="aw-fold">' + (shown ? '▾' : '▸') + '</span>';

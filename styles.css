@@ -2810,6 +2810,11 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
 .adv-world.locked .aw-head, .adv-world.locked .aw-grid { opacity: 0.6; }
 .aw-gate { margin-top: 8px; font-size: 13px; font-weight: 800; color: var(--muted); line-height: 1.35; }
 .adv-world.shown .aw-gate { margin: 0 0 10px; }
-.adv-world:not(.shown) { contain-intrinsic-size: auto 64px; }
+.aw-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.aw-title .aw-count { margin-left: 0; font-size: 13px; }
+.aw-stars { white-space: nowrap; }
+.adv-world:not(.shown) { contain-intrinsic-size: auto 72px; }
+/* iPad набок — миры в две колонки, «ещё N миров» — во всю ширину */
+#advMap .adv-soon { grid-column: 1 / -1; }
 .adv-soon { margin: 4px 0 8px; padding: 12px; border-radius: 18px; text-align: center; font-weight: 800; color: var(--muted);
   border: 2px dashed rgb(var(--ink) / 0.15); }
