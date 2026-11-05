@@ -29,7 +29,7 @@ do $$
 declare mid bigint;
 begin
   delete from friend_chat; delete from friend_chat_read; delete from friendships;
-  delete from matches; delete from rivalry; delete from push_outbox;
+  delete from matches; delete from push_outbox;
   delete from students where username in ('Ян', 'Ася', 'Юля', 'Яна', 'Ян2', 'Ярослав');
   update students set created_at = now() - interval '2 hours';
   perform register_student('Ян', '111111', 'год рождения');
@@ -39,12 +39,9 @@ begin
   perform send_friend_phrase('Ян', '111111', 'Ася', 'play');
   perform send_friend_phrase('Ася', '222222', 'Ян', 'gg');
   perform friend_thread('Ася', '222222', 'Ян');   -- Ася прочитала переписку
-  -- «Ян» по алфавиту после «Ася»: в парах по алфавиту он стоит вторым
-  insert into rivalry(a, b, winner, streak) values ('Ася', 'Ян', 'Ян', 3);
   insert into runs(username, score, rounds) values ('Ян', 120, 4);
   insert into push_outbox(username, kind, who) values ('Ася', 'talk', 'Ян');
-  insert into elo_ratings(username, mode, elo, games) values ('Ян', 0, 1100, 5)
-    on conflict do nothing;
+  perform wallet_add('Ян', 30, 1, 'test', 'test:rename');
   insert into matches(p0, p1, range_min, range_max, secret, status, ranked)
   values ('Ян', 'Ася', 1, 100, 50, 'finished', false) returning id into mid;
 end $$;
@@ -157,14 +154,11 @@ begin
   th := friend_thread('Ася', '222222', 'Абвгд');
   if jsonb_array_length(th->'messages') <> 2 then raise exception 'ОШИБКА: переписка потерялась'; end if;
   if (th->'messages'->0->>'code') is distinct from 'play' then raise exception 'ОШИБКА: порядок фраз'; end if;
-  if (select count(*) from rivalry where a = 'Абвгд' and b = 'Ася' and winner = 'Абвгд' and streak = 3) <> 1 then
-    raise exception 'ОШИБКА: лесенка против накрутки не переехала';
-  end if;
   if (select count(*) from runs where username = 'Абвгд' and score = 120) <> 1 then
     raise exception 'ОШИБКА: результат испытания остался под старым именем';
   end if;
-  if (select elo from elo_ratings where username = 'Абвгд' and mode = 0) is distinct from 1100 then
-    raise exception 'ОШИБКА: рейтинг не переехал';
+  if (select coins from wallet where username = 'Абвгд') is distinct from 30 then
+    raise exception 'ОШИБКА: кошелёк не переехал';
   end if;
   if exists (select 1 from push_outbox where username = 'Ася' and who is distinct from 'Абвгд') then
     raise exception 'ОШИБКА: уведомление подписано старым именем';
@@ -319,7 +313,7 @@ end $$;
 \echo === уборка
 do $$ begin
   delete from friend_chat; delete from friend_chat_read; delete from friendships;
-  delete from matches; delete from rivalry; delete from push_outbox;
+  delete from matches; delete from push_outbox;
   delete from runs where username in ('Ян', 'Ян2', 'Абвгд');
   delete from students where username in ('Ян', 'Ася', 'Юля', 'Яна', 'Ян2', 'Ярослав', 'Абвгд', 'ян');
   delete from students where username like '#%';

@@ -127,25 +127,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 5. ход бота размечается так же
-do $$
-declare mid bigint; r jsonb;
-begin
-  insert into matches(p0, p1, ranked, ranked_mode, status, range_min, range_max, bot_seat, bot_level, starter, wins_needed)
-  values ('Лев', '@bot:owl', true, 0, 'active', 1, 100, 1, 0.9, 1, 1) returning matches.id into mid;
-  perform start_match_round(mid);
-  update matches set fog = array[false, true], turn_deadline = now() - interval '20 seconds' where matches.id = mid;
-  perform bot_act(mid);
-  update matches set status = 'finished', match_over = true where matches.id = mid;
-  r := match_review('Лев', '1234', mid);
-  if jsonb_array_length(r->'moves') <> 1 or (r->'moves'->0->>'seat')::int <> 1
-     or not (r->'moves'->0->>'limited')::boolean then
-    raise exception 'ОШИБКА: ход бота под туманом %', r->'moves';
-  end if;
-end $$;
-\echo ok
-
-\echo === 6. anon смотрит разбор через функцию, но таблицу ходов напрямую не читает
+\echo === 5. anon смотрит разбор через функцию, но таблицу ходов напрямую не читает
 set local role anon;
 do $$
 declare n int := 0;

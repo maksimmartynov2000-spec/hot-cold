@@ -5,7 +5,7 @@
 \echo === подготовка: Лев и Кира друзья, Максим сам по себе
 do $$ begin
   delete from friend_chat; delete from friend_chat_read;
-  delete from matches; delete from rivalry;
+  delete from matches;
   update students set created_at = now() - interval '2 hours';
   if friend_status('Лев','Кира') is distinct from 'friend' then
     perform send_friend_request('Лев','1234','Кира');
@@ -130,75 +130,15 @@ begin
 end $$;
 \echo ok
 
-\echo === 6. вызов друга на рейтинг идёт по правилам режима
-do $$
-declare mid bigint; m matches; r record;
-begin
-  delete from matches;
-  mid := challenge_friend_ranked('Лев','1234','Кира', 3);
-  select * into m from matches where id = mid;
-  select * into r from ranked_rules(3);
-  if m.status is distinct from 'invited' then raise exception 'ОШИБКА: начался без согласия'; end if;
-  if not m.ranked or m.ranked_mode is distinct from 3 then
-    raise exception 'ОШИБКА: матч не рейтинговый или не тот режим';
-  end if;
-  if (m.range_min, m.range_max, m.frost, m.bonuses_on)
-     is distinct from (r.range_min, r.range_max, r.frost, r.bonuses) then
-    raise exception 'ОШИБКА: условия разъехались с режимом';
-  end if;
-  if m.wins_needed is distinct from 3 then raise exception 'ОШИБКА: не три победы'; end if;
-  if respond_challenge('Кира','4321', mid, true) is distinct from 'active' then
-    raise exception 'ОШИБКА: вызов не принимается';
-  end if;
-end $$;
-\echo ok
-
-\echo === 7. рейтинг за игру с другом начисляется, но по лесенке
-do $$
-declare mid bigint; m matches; lev int;
-begin
-  delete from matches; delete from elo_ratings; delete from rivalry;
-  mid := challenge_friend_ranked('Лев','1234','Кира', 0);
-  perform respond_challenge('Кира','4321', mid, true);
-  select * into m from matches where id = mid;
-  update matches set wins[match_seat(m,'Лев') + 1] = 2, cur = match_seat(m, 'Лев'),
-      turn_deadline = now() + interval '1 minute' where id = mid;
-  select * into m from matches where id = mid;
-  perform match_guess('Лев','1234', mid, m.secret);
-  select elo into lev from elo_ratings where username = 'Лев' and mode = 0;
-  if lev is distinct from 1020 then raise exception 'ОШИБКА: первая победа дала %', lev; end if;
-  if (select streak from rivalry) is distinct from 1 then
-    raise exception 'ОШИБКА: серия не посчитана';
-  end if;
-end $$;
-\echo ok
-
-\echo === 8. на рейтинг зовут только друга и только в существующий режим
+\echo === 6. на рейтинг друга не позвать: рейтинга нет (миграция 062)
 do $$ begin
-  delete from matches;
-  begin
-    perform challenge_friend_ranked('Лев','1234','Максим', 0);
-    raise exception 'ОШИБКА: позвал не друга';
-  exception when others then
-    if sqlerrm is distinct from 'not_a_friend' then raise; end if;
-  end;
-  begin
-    perform challenge_friend_ranked('Лев','1234','Кира', 9);
-    raise exception 'ОШИБКА: принял несуществующий режим';
-  exception when others then
-    if sqlerrm is distinct from 'bad_mode' then raise; end if;
-  end;
-  perform challenge_friend_ranked('Лев','1234','Кира', 0);
-  begin
-    perform challenge_friend_ranked('Лев','1234','Кира', 1);
-    raise exception 'ОШИБКА: создалось два вызова разом';
-  exception when others then
-    if sqlerrm is distinct from 'match_already_live' then raise; end if;
-  end;
+  if exists (select 1 from pg_proc where proname = 'challenge_friend_ranked') then
+    raise exception 'ОШИБКА: вызов на рейтинг остался';
+  end if;
 end $$;
 \echo ok
 
-\echo === 9. удаление аккаунта уносит переписку
+\echo === 7. удаление аккаунта уносит переписку
 do $$
 declare gone text; n int;
 begin
@@ -221,7 +161,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 10. фразы переводятся кодом, а не текстом
+\echo === 8. фразы переводятся кодом, а не текстом
 do $$
 declare codes text[];
 begin
@@ -238,7 +178,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 11. anon не читает чужую переписку напрямую
+\echo === 9. anon не читает чужую переписку напрямую
 begin;
 set local role anon;
 do $$ begin
@@ -262,7 +202,7 @@ rollback;
 \echo === уборка
 do $$ begin
   delete from friend_chat; delete from friend_chat_read;
-  delete from matches; delete from elo_ratings; delete from rivalry;
+  delete from matches;
   delete from students where username like '#%';
 end $$;
 \echo ok

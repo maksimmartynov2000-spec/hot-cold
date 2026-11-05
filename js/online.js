@@ -1,5 +1,5 @@
-// Всё, что идёт через Supabase: аккаунт и профиль, друзья и приглашения, онлайн-
-// партии и рейтинг, задания и достижения, сигналы Realtime, переписка,
+// Всё, что идёт через Supabase: аккаунт и профиль, друзья и приглашения,
+// партии с друзьями, задания и достижения, сигналы Realtime, переписка,
 // уведомления, Испытание. Здесь же обучение и шторка «Передайте телефон»:
 // они стояли в этом месте исходного файла, а порядок объявлений не меняли.
 
@@ -98,7 +98,7 @@ async function syncProfile() {
 }
 
 // Чип с именем ученика живёт рядом с переключателем языка и показывается
-// только в хабе режима на рейтинг — во время самой игры он лишний и легко нажать случайно
+// только в хабе Испытания — во время самой игры он лишний и легко нажать случайно
 // Кружок с буквой: первая буква имени и цвет, который из имени же и
 // считается — у каждого свой и не меняется от входа к входу. Array.from, а
 // не [0]: имя может начинаться с эмодзи, и половинка суррогатной пары
@@ -233,7 +233,7 @@ function updateAccountChip() {
   // Профиль — вкладка нижнего меню. Без аккаунта она же — настройки: язык,
   // тема и звук должны быть под рукой и у того, кто ещё не вошёл.
   // Друзья — соседняя вкладка, видна и без аккаунта: иначе про друзей никто
-  // не узнает, пока случайно не зайдёт в онлайн. Нажатие приведёт ко входу
+  // не узнает, пока случайно не зайдёт к друзьям. Нажатие приведёт ко входу
   const box = document.getElementById('accountFace');
   box.classList.toggle('guest', !auth);
   const face = document.getElementById('accountChipName');
@@ -272,11 +272,9 @@ function fillProfile() {
   const L = t();
   const face = document.getElementById('pfAvatar');
   face.classList.toggle('guest', !auth);
-  // Рамка кружка — цвета лиги: бронза, серебро, золото, платина, алмаз,
-  // легенда. Ещё не играл на звёзды — фирменная, золотая с оранжевым
-  const FRAMES = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'legend'];
-  face.dataset.frame = auth ? ((typeof onlineInfo !== 'undefined' && onlineInfo && onlineInfo.frame) ||
-    (ladderInfo ? FRAMES[ladderPos(ladderInfo.stars).league] : 'base')) : '';
+  // Рамка кружка — своя (с пути, из магазина, рамка лиги, полученная раньше)
+  // или фирменная, золотая с оранжевым
+  face.dataset.frame = auth ? ((typeof onlineInfo !== 'undefined' && onlineInfo && onlineInfo.frame) || 'base') : '';
   const ttl = document.getElementById('pfTitle');
   const myTitle = auth && typeof onlineInfo !== 'undefined' && onlineInfo && onlineInfo.title;
   ttl.textContent = myTitle ? t().pass.titles[myTitle] : '';
@@ -296,21 +294,6 @@ function fillProfile() {
   const warn = document.getElementById('pfPinShort');
   warn.textContent = short ? L.run.pinShort : '';
   warn.classList.toggle('hidden', !short);
-  const lg = document.getElementById('pfLeague');
-  lg.classList.toggle('hidden', !(auth && ladderInfo));
-  if (auth && ladderInfo) {
-    lg.textContent = leagueLabel(ladderInfo.stars) +
-      (ladderInfo.stars < 150 ? ' ' + starsLine(ladderInfo.stars) : '');
-    // Значки прошлых сезонов: лучшая лига и месяц
-    const badges = (ladderInfo.badges || []).map(b =>
-      LEAGUE_ICONS[b.league] + ' ' + String(b.season).slice(5) + '.' + String(b.season).slice(0, 4));
-    if (badges.length) {
-      const row = document.createElement('span');
-      row.className = 'pf-badges';
-      row.textContent = L.run.lgSeasons + ': ' + badges.join('  ');
-      lg.appendChild(row);
-    }
-  }
   fillProgressProfile();
   document.getElementById('pfAccount').classList.toggle('hidden', !auth);
   document.getElementById('pfLogout').classList.toggle('hidden', !auth);
@@ -374,9 +357,6 @@ function openLogoutModal() {
     syncProfile().then(() => {
       if (!document.getElementById('logoutModal').classList.contains('hidden')) fillProfile();
     });
-    loadLadder().then(() => {
-      if (!document.getElementById('logoutModal').classList.contains('hidden')) fillProfile();
-    });
     loadProgress().then(() => {
       if (!document.getElementById('logoutModal').classList.contains('hidden')) fillProfile();
     });
@@ -412,14 +392,14 @@ function renderAvatarGrid() {
   grid.innerHTML = '';
   // Сверху — цвета фона, два ряда по пять; ниже — буква и животные уже на
   // выбранном цвете: сразу видно, как это будет выглядеть
-  // Награды за лиги — только когда сервер знает лиги
-  const rewardsOf = kind => ladderInfo ? LEAGUE_REWARDS.filter(r => r.kind === kind).map(r => r.value) : [];
+  // Награды лиг — только полученные: рейтинга больше нет (миграция 062), а
+  // заработанное осталось в коллекции
+  const rewardsOf = kind => LEAGUE_REWARDS.filter(r => r.kind === kind && passOwns(kind, r.value)).map(r => r.value);
   if (colorsSupported()) {
-    AVATAR_BG.concat(rewardsOf('color')).concat(onlineInfo ? PASS_COLORS : []).forEach(color => {
+    AVATAR_BG.concat(rewardsOf('color')).concat(onlineInfo ? PASS_COLORS : []).concat(shopOwnedCodes('color')).forEach(color => {
       const c = document.createElement('button');
-      const locked = PASS_COLORS.indexOf(color) >= 0 ? !passOwns('color', color)
-        : rewardLeague('color', color) > 0 && !rewardOpen('color', color);
-      c.className = 'av-color' + (color === bg ? ' sel' : '') + (locked ? ' locked' : '');
+      const locked = PASS_COLORS.indexOf(color) >= 0 && !passOwns('color', color);
+      c.className = 'av-color' + (color === bg ? ' sel' : '') + (locked ? ' locked' : '') + (isShinyBg(color) ? ' shine' : '');
       c.dataset.color = color;
       c.style.background = avatarBgCss(color);
       c.setAttribute('aria-label', color);
@@ -438,7 +418,8 @@ function renderAvatarGrid() {
   // Иконки боссов Приключения — когда база о них знает (миграция 049)
   const advIcons = advServer ? ADV_PICK_BOSSES : [];
   const passIcons = onlineInfo ? PASS_ICONS : [];
-  ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons, ...advIcons, ...passIcons].forEach((icon, i) => {
+  const shopIcons = shopOwnedCodes('icon');
+  ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons, ...advIcons, ...passIcons, ...shopIcons].forEach((icon, i) => {
     // Награды — отдельным блоком после обычных: их не выбирают, а заслуживают
     if (i === AVATAR_CHOICES.length + 1) {
       const sep = document.createElement('div');
@@ -449,8 +430,7 @@ function renderAvatarGrid() {
     const locked = icon === TUTORIAL_ICON ? !tutorialIconOpen()
       : questIconDays(icon) ? !questIconOpen(icon)
       : ADV_ICONS.indexOf(icon) >= 0 ? !advIconOpen(icon)
-      : PASS_ICONS.indexOf(icon) >= 0 ? !passOwns('icon', icon)
-      : rewardLeague('icon', icon) > 0 && !rewardOpen('icon', icon);
+      : PASS_ICONS.indexOf(icon) >= 0 && !passOwns('icon', icon);
     b.className = 'av-tile' + (icon ? '' : ' letter') + (icon === current ? ' sel' : '') + (locked ? ' locked' : '');
     b.dataset.icon = icon;
     const art = icon ? iconArt(icon, 0) : '';
@@ -460,6 +440,16 @@ function renderAvatarGrid() {
     b.onclick = () => chooseAvatar(icon);
     grid.appendChild(b);
   });
+  // Ещё иконки и фоны — в магазине (миграция 061): сразу под своими, до сотен
+  // портретов Приключения, иначе до ссылки не долистать
+  if (onlineInfo) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn-ghost av-shop';
+    b.textContent = t().shop.more;
+    b.onclick = () => openShop();
+    grid.appendChild(b);
+  }
   // Из Приключения: рисунки соперников, по мирам. Когда база их знает (миграция 052)
   if (progressInfo && progressInfo.stats && 'advGold' in progressInfo.stats) {
     const head = document.createElement('div');
@@ -479,17 +469,18 @@ function renderAvatarGrid() {
   }
 }
 
-// Цвет виден сразу; сетка не сворачивается — после цвета часто выбирают и
-// животное. Сервер не принял — возвращаем прежний
-// Закрытая награда: говорим, в какой лиге она откроется
+// Награда лиги, которой нет в коллекции: рейтинга больше нет (миграция 062),
+// получить её нельзя — сетка таких и не показывает
 function lockedNote(kind, value) {
-  if (!rewardLeague(kind, value) || rewardOpen(kind, value)) return false;
-  setNote('avNote', t().run.lgLocked.replace('{l}', t().leagues[rewardLeague(kind, value)]), true);
+  if (!LEAGUE_REWARDS.some(r => r.kind === kind && r.value === value) || passOwns(kind, value)) return false;
+  setNote('avNote', t().pass.locked.replace('{w}', t().pass.whereLeague), true);
   return true;
 }
 
+// Цвет виден сразу; сетка не сворачивается — после цвета часто выбирают и
+// животное. Сервер не принял — возвращаем прежний
 async function chooseColor(color) {
-  if (PASS_COLORS.indexOf(color) >= 0 && !passOwns('color', color)) {
+  if ((PASS_COLORS.indexOf(color) >= 0 || isShopItem('color', color)) && !passOwns('color', color)) {
     return setNote('avNote', t().pass.locked.replace('{w}', passWhere('color', color)), true);
   }
   if (lockedNote('color', color)) return;
@@ -523,7 +514,7 @@ async function chooseAvatar(icon) {
   if (questIconDays(icon) && !questIconOpen(icon)) {
     return setNote('avNote', t().prog.streakLocked.replace('{n}', questIconDays(icon)), true);
   }
-  if (PASS_ICONS.indexOf(icon) >= 0 && !passOwns('icon', icon)) {
+  if ((PASS_ICONS.indexOf(icon) >= 0 || isShopItem('icon', icon)) && !passOwns('icon', icon)) {
     return setNote('avNote', t().pass.locked.replace('{w}', passWhere('icon', icon)), true);
   }
   // Иконка за босса — раньше иконок соперников: с шестого мира портрет босса
@@ -695,7 +686,7 @@ function confirmLogout() {
 }
 
 // Удаление аккаунта. Спрашиваем отдельным окном и пишем, что именно исчезнет:
-// рейтинг и друзей вернуть будет нечем
+// друзей, монеты и покупки вернуть будет нечем
 function openDeleteModal() {
   const auth = runAuth();
   if (!auth) return;
@@ -722,8 +713,6 @@ async function confirmDelete() {
   closeDeleteModal();
   runLogout();
   stopFriendsPoll();
-  stopRankedPoll();
-  stopOnlinePoll();
   online = null;
   mode = null;
   applyTranslations();
@@ -733,7 +722,7 @@ async function confirmDelete() {
 
 let runAuthMode = 'login';
 
-// Куда вернуться после входа: аккаунт нужен и рейтингу, и онлайну
+// Куда вернуться после входа: аккаунт нужен друзьям, Испытанию и наградам
 let authReturn = 'runHub';
 
 function afterAuth() {
@@ -744,16 +733,8 @@ function afterAuth() {
   // Пришёл по ссылке-приглашению и только что вошёл — теперь можно добавить
   if (pendingInvite()) setTimeout(checkPendingInvite, 300);
   if (authReturn === 'mode') return showScreen('mode');
-  if (authReturn === 'online') return openOnline();
   if (authReturn === 'friends') return openFriends();
   return openRunHub();
-}
-
-
-function openOnlineEntry() {
-  if (!onlineOpen()) return openLessonGate();
-  authReturn = 'online';
-  if (runAuth()) openOnline(); else { authReturn = 'online'; renderAuthChoiceTitle(); showScreen('authChoice'); }
 }
 
 function openFriendsEntry() {
@@ -924,30 +905,6 @@ function toggleRunPinEye() {
 
 
 
-// Строка любого топа — рейтинга и «Испытания» одинаково. Первые три —
-// медалями: место читается с одного взгляда
-// Место — цифрой в кружке, первые три — золотой, серебряный, бронзовый.
-// Медали-эмодзи путались с медалями лиг: «🥇 Аня … 🥇 Золото 1»
-function topRow(i, name, points, isMe) {
-  const row = document.createElement('div');
-  row.className = 'lb-row rk-top-row' + (isMe ? ' me' : '');
-  const place = document.createElement('span');
-  place.className = 'rk-place' + (i < 3 ? ' p' + (i + 1) : '');
-  place.textContent = String(i + 1);
-  const face = document.createElement('span');
-  face.className = 'avatar';
-  paintAvatar(face, name);
-  const who = document.createElement('span');
-  who.className = 'rk-who';
-  who.textContent = name;
-  const pts = document.createElement('span');
-  pts.className = 'rk-pts';
-  pts.textContent = typeof points === 'number' ? formatNum(points) : points;
-  row.append(place, face, who, pts);
-  return row;
-}
-
-
 // ================= ОНЛАЙН: ДРУЗЬЯ =================
 // Список опрашивается, пока экран открыт: входящая заявка должна появиться
 // сама, без перезахода. Раз в десять секунд — заметить успеваешь, а нагрузка
@@ -955,27 +912,6 @@ function topRow(i, name, points, isMe) {
 const FRIENDS_POLL_MS = 10000;
 let friendsTimer = null;
 let friendsBusy = false;
-
-// Рейтинг и друзья — разные экраны. На одном они мешали друг другу: за
-// рейтингом приходят играть сейчас, к друзьям — договариваться
-function openOnline() {
-  // Миграцию 056 могли применить, пока игра была открыта: проверяем заново
-  playApi = 'new';
-  const auth = runAuth();
-  if (!auth) { authReturn = 'online'; renderAuthChoiceTitle(); return showScreen('authChoice'); }
-  setNote('rkNote', '');
-  applyTranslations();
-  renderRankedModes();
-  renderRanked(null);
-  showScreen('online');
-  startOnlinePoll();
-  loadFriends(true);
-  loadMatches();
-  loadRanked();
-  loadOnlineInfo();
-  // Лестница меняется только после партии — спрашиваем при входе, не в опросе
-  loadLadder().then(() => { if (screen === 'online') { renderRanked(null); loadEloTop(); } });
-}
 
 // Раскрыт ли поиск, решаем один раз за заход на экран — по первому списку
 // друзей. Дальше решает игрок: опрос каждые 10 секунд его выбор не трогает
@@ -1069,8 +1005,6 @@ function signedOutElsewhere(message) {
   signingOut = true;
   runLogout();
   stopFriendsPoll();
-  stopRankedPoll();
-  stopOnlinePoll();
   stopChatPoll();
   closeLogoutModal();
   online = null;
@@ -1313,13 +1247,6 @@ function matchRow(m) {
     row.appendChild(el);
   };
 
-  if (m.ranked) {
-    const tag = document.createElement('span');
-    tag.className = 'rk-row-tag';
-    tag.textContent = L.rkBadge;
-    who.appendChild(tag);
-  }
-
   if (m.status === 'invited' && m.seat === 1) {
     button(L.accept, 'yes', () => answerChallenge(m.id, true));
     button(L.decline, 'no', () => answerChallenge(m.id, false));
@@ -1337,18 +1264,11 @@ async function loadMatches(quiet) {
   try {
     const rows = (await friendRpc('list_matches')) || [];
     rows.forEach(m => { if (m.status === 'invited' && m.seat === 1) notifyAway('invite-' + m.id); });
-    // Дружеские игры — в строках друзей; рейтинговые — на экране рейтинга
-    friendMatches = rows.filter(m => !m.ranked);
+    // Игры с друзьями — в строках друзей
+    friendMatches = rows;
     renderFriendsList();
-    const rk = document.getElementById('rkGamesList');
-    rk.innerHTML = '';
-    rows.filter(m => m.ranked).forEach(m => rk.appendChild(matchRow(m)));
-    document.getElementById('rkGamesBox').classList.toggle('hidden', !rows.some(m => m.ranked));
   } catch (e) {
-    if (!quiet) {
-      setNote('gamesNote', onlineMatchError(e.message), true);
-      if (screen === 'online') setNote('rkNote', onlineMatchError(e.message), true);
-    }
+    if (!quiet) setNote('gamesNote', onlineMatchError(e.message), true);
   }
 }
 
@@ -1682,7 +1602,7 @@ function liftCurtain() {
 
 // ================= ОБУЧЕНИЕ =================
 // Три урока: подсказки, дуэль с ботом, бонусы. Пока не пройдены первые два,
-// онлайн закрыт. Кто уже играл до появления обучения, ничего не проходит —
+// «Друзья» закрыты. Кто уже играл до появления обучения, ничего не проходит —
 // его узнаём по следам прошлых игр в браузере
 const TUTORIAL_ICON = '🎓';
 const TUT_KEY = 'hc_tutorial';
@@ -1705,7 +1625,7 @@ function tutInit() {
       const k = localStorage.key(i);
       if (k && k.indexOf('hc_') === 0 && quiet.indexOf(k) < 0) veteran = true;
     }
-    // Пришёл по приглашению — друг ждёт: онлайн открыт сразу, уроки только предлагаются
+    // Пришёл по приглашению — друг ждёт: «Друзья» открыты сразу, уроки только предлагаются
     tutSave({ done: [], skipped: veteran, veteran: veteran, invited: !!pendingInvite() });
     // Старые игроки бонусы уже видели: карточки им ни к чему
     if (veteran) localStorage.setItem(SEEN_BONUS_KEY, JSON.stringify(BONUS_TYPES.concat(['near'])));
@@ -1732,21 +1652,16 @@ function renderTutorialMenu() {
     document.getElementById('tTutTitle').textContent = T.tutTitle.replace('{n}', n);
     document.getElementById('tTutSub').textContent = T.tutSub[n - 1];
   }
-  // До уроков 1–2 закрыт только онлайн: Испытание — соло, учиться в нём можно сразу
-  const locked = !onlineOpen();
-  document.querySelector('.mode-btn.online').classList.toggle('locked', locked);
-  document.getElementById('tOnlineLock').textContent = T.tutLocked;
-  document.getElementById('tOnlineLock').classList.toggle('hidden', !locked);
+  // Испытание — соло, учиться в нём можно сразу; до уроков 1–2 закрыты
+  // только «Друзья» (onlineOpen)
   document.getElementById('tRunLock').classList.add('hidden');
   document.querySelector('.mode-btn.run').classList.remove('locked');
   document.getElementById('tTutReplay').textContent = T.tutReplay;
   renderModeInfo();
 }
 
-// Строка под «Испытанием» и «Игрой онлайн» — своё: рекорд и лига со звёздами.
-// Пока онлайн закрыт обучением, там подпись про обучение, а не это
+// Строка под «Испытанием» и «Приключением» — своё: рекорд и сколько пройдено
 function renderModeInfo() {
-  const locked = !onlineOpen();
   const best = runAuth() ? runBest() : 0;
   const run = document.getElementById('tRunInfo');
   // Нет своего — короткое «что это»: новичку иначе не понять, чем Испытание
@@ -1756,18 +1671,6 @@ function renderModeInfo() {
   run.classList.remove('hidden');
   document.getElementById('tSoloSub').textContent = M.solo;
   document.getElementById('tDuelSub').textContent = M.duel;
-  const on = document.getElementById('tOnlineInfo');
-  const lg = runAuth() && ladderInfo;
-  // Не больше двух коротких вещей: один повод зайти и лига. Раньше тут стояли
-  // ещё серия и ряд звёздочек — выходил набор значков, а не фраза
-  const oi = typeof onlineInfo !== 'undefined' && onlineInfo;
-  const hints = [];
-  if (oi && oi.played && !oi.chestOpened) hints.push(t().pass.menuChest);
-  else if (oi && oi.weekend && oi.weekend.on) hints.push(t().pass.cup.starsX2);
-  else if (oi && !oi.played) hints.push(t().pass.menuPlay);
-  if (lg) hints.push(leagueLabel(ladderInfo.stars));
-  on.textContent = hints.length ? hints.join(' · ') : M.online;
-  on.classList.toggle('hidden', locked);
   // Приключение: сколько соперников из 50 уже обыграно
   const ad = document.getElementById('tAdvInfo');
   const done = typeof advDone === 'function' ? advDone() : 0;
@@ -2179,12 +2082,12 @@ function onSignal(p) {
   if (!runAuth()) return;
   if (p.k === 'match') {
     if (online && screen === 'game' && online.id === p.id) refreshMatch(true);
-    else if (screen === 'online' || screen === 'friends') loadMatches(true);
+    else if (screen === 'friends') loadMatches(true);
   } else if (p.k === 'friends') {
-    if (screen === 'online' || screen === 'friends') loadFriends(true);
+    if (screen === 'friends') loadFriends(true);
   } else if (p.k === 'chat') {
     if (screen === 'chat' && chatWith) loadChat(true);
-    else if (screen === 'online' || screen === 'friends') loadFriends(true);
+    else if (screen === 'friends') loadFriends(true);
   }
 }
 
@@ -2226,7 +2129,6 @@ function openChat(name) {
   renderChatLeft();
   setNote('chatNote', '');
   renderChatPad();
-  renderChatModes();
   applyTranslations();
   showScreen('chat');
   startChatPoll();
@@ -2250,21 +2152,6 @@ function renderChatPad() {
     b.disabled = chatBusy;
     b.onclick = () => sendTalk(code);
     pad.appendChild(b);
-  });
-}
-
-// Позвать на рейтинг можно в любую разновидность: условия берёт сервер
-function renderChatModes() {
-  const box = document.getElementById('chatModes');
-  box.innerHTML = '';
-  // Названия — правилами, как в «Своей игре»: прежних режимов («Обычная»,
-  // «Мороз и Жара») в онлайне больше нет (миграция 056)
-  const R = t().online.rules;
-  RANKED_MODES.forEach(mode => {
-    const b = rankedModeButton(mode, false, () => challengeRankedFromChat(mode));
-    b.querySelector('.rm-name').textContent = R.ranges[(mode & 1) ? 'pm100' : '100'];
-    b.querySelector('.rm-range').textContent = (mode & 2) ? R.on : R.off;
-    box.appendChild(b);
   });
 }
 
@@ -2298,7 +2185,7 @@ function renderChat(messages) {
   box.scrollTop = box.scrollHeight;
 }
 
-// Возраст сообщения теми же словами, что и давность игры в рейтинге
+// Возраст сообщения: «только что», «5 мин назад», «3 ч назад»
 function agoShort(seconds) {
   const L = t().online;
   if (seconds === null || seconds === undefined || seconds < 90) return L.rkAgoNow;
@@ -2387,15 +2274,6 @@ function challengeFromChat() {
   openChallenge(name);
 }
 
-async function challengeRankedFromChat(mode) {
-  if (!chatWith) return;
-  try {
-    await friendRpc('challenge_friend_ranked', { p_to: chatWith, p_mode: mode });
-    setNote('chatNote', t().online.chatSent);
-  } catch (e) {
-    setNote('chatNote', onlineMatchError(e.message), true);
-  }
-}
 
 // ================= УВЕДОМЛЕНИЯ НА ЗАКРЫТОЕ ПРИЛОЖЕНИЕ =================
 // Пока на сервере не настроен ключ, переключателя нет вовсе: обещать нечего.
@@ -2554,466 +2432,8 @@ function clearAway() {
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden) clearAway(); });
 
-// ================= РЕЙТИНГОВЫЙ ОНЛАЙН =================
-// Четыре разновидности, у каждой свой отдельный рейтинг. Номер режима —
-// два бита: младший включает мороз и жару, старший — бонусы. Ровно то же
-// правило действует на сервере, поэтому подпись кнопки всегда совпадает
-// с тем, во что раздадут играть
-const RANKED_POLL_MS = 3000;
-const RANKED_MODES = [0, 1, 2, 3];
-// Режим дня — пятый, со своей очередью (миграция 054). Правила дня по кругу,
-// сутки по UTC: у всех в очереди один и тот же. Порядок — копия
-// daily_variants() из базы, сверяется тестом
-const DAILY_MODE = 4;
-const DAILY_VARIANTS = ['blitz', 'chaos', 'mini'];
-let rankedTimer = null;
-let onlineTimer = null;
-let rankedBusy = false;
-let rankedInQueue = false;
-let rankedMatchId = null;
-let rankedMode = (function () {
-  try {
-    const v = parseInt(localStorage.getItem('hc_rkmode'));
-    return (v >= 0 && v <= DAILY_MODE) ? v : 0;
-  } catch (e) { return 0; }
-})();
-let rankedRatings = null;
-
-// ---------- «Играть» и «Своя игра» (миграция 056) ----------
-// Очередь — по правилам: диапазон, бонусы, до скольки побед, время на ход или
-// правила дня. «Играть» — правила по умолчанию. Рейтинг один на всё.
-// Без миграции 056 игра ходит в старую очередь режима, ближайшего к правилам
-const PLAY_DEFAULT = { range: '100', bonuses: true, wins: 3, blitz: false };
-const PLAY_RANGES = ['20', '100', 'pm100'];
-const PLAY_WINS = [1, 3, 5];
-let playApi = 'new';
-let playOffers = [];
-let playElo = null;
-let playRules = (function () {
-  try { return playNorm(JSON.parse(localStorage.getItem('hc_rules') || 'null')); } catch (e) { return playNorm(null); }
-})();
-
-function playNorm(r) {
-  if (!r || typeof r !== 'object') return Object.assign({}, PLAY_DEFAULT);
-  if (r.daily) return { daily: true };
-  return { range: PLAY_RANGES.includes(r.range) ? r.range : '100', bonuses: r.bonuses !== false,
-           wins: PLAY_WINS.includes(r.wins) ? r.wins : 3, blitz: !!r.blitz };
-}
-function playIsDefault(r) {
-  return !r.daily && r.range === '100' && r.bonuses && r.wins === 3 && !r.blitz;
-}
-function playSave() {
-  try { localStorage.setItem('hc_rules', JSON.stringify(playRules)); } catch (e) {}
-}
-// Правила словами: «1–100 · с бонусами · до 3 побед»; правила дня — названием дня
-function playRulesText(r) {
-  const R = t().online.rules;
-  if (!r) return '';
-  if (r.daily) return '📅 ' + t().pass.daily[dailyVariant()] + ' · ' + t().pass.daily[dailyVariant() + 'D'];
-  return [R.ranges[r.range], r.bonuses ? R.on : R.off, R.wins[r.wins]].concat(r.blitz ? [R.blitz] : []).join(' · ');
-}
-// Старая очередь (до миграции 056): режим из правил
-function playOldMode(r) {
-  if (r.daily) return DAILY_MODE;
-  return (r.range === 'pm100' ? 1 : 0) + (r.bonuses ? 2 : 0);
-}
-function playMissing(e) {
-  return /Could not find the function|does not exist/.test((e && e.message) || '');
-}
-
-function startRankedPoll() {
-  stopRankedPoll();
-  rankedTimer = setInterval(() => {
-    if (screen === 'online' && rankedInQueue) loadRanked(true);
-    else stopRankedPoll();
-  }, RANKED_POLL_MS);
-}
-
-// Пока экран рейтинга открыт, список игр и рейтинг обновляются сами:
-// соперник мог принять реванш, пока вы смотрите на таблицу
-function startOnlinePoll() {
-  stopOnlinePoll();
-  onlineTimer = setInterval(() => {
-    if (screen !== 'online') return stopOnlinePoll();
-    loadMatches(true);
-    loadFriends(true);
-    if (!rankedInQueue) loadRanked(true);
-  }, FRIENDS_POLL_MS);
-}
-
-function stopOnlinePoll() {
-  if (onlineTimer) { clearInterval(onlineTimer); onlineTimer = null; }
-}
-
-function stopRankedPoll() {
-  if (rankedTimer) { clearInterval(rankedTimer); rankedTimer = null; }
-}
-
-function rankedModeFrost(mode) { return (mode & 1) === 1; }
-function rankedModeBonuses(mode) { return (mode & 2) === 2; }
-
-// Разновидность словами: «−100…100 · бонусы» ребёнку ничего не говорило.
-// Диапазон — мелкой строкой под названием (rankedModeRange)
-function rankedModeLabel(mode) {
-  if (mode === DAILY_MODE) return t().pass.daily.name + ' · ' + t().pass.daily[dailyVariant()];
-  return t().online.rkModeNames[mode] || '';
-}
-
-// Режим дня: что говорит база, а без неё — тот же расчёт по UTC
-function dailyVariant(next) {
-  const d = onlineInfo && onlineInfo.daily;
-  if (d && d.variant) return next ? d.next : d.variant;
-  return DAILY_VARIANTS[(Math.floor(Date.now() / 86400000) + (next ? 1 : 0)) % 3];
-}
-function dailyOpen() {
-  return !!(onlineInfo && onlineInfo.daily);
-}
-
-// Карточка режима дня над переключателем: что сегодня, чем отличается, что завтра
-function renderDailyMode() {
-  const box = document.getElementById('rkDaily');
-  if (!box) return;
-  box.classList.toggle('hidden', !dailyOpen());
-  if (!dailyOpen()) return;
-  const D = t().pass.daily, v = dailyVariant();
-  box.classList.toggle('active', rankedMode === DAILY_MODE);
-  box.dataset.variant = v;
-  box.innerHTML =
-    '<span class="dm-head">' + escapeHtml(D.name) + '</span>' +
-    '<b class="dm-name">' + escapeHtml(D[v]) + '</b>' +
-    '<span class="dm-rule">' + escapeHtml(D[v + 'D']) + '</span>' +
-    '<span class="dm-perk">' + escapeHtml(D.perk) + '</span>' +
-    '<small class="dm-next">' + escapeHtml(D.next.replace('{v}', D[dailyVariant(true)])
-      .replace('{t}', timeLeftText(onlineInfo.daily.endsIn || 0))) + '</small>' +
-    // Карточка — тоже выбор режима, как кнопки ниже: сказать это словами
-    '<span class="dm-pick">' + escapeHtml(rankedMode === DAILY_MODE ? D.picked : D.pick) + '</span>';
-}
-
-function rankedModeRange(mode) {
-  return rankedModeFrost(mode) ? '−100…100' : '1–100';
-}
-
-function rankedModeButton(mode, active, onClick) {
-  const b = document.createElement('button');
-  b.className = 'rk-mode' + (active ? ' active' : '');
-  b.dataset.mode = mode;
-  const name = document.createElement('div');
-  name.className = 'rm-name';
-  name.textContent = rankedModeLabel(mode);
-  const range = document.createElement('div');
-  range.className = 'rm-range';
-  range.textContent = rankedModeRange(mode);
-  b.append(name, range);
-  b.onclick = onClick;
-  return b;
-}
-
-// Переключение разновидности выводит из очереди: ждать в двух местах нельзя,
-// иначе человека затянуло бы в две партии сразу
-async function setRankedMode(mode) {
-  return setPlayRules(mode === DAILY_MODE ? { daily: true }
-    : { range: (mode & 1) ? 'pm100' : '100', bonuses: (mode & 2) === 2, wins: 3, blitz: false });
-}
-
-// Новые правила: из очереди выйти (ждать в двух местах нельзя), запомнить
-async function setPlayRules(r) {
-  const wasQueued = rankedInQueue;
-  playRules = playNorm(r);
-  rankedMode = playOldMode(playRules);
-  playSave();
-  if (wasQueued) await cancelRanked();
-  renderRankedModes();
-  renderRanked(null);
-  loadRanked(true);
-}
-
-function renderRankedModes() {
-  const box = document.getElementById('rkModes');
-  if (!box) return;
-  // Без миграции 054 правил дня нет — возвращаемся к обычным
-  if (playRules.daily && !dailyOpen()) { playRules = Object.assign({}, PLAY_DEFAULT); playSave(); }
-  rankedMode = playOldMode(playRules);
-  // Вместо четырёх вкладок — строка правил и «Своя игра»
-  box.classList.add('hidden');
-  document.getElementById('rkDaily').classList.add('hidden');
-  const bar = document.getElementById('rkRules');
-  if (!bar) return;
-  const R = t().online.rules;
-  bar.innerHTML = '<span class="rr-text"><small>' + escapeHtml(playIsDefault(playRules) ? R.quick : R.custom) + '</small><b>' +
-    escapeHtml(playRulesText(playRules)) + '</b></span>' +
-    '<button class="rr-btn" onclick="openRulesModal()">' + escapeHtml(R.btn) + '</button>';
-}
-
-// ---------- окно «Своя игра» ----------
-let rulesDraft = null;
-function openRulesModal() {
-  rulesDraft = Object.assign({}, playRules.daily ? PLAY_DEFAULT : playRules);
-  rulesDraft.daily = !!playRules.daily;
-  renderRulesModal();
-  document.getElementById('rulesModal').classList.remove('hidden');
-}
-function closeRulesModal() { document.getElementById('rulesModal').classList.add('hidden'); }
-function rulesPick(key, val) {
-  rulesDraft[key] = val;
-  rulesDraft.daily = false;
-  renderRulesModal();
-}
-function renderRulesModal() {
-  const R = t().online.rules, d = rulesDraft;
-  const chips = (key, vals, label) => '<div class="ru-row"><div class="ru-head">' + escapeHtml(label) + '</div><div class="ru-chips">' +
-    vals.map(([v, text]) => '<button class="ru-chip' + (!d.daily && d[key] === v ? ' on' : '') + '" data-k="' + key + '" data-v="' + v +
-      '" onclick="rulesPick(\'' + key + '\', ' + JSON.stringify(v).replace(/"/g, '&quot;') + ')">' + escapeHtml(text) + '</button>').join('') + '</div></div>';
-  document.getElementById('rulesTitle').textContent = R.title;
-  document.getElementById('rulesBody').innerHTML =
-    chips('range', PLAY_RANGES.map(v => [v, R.ranges[v]]), R.range) +
-    chips('bonuses', [[true, R.on], [false, R.off]], R.bonusesHead) +
-    chips('wins', PLAY_WINS.map(v => [v, R.wins[v]]), R.winsHead) +
-    chips('blitz', [[false, R.normal], [true, R.blitz]], R.time) +
-    (dailyOpen() ? '<button class="ru-daily' + (d.daily ? ' on' : '') + '" onclick="rulesDraft.daily = true; renderRulesModal()">' +
-      escapeHtml(R.daily.replace('{v}', t().pass.daily[dailyVariant()])) + '<small>' + escapeHtml(t().pass.daily[dailyVariant() + 'D'] + ' · ' + t().pass.daily.perk) +
-      '</small></button>' : '') +
-    '<button class="ru-reset" onclick="rulesDraft = Object.assign({}, PLAY_DEFAULT); renderRulesModal()">' + escapeHtml(R.reset) + '</button>';
-  document.getElementById('rulesOk').textContent = R.done;
-}
-async function saveRulesModal() {
-  closeRulesModal();
-  await setPlayRules(rulesDraft.daily ? { daily: true } : rulesDraft);
-}
-
-// Кто ждёт с другими правилами — «Сыграть» встаёт в очередь с его правилами
-function renderOffers() {
-  const box = document.getElementById('rkOffers');
-  if (!box) return;
-  const R = t().online.rules;
-  box.classList.toggle('hidden', !rankedInQueue || !playOffers.length);
-  if (!rankedInQueue || !playOffers.length) { box.innerHTML = ''; return; }
-  box.innerHTML = '<div class="of-head">' + escapeHtml(R.offerHead) + '</div>' + playOffers.map((o, i) =>
-    '<div class="of-row"><span class="avatar" data-avatar-for="' + escapeHtml(o.username) + '"></span><span class="of-text"><b>' +
-    escapeHtml(playerName(o.username)) + '</b><small>' + escapeHtml(playRulesText(playNorm(o.rules))) + '</small></span>' +
-    '<button class="of-go" onclick="acceptOffer(' + i + ')">' + escapeHtml(R.offerGo) + '</button></div>').join('');
-  box.querySelectorAll('.avatar').forEach(a => paintAvatar(a, a.dataset.avatarFor));
-  fetchAvatars(playOffers.map(o => o.username));
-  fitPlayBar();
-}
-// Закреплённая внизу панель растёт (ожидание, предложения) — снизу экрана
-// столько же места, чтобы она ничего не закрывала
-function fitPlayBar() {
-  const bar = document.getElementById('rkPlayBar'), scr = document.getElementById('screenOnline');
-  if (!bar || !scr) return;
-  // Прямо над нижним меню, какой бы высоты оно ни было: у телефона набок оно
-  // ниже, и панель с запасом под вертикальное меню висела посреди экрана
-  const tabs = document.getElementById('tabbar');
-  if (tabs && tabs.offsetHeight) bar.style.bottom = tabs.offsetHeight + 'px';
-  scr.style.paddingBottom = (bar.offsetHeight + 24) + 'px';
-}
-// Повернули телефон — меню сменило высоту: панель переставить
-window.addEventListener('resize', () => { if (screen === 'online') fitPlayBar(); });
-async function acceptOffer(i) {
-  const o = playOffers[i];
-  if (!o) return;
-  // Чужие правила — только на эту партию: свои остаются запомненными
-  await cancelRanked();
-  return startRanked(playNorm(o.rules));
-}
-
-// Давность в человеческих словах. Меньше полутора минут — «только что»:
-// точнее незачем, решение «ждать или не ждать» от секунд не зависит
-function rankedAgoText(seconds) {
-  const L = t().online;
-  if (seconds === null || seconds === undefined) return L.rkLastNever;
-  if (seconds < 90) return L.rkLastPlayed.replace('{n}', L.rkAgoNow);
-  if (seconds < 5400) return L.rkLastPlayed.replace('{n}', L.rkAgoMin.replace('{n}', Math.round(seconds / 60)));
-  if (seconds < 172800) return L.rkLastPlayed.replace('{n}', L.rkAgoHour.replace('{n}', Math.round(seconds / 3600)));
-  return L.rkLastPlayed.replace('{n}', L.rkAgoDay.replace('{n}', Math.round(seconds / 86400)));
-}
-
-function renderRanked(st) {
-  const L = t().online;
-  const mine = playElo || (rankedRatings && rankedRatings[rankedMode]);
-  const elo = document.getElementById('rkElo');
-  const starsEl = document.getElementById('rkStars');
-  elo.classList.toggle('league', !!ladderInfo);
-  starsEl.classList.toggle('hidden', !ladderInfo);
-  if (ladderInfo) {
-    // Лига — крупно, звёзды под ней. Число рейтинга видно только Легенде:
-    // ниже его заменяют звёзды, а рейтинг работает на подбор соперника
-    const p = ladderPos(ladderInfo.stars);
-    elo.textContent = leagueLabel(ladderInfo.stars).replace(/^\S+\s/, '');
-    // Герб лиги рисунком; эмодзи-медаль из подписи убрана — она бы дублировала герб
-    const em = document.getElementById('rkEmblem');
-    em.innerHTML = leagueEmblem(p.league, p.legend ? null : p.rank, 76);
-    em.style.setProperty('--lg-glow', LEAGUE_ART[p.league].glow);
-    em.classList.remove('hidden');
-    const link = document.getElementById('rkPathLink');
-    link.textContent = t().path.link;
-    link.classList.remove('hidden');
-    // Число рейтинга не показываем и Легенде: лестница — лиги и звёзды
-    starsEl.textContent = p.legend ? '' : starsLine(ladderInfo.stars);
-    const days = Math.floor((ladderInfo.endsIn || 0) / 86400);
-    const month = seasonMonth(ladderInfo.season);
-    document.getElementById('rkEloSub').textContent = days > 0
-      ? L.lgSeason.replace('{m}', month).replace('{n}', days) : L.lgSeasonLast.replace('{m}', month);
-    // Ученик: первые партии без потери звёзд — сказать, сколько ещё
-    const left = ladderInfo.apprentice || 0;
-    const ap = document.getElementById('rkApprentice');
-    ap.textContent = t().tut.rkApprentice.replace('{n}', left);
-    ap.classList.toggle('hidden', !(left > 0));
-  } else {
-    document.getElementById('rkEmblem').classList.add('hidden');
-    document.getElementById('rkPathLink').classList.add('hidden');
-    elo.textContent = mine ? formatNum(mine.elo) : '—';
-    document.getElementById('rkEloSub').textContent = mine
-      ? L.rkEloSub.replace('{g}', mine.games) : L.rkEloSub.replace('{g}', '0');
-  }
-
-  const play = document.getElementById('tRkPlay');
-  play.textContent = rankedMatchId ? L.rkResume : L.rkPlay;
-  play.classList.toggle('hidden', rankedInQueue);
-  document.getElementById('rkWaitBox').classList.toggle('hidden', !rankedInQueue);
-  fitPlayBar();
-  if (!rankedInQueue || !st) return;
-
-  // Точки в конце — единственная живая деталь на экране ожидания: по ней
-  // видно, что опрос идёт, а не подвис
-  // Сверху — «ищем» и секундомер, ниже — по строке на каждую подробность.
-  // Раньше всё шло одной строкой через точки и читалось как шифр
-  const dots = '.'.repeat(1 + (Math.floor(st.waited / 3) % 3));
-  const mm = Math.floor(st.waited / 60), ss = st.waited % 60;
-  document.getElementById('rkWaitText').textContent =
-    '🔍 ' + L.rkSearching + dots + '  ' + mm + ':' + String(ss).padStart(2, '0');
-  // Когда ждёшь один, полезно знать две вещи: скоро ли бот и давно ли тут
-  // вообще играли люди
-  const botLine = !st.botWait ? ''
-    : (st.waited < st.botWait ? L.rkBotSoon.replace('{n}', st.botWait - st.waited) : L.rkBotNow);
-  document.getElementById('rkWaitSub').textContent = (st.queue > 1
-    ? [L.rkQueueMany.replace('{n}', st.queue), botLine]
-    : [L.rkQueueOne, botLine, rankedAgoText(st.lastAgo)]).filter(Boolean).join('\n');
-}
-
-async function loadRanked(quiet) {
-  try {
-    let st;
-    if (playApi === 'new') {
-      try {
-        st = await friendRpc('play_status', {});
-      } catch (e) {
-        if (!playMissing(e)) throw e;
-        playApi = 'old';
-      }
-    }
-    if (playApi === 'old') st = await friendRpc('ranked_status', { p_mode: rankedMode });
-    if (!st) return;
-    const wasQueued = rankedInQueue;
-    rankedMatchId = st.matchId || null;
-    rankedInQueue = !!st.inQueue;
-    rankedRatings = st.ratings || null;
-    playElo = playApi === 'new' ? { elo: st.elo, games: st.games } : null;
-    playOffers = playApi === 'new' ? (st.offers || []) : [];
-    // В матч затягиваем только того, кто стоял в очереди и ждал именно этого.
-    // Иначе с экрана начатой игры было бы не уйти: он открывался бы заново
-    if (rankedMatchId && wasQueued) {
-      rankedInQueue = false;
-      stopRankedPoll();
-      notifyAway('found-' + rankedMatchId);
-      return openMatch(rankedMatchId);
-    }
-    if (rankedInQueue && !rankedTimer) startRankedPoll();
-    renderRankedModes();
-    renderRanked(st);
-    renderOffers();
-    // Старая очередь: ждём в другой разновидности — сказать
-    const other = (playApi === 'new' || st.queueMode === null || st.queueMode === undefined || st.inQueue)
-      ? '' : t().online.rkOtherMode.replace('{mode}', rankedModeLabel(st.queueMode));
-    if (other) setNote('rkNote', other);
-    else if (!quiet) setNote('rkNote', '');
-  } catch (e) {
-    if (!quiet) setNote('rkNote', onlineMatchError(e.message), true);
-  }
-}
-
-// rules — разово чужие правила (из предложения); без них — свои
-async function startRanked(rules) {
-  if (rankedBusy) return;
-  if (rankedMatchId) return openMatch(rankedMatchId);
-  rankedBusy = true;
-  setNote('rkNote', '');
-  const use = rules && rules.range !== undefined || (rules && rules.daily) ? rules : playRules;
-  try {
-    let r;
-    if (playApi === 'new') {
-      try {
-        r = await friendRpc('play_join', { p_rules: use });
-      } catch (e) {
-        if (!playMissing(e)) throw e;
-        playApi = 'old';
-      }
-    }
-    if (playApi === 'old') r = await friendRpc('join_ranked_queue', { p_mode: playOldMode(use) });
-    if (r && r.matchId) {
-      rankedInQueue = false;
-      rankedMatchId = r.matchId;
-      stopRankedPoll();
-      rankedBusy = false;
-      return openMatch(r.matchId);
-    }
-    rankedInQueue = true;
-    startRankedPoll();
-    await loadRanked(true);
-  } catch (e) {
-    setNote('rkNote', onlineMatchError(e.message), true);
-  } finally {
-    rankedBusy = false;
-  }
-}
-
-async function cancelRanked() {
-  rankedInQueue = false;
-  stopRankedPoll();
-  try {
-    await friendRpc('leave_ranked_queue');
-  } catch (e) {
-    setNote('rkNote', onlineMatchError(e.message), true);
-  }
-  await loadRanked(true);
-}
-
-async function loadEloTop() {
-  if (!sb) return;
-  const box = document.getElementById('rkTopList');
-  if (!box) return;
-  // С лигами топ один на все режимы — по звёздам сезона
-  if (ladderInfo) {
-    document.getElementById('tRkTop').textContent = t().online.lgTop;
-    try {
-      const { data, error } = await sb.rpc('ladder_top');
-      if (error) throw new Error(error.message);
-      const rows = data || [];
-      const me = (runAuth() || {}).username;
-      if (!rows.length) {
-        box.innerHTML = '<div class="fr-note">' + escapeHtml(t().online.rkTopEmpty) + '</div>';
-        return;
-      }
-      box.replaceChildren(...rows.map((r, i) => topRow(i, r.username, leagueLabel(r.stars), r.username === me)));
-      fetchAvatars(rows.map(r => r.username));
-    } catch (e) {}
-    return;
-  }
-  try {
-    const { data, error } = await sb.rpc('elo_leaderboard', { p_mode: playApi === 'new' ? 0 : rankedMode });
-    if (error) throw new Error(error.message);
-    const rows = data || [];
-    const me = (runAuth() || {}).username;
-    if (!rows.length) {
-      box.innerHTML = '<div class="fr-note">' + escapeHtml(t().online.rkTopEmpty) + '</div>';
-      return;
-    }
-    box.replaceChildren(...rows.map((r, i) => topRow(i, r.username, r.elo, r.username === me)));
-    fetchAvatars(rows.map(r => r.username));
-  } catch (e) {}
-}
-
-// Выход из рейтинговой игры — поражение, и спросить об этом надо до того,
-// как оно случится: сервер потом уже ничего не отменит
+// ================= ПАРТИЯ С ДРУГОМ =================
+// Сдаться: партия кончается, победа — другу
 function openResign() {
   const L = t().online;
   document.getElementById('tResignTitle').textContent = L.rkResignAsk;
@@ -3067,21 +2487,20 @@ function applyMatchState(st) {
   if (!st) return;
   online.seat = st.seat;
   online.status = st.status;
-  online.ranked = !!st.ranked;
   online.forfeitBy = (st.forfeitBy === null || st.forfeitBy === undefined) ? null : st.forfeitBy;
-  online.eloDelta = st.eloDelta || null;
+
   // Партия кончилась — чуть погодя спросить, не открылось ли достижение:
   // уведомление выезжает поверх итога партии
-  // Партию закончили у нас на глазах (а не открыли старую) — тогда звёзды
-  // покажем на весь экран
-  if (!st.matchOver) online.wasPlaying = true;
-  if (st.matchOver && online.wasPlaying) online.justFinished = true;
   if (st.matchOver && !online.progressAsked) {
     online.progressAsked = true;
-    setTimeout(() => { if (runAuth()) { loadProgress(); loadOnlineInfo(); } }, 2500);
+    // И монеты за партию (миграция 061): «+15 🪙» — разница с кошельком до неё
+    setTimeout(() => {
+      if (!runAuth()) return;
+      loadProgress();
+      loadOnlineInfo();
+      if (typeof walletAfterGame === 'function') walletAfterGame();
+    }, 2500);
   }
-  online.elo = st.elo;
-  online.botSeat = (st.botSeat === null || st.botSeat === undefined) ? null : st.botSeat;
   // Начало партии и перерыв: сервер присылает остаток секунд, дальше
   // отсчитывает браузер — как часы хода
   const at = n => (n === null || n === undefined) ? null : Date.now() + n * 1000;
@@ -3090,13 +2509,6 @@ function applyMatchState(st) {
   online.startsAt = at(st.startsIn);
   online.nextAt = at(st.nextIn);
   online.ready = (st.ready || [false, false]).slice();
-  // Без поля (база до миграции 035) считаем, что звёзды есть: так было
-  online.ladder = st.ladder === undefined ? true : !!st.ladder;
-  // Режим дня: правила видны по самой партии (миграция 054 их и ставит)
-  online.variant = st.rankedMode !== DAILY_MODE
-    // Своя игра с блицем (миграция 056): 10 секунд на ход без «Спешки»
-    ? (st.ranked && st.turnSeconds === 10 && !(st.rush || []).some(Boolean) ? 'blitz' : null)
-    : st.rangeMax === 50 ? 'mini' : st.bonusesOn ? 'chaos' : 'blitz';
   mode = 'duel';
   RANGE_MIN = st.rangeMin;
   RANGE_MAX = st.rangeMax;
@@ -3279,16 +2691,14 @@ async function onlineNextRound() {
   }
 }
 
-// Уход с экрана матч не закрывает: к начатой игре можно вернуться
-// Возвращаемся туда, откуда игра началась: рейтинг и друзья живут порознь
+// Уход с экрана матч не закрывает: к начатой игре можно вернуться — из «Друзей»
 function backToOnline() {
-  const wasRanked = !!(online && online.ranked);
   stopMatchPoll();
   stopClock();
   setMatchNote('');
   online = null;
   mode = null;
-  if (wasRanked) openOnline(); else openFriends();
+  openFriends();
 }
 
 // Приглашение уходит, но игра начнётся только когда соперник согласится:
@@ -3302,9 +2712,8 @@ async function offerRematch() {
   } catch (e) {
     return setMatchNote(onlineMatchError(e.message));
   }
-  // Старый бот согласия не ждёт, а позвавший соперник уже согласен: новая
-  // партия уже идёт
-  if ((online.botSeat !== null || online.rematchOffer) && newId) { stopMatchPoll(); return openMatch(newId); }
+  // Позвавший соперник уже согласен: новая партия уже идёт
+  if (online.rematchOffer && newId) { stopMatchPoll(); return openMatch(newId); }
   online.rematchSent = other;
   setMatchNote('');
   renderAll();
@@ -3444,10 +2853,11 @@ function botSayText(text) {
   setTimeout(renderSayBubble, SAY_SHOW_MS + 50);
 }
 
-// Заголовок экрана входа: куда человек шёл — онлайн или к друзьям
+// Заголовок экрана входа: куда человек шёл — к друзьям, в Испытание или из профиля
 function renderAuthChoiceTitle() {
   const el = document.getElementById('tAuthChoiceTitle');
   if (!el) return;
   const L = t();
-  el.textContent = authReturn === 'friends' ? '👥 ' + L.navFriends : '🌐 ' + L.online.mode;
+  el.textContent = authReturn === 'friends' ? '👥 ' + L.navFriends
+    : authReturn === 'runHub' ? '🏆 ' + L.run.mode : L.run.signIn;
 }

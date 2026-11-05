@@ -1,6 +1,8 @@
 -- Проверка миграции 034_fog_whole_round.txt.
 -- Вставить целиком в Supabase → SQL Editor → Run. Ничего не меняет, только читает.
 -- В колонке «итог» должно быть ✔ у каждой строки.
+-- Миграция 062 убрала онлайн со случайными соперниками (очередь, рейтинг,
+-- ботов, турнир): проверки этого отсюда убраны
 
 with fn as (
   select p.proname as name, p.prosrc as src
@@ -21,8 +23,6 @@ checks(nn, what, ok) as (values
   (3, 'игрок под помехой не видит ходы и на чужом ходу',
       exists (select 1 from fn where name = 'match_state' and src like '%fog_from%')
       and not exists (select 1 from fn where name = 'match_state' and src like '%m.fog[my_seat + 1] and m.cur = my_seat%')),
-  (4, 'бот под помехой видит то же, что человек',
-      exists (select 1 from fn where name = 'bot_candidates' and src like '%fog_from%')),
   (5, 'anon смотрит партию через функцию, отметку сам не ставит',
       coalesce(has_function_privilege('anon', to_regprocedure('public.match_state(text,text,bigint)'), 'execute'), false)
       and not coalesce(has_function_privilege('anon', to_regprocedure('public.matches_hide_from()'), 'execute'), false))

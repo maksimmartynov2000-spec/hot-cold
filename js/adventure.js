@@ -1332,6 +1332,8 @@ async function advSync() {
       advRemember(r.done);
       advMergeStars(r.stars);
       advFillStars();
+      // Звёзды с телефона без входа — тоже монеты (миграция 061)
+      if (typeof walletGot === 'function') walletGot(r.coins, r.gems);
       return;
     }
   } catch (e) {
@@ -1351,6 +1353,8 @@ function advReport(n, k) {
   friendRpc('adventure_result', { p_n: n, p_stars: k })
     .then(r => {
       if (r && typeof r.done === 'number') { advRemember(r.done); advMergeStars(r.stars); }
+      // Новые звёзды, босс, мир на ★★★ — монеты и кристаллы (миграция 061)
+      if (r && typeof walletGot === 'function') walletGot(r.coins, r.gems);
       if (typeof loadProgress === 'function') loadProgress();
     })
     .catch(() => advSync());

@@ -454,7 +454,12 @@ function finishRun(res, quit) {
 function trialReport(rounds, score) {
   if (!runAuth() || typeof sb === 'undefined' || !sb) return;
   friendRpc('run_report', { p_rounds: rounds, p_score: score })
-    .then(r => { if (r && typeof r.best === 'number') rememberRunBest(r.best); if (runAuth()) loadProgress(); })
+    .then(r => {
+      if (r && typeof r.best === 'number') rememberRunBest(r.best);
+      // Монеты за раунды (миграция 061)
+      if (r && typeof walletGot === 'function') walletGot(r.coins, 0);
+      if (runAuth()) loadProgress();
+    })
     .catch(() => {});
 }
 

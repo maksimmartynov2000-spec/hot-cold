@@ -25,10 +25,34 @@ const AVATAR_GRAD = {
   // С сезонного пути и из сундука
   'grad-aurora': 'linear-gradient(135deg, #a7f3d0 0%, #22d3ee 35%, #a78bfa 70%, #f0abfc 100%)',
   'grad-lava': 'linear-gradient(135deg, #fde68a 0%, #fb923c 35%, #ef4444 70%, #7f1d1d 100%)',
-  'grad-night': 'linear-gradient(135deg, #c7d2fe 0%, #6366f1 35%, #1e1b4b 75%, #0f172a 100%)'
+  'grad-night': 'linear-gradient(135deg, #c7d2fe 0%, #6366f1 35%, #1e1b4b 75%, #0f172a 100%)',
+  // Из магазина (миграция 061): пять за монеты и три редких за кристаллы — переливаются
+  'grad-mint': 'linear-gradient(135deg, #d1fae5 0%, #6ee7b7 45%, #10b981 100%)',
+  'grad-peach': 'linear-gradient(135deg, #ffedd5 0%, #fdba74 45%, #fb7185 100%)',
+  'grad-sky': 'linear-gradient(135deg, #e0f2fe 0%, #7dd3fc 45%, #3b82f6 100%)',
+  'grad-violet': 'linear-gradient(135deg, #f3e8ff 0%, #c4b5fd 45%, #8b5cf6 100%)',
+  'grad-sand': 'linear-gradient(135deg, #fef9c3 0%, #fcd34d 45%, #d97706 100%)',
+  // Галактика: звёзды разбросаны по диагонали — перелив сдвигает фон по ней,
+  // и несколько звёзд видно всегда
+  'grad-galaxy': [
+    'radial-gradient(circle at 14% 22%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 30% 12%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 26% 40%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 42% 30%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 40% 56%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 55% 44%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 60% 68%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 72% 54%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 76% 82%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 88% 70%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 20% 70%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 80% 26%, #fff 0 1.4%, transparent 2.4%)',
+    'linear-gradient(135deg, #312e81 0%, #7c3aed 40%, #db2777 70%, #0f172a 100%)'].join(', '),
+  'grad-rainbow': 'linear-gradient(135deg, #ff6b6b 0%, #ffd166 25%, #6ee7b7 50%, #60a5fa 75%, #c084fc 100%)',
+  'grad-sun': 'radial-gradient(circle at 50% 42%, #fffbe6 0%, #fde047 30%, #f59e0b 62%, #ea580c 100%)'
 };
 // С каким фоном кружок ещё и переливается
-const SHINY_BG = ['#0ea5e9', '#d946ef'];
+const SHINY_BG = ['#0ea5e9', '#d946ef', 'grad-galaxy', 'grad-rainbow', 'grad-sun'];
 
 function avatarBgCss(color) {
   return REWARD_BG[color] || AVATAR_GRAD[color] || color || '';
@@ -51,12 +75,15 @@ const ICON_ART = new Set([
 ]);
 // Остальные картинки — по имени, а не по эмодзи: соперники Приключения
 // (adv-01…), значки режимов (m-…), поясов подсказки (t-0…t-8) и бонусов (b-…).
-// Портретов соперников — сколько их уже нарисовано: миры выходят партиями
+// Портретов соперников — сколько их уже нарисовано: миры выходят партиями.
+// Иконки магазина «Стихии» — shop-01…shop-20 (миграция 061)
 const ADV_ART = 500;
-const NAMED_ART = ['m-solo', 'm-duel', 'm-adventure', 'm-run', 'm-online', 'm-play', 'm-friends', 'm-settings',
+const SHOP_ART = 20;
+const NAMED_ART = ['m-solo', 'm-duel', 'm-adventure', 'm-run', 'm-play', 'm-friends', 'm-settings',
   't-0', 't-1', 't-2', 't-3', 't-4', 't-5', 't-6', 't-7', 't-8',
   'b-extra', 'b-fog', 'b-blind', 'b-rush', 'b-skip', 'b-gift', 'b-memory', 'b-token']
-  .concat(Array.from({ length: ADV_ART }, (_, i) => 'adv-' + String(i + 1).padStart(2, '0')));
+  .concat(Array.from({ length: ADV_ART }, (_, i) => 'adv-' + String(i + 1).padStart(2, '0')))
+  .concat(Array.from({ length: SHOP_ART }, (_, i) => 'shop-' + String(i + 1).padStart(2, '0')));
 function isNamedArt(code) { return NAMED_ART.indexOf(code) >= 0; }
 
 function iconFile(code) {

@@ -1,0 +1,624 @@
+-- Магазин: монеты 🪙 и кристаллы 💎, товары и начисления за игру.
+-- Применять в Supabase: SQL Editor → вставить целиком → Run. Применить ДО мёржа.
+--
+-- • Кошелёк: монеты и кристаллы. Отдельно — сколько кристаллов куплено за
+--   деньги (сейчас всегда 0: покупки за деньги нет, но место под неё есть).
+-- • Монеты — за любую игру: Приключение (5 🪙 за каждую новую звезду),
+--   онлайн (победа 15, поражение 5, в режиме дня — вдвое; сдавшемуся — 0), Испытание
+--   (2 🪙 за раунд, до 20 за заход), задания дня (20 🪙 за каждое).
+--   За онлайн и Испытание — не больше 300 🪙 в день: накрутить нельзя.
+-- • Кристаллы: 2 💎 за первую победу над боссом мира, 3 💎 за мир, где у всех
+--   соперников ★★★, на турнире выходных — 1 💎 за 3 победы и 2 💎 за 5.
+-- • Прошлое считается по тем же правилам: за уже полученные звёзды и
+--   побеждённых боссов начислено сразу. Повторный запуск миграции не
+--   начисляет второй раз.
+-- • Товары: 20 иконок «Стихии», 8 рамок, 8 цветов фона, 10 титулов и 8 фраз.
+--   Купленное — навсегда, надевается там же, где награды пути.
+-- • Трофеи (иконки боссов и соперников, рамки турнира) не продаются.
+-- Всё считает база: из игры монеты не прислать.
+
+-- ============ 1. Кошелёк и журнал ============
+create table if not exists wallet (
+  username text primary key references students(username) on update cascade on delete cascade,
+  coins int not null default 0,
+  gems int not null default 0,
+  -- Кристаллы, купленные за деньги (на будущее; сейчас всегда 0)
+  gems_paid int not null default 0,
+  -- За что из Приключения уже заплачено: звёзды — как adventure_stars,
+  -- боссы и миры ★★★ — по символу '1' на мир
+  adv_paid text not null default '',
+  boss_paid text not null default '',
+  gold_paid text not null default '',
+  updated_at timestamptz not null default now()
+);
+alter table wallet enable row level security;
+alter table wallet drop constraint if exists wallet_nonneg;
+alter table wallet add constraint wallet_nonneg check (coins >= 0 and gems >= 0 and gems_paid >= 0);
+
+-- Каждое начисление и каждая покупка. ref — ключ события: одно и то же
+-- событие (партия, задание, турнир, покупка) записывается один раз
+create table if not exists wallet_log (
+  id bigserial primary key,
+  username text not null references students(username) on update cascade on delete cascade,
+  coins int not null default 0,
+  gems int not null default 0,
+  reason text not null,
+  ref text,
+  day date not null,
+  created_at timestamptz not null default now()
+);
+alter table wallet_log enable row level security;
+create unique index if not exists wallet_log_once on wallet_log(username, reason, ref) where ref is not null;
+create index if not exists wallet_log_day on wallet_log(username, day);
+
+-- Сколько монет в день можно получить за партии онлайн и Испытание
+create or replace function wallet_cap() returns int language sql immutable as $$ select 300; $$;
+
+-- Кому кошелёк положен: живому игроку, не боту и не гостю
+create or replace function wallet_person(p_username text)
+returns boolean language sql stable security definer set search_path = public, pg_temp as $$
+  select p_username is not null and p_username not like '#%' and p_username not like '@bot:%'
+     and exists (select 1 from students s where s.username = p_username and not coalesce(s.is_bot, false));
+$$;
+
+-- Начислить без дневного предела. С ключом — один раз; true — если начислено
+create or replace function wallet_add(p_username text, p_coins int, p_gems int, p_reason text, p_ref text)
+returns boolean
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare n int;
+begin
+  if not wallet_person(p_username) or (coalesce(p_coins, 0) <= 0 and coalesce(p_gems, 0) <= 0) then return false; end if;
+  insert into wallet(username) values (p_username) on conflict do nothing;
+  perform 1 from wallet where username = p_username for update;
+  insert into wallet_log(username, coins, gems, reason, ref, day)
+  values (p_username, coalesce(p_coins, 0), coalesce(p_gems, 0), p_reason, p_ref, player_day(p_username))
+  on conflict do nothing;
+  get diagnostics n = row_count;
+  if n = 0 then return false; end if;
+  update wallet set coins = coins + coalesce(p_coins, 0), gems = gems + coalesce(p_gems, 0), updated_at = now()
+   where username = p_username;
+  return true;
+end;
+$$;
+
+-- Монеты за партию онлайн или Испытание: не больше wallet_cap() в день.
+-- Возвращает, сколько начислено на самом деле
+create or replace function wallet_earn(p_username text, p_coins int, p_reason text, p_ref text)
+returns int
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare d date; today int; amt int; n int;
+begin
+  if not wallet_person(p_username) or coalesce(p_coins, 0) <= 0 then return 0; end if;
+  insert into wallet(username) values (p_username) on conflict do nothing;
+  perform 1 from wallet where username = p_username for update;
+  d := player_day(p_username);
+  select coalesce(sum(l.coins), 0) into today from wallet_log l
+   where l.username = p_username and l.day = d and l.reason in ('online', 'trial');
+  amt := least(p_coins, greatest(0, wallet_cap() - today));
+  if amt <= 0 then return 0; end if;
+  insert into wallet_log(username, coins, gems, reason, ref, day) values (p_username, amt, 0, p_reason, p_ref, d)
+  on conflict do nothing;
+  get diagnostics n = row_count;
+  if n = 0 then return 0; end if;
+  update wallet set coins = coins + amt, updated_at = now() where username = p_username;
+  return amt;
+end;
+$$;
+
+-- Приключение: 5 🪙 за звезду, 2 💎 за побеждённого босса мира, 3 💎 за мир
+-- с ★★★ у всех. Платится разница с тем, что уже заплачено, поэтому прошлые
+-- успехи, синхронизация с другого телефона и новые победы считаются одинаково
+create or replace function adventure_wallet(p_username text)
+returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare s students; w wallet; st text; ap text; bp text; gp text; i int; nw int; cur int; paid int;
+        c int := 0; g int := 0;
+begin
+  if not wallet_person(p_username) then return jsonb_build_object('coins', 0, 'gems', 0); end if;
+  insert into wallet(username) values (p_username) on conflict do nothing;
+  select * into w from wallet where username = p_username for update;
+  select * into s from students where username = p_username;
+  st := coalesce(s.adventure_stars, '');
+  ap := rpad(w.adv_paid, greatest(length(w.adv_paid), length(st)), '0');
+  for i in 1 .. length(st) loop
+    cur := substr(st, i, 1)::int;
+    paid := substr(ap, i, 1)::int;
+    if cur > paid then
+      c := c + 5 * (cur - paid);
+      ap := overlay(ap placing cur::text from i for 1);
+    end if;
+  end loop;
+  bp := rpad(w.boss_paid, 50, '0');
+  gp := rpad(w.gold_paid, 50, '0');
+  for nw in 0 .. 49 loop
+    -- Босс — десятый в мире: пройден, если открыт следующий или у него есть звезда
+    if substr(bp, nw + 1, 1) = '0'
+       and (coalesce(s.adventure, 0) > nw * 10 + 9 or substr(st, nw * 10 + 10, 1) between '1' and '3') then
+      g := g + 2;
+      bp := overlay(bp placing '1' from nw + 1 for 1);
+    end if;
+    if substr(gp, nw + 1, 1) = '0' and substr(st, nw * 10 + 1, 10) = '3333333333' then
+      g := g + 3;
+      gp := overlay(gp placing '1' from nw + 1 for 1);
+    end if;
+  end loop;
+  if c > 0 or g > 0 then
+    update wallet set coins = coins + c, gems = gems + g, adv_paid = ap, boss_paid = bp, gold_paid = gp,
+                      updated_at = now()
+     where username = p_username;
+    insert into wallet_log(username, coins, gems, reason, ref, day)
+    values (p_username, c, g, 'adventure', null, player_day(p_username));
+  end if;
+  return jsonb_build_object('coins', c, 'gems', g);
+end;
+$$;
+
+-- Кристаллы за деньги — место под будущую покупку. Зовёт только сервер
+-- оплаты (ключ — номер платежа, повтор не начисляет), из игры недоступно
+create or replace function wallet_add_paid(p_username text, p_gems int, p_payment text)
+returns boolean
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare n int;
+begin
+  if not wallet_person(p_username) or coalesce(p_gems, 0) <= 0 or p_payment is null then return false; end if;
+  insert into wallet(username) values (p_username) on conflict do nothing;
+  perform 1 from wallet where username = p_username for update;
+  insert into wallet_log(username, coins, gems, reason, ref, day)
+  values (p_username, 0, p_gems, 'paid', p_payment, player_day(p_username))
+  on conflict do nothing;
+  get diagnostics n = row_count;
+  if n = 0 then return false; end if;
+  update wallet set gems = gems + p_gems, gems_paid = gems_paid + p_gems, updated_at = now() where username = p_username;
+  return true;
+end;
+$$;
+
+-- ============ 2. Товары ============
+-- Копия — в js/shop.js (SHOP_ITEMS), сверяется тестом. Цена — в монетах или
+-- в кристаллах (одно из двух)
+create or replace function shop_items()
+returns table(kind text, code text, coins int, gems int)
+language sql immutable as $$
+  values
+    -- Иконки «Стихии»: десять за монеты, десять легендарных за кристаллы
+    ('icon', 'shop-01', 150, 0), ('icon', 'shop-02', 150, 0), ('icon', 'shop-03', 150, 0), ('icon', 'shop-04', 150, 0),
+    ('icon', 'shop-05', 150, 0), ('icon', 'shop-06', 150, 0), ('icon', 'shop-07', 150, 0), ('icon', 'shop-08', 150, 0),
+    ('icon', 'shop-09', 150, 0), ('icon', 'shop-10', 150, 0),
+    ('icon', 'shop-11', 0, 15), ('icon', 'shop-12', 0, 15), ('icon', 'shop-13', 0, 15), ('icon', 'shop-14', 0, 15),
+    ('icon', 'shop-15', 0, 15), ('icon', 'shop-16', 0, 15), ('icon', 'shop-17', 0, 15), ('icon', 'shop-18', 0, 15),
+    ('icon', 'shop-19', 0, 15), ('icon', 'shop-20', 0, 15),
+    -- Рамки: три последние переливаются
+    ('frame', 'leaf', 150, 0), ('frame', 'ocean', 150, 0), ('frame', 'coral', 150, 0), ('frame', 'ember', 150, 0),
+    ('frame', 'night', 150, 0), ('frame', 'galaxy', 0, 12), ('frame', 'aurora', 0, 12), ('frame', 'prism', 0, 12),
+    -- Цвета фона кружка: три последних переливаются
+    ('color', 'grad-mint', 100, 0), ('color', 'grad-peach', 100, 0), ('color', 'grad-sky', 100, 0),
+    ('color', 'grad-violet', 100, 0), ('color', 'grad-sand', 100, 0),
+    ('color', 'grad-galaxy', 0, 10), ('color', 'grad-rainbow', 0, 10), ('color', 'grad-sun', 0, 10),
+    -- Титулы под именем
+    ('title', 'thinker', 150, 0), ('title', 'explorer', 150, 0), ('title', 'lucky', 150, 0),
+    ('title', 'strategist', 150, 0), ('title', 'speedy', 150, 0), ('title', 'calm', 150, 0),
+    ('title', 'sleuth', 150, 0), ('title', 'friend', 150, 0), ('title', 'legend', 0, 10), ('title', 'genius', 0, 10),
+    -- Фразы для чата в партии
+    ('phrase', 'bingo', 100, 0), ('phrase', 'respect', 100, 0), ('phrase', 'brain', 100, 0),
+    ('phrase', 'whatluck', 100, 0), ('phrase', 'thanks', 100, 0), ('phrase', 'math', 100, 0),
+    ('phrase', 'comeback', 100, 0), ('phrase', 'bravo', 100, 0);
+$$;
+
+create or replace function shop_codes(p_kind text)
+returns text[] language sql immutable as $$
+  select coalesce(array_agg(i.code order by i.code), '{}') from shop_items() i where i.kind = p_kind;
+$$;
+
+-- Купить. Цена списывается, вещь — навсегда в cosmetics (как награды пути)
+create or replace function shop_buy(p_username text, p_pin text, p_kind text, p_code text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; it record; w wallet;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into it from shop_items() i where i.kind = p_kind and i.code = p_code;
+  if it.kind is null then raise exception 'no_such_item'; end if;
+  insert into wallet(username) values (me) on conflict do nothing;
+  select * into w from wallet where username = me for update;
+  if cosmetic_has(me, p_kind, p_code) then raise exception 'already_owned'; end if;
+  if w.coins < it.coins or w.gems < it.gems then raise exception 'not_enough'; end if;
+  update wallet set coins = coins - it.coins, gems = gems - it.gems, updated_at = now()
+   where username = me returning * into w;
+  insert into wallet_log(username, coins, gems, reason, ref, day)
+  values (me, -it.coins, -it.gems, 'buy', p_kind || ':' || p_code, player_day(me));
+  perform cosmetic_grant(me, p_kind, p_code, 'shop');
+  return jsonb_build_object('coins', w.coins, 'gems', w.gems, 'kind', p_kind, 'code', p_code);
+end;
+$$;
+
+-- Кошелёк и сколько монет за партии сегодня уже получено (из wallet_cap())
+create or replace function my_wallet(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; w wallet; today int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into w from wallet where username = me;
+  select coalesce(sum(l.coins), 0) into today from wallet_log l
+   where l.username = me and l.day = player_day(me) and l.reason in ('online', 'trial');
+  return jsonb_build_object('coins', coalesce(w.coins, 0), 'gems', coalesce(w.gems, 0),
+                            'today', today, 'cap', wallet_cap());
+end;
+$$;
+
+-- ============ 3. Начисления ============
+-- Приключение: бой выигран — звёзды, боссы и миры ★★★ из кошелька
+create or replace function adventure_result(p_username text, p_pin text, p_n int, p_stars int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; s students; was int; got int; st text; pay jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_n is null or p_n < 0 or p_n > 499 or p_stars is null or p_stars < 1 or p_stars > 3 then
+    raise exception 'bad_result';
+  end if;
+  select * into s from students where username = me for update;
+  -- Дальше открытого соперника не прыгнуть
+  if p_n > s.adventure then raise exception 'not_open'; end if;
+  st := rpad(s.adventure_stars, greatest(length(s.adventure_stars), p_n + 1), '0');
+  was := substr(st, p_n + 1, 1)::int;
+  got := greatest(0, p_stars - was);
+  if got > 0 then st := overlay(st placing p_stars::text from p_n + 1 for 1); end if;
+  update students
+     set adventure_stars = st,
+         adventure = greatest(adventure, p_n + 1)
+   where username = me
+  returning * into s;
+  perform quest_event(me, 'adv_win', 1);
+  if got > 0 then perform quest_event(me, 'adv_star', got); end if;
+  perform achievements_sync(me);
+  pay := adventure_wallet(me);
+  return jsonb_build_object('done', s.adventure, 'stars', s.adventure_stars,
+                            'total', adventure_star_total(s.adventure_stars), 'new', got,
+                            'coins', pay->'coins', 'gems', pay->'gems');
+end;
+$$;
+
+-- Синхронизация (прогресс с телефона без входа) — тоже с оплатой разницы
+create or replace function adventure_sync(p_username text, p_pin text, p_done int, p_stars text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; s students; st text; pay jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_stars is not null and (p_stars !~ '^[0-3]*$' or length(p_stars) > 500) then raise exception 'bad_stars'; end if;
+  select * into s from students where username = me for update;
+  st := adventure_star_merge(s.adventure_stars, p_stars);
+  update students
+     set adventure = greatest(adventure, least(500, greatest(0, coalesce(p_done, 0)))),
+         adventure_stars = st
+   where username = me
+  returning * into s;
+  perform achievements_sync(me);
+  pay := adventure_wallet(me);
+  return jsonb_build_object('done', s.adventure, 'stars', s.adventure_stars,
+                            'total', adventure_star_total(s.adventure_stars),
+                            'coins', pay->'coins', 'gems', pay->'gems');
+end;
+$$;
+
+-- Старый путь сохранения (прежняя версия игры): кристаллы за боссов тоже
+create or replace function adventure_save(p_username text, p_pin text, p_done int)
+returns int
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; r int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  update students
+     set adventure = greatest(adventure, least(500, greatest(0, coalesce(p_done, 0))))
+   where username = me
+  returning adventure into r;
+  perform adventure_wallet(me);
+  return r;
+end;
+$$;
+
+-- Онлайн: партия с исходом — очки сезона (как раньше) и монеты
+create or replace function matches_pass()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare seat int; who text; w int; k int;
+begin
+  w := match_winner(new);
+  if w is null then return null; end if;
+  k := case when new.ranked_mode = 4 then 2 else 1 end;
+  for seat in 0..1 loop
+    if new.bot_seat is not null and new.bot_seat = seat then continue; end if;
+    who := case when seat = 0 then new.p0 else new.p1 end;
+    if who like '#%' then continue; end if;
+    perform season_xp(who, (10 + case when w = seat then 10 else 0 end) * k);
+    insert into online_days(username, day, played) values (who, player_day(who), true)
+    on conflict (username, day) do update set played = true;
+    -- Сдался или ушёл из партии — без монет: иначе их копили бы, бросая партии
+    perform wallet_earn(who, (case when w = seat then 15 when new.forfeit_by = seat then 0 else 5 end) * k,
+                        'online', 'match:' || new.id);
+  end loop;
+  return null;
+end;
+$$;
+
+-- Задание дня выполнено — очки сезона (как раньше) и 20 🪙
+create or replace function daily_quests_pass()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.progress >= new.goal and old.progress < old.goal then
+    perform season_xp(new.username, 20);
+    perform wallet_add(new.username, 20, 0, 'quest', 'quest:' || new.day || ':' || new.slot);
+  end if;
+  return null;
+end;
+$$;
+
+-- Испытание: итог захода — как раньше, плюс 2 🪙 за раунд (до 20)
+create or replace function run_report(p_username text, p_pin text, p_rounds int, p_score int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; r run_sessions; best int; best_rounds int; coins int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_rounds is null or p_rounds < 0 or p_rounds > 60 then raise exception 'bad_result'; end if;
+  -- Больше, чем за 60 раундов лучшей игры, набрать нельзя: очки за раунд n —
+  -- не больше 100·n·14, с риском и подарком ×4
+  if p_score is null or p_score < 0 or p_score > 5600 * p_rounds * (p_rounds + 1) / 2 + 1 then
+    raise exception 'bad_result';
+  end if;
+  select * into r from run_sessions where username = me;
+  -- Не чаще раза в 5 секунд: итог присылается один раз на заход
+  if r.username is not null and r.status = 'finished' and r.updated_at > now() - interval '5 seconds' then
+    raise exception 'too_fast';
+  end if;
+  insert into run_sessions(username, status, round, score, range_min, range_max, allowed, secret, moves, frost)
+  values (me, 'active', p_rounds + 1, p_score, 1, 10, 1, 1, 0, false)
+  on conflict (username) do update
+    set status = 'active', round = p_rounds + 1, score = p_score, range_min = 1, range_max = 10,
+        allowed = 1, secret = 1, moves = 0, frost = false, updated_at = now();
+  -- run_finish пишет runs и рекорд и закрывает строку — на этом срабатывает
+  -- триггер заданий и достижений
+  perform run_finish(me);
+  coins := wallet_earn(me, least(20, 2 * p_rounds), 'trial', null);
+  select best_run_score, best_run_rounds into best, best_rounds from students where username = me;
+  return jsonb_build_object('best', coalesce(best, 0), 'bestRounds', coalesce(best_rounds, 0), 'coins', coins);
+end;
+$$;
+
+-- Турнир выходных: награды как раньше, плюс 1 💎 за 3 победы и 2 💎 за 5
+create or replace function weekend_claim(p_username text, p_pin text, p_goal int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; c weekend_cup; xp int; sur record; got jsonb := null; frame boolean := false; res jsonb; gems int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_goal not in (3, 5) then raise exception 'bad_goal'; end if;
+  select * into c from weekend_cup where username = me and week = weekend_row_key() for update;
+  if c.username is null or c.wins < p_goal then raise exception 'cup_locked'; end if;
+  if p_goal = 3 and c.claim3 is not null then return c.claim3 || jsonb_build_object('already', true); end if;
+  if p_goal = 5 and c.claim5 is not null then return c.claim5 || jsonb_build_object('already', true); end if;
+
+  if p_goal = 5 and cosmetic_grant(me, 'frame', cup_frame_code(), 'cup:' || c.week) then
+    frame := true;
+    xp := 50;
+  else
+    xp := case when p_goal = 3 then 50 else 100 end;
+    -- Сундук за 3 победы — сюрприз всегда, если ещё есть что дать; большой — через раз
+    if p_goal = 3 or random() < 0.5 then
+      select x.* into sur from chest_surprises() x where not cosmetic_has(me, x.kind, x.code) order by random() limit 1;
+      if sur.kind is not null and cosmetic_grant(me, sur.kind, sur.code, 'cup:' || c.week) then
+        got := jsonb_build_object('kind', sur.kind, 'code', sur.code);
+      end if;
+    end if;
+  end if;
+  perform season_xp(me, xp);
+  gems := case when p_goal = 3 then 1 else 2 end;
+  if not wallet_add(me, 0, gems, 'cup', 'cup:' || c.week || ':' || p_goal) then gems := 0; end if;
+  res := jsonb_build_object('goal', p_goal, 'xp', xp, 'surprise', got,
+                            'frame', case when frame then cup_frame_code() end, 'gems', gems);
+  if p_goal = 3 then update weekend_cup set claim3 = res where username = me and week = c.week;
+  else update weekend_cup set claim5 = res where username = me and week = c.week; end if;
+  return res;
+end;
+$$;
+
+-- ============ 4. Надеть купленное ============
+alter table students drop constraint if exists student_avatar_allowed;
+alter table students add constraint student_avatar_allowed
+  check (avatar is null or avatar = any (avatar_choices() || reward_icons() || tutorial_icon() || quest_icons()
+                                         || adventure_icons() || adventure_char_icons() || pass_icons()
+                                         || shop_codes('icon')));
+
+create or replace function set_avatar(p_username text, p_pin text, p_avatar text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; need int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  -- Иконка за обучение — тому, кто его прошёл
+  if p_avatar = tutorial_icon() then
+    if not coalesce((select tutorial_done from students where username = me), false) then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка за серию заданий — тому, у кого была такая серия
+  elsif p_avatar = any (quest_icons()) then
+    select days into need from quest_rewards() where icon = p_avatar;
+    if coalesce((select quest_best from player_stats where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка босса Приключения — тому, кто прошёл его мир
+  elsif p_avatar = any (adventure_icons()) then
+    need := array_position(adventure_icons(), p_avatar) * 10;
+    if coalesce((select adventure from students where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка соперника Приключения — когда весь его мир пройден на 3★
+  elsif p_avatar = any (adventure_char_icons()) then
+    need := (substr(p_avatar, 5)::int - 1) / 10;
+    if substr(coalesce((select adventure_stars from students where username = me), ''), need * 10 + 1, 10) <> '3333333333' then
+      raise exception 'avatar_locked';
+    end if;
+  -- Иконка сезонного пути, сундука или магазина — тому, у кого она есть
+  elsif p_avatar = any (pass_icons() || shop_codes('icon')) then
+    if not cosmetic_has(me, 'icon', p_avatar) then raise exception 'avatar_locked'; end if;
+  elsif p_avatar is not null and not (p_avatar = any (avatar_choices())) then
+    select league into need from league_rewards() where kind = 'icon' and value = p_avatar;
+    if need is null then raise exception 'invalid_avatar'; end if;
+    if coalesce((select peak from ladder where username = me), 0) < need then
+      raise exception 'avatar_locked';
+    end if;
+  end if;
+  update students set avatar = p_avatar where username = me;
+  return p_avatar;
+end;
+$$;
+
+alter table students drop constraint if exists student_avatar_color_allowed;
+alter table students add constraint student_avatar_color_allowed
+  check (avatar_color is null or avatar_color = any (avatar_colors() || reward_colors() || pass_colors() || shop_codes('color')));
+
+create or replace function set_avatar_color(p_username text, p_pin text, p_color text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; need int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_color = any (pass_colors() || shop_codes('color')) then
+    if not cosmetic_has(me, 'color', p_color) then raise exception 'color_locked'; end if;
+  elsif p_color is not null and not (p_color = any (avatar_colors())) then
+    select league into need from league_rewards() where kind = 'color' and value = p_color;
+    if need is null then raise exception 'invalid_color'; end if;
+    if coalesce((select peak from ladder where username = me), 0) < need then
+      raise exception 'color_locked';
+    end if;
+  end if;
+  update students set avatar_color = p_color where username = me;
+  return p_color;
+end;
+$$;
+
+create or replace function chat_codes()
+returns text[]
+language sql
+immutable
+as $$
+  select array['hi', 'luck', 'nice', 'wow', 'think', 'almost', 'again', 'gg',
+               'hot', 'cold', 'hurry'] || pass_phrases() || shop_codes('phrase');
+$$;
+
+create or replace function send_phrase(p_username text, p_pin text,
+                                       p_match_id bigint, p_code text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; my_seat int; recent int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  my_seat := match_seat(m, me);
+  if my_seat is null then raise exception 'not_your_match'; end if;
+  if m.status not in ('active', 'invited') then raise exception 'not_playing'; end if;
+  if not (p_code = any(chat_codes())) then raise exception 'bad_phrase'; end if;
+  -- Фраза из наград или магазина — только у того, у кого она есть
+  if p_code = any (pass_phrases() || shop_codes('phrase')) and not cosmetic_has(me, 'phrase', p_code) then
+    raise exception 'phrase_locked';
+  end if;
+
+  select count(*) into recent from match_chat c
+  where c.match_id = p_match_id and c.seat = my_seat
+    and c.created_at > now() - interval '10 seconds';
+  if recent >= 3 then raise exception 'too_fast'; end if;
+
+  insert into match_chat(match_id, seat, code) values (p_match_id, my_seat, p_code);
+  return true;
+end;
+$$;
+
+-- ============ 5. Прошлое: звёзды и боссы — по тем же правилам ============
+-- Разница с уже заплаченным: второй запуск миграции ничего не добавит
+do $$
+declare u text;
+begin
+  for u in select username from students where not coalesce(is_bot, false) and username not like '@bot:%' loop
+    perform adventure_wallet(u);
+  end loop;
+end $$;
+
+-- ============ 6. Права ============
+revoke execute on function wallet_person(text) from public, anon;
+revoke execute on function wallet_add(text, int, int, text, text) from public, anon;
+revoke execute on function wallet_earn(text, int, text, text) from public, anon;
+revoke execute on function adventure_wallet(text) from public, anon;
+revoke execute on function wallet_add_paid(text, int, text) from public, anon;
+do $$ begin
+  -- В Supabase есть и роль вошедших; в тестовой базе её может не быть
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke execute on function wallet_add_paid(text, int, text) from authenticated;
+  end if;
+  -- Зовёт только сервер оплаты (служебная роль Supabase), когда покупка появится
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function wallet_add_paid(text, int, text) to service_role;
+  end if;
+end $$;
+grant execute on function wallet_cap() to anon;
+grant execute on function shop_items() to anon;
+grant execute on function shop_codes(text) to anon;
+grant execute on function shop_buy(text, text, text, text) to anon;
+grant execute on function my_wallet(text, text) to anon;
+grant execute on function adventure_result(text, text, int, int) to anon;
+grant execute on function adventure_sync(text, text, int, text) to anon;
+grant execute on function adventure_save(text, text, int) to anon;
+grant execute on function run_report(text, text, int, int) to anon;
+grant execute on function weekend_claim(text, text, int) to anon;
+grant execute on function set_avatar(text, text, text) to anon;
+grant execute on function set_avatar_color(text, text, text) to anon;
+grant execute on function send_phrase(text, text, bigint, text) to anon;

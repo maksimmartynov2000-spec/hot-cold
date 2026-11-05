@@ -73,27 +73,10 @@ function serve() {
   // когда нужна, и без сети берётся из кеша
   check('без сети библиотека QR-кода на месте', await page.evaluate(() => loadQrLib().then(() => typeof qrcode === 'function')));
   check('supabase-js — из кеша, без CDN', await page.evaluate(() => caches.match('./vendor/supabase.js').then(r => !!r)));
-  check('без сети видны все пять режимов',
-    (await page.locator('#screenMode .mode-btn:not(.hidden)').count()) === 5);
+  check('без сети видны все четыре режима', (await page.locator('#screenMode .mode-btn:not(.hidden)').count()) === 4);
 
-  // Онлайн — первый режим, которому сеть нужна по существу. И рейтинг, и друзья
-  // должны сказать об этом словами, а не молча зависнуть на пустом списке
-  await page.click('#tModeOnline');
-  await page.waitForTimeout(600);
-  const rankedNote = await page.evaluate(() => {
-    const el = document.getElementById('rkNote');
-    return { open: !document.getElementById('screenOnline').classList.contains('hidden'),
-             note: el ? el.textContent : '',
-             bad: el ? el.classList.contains('bad') : false };
-  });
-  check('без сети рейтинг говорит про связь, а не молчит',
-    rankedNote.open && rankedNote.bad && rankedNote.note.length > 0,
-    JSON.stringify(rankedNote));
-  check('и не показывает сырую ошибку fetch',
-    rankedNote.note.indexOf('fetch') < 0, rankedNote.note);
-  await page.click('#navPlay');
-  await page.waitForTimeout(300);
-
+  // «Друзья» — то, чему сеть нужна по существу: должны сказать об этом
+  // словами, а не молча зависнуть на пустом списке
   await page.click('#friendsBtn');
   await page.waitForTimeout(600);
   const offlineNote = await page.evaluate(() => {
@@ -102,7 +85,7 @@ function serve() {
              note: el ? el.textContent : '',
              bad: el ? el.classList.contains('bad') : false };
   });
-  check('и друзья тоже говорят про связь',
+  check('без сети «Друзья» говорят про связь, а не молчат',
     offlineNote.open && offlineNote.bad && offlineNote.note.length > 0,
     JSON.stringify(offlineNote));
   await page.click('#navPlay');

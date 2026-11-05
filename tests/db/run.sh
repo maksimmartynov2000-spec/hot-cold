@@ -30,9 +30,9 @@ node "$DIR/bonus_count_from_js.js"
 node "$DIR/near_radius_from_js.js"
 node "$DIR/avatars_from_js.js"
 node "$DIR/say_codes_from_js.js"
-node "$DIR/bots_from_js.js"
 node "$DIR/rewards_from_js.js"
 node "$DIR/pass_sets_from_js.js"
+node "$DIR/shop_from_js.js"
 chmod a+r "$DIR"/*.csv
 
 # Список «-f файл» для psql: все миграции с номером не меньше $1.
@@ -67,6 +67,26 @@ if ! su postgres -c "psql -q -d hotcold_scratch -v ON_ERROR_STOP=1 \
 fi
 rm -f "$DIR/.scratch.log"
 su postgres -c "dropdb --if-exists hotcold_scratch" >/dev/null 2>&1
+
+# 1б. Переход на 062 (без онлайна): база до неё с рейтингом и ботами, потом
+#     062 — награды лиг в коллекции, рейтинг и боты удалены, партии с друзьями
+#     на месте. Удаление без возврата, поэтому проверяется отдельно
+echo "--- переход на 062"
+BEFORE=""
+for M in "$MIG"/*.txt; do
+  N=$(basename "$M" | cut -c1-3)
+  if [ "$N" -lt 062 ]; then BEFORE="$BEFORE -f $M"; fi
+done
+su postgres -c "dropdb --if-exists hotcold_upgrade" >/dev/null 2>&1
+su postgres -c "createdb hotcold_upgrade"
+if ! UPG=$(su postgres -c "psql -q -A -t -d hotcold_upgrade -v ON_ERROR_STOP=1 -f $DIR/00_supabase.sql $BEFORE \
+     -f $DIR/upgrade_062_before.sql -f $MIG/062_no_online.txt -f $DIR/upgrade_062_after.sql" 2>"$DIR/.scratch.log"); then
+  grep -v NOTICE "$DIR/.scratch.log"
+  FAILED=1
+fi
+echo "$UPG" | grep "переход" || true
+rm -f "$DIR/.scratch.log"
+su postgres -c "dropdb --if-exists hotcold_upgrade" >/dev/null 2>&1
 
 # 2. Тестовая база. Игроки — старые аккаунты с PIN из 4 цифр: регистрация
 #    теперь просит 6 (миграция 040), а вход старым PIN работает как раньше
