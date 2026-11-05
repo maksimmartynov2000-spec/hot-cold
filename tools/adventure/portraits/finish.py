@@ -1,12 +1,13 @@
 # Портреты партии: python3 -I tools/adventure/portraits/finish.py <партия> <cutdir> <icons dir> <picks>
 # cutdir — клетки после cutsheet.py: <лист><вариант>-<NN>.png (лист 1–5, вариант a, b…).
-# picks — пять строк через «/», в каждой 20 букв варианта по клеткам листа:
+# picks — пять строк через «/» (у партии 5 — три: 20, 20 и 10 букв), буква — вариант клетки листа:
 #   "aaaaaaaaaaaaaaaaaaaa/abaa…/…". Боссам (9-я и 19-я клетка) — кремовое сияние за спиной.
 # Партия 1 — герои 51–150 (adv-51…), партия 2 — 151–250 и т. д. Рядом с cutdir — контактный лист.
 import numpy as np, os, sys
 from PIL import Image, ImageDraw
 batch, CUT, OUT, picks = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4].split('/')
-assert len(picks) == 5 and all(len(p) == 20 for p in picks), picks
+# Партия 5 (миры 46–50) — 50 героев: листы 6–8 из prompts5.txt, здесь это листы 1–3
+assert [len(p) for p in picks] == ([20] * 5 if batch < 5 else [20, 20, 10]), picks
 def glow(size=192):
     y, x = np.mgrid[0:size, 0:size]
     r = np.hypot(x - size / 2 + 0.5, y - size / 2 + 0.5) / (size / 2)

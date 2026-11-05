@@ -1,0 +1,88 @@
+ПОРТРЕТЫ: миры 36–50 — листы 6–8 (миры 46–50, герои 451–500)
+
+Как сделать каждый лист (так же, как партии 2 и 3):
+1. Откройте Gemini, приложите ту же картинку-образец стиля (style-ref).
+2. Вставьте текст листа целиком — от «Match» до последней строки.
+3. Готовую картинку пришлите сюда. Если Gemini дал два варианта — присылайте оба. Нарежу и подключу сам.
+Листы 1–7 — по 20 героев (5 в ряд, 4 ряда), лист 8 — 10 героев (5 в ряд, 2 ряда).
+Если какой-то герой вышел плохо — скажите, кого переделать: дам подсказку на него одного.
+
+Кто есть кто (по рядам слева направо; 👑 — босс):
+Лист 6.
+  ряд 1: Киви Комочек (мир 46), Кеа Хулиган (мир 46), Какапо Обнимашка (мир 46), Пукеко Болотник (мир 46), Вета Громадина (мир 46)
+  ряд 2: Такахе Синька (мир 46), Туи Пересмешник (мир 46), Морской котик Пляжник (мир 46), Веерохвостка Порхушка (мир 46), 👑 Великий Туатара (мир 46)
+  ряд 3: Электрический угорь Разряд (мир 47), Иния Розовка (мир 47), Пиранья Щёлк (мир 47), Гоацин Панк (мир 47), Древолаз Бирюза (мир 47)
+  ряд 4: Гарпия Взгляд (мир 47), Тамарин Усище (мир 47), Агути Орешек (мир 47), Морфо Синева (мир 47), 👑 Королева Анаконда (мир 47)
+Лист 7.
+  ряд 1: Совёнок Конверт (мир 48), Жабёнок Пузырь (мир 48), Ученица Руна (мир 48), Ученик Свиток (мир 48), Кот Мурмяу (мир 48)
+  ряд 2: Гиппогриф Ураган (мир 48), Пикси Шалунья (мир 48), Кролик Абракадабра (мир 48), Ёж Шалфей (мир 48), 👑 Архимаг Седобород (мир 48)
+  ряд 3: Сапсан Пике (мир 49), Жук-геркулес Титан (мир 49), Стеклянная лягушка Невидимка (мир 49), Креветка-богомол Удар (мир 49), Медоед Бесстрашный (мир 49)
+  ряд 4: Рыба-брызгун Снайпер (мир 49), Утконос Сенсор (мир 49), Землеройка Турбо (мир 49), Лирохвост Пародист (мир 49), 👑 Доктор Хаос (мир 49)
+Лист 8.
+  ряд 1: Дронт Додо (мир 50), Моа Ходуля (мир 50), Сумчатый волк Тасман (мир 50), Трилобит Кембрий (мир 50), Стеллерова корова Великанша (мир 50)
+  ряд 2: Бескрылая гагарка Фрак (мир 50), Орёл Хааста Размах (мир 50), Квагга Полузебра (мир 50), Аммонит Юрский (мир 50), 👑 Повелитель Хронос (мир 50)
+
+=============== ЛИСТ 6 из 8 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no letters, no grid lines, no borders.
+Row 1, column 1: a round brown kiwi bird with a long thin beak poking in the leaves
+Row 1, column 2: a cheeky olive-green kea parrot with orange under its wings, grinning
+Row 1, column 3: a chubby green kakapo parrot with an owl-like face hugging itself
+Row 1, column 4: a pukeko swamphen with bright blue feathers and a red beak
+Row 1, column 5: a giant weta insect with long antennae, friendly
+Row 2, column 1: a takahe, a plump flightless blue-green bird with a big red beak
+Row 2, column 2: a tui bird with glossy dark feathers and a white puff at its throat, singing
+Row 2, column 3: a fur seal pup sunbathing on a rock
+Row 2, column 4: a fantail bird with its tail spread like a fan, fluttering
+Row 2, column 5: a big ancient tuatara reptile with a spiky crest and a wise smile, wearing a crown, slightly bigger and grander than the others
+Row 3, column 1: a friendly electric eel with tiny sparks around it
+Row 3, column 2: a pink Amazon river dolphin with a long beak, smiling
+Row 3, column 3: a cute round red-bellied piranha with a big friendly smile and tiny rounded teeth
+Row 3, column 4: a hoatzin bird with a spiky punk crest and a blue face
+Row 3, column 5: a tiny bright turquoise poison dart frog with black spots
+Row 4, column 1: a harpy eagle with a double crest and an intense but friendly stare
+Row 4, column 2: an emperor tamarin monkey with a long white mustache
+Row 4, column 3: an agouti holding a big Brazil nut
+Row 4, column 4: a blue morpho butterfly with shimmering bright blue wings
+Row 4, column 5: a big friendly green anaconda queen coiled up, wearing a crown of jungle flowers, slightly bigger and grander than the others
+
+=============== ЛИСТ 7 из 8 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no letters, no grid lines, no borders.
+Row 1, column 1: a fluffy owlet postman carrying a sealed letter in its beak
+Row 1, column 2: a toad potion-maker stirring a little bubbling cauldron
+Row 1, column 3: a young witch apprentice girl in a pointy hat holding a glowing wand
+Row 1, column 4: a young wizard apprentice boy in a robe reading a magic scroll
+Row 1, column 5: a black cat familiar with a tiny star on its forehead and glowing green eyes
+Row 2, column 1: a baby hippogriff, half eagle and half horse, flapping its wings
+Row 2, column 2: a mischievous blue pixie with dragonfly wings, giggling
+Row 2, column 3: a white rabbit magician in a bow tie popping out of sparkles
+Row 2, column 4: a hedgehog herbalist in a leaf hat with a little basket of herbs
+Row 2, column 5: a kind old archmage in a starry blue robe with a long white beard and a staff with a glowing crystal, slightly bigger and grander than the others
+Row 3, column 1: a peregrine falcon superhero in a mask and cape diving at high speed
+Row 3, column 2: a Hercules beetle superhero lifting a big boulder with its horn
+Row 3, column 3: a glass frog superhero with see-through skin and a little mask
+Row 3, column 4: a colorful mantis shrimp superhero with boxing-glove claws and a cape
+Row 3, column 5: a honey badger superhero in a cape with a fearless grin
+Row 4, column 1: an archerfish superhero in a mask shooting a jet of water
+Row 4, column 2: a platypus superhero with a glowing bill and a cape
+Row 4, column 3: a tiny shrew superhero with a lightning-bolt cape zooming along
+Row 4, column 4: a lyrebird superhero with a spectacular lyre-shaped tail, singing
+Row 4, column 5: a cute purple chameleon mad-scientist villain in a lab coat and goggles, mischievous grin, slightly bigger and grander than the others
+
+=============== ЛИСТ 8 из 8 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 10 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 2 rows, pure white background, landscape 2:1 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no letters, no grid lines, no borders.
+Row 1, column 1: a dodo bird with a big hooked beak and a round body, cheerful
+Row 1, column 2: a giant moa bird with long thick legs and a tiny head, very tall
+Row 1, column 3: a thylacine, a Tasmanian tiger with stripes on its back, gentle smile
+Row 1, column 4: a trilobite with a segmented shell and big compound eyes, smiling
+Row 1, column 5: a Steller sea cow, a huge gentle sea cow floating and munching seaweed
+Row 2, column 1: a great auk standing upright in black-and-white feathers like a tuxedo
+Row 2, column 2: a Haast eagle with enormous wings spread wide, friendly
+Row 2, column 3: a quagga, a zebra-like horse with stripes only on its front half
+Row 2, column 4: an ammonite with a spiral shell and little tentacles, smiling
+Row 2, column 5: a majestic dragon of time with golden clock-like patterns on its wings and a glowing hourglass on its chest, crowned, wise friendly eyes, slightly bigger and grander than the others

@@ -4,7 +4,7 @@ import json, sys
 L = {int(k): v for k, v in json.load(open(sys.argv[1])).items()}
 w0 = int(sys.argv[3])
 shift, level = {}, {}
-for w in range(w0, w0 + 10):
+for w in range(w0, min(w0 + 10, 50)):   # последняя партия — миры 46–50
     reg = [L[w * 10 + i] for i in range(9)]
     s = round(sum(reg) / 9, 2)
     shift[str(w)] = s
