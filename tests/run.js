@@ -7258,6 +7258,23 @@ async function testOnlineAdvBonuses(browser) {
   const su = await page.evaluate(() => document.getElementById('bonusLine').textContent);
   check('строка: щит отбил ловушку «Пропуск хода»', /Щит/.test(su) && /Пропуск хода/.test(su), su);
 
+  // Новые бонусы (миграция 060): зеркало видно обоим, делимость и компас — только свои
+  await page.evaluate(() => { Object.assign(window.__match, { seat: 0, cur: 0, skip: [false, false], frozen: [false, false], forced: null,
+    shield: [false, false], mirror: [false, true], know: { parity: null, half: null, div3: true, div5: false, gt: 20, lt: 70 },
+    lastBonus: 'compass', lastBonusBy: 0, shieldTrap: null }); refreshMatch(true); });
+  await page.waitForTimeout(300);
+  const nb = await page.evaluate(() => ({ me: document.getElementById('peff0').textContent, rival: document.getElementById('peff1').textContent,
+    line: document.getElementById('bonusLine').textContent }));
+  check('онлайн: делимость и компас — у моего имени', /делится на 3/.test(nb.me) && /не делится на 5/.test(nb.me) &&
+    /больше 20/.test(nb.me) && /меньше 70/.test(nb.me), nb.me);
+  check('онлайн: зеркало соперника видно мне, у меня его нет', /🪞/.test(nb.rival) && !/🪞/.test(nb.me) && /Компас/.test(nb.line),
+    JSON.stringify(nb));
+  await page.evaluate(() => { Object.assign(window.__match, { seat: 0, cur: 0, mirror: [false, false], know: {},
+    lastBonus: 'mirrorUsed', lastBonusBy: 1, shieldTrap: 'gift' }); refreshMatch(true); });
+  await page.waitForTimeout(300);
+  const mu = await page.evaluate(() => document.getElementById('bonusLine').textContent);
+  check('строка: зеркало отразило ловушку «Подарок сопернику»', /зеркало отразило ловушку «Подарок сопернику»/.test(mu), mu);
+
   // Список бонусов: четыре новых — в полезных, «только в Приключении» — один Шальной бросок
   await page.evaluate(() => openBonusGuide());
   const guide = await page.evaluate(() => [...document.querySelectorAll('#bgList .bg-head')].map(h => {

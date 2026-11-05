@@ -3135,10 +3135,17 @@ function applyMatchState(st) {
   D.frozen = (st.frozen || [false, false]).slice();
   D.shieldedTrap = st.shieldTrap || null;
   D.shieldedText = null;
+  // Новые бонусы (миграция 060): зеркало видят оба, делимость и компас — только свои
+  D.mirror = (st.mirror || [false, false]).slice();
   D.know = [{}, {}];
   if (st.know) {
-    if (st.know.parity !== null && st.know.parity !== undefined) D.know[st.seat].parity = st.know.parity;
-    if (st.know.half) D.know[st.seat].half = st.know.half;
+    const k = D.know[st.seat];
+    if (st.know.parity !== null && st.know.parity !== undefined) k.parity = st.know.parity;
+    if (st.know.half) k.half = st.know.half;
+    if (typeof st.know.div3 === 'boolean') k.div3 = st.know.div3;
+    if (typeof st.know.div5 === 'boolean') k.div5 = st.know.div5;
+    if (typeof st.know.gt === 'number') k.gt = st.know.gt;
+    if (typeof st.know.lt === 'number') k.lt = st.know.lt;
   }
   D.lastBonusBy = st.lastBonusBy || 0;
   D.bonuses = [];

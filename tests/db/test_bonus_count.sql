@@ -55,8 +55,10 @@ begin
   values ('Лев', 'Кира', -1000, 1000, 5, 'active', true, 2000) returning id into mid;
   perform place_match_bonuses(mid);
   select array_agg(distinct type order by type) into kinds from match_bonuses where match_id = mid;
-  -- С миграции 057 — ещё четыре из Приключения: рентген, половина, щит, заморозка
-  if kinds is distinct from array['blind','extra','fog','freeze','gift','half','memory','rush','shield','skip','xray'] then
+  -- С миграции 057 — ещё четыре из Приключения: рентген, половина, щит, заморозка;
+  -- с 060 — делимость на 3 и 5, компас, воришка, зеркало
+  if kinds is distinct from array['blind','compass','div3','div5','extra','fog','freeze','gift','half','memory',
+                                  'mirror','rush','shield','skip','thief','xray'] then
     raise exception 'ОШИБКА: виды бонусов %', kinds;
   end if;
 end $$;

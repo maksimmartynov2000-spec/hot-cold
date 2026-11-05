@@ -1,0 +1,426 @@
+-- Онлайн: пять новых бонусов — «Делится на 3?», «Делится на 5?», Компас, Воришка, Зеркало.
+-- Применять в Supabase: SQL Editor → вставить целиком → Run. Применить ДО мёржа.
+--
+-- • Делится на 3? / Делится на 5? — взявший узнаёт, делится ли загаданное
+--   на 3 (на 5). Ответ видит только он.
+-- • Компас — взявший узнаёт, загаданное больше числа, на котором лежал бонус,
+--   или меньше. Тоже только он.
+-- • Воришка — взявший забирает у соперника «⚡ +1 ход»; у того пусто — берёт
+--   из запаса.
+-- • Зеркало — следующая ловушка (пропуск хода, подарок, короткая память)
+--   уходит сопернику. Зеркало видят оба. Есть и щит — первым срабатывает зеркало.
+-- Полезных бонусов стало тринадцать, ловушек — три; доля ловушек та же, около трети.
+-- Бот-«человек» пользуется новым знанием, как пользовался Рентгеном и Половиной.
+
+-- ============ 1. Что помнит партия ============
+alter table matches add column if not exists know_div3 boolean[] not null default array[null, null]::boolean[];
+alter table matches add column if not exists know_div5 boolean[] not null default array[null, null]::boolean[];
+alter table matches add column if not exists know_gt int[] not null default array[null, null]::int[];
+alter table matches add column if not exists know_lt int[] not null default array[null, null]::int[];
+alter table matches add column if not exists mirror boolean[] not null default array[false, false];
+
+-- Новый раунд — всё, что знали и чем защищались, сначала
+create or replace function start_match_round(p_match_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches;
+begin
+  select * into m from matches where id = p_match_id;
+  update matches
+  set secret = m.range_min + floor(random() * (m.range_max - m.range_min + 1))::int,
+      tokens = array[1, 1],
+      cur = m.starter,
+      armed = false,
+      round_over = false,
+      round_winner = null,
+      rush = array[0, 0],
+      fog = array[false, false],
+      blind = array[false, false],
+      auto_lava = array[false, false],
+      skip_turn = array[false, false],
+      short_memory = array[false, false],
+      shield = array[false, false],
+      frozen = array[false, false],
+      know_parity = array[null, null]::int[],
+      know_half = array[null, null]::text[],
+      know_div3 = array[null, null]::boolean[],
+      know_div5 = array[null, null]::boolean[],
+      know_gt = array[null, null]::int[],
+      know_lt = array[null, null]::int[],
+      mirror = array[false, false],
+      shield_trap = null,
+      near_bonus = false,
+      last_bonus = null,
+      last_bonus_by = null,
+      last_timeout = false,
+      updated_at = now()
+  where id = p_match_id;
+  perform place_match_bonuses(p_match_id);
+  select * into m from matches where id = p_match_id;
+  update matches set turn_deadline = now() + make_interval(secs => turn_seconds(m))
+  where id = p_match_id;
+end;
+$$;
+
+
+-- Бонус взявшего. p_guess — число, на котором он лежал: компасу нужно, от чего мерить.
+-- Прежняя версия без числа (миграция 057) заменяется этой: без числа она
+-- работает как раньше
+drop function if exists apply_match_bonus(bigint, text, int);
+create or replace function apply_match_bonus(p_match_id bigint, p_type text, p_by int, p_guess int default null)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; rival int;
+begin
+  select * into m from matches where id = p_match_id;
+  rival := 1 - p_by;
+  if p_type = 'extra' then
+    update matches set tokens[p_by + 1] = m.tokens[p_by + 1] + 2 where id = p_match_id;
+  elsif p_type = 'fog' then
+    update matches set fog[rival + 1] = true where id = p_match_id;
+  elsif p_type = 'blind' then
+    update matches set blind[rival + 1] = true where id = p_match_id;
+  elsif p_type = 'lava' then
+    update matches set auto_lava[rival + 1] = true where id = p_match_id;
+  elsif p_type = 'rush' then
+    update matches set rush[rival + 1] = m.rush[rival + 1] + 3 where id = p_match_id;
+  elsif p_type = 'skip' then
+    update matches set skip_turn[p_by + 1] = true where id = p_match_id;
+  elsif p_type = 'gift' then
+    update matches set tokens[rival + 1] = m.tokens[rival + 1] + 1 where id = p_match_id;
+  elsif p_type = 'memory' then
+    update matches set short_memory[p_by + 1] = true where id = p_match_id;
+  -- Бонусы из Приключения (057)
+  elsif p_type = 'xray' then
+    update matches set know_parity[p_by + 1] = abs(m.secret) % 2 where id = p_match_id;
+  elsif p_type = 'half' then
+    update matches set know_half[p_by + 1] = case when m.secret <= match_half_mark(m) then 'low' else 'high' end
+    where id = p_match_id;
+  elsif p_type = 'shield' then
+    update matches set shield[p_by + 1] = true where id = p_match_id;
+  elsif p_type = 'freeze' then
+    update matches set skip_turn[rival + 1] = true, frozen[rival + 1] = true where id = p_match_id;
+  -- Новые (060). Делимость — по модулю: у −45 те же делители, что у 45
+  elsif p_type = 'div3' then
+    update matches set know_div3[p_by + 1] = (abs(m.secret) % 3 = 0) where id = p_match_id;
+  elsif p_type = 'div5' then
+    update matches set know_div5[p_by + 1] = (abs(m.secret) % 5 = 0) where id = p_match_id;
+  elsif p_type = 'compass' then
+    if p_guess is not null and m.secret > p_guess then
+      update matches set know_gt[p_by + 1] = greatest(coalesce(m.know_gt[p_by + 1], p_guess), p_guess) where id = p_match_id;
+    elsif p_guess is not null and m.secret < p_guess then
+      update matches set know_lt[p_by + 1] = least(coalesce(m.know_lt[p_by + 1], p_guess), p_guess) where id = p_match_id;
+    end if;
+  elsif p_type = 'thief' then
+    update matches set tokens[rival + 1] = greatest(0, m.tokens[rival + 1] - 1),
+                       tokens[p_by + 1] = m.tokens[p_by + 1] + 1
+    where id = p_match_id;
+  elsif p_type = 'mirror' then
+    update matches set mirror[p_by + 1] = true where id = p_match_id;
+  end if;
+end;
+$$;
+
+-- ============ 2. Раскладка: тринадцать полезных, три ловушки ============
+-- Набор — копия в js/game.js (BONUS_ONLINE), сверяется тестом. Раскладка
+-- (place_match_bonuses, 057) берёт его отсюда — её менять не нужно
+create or replace function online_bonus_good() returns text[] language sql immutable as
+$$ select array['extra', 'fog', 'blind', 'rush', 'xray', 'half', 'shield', 'freeze',
+                'div3', 'div5', 'compass', 'thief', 'mirror']; $$;
+
+-- ============ 3. Ход: зеркало и щит перехватывают ловушку ============
+create or replace function match_guess_core(p_match_id bigint, p_seat int, p_guess int)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; seat int; dist int; band int; used_double boolean;
+        hit record; btype text; radius int; done boolean; reflected text;
+begin
+  seat := p_seat;
+  select * into m from matches where id = p_match_id for update;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  if m.status <> 'active' then raise exception 'not_playing'; end if;
+  if m.round_over or m.match_over then raise exception 'round_over'; end if;
+  if m.cur <> seat then raise exception 'not_your_turn'; end if;
+  -- Пока оба не пришли и не отсчитано 3-2-1, ходить нельзя
+  if m.lobby or (m.start_at is not null and m.start_at > now()) then
+    raise exception 'not_started';
+  end if;
+  if m.skip_turn[seat + 1] or m.auto_lava[seat + 1] then raise exception 'forced_turn'; end if;
+  if p_guess is null or p_guess < m.range_min or p_guess > m.range_max then
+    raise exception 'out_of_range';
+  end if;
+
+  dist := abs(p_guess - m.secret);
+  band := feedback_tier(match_span(m), dist);
+  -- Для разбора: ход сделан под помехой — игрок видел не все ходы
+  insert into match_moves(match_id, round, seat, guess, tier, limited)
+  values (p_match_id, m.round, seat, p_guess, band,
+          m.fog[seat + 1] or m.blind[seat + 1] or m.short_memory[seat + 1]);
+
+  radius := bonus_near_radius(match_span(m));
+  select * into hit from match_bonuses b
+  where b.match_id = p_match_id and b.round = m.round and not b.taken and b.value = p_guess;
+
+  btype := null;
+  if hit.type is not null then
+    btype := hit.type;
+    if match_bonus_blocked(m, btype, 1 - seat) then btype := 'extra'; end if;
+    update match_bonuses set taken = true
+    where match_id = p_match_id and round = m.round and value = p_guess;
+  end if;
+
+  -- Зеркало (миграция 060) отражает ловушку в соперника, щит (057) просто
+  -- отбивает. Зеркало — первым: оно сильнее, а щит останется на потом
+  update matches set shield_trap = null where id = p_match_id;
+  reflected := null;
+  if btype in ('skip', 'gift', 'memory') and m.mirror[seat + 1] then
+    update matches set mirror[seat + 1] = false, shield_trap = btype where id = p_match_id;
+    reflected := btype;
+    btype := 'mirrorUsed';
+  elsif btype in ('skip', 'gift', 'memory') and m.shield[seat + 1] then
+    update matches set shield[seat + 1] = false, shield_trap = btype where id = p_match_id;
+    btype := 'shieldUsed';
+  end if;
+
+  -- Сходил — значит на месте: счётчик молчания обнуляется
+  update matches
+  set last_bonus = btype,
+      last_bonus_by = seat,
+      last_timeout = false,
+      timeouts[seat + 1] = 0,
+      near_bonus = (btype is null and exists (
+        select 1 from match_bonuses b
+        where b.match_id = p_match_id and b.round = m.round and not b.taken
+          and abs(b.value - p_guess) <= radius))
+  where id = p_match_id;
+
+  if reflected is not null then
+    perform apply_match_bonus(p_match_id, reflected, 1 - seat, p_guess);
+  elsif btype is not null and btype <> 'shieldUsed' then
+    perform apply_match_bonus(p_match_id, btype, seat, p_guess);
+  end if;
+
+  select * into m from matches where id = p_match_id;
+  used_double := m.armed;
+
+  if dist = 0 then
+    done := (m.wins[seat + 1] + 1) >= m.wins_needed;
+    update matches
+    set round_over = true, round_winner = seat,
+        wins[seat + 1] = m.wins[seat + 1] + 1,
+        match_over = done,
+        status = case when done then 'finished' else status end,
+        armed = false, turn_deadline = null, updated_at = now()
+    where id = p_match_id;
+    if done then perform apply_elo(p_match_id, seat); end if;
+  elsif used_double then
+    update matches set armed = false, updated_at = now() where id = p_match_id;
+    select * into m from matches where id = p_match_id;
+    update matches set turn_deadline = now() + make_interval(secs => turn_seconds(m))
+    where id = p_match_id;
+  else
+    perform pass_turn(p_match_id, false);
+  end if;
+
+  return band;
+end;
+$$;
+
+
+-- ============ 4. Что видит игрок ============
+create or replace function match_state(p_username text, p_pin text, p_match_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; m matches; my_seat int; moves jsonb; reveal boolean;
+        visible int; hide_mine boolean; hide_theirs boolean; chat jsonb; my_elo int;
+        other text; rm matches; rem jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+
+  perform expire_stale_matches();
+
+  select * into m from matches where id = p_match_id;
+  if m.id is null then raise exception 'no_such_match'; end if;
+  my_seat := match_seat(m, me);
+  if my_seat is null then raise exception 'not_your_match'; end if;
+
+  perform match_flow_tick(p_match_id, my_seat);
+
+  if m.bot_seat is not null then perform bot_act(p_match_id); end if;
+  perform apply_turn_timeout(p_match_id);
+
+  select * into m from matches where id = p_match_id;
+
+  reveal := m.round_over or m.match_over or m.status <> 'active';
+  hide_mine := (not reveal) and m.blind[my_seat + 1];
+  hide_theirs := (not reveal) and m.fog[my_seat + 1];
+  visible := case when (not reveal) and m.short_memory[my_seat + 1] then 2 else 4 end;
+
+  select coalesce(jsonb_agg(x order by x_id), '[]'::jsonb) into moves from (
+    select mv.id as x_id,
+           case
+             when mv.kind = 'timeout'
+               then jsonb_build_object('seat', mv.seat, 'timeout', true)
+             when (mv.seat = my_seat and hide_mine and mv.id > m.blind_from[my_seat + 1])
+               or (mv.seat <> my_seat and hide_theirs and mv.id > m.fog_from[my_seat + 1])
+               then jsonb_build_object('seat', mv.seat, 'hidden', true)
+             else jsonb_build_object('seat', mv.seat, 'guess', mv.guess, 'tier', mv.tier)
+           end as x
+    from (select * from match_moves mv2
+          where mv2.match_id = p_match_id and mv2.round = m.round
+          order by mv2.id desc limit visible) mv
+  ) q;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', c.id, 'seat', c.seat, 'code', c.code,
+           'ago', floor(extract(epoch from (now() - c.created_at)))::int) order by c.id), '[]'::jsonb)
+    into chat
+  from (select * from match_chat c2 where c2.match_id = p_match_id
+        order by c2.id desc limit 6) c;
+
+  select e.elo into my_elo from elo_ratings e
+  where e.username = me and e.mode = 0;  -- рейтинг один (миграция 056)
+
+  -- Реванш после этой партии: приглашение или уже идущая
+  if m.status = 'finished' then
+    other := case when m.p0 = me then m.p1 else m.p0 end;
+    select * into rm from matches y
+    where y.id > m.id and y.status in ('invited', 'active', 'declined')
+      and ((y.p0 = me and y.p1 = other) or (y.p0 = other and y.p1 = me))
+    order by y.id desc limit 1;
+    if rm.id is not null then
+      rem := jsonb_build_object('id', rm.id, 'status', rm.status, 'mine', rm.p0 = me);
+    end if;
+  end if;
+
+  return jsonb_build_object(
+    'id', m.id, 'seat', my_seat,
+    'names', jsonb_build_array(m.p0, m.p1),
+    'status', m.status, 'winsNeeded', m.wins_needed,
+    'rangeMin', m.range_min, 'rangeMax', m.range_max, 'frost', m.frost,
+    'round', m.round, 'wins', m.wins, 'cur', m.cur, 'tokens', m.tokens, 'armed', m.armed,
+    'roundOver', m.round_over, 'roundWinner', m.round_winner, 'matchOver', m.match_over,
+    'moves', moves,
+    'secret', case when reveal then to_jsonb(m.secret) else 'null'::jsonb end,
+    'bonusesOn', m.bonuses_on,
+    'fog', m.fog, 'blind', m.blind, 'autoLava', m.auto_lava,
+    'skip', m.skip_turn, 'shortMemory', m.short_memory, 'rush', m.rush,
+    'nearBonus', m.near_bonus, 'lastBonus', m.last_bonus, 'lastBonusBy', m.last_bonus_by,
+    'lastTimeout', m.last_timeout,
+    'forced', forced_turn_kind(m),
+    'turnSeconds', turn_seconds(m),
+    'secondsLeft', case when m.turn_deadline is null then null
+                        else greatest(0, ceil(extract(epoch from (m.turn_deadline - now()))))::int end,
+    'chat', chat,
+    'ranked', m.ranked,
+    'rankedMode', m.ranked_mode,
+    'botSeat', case when match_legacy_bot(m) then m.bot_seat end,
+    'forfeitBy', m.forfeit_by,
+    'eloDelta', case when m.elo_applied then to_jsonb(m.elo_delta) else 'null'::jsonb end,
+    'elo', coalesce(my_elo, 1000),
+    'updatedAt', m.updated_at,
+    'lobby', m.lobby,
+    'present', jsonb_build_array(match_side_here(m, 0), match_side_here(m, 1)),
+    'lobbyLeft', case when m.lobby and m.accepted_at is not null
+                      then greatest(0, ceil(extract(epoch from (m.accepted_at + interval '5 minutes' - now()))))::int end,
+    'startsIn', case when m.start_at is not null and m.start_at > now()
+                     then ceil(extract(epoch from (m.start_at - now())))::int end,
+    'nextIn', case when m.status = 'active' and m.round_over and not m.match_over and m.round_ended_at is not null
+                   then greatest(0, ceil(extract(epoch from (m.round_ended_at + interval '10 seconds' - now()))))::int end,
+    'ready', jsonb_build_array(match_side_ready(m, 0), match_side_ready(m, 1)),
+    'ladder', m.ladder,
+    'rematch', rem
+  )
+  -- Бонусы из Приключения (миграция 057): щит видят оба, ответ Рентгена и
+  -- Половины — только тот, кто взял. Отдельным объектом: у jsonb_build_object
+  -- предел — сто аргументов
+  || jsonb_build_object(
+    'shield', m.shield, 'frozen', m.frozen, 'shieldTrap', m.shield_trap,
+    -- Новые бонусы (миграция 060): зеркало видят оба, знание — только взявший
+    'mirror', m.mirror,
+    'know', jsonb_build_object('parity', m.know_parity[my_seat + 1], 'half', m.know_half[my_seat + 1],
+                               'div3', m.know_div3[my_seat + 1], 'div5', m.know_div5[my_seat + 1],
+                               'gt', m.know_gt[my_seat + 1], 'lt', m.know_lt[my_seat + 1]));
+end;
+$$;
+
+
+-- ============ 5. Бот пользуется новым знанием ============
+create or replace function bot_candidates(p_match_id bigint, p_seat int, p_careless boolean)
+returns int[]
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare m matches; db int[]; mv record; cand boolean[]; n int; i int; res int[] := '{}';
+begin
+  select * into m from matches where id = p_match_id;
+  n := match_span(m);
+  db := bot_dist_bands(n);
+  cand := array_fill(true, array[n]);
+  for mv in
+    select k.guess, k.tier from (
+      select x.guess, x.tier, x.id from match_moves x
+      where x.match_id = p_match_id and x.round = m.round
+        and x.guess is not null and x.tier is not null
+        and not (m.fog[p_seat + 1] and x.seat <> p_seat and x.id > m.fog_from[p_seat + 1])
+        and not (m.blind[p_seat + 1] and x.seat = p_seat and x.id > m.blind_from[p_seat + 1])
+      order by x.id desc
+      limit case when p_careless then 1 when m.short_memory[p_seat + 1] then 2 else null end
+    ) k
+  loop
+    for i in 1..n loop
+      if cand[i] and db[abs(m.range_min + i - 1 - mv.guess) + 1] <> mv.tier then
+        cand[i] := false;
+      end if;
+    end loop;
+  end loop;
+  -- Знание из бонусов (миграция 058): Рентген — чётность, Половина — половина
+  -- прямой. Бот пользуется им, как пользовался бы человек
+  for i in 1..n loop
+    if cand[i] and m.know_parity[p_seat + 1] is not null
+       and abs(m.range_min + i - 1) % 2 <> m.know_parity[p_seat + 1] then cand[i] := false; end if;
+    if cand[i] and m.know_half[p_seat + 1] = 'low' and m.range_min + i - 1 > match_half_mark(m) then cand[i] := false; end if;
+    if cand[i] and m.know_half[p_seat + 1] = 'high' and m.range_min + i - 1 <= match_half_mark(m) then cand[i] := false; end if;
+    -- Миграция 060: делимость на 3 и 5, компас — больше или меньше числа
+    if cand[i] and m.know_div3[p_seat + 1] is not null
+       and (abs(m.range_min + i - 1) % 3 = 0) <> m.know_div3[p_seat + 1] then cand[i] := false; end if;
+    if cand[i] and m.know_div5[p_seat + 1] is not null
+       and (abs(m.range_min + i - 1) % 5 = 0) <> m.know_div5[p_seat + 1] then cand[i] := false; end if;
+    if cand[i] and m.know_gt[p_seat + 1] is not null and m.range_min + i - 1 <= m.know_gt[p_seat + 1] then cand[i] := false; end if;
+    if cand[i] and m.know_lt[p_seat + 1] is not null and m.range_min + i - 1 >= m.know_lt[p_seat + 1] then cand[i] := false; end if;
+  end loop;
+  for i in 1..n loop
+    if cand[i] then res := res || (m.range_min + i - 1); end if;
+  end loop;
+  -- Ответы честные, поэтому загаданное всегда среди возможных и пусто не
+  -- бывает. На всякий случай — весь диапазон, а не ошибка посреди партии
+  if coalesce(array_length(res, 1), 0) = 0 then
+    select array_agg(g order by g) into res from generate_series(m.range_min, m.range_max) g;
+  end if;
+  return res;
+end;
+$$;
+
+
+-- ============ 6. Права ============
+revoke execute on function start_match_round(bigint) from public, anon;
+revoke execute on function apply_match_bonus(bigint, text, int, int) from public, anon;
+revoke execute on function match_guess_core(bigint, int, int) from public, anon;
+revoke execute on function bot_candidates(bigint, int, boolean) from public, anon;
+grant execute on function online_bonus_good() to anon;
+grant execute on function match_state(text, text, bigint) to anon;

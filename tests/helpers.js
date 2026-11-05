@@ -574,6 +574,8 @@ function stubSupabase(opts) {
         // Бонусы из Приключения (миграция 057): знание — только своё
         shield: M.shield || [false, false], frozen: M.frozen || [false, false],
         shieldTrap: M.shieldTrap || null, know: M.know || { parity: null, half: null },
+        // Новые бонусы (миграция 060): зеркало видят оба
+        mirror: M.mirror || [false, false],
         updatedAt: '2026-01-01T00:00:00Z' };
     };
 
