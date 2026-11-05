@@ -371,9 +371,10 @@ const BONUS_ADV = ['xray', 'half', 'shield', 'freeze', 'lava', 'div3', 'div5', '
 // Цифры загаданного — только в бою с боссом: каждая сужает выбор в 10 раз,
 // в обычном бою победу решал бы тот, кто первым на неё наступил
 const BONUS_BOSS = ['tens', 'units'];
-// Полезные бонусы онлайн-партии (миграция 057): к прежним — четыре из
-// Приключения. Копия online_bonus_good() из базы, сверяется тестом
-const BONUS_ONLINE = ['extra', 'fog', 'blind', 'rush', 'xray', 'half', 'shield', 'freeze'];
+// Полезные бонусы онлайн-партии: к прежним — четыре из Приключения (миграция
+// 057) и пять новых (060). Копия online_bonus_good() из базы, сверяется тестом
+const BONUS_ONLINE = ['extra', 'fog', 'blind', 'rush', 'xray', 'half', 'shield', 'freeze',
+                      'div3', 'div5', 'compass', 'thief', 'mirror'];
 // Набор бонусов на партию: null — обычный. Приключение подставляет свой:
 // { good: [...], trap: [...], count }
 let bonusSet = null;
