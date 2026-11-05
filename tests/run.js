@@ -5,9 +5,9 @@ const { GAME_URL, launchOptions, applyStub, check, report } = require('./helpers
 const PHONE = { width: 430, height: 850 };
 
 // Свой контекст на каждый тест: иначе страницы делят localStorage и влияют друг на друга
-// Экран входа: теперь его открывает онлайн (Испытание входа не просит)
+// Экран входа открывают «Друзья» (Испытание входа не просит)
 async function openAuth(page) {
-  await page.evaluate(() => { tutSave({ done: [1, 2, 3], skipped: true, veteran: true }); openOnlineEntry(); });
+  await page.evaluate(() => { tutSave({ done: [1, 2, 3], skipped: true, veteran: true }); openFriendsEntry(); });
 }
 
 async function newGame(browser, opts) {
@@ -68,13 +68,14 @@ async function testModes(browser) {
     document.getElementById('tModeSolo').textContent,
     document.getElementById('tModeDuel').textContent,
     document.getElementById('tModeBot').textContent,
-    document.getElementById('tModeRun').textContent,
-    document.getElementById('tModeOnline').textContent
+    document.getElementById('tModeRun').textContent
   ]);
-  check('в меню пять режимов с названиями', names.every(n => n && n.trim()), names.join(' / '));
-  check('карточек в меню тоже пять',
+  // Онлайна со случайными соперниками нет (миграция 062): с другом — через «Друзей»
+  check('в меню четыре режима с названиями', names.every(n => n && n.trim()), names.join(' / '));
+  check('карточек в меню тоже четыре, онлайна нет',
     // Карточка обучения видна только новичку — здесь её нет
-    await page.evaluate(() => document.querySelectorAll('#screenMode .mode-btn:not(.hidden)').length) === 5);
+    await page.evaluate(() => document.querySelectorAll('#screenMode .mode-btn:not(.hidden)').length === 4 &&
+      !document.getElementById('tModeOnline') && !document.getElementById('screenOnline')));
 
   // Тренировка
   await page.click('#tModeSolo');
@@ -248,13 +249,14 @@ async function testAuth(browser) {
   console.log('\nВход и регистрация');
   const page = await newGame(browser);
 
-  // Испытание входа не просит: счёт в телефоне. Вход нужен онлайну
+  // Испытание входа не просит: счёт в телефоне. Вход нужен друзьям
   await page.click('#tModeRun');
   await page.waitForTimeout(250);
   check('Испытание без аккаунта открывается сразу', await page.locator('#screenRunHub').isVisible());
-  await page.evaluate(() => { tutSave({ done: [1, 2, 3], skipped: true, veteran: true }); openOnlineEntry(); });
+  await page.evaluate(() => { tutSave({ done: [1, 2, 3], skipped: true, veteran: true }); openFriendsEntry(); });
   await page.waitForTimeout(250);
-  check('без аккаунта онлайн показывает выбор вход/регистрация', await page.locator('#screenAuthChoice').isVisible());
+  check('без аккаунта «Друзья» показывают выбор вход/регистрация', await page.locator('#screenAuthChoice').isVisible() &&
+    /Друзья/.test(await page.locator('#tAuthChoiceTitle').textContent()));
 
   await page.click('#screenAuthChoice >> text=Зарегистрироваться');
   await page.waitForTimeout(150);
@@ -2814,289 +2816,6 @@ async function testPhrases(browser) {
   await done(solo);
 }
 
-// ---------------------------------------------------------------- рейтинг онлайн
-async function testRanked(browser) {
-  console.log('\nОнлайн: рейтинг');
-
-  let page = await newGame(browser, { user: 'Лев' });
-  await page.evaluate(() => {
-    window.__rankedQ.ratings = { 0: { elo: 1180, games: 7 }, 1: { elo: 940, games: 4 },
-                                 2: { elo: 1000, games: 0 }, 3: { elo: 1520, games: 12 } };
-    window.__rankedQ.lastAgo = 240;
-    window.__eloTop = {
-      0: [{ username: 'Кира', elo: 1300, games: 9 }, { username: 'Лев', elo: 1180, games: 7 }],
-      3: [{ username: 'Лев', elo: 1520, games: 12 }]
-    };
-    window.__matches = [
-      { id: 1, other: 'Кира', seat: 1, status: 'invited', round: 1, wins: [0, 0],
-        my_turn: false, ranked: false },
-      { id: 7, other: 'Гриша', seat: 0, status: 'active', round: 2, wins: [1, 0],
-        my_turn: true, ranked: true }
-    ];
-  });
-  await page.click('#tModeOnline');
-  await page.waitForTimeout(600);
-
-  // Рейтинг и друзья — разные экраны, а не вкладки одного
-  const split = await page.evaluate(() => ({
-    ranked: !document.getElementById('screenOnline').classList.contains('hidden'),
-    friends: !document.getElementById('screenFriends').classList.contains('hidden'),
-    tabs: document.querySelectorAll('.ol-tab').length,
-    menu: [...document.querySelectorAll('#screenMode .mode-btn:not(.hidden) .m-title')].map(e => e.textContent),
-    hdr: !document.getElementById('friendsBtn').classList.contains('hidden')
-  }));
-  check('«Игра онлайн» ведёт сразу на рейтинг', split.ranked && !split.friends);
-  check('вкладок внутри больше нет', split.tabs === 0, String(split.tabs));
-  check('в списке режимов «Друзей» нет — они не режим игры',
-    split.menu.length === 5 && !split.menu.some(n => /Друз/.test(n)), split.menu.join(' | '));
-  check('зато есть кнопка в шапке', split.hdr);
-
-  // Четыре вкладки режимов заменены строкой правил и «Своей игрой» (миграция 056)
-  await page.evaluate(async () => { window.__play = { elo: 1180, games: 7, offers: [] }; openOnline(); });
-  await page.waitForTimeout(400);
-  await page.waitForTimeout(400);
-  const modes = await page.evaluate(() => ({
-    tabs: !document.getElementById('rkModes').classList.contains('hidden'),
-    bar: document.getElementById('rkRules').textContent,
-    rules: !!document.getElementById('tRkRules'),
-    title: document.getElementById('tOnlineScreen').textContent,
-    elo: document.getElementById('rkElo').textContent.replace(/[\s  ]/g, ''),
-    sub: document.getElementById('rkEloSub').textContent
-  }));
-  check('у экрана есть название', modes.title === '🌐 Игра онлайн', modes.title);
-  check('вкладок режимов больше нет', !modes.tabs);
-  check('строка правил: «Быстрая игра · 1–100 · с бонусами · до 3 побед» и «Своя игра»',
-    /Быстрая игра/.test(modes.bar) && /1–100 · с бонусами · до 3 побед/.test(modes.bar) && /Своя игра/.test(modes.bar), modes.bar);
-  check('длинного описания правил больше нет', !modes.rules);
-  check('крупно — один общий рейтинг', modes.elo === '1180', modes.elo);
-  check('под ним — сколько сыграно', modes.sub === 'ваш рейтинг · игр: 7', modes.sub);
-
-  const top0 = await page.evaluate(() =>
-    [...document.querySelectorAll('#rkTopList .lb-row')].map(r => r.textContent));
-  check('топ — общий', top0.length === 2 && top0[0].indexOf('Кира') >= 0, top0.join(' | '));
-  const topLook = await page.evaluate(() =>
-    [...document.querySelectorAll('#rkTopList .rk-top-row')].map(r => ({
-      place: r.querySelector('.rk-place').textContent, me: r.classList.contains('me'),
-      face: !!r.querySelector('.avatar') })));
-  check('в топе место цифрой, первые три — в цветном кружке',
-    topLook.map(r => r.place).join() === '1,2' &&
-    await page.evaluate(() => document.querySelector('#rkTopList .rk-place').classList.contains('p1')), JSON.stringify(topLook));
-  check('своя строка выделена, у каждого — кружок',
-    topLook.map(r => r.me).join() === 'false,true' && topLook.every(r => r.face), JSON.stringify(topLook));
-
-  // «Своя игра»: −100…100, без бонусов, до 5, блиц
-  await page.click('#rkRules .rr-btn');
-  await page.waitForTimeout(200);
-  const modal = await page.evaluate(() => ({ open: !document.getElementById('rulesModal').classList.contains('hidden'),
-    heads: [...document.querySelectorAll('#rulesBody .ru-head')].map(e => e.textContent),
-    on: [...document.querySelectorAll('#rulesBody .ru-chip.on')].map(e => e.textContent) }));
-  check('«Своя игра»: числа, бонусы, до скольки, время — выбрано как обычно', modal.open &&
-    modal.heads.join() === 'Числа,Бонусы,Играем до,Время на ход' && modal.on.join() === '1–100,с бонусами,до 3 побед,Обычно',
-    JSON.stringify(modal));
-  for (const sel of ['[data-k="range"][data-v="pm100"]', '[data-k="bonuses"][data-v="false"]', '[data-k="wins"][data-v="5"]', '[data-k="blitz"][data-v="true"]']) {
-    await page.click('#rulesBody .ru-chip' + sel);
-  }
-  await page.click('#rulesOk');
-  await page.waitForTimeout(400);
-  const custom = await page.evaluate(() => ({ bar: document.getElementById('rkRules').textContent,
-    saved: JSON.parse(localStorage.getItem('hc_rules')) }));
-  check('свои правила видны строкой и запомнены', /Свои правила/.test(custom.bar) &&
-    /−100…100 · без бонусов · до 5 побед · Блиц 10 с/.test(custom.bar) &&
-    JSON.stringify(custom.saved) === '{"range":"pm100","bonuses":false,"wins":5,"blitz":true}', JSON.stringify(custom));
-  await page.evaluate(() => setPlayRules({}));
-
-  // Списки игр разъехались по экранам
-  const lists = await page.evaluate(() => ({
-    rk: [...document.querySelectorAll('#rkGamesList .friend-row')].map(r => r.dataset.id),
-    fr: [...document.querySelectorAll('#screenFriends .friend-row[data-id]')].map(r => r.dataset.id)
-  }));
-  check('рейтинговая игра лежит на экране рейтинга', lists.rk.join() === '7', lists.rk.join());
-  check('и её блок виден, раз игра есть',
-    await page.locator('#rkGamesBox').isVisible());
-  check('вызов друга — на экране друзей', lists.fr.join() === '1', lists.fr.join());
-
-  await page.click('#friendsBtn');
-  await page.waitForTimeout(500);
-  const onFriends = await page.evaluate(() => ({
-    ranked: !document.getElementById('screenOnline').classList.contains('hidden'),
-    friends: !document.getElementById('screenFriends').classList.contains('hidden'),
-    search: !!document.querySelector('#screenFriends #friendSearch'),
-    modes: document.querySelectorAll('#screenFriends .rk-mode').length
-  }));
-  check('экран друзей прячет рейтинг', !onFriends.ranked && onFriends.friends);
-  check('и поиск игроков лежит именно на нём', onFriends.search);
-  check('разновидностей рейтинга у друзей нет', onFriends.modes === 0, String(onFriends.modes));
-  await done(page);
-
-  // Рейтинговой игры нет — блока нет вовсе, без «игра не идёт»
-  page = await newGame(browser, { user: 'Лев' });
-  await page.evaluate(() => { window.__matches = [
-    { id: 1, other: 'Кира', seat: 1, status: 'invited', round: 1, wins: [0, 0], my_turn: false, ranked: false }]; });
-  await page.click('#tModeOnline');
-  await page.waitForTimeout(600);
-  const idle = await page.evaluate(() => ({
-    box: !document.getElementById('rkGamesBox').classList.contains('hidden'),
-    text: document.getElementById('screenOnline').innerText
-  }));
-  check('без рейтинговой игры её блока нет', !idle.box);
-  check('и нигде не написано, что игра «не идёт»', !/не идёт/.test(idle.text), idle.text);
-  await done(page);
-
-  // Очередь по правилам; кто ждёт с другими — можно к нему
-  page = await newGame(browser, { user: 'Лев' });
-  await page.evaluate(() => { window.__play = { elo: 1000, games: 0, offers: [] }; window.__rankedQ.lastAgo = 240; });
-  await page.click('#tModeOnline');
-  await page.waitForTimeout(500);
-  await page.click('#tRkPlay');
-  await page.waitForTimeout(500);
-  const queued = await page.evaluate(() => ({
-    waiting: !document.getElementById('rkWaitBox').classList.contains('hidden'),
-    playHidden: document.getElementById('tRkPlay').classList.contains('hidden'),
-    text: document.getElementById('rkWaitText').textContent,
-    sub: document.getElementById('rkWaitSub').textContent,
-    rules: window.__play.joined
-  }));
-  check('встали в очередь с правилами «Играть»', JSON.stringify(queued.rules) === '{"range":"100","bonuses":true,"wins":3,"blitz":false}',
-    JSON.stringify(queued.rules));
-  check('вместо кнопки видно ожидание', queued.waiting && queued.playHidden);
-  check('в ожидании сказано, что ищут, и идёт секундомер',
-    queued.text.indexOf('Ищем соперника') >= 0 && /\d:\d\d$/.test(queued.text), queued.text);
-  check('и что пока никого нет — отдельной строкой', queued.sub.split('\n')[0] === 'пока ждёте только вы', queued.sub);
-
-  await page.evaluate(async () => { window.__play.offers = [{ username: 'Кира', rules: { range: '20', bonuses: true, wins: 1, blitz: false }, waited: 12 }];
-    await loadRanked(true); });
-  const offer = await page.evaluate(() => ({ shown: !document.getElementById('rkOffers').classList.contains('hidden'),
-    text: document.getElementById('rkOffers').textContent }));
-  check('видно, кто ждёт с другими правилами', offer.shown && /Кира/.test(offer.text) && /1–20 · с бонусами · до 1 победы/.test(offer.text) &&
-    /Сыграть/.test(offer.text), offer.text);
-  await page.click('#rkOffers .of-go');
-  await page.waitForTimeout(400);
-  const took = await page.evaluate(() => ({ joined: window.__play.joined, saved: JSON.parse(localStorage.getItem('hc_rules') || 'null') }));
-  check('«Сыграть» — в очередь с её правилами, свои не меняются', took.joined.range === '20' && took.joined.wins === 1 &&
-    (!took.saved || took.saved.range === '100'), JSON.stringify(took));
-
-  // Смена правил во время ожидания выводит из очереди
-  await page.evaluate(() => setPlayRules({ range: '20' }));
-  await page.waitForTimeout(500);
-  const moved = await page.evaluate(() => ({
-    waiting: !document.getElementById('rkWaitBox').classList.contains('hidden'), inQueue: window.__play.inQueue }));
-  check('смена правил выводит из очереди', !moved.waiting && moved.inQueue === false, JSON.stringify(moved));
-  await done(page);
-
-  // База до миграции 056 — старая очередь режима, ближайшего к правилам
-  page = await newGame(browser, { user: 'Лев' });
-  await page.evaluate(() => { playRules = playNorm({ range: 'pm100', bonuses: true, wins: 3 }); });
-  await page.click('#tModeOnline');
-  await page.waitForTimeout(500);
-  await page.click('#tRkPlay');
-  await page.waitForTimeout(400);
-  check('без 056: старая очередь «Всё сразу» (режим 3)', await page.evaluate(() => window.__rankedQ.mode === 3 && window.__rankedQ.inQueue));
-  await done(page);
-
-  // Соперник нашёлся — на доску переносит сам опрос, без нажатий
-  page = await newGame(browser, { user: 'Лев' });
-  await page.click('#tModeOnline');
-  await page.waitForTimeout(500);
-  await page.click('#tRkPlay');
-  await page.waitForTimeout(400);
-  await page.evaluate(() => {
-    window.__rankedQ.matchId = 7;
-    Object.assign(window.__match, { id: 7, ranked: true, rankedMode: 0,
-                                    names: ['Кира', 'Лев'], seat: 1 });
-  });
-  await page.waitForTimeout(4200);
-  const onBoard = await page.locator('#screenGame').isVisible();
-  check('подбор сам открывает доску', onBoard);
-  check('клиент знает, что игра рейтинговая',
-    await page.evaluate(() => !!online && online.ranked === true));
-
-  // Выход из рейтинговой игры спрашивает, а не выходит молча
-  if (onBoard) await page.click('#tMenu');
-  await page.waitForTimeout(300);
-  const ask = await page.evaluate(() => ({
-    open: !document.getElementById('resignModal').classList.contains('hidden'),
-    text: document.getElementById('tResignTitle').textContent,
-    stay: document.getElementById('tResignStay').textContent,
-    go: document.getElementById('tResignGo').textContent,
-    still: !document.getElementById('screenGame').classList.contains('hidden')
-  }));
-  check('выход из рейтинга спрашивает подтверждение', ask.open);
-  check('и объясняет, что это поражение', ask.text.indexOf('поражение') >= 0, ask.text);
-  check('можно остаться', ask.stay === 'Остаться в игре', ask.stay);
-  check('или сдаться', ask.go === 'Сдаться', ask.go);
-  check('доска пока на месте', ask.still);
-
-  if (ask.open) await page.click('#tResignStay');
-  await page.waitForTimeout(200);
-  check('отказ от выхода возвращает к игре',
-    onBoard && (await page.locator('#screenGame').isVisible()) &&
-    !(await page.locator('#resignModal').isVisible()));
-  await done(page);
-
-  // Итог по уходу соперника: названо имя и изменение рейтинга
-  page = await newGame(browser, { user: 'Лев' });
-  await page.evaluate(() => {
-    window.__rankedQ.matchId = 7;
-    window.__matches = [{ id: 7, other: 'Кира', seat: 1, status: 'active',
-                          round: 1, wins: [0, 0], my_turn: true, ranked: true }];
-    Object.assign(window.__match, {
-      id: 7, ranked: true, rankedMode: 2, names: ['Кира', 'Лев'], seat: 1, cur: 1,
-      roundOver: true, roundWinner: 1, matchOver: true, wins: [0, 3],
-      forfeitBy: 0, eloDelta: [-18, 18], elo: 1198, secret: 42
-    });
-  });
-  await page.click('#tModeOnline');
-  await page.waitForTimeout(600);
-  const row = await page.evaluate(() => {
-    const r = document.querySelector('#rkGamesList .friend-row');
-    return { tag: r ? (r.querySelector('.rk-row-tag') || {}).textContent : null };
-  });
-  check('в списке рейтинговых игра помечена', row.tag === 'рейтинг', String(row.tag));
-
-  await page.click('#rkGamesList .friend-row .fr-btn');
-  await page.waitForTimeout(700);
-  // Число в карточке разбито пробелами по-русски — сравниваем без них
-  const card = await page.evaluate(() =>
-    document.getElementById('resultBox').textContent.replace(/[\s  ]/g, ''));
-  check('сказано, что соперник вышел из игры',
-    card.indexOf('Киравышелизигры') >= 0, card);
-  // Число рейтинга не показываем никогда — только лиги и звёзды
-  check('числа рейтинга в итоге нет',
-    card.indexOf('1198') < 0 && card.indexOf('(+18)') < 0 && card.indexOf('Рейтинг:') < 0, card);
-
-  // Реванш: приглашение уходит, но с экрана не уносит — соперник ещё не согласился
-  const beforeBtns = await page.evaluate(() =>
-    [...document.querySelectorAll('.r-actions button')].map(b => b.textContent));
-  check('после матча предлагают реванш и выход',
-    beforeBtns.join(' | ') === 'Реванш | В меню', beforeBtns.join(' | '));
-
-  await page.click('.r-actions .btn');
-  await page.waitForTimeout(600);
-  const sent = await page.evaluate(() => ({
-    calls: window.__rpcCalls.filter(c => c.name === 'rematch').length,
-    onBoard: !document.getElementById('screenGame').classList.contains('hidden'),
-    card: document.getElementById('resultBox').textContent,
-    btns: [...document.querySelectorAll('.r-actions button')].map(b => b.textContent)
-  }));
-  check('реванш ушёл на сервер', sent.calls === 1, String(sent.calls));
-  check('и с доски никуда не унесло', sent.onBoard);
-  check('сказано, кому предложен реванш',
-    sent.card.indexOf('Реванш предложен: Кира') >= 0, sent.card);
-  check('кнопки реванша больше нет', sent.btns.join(' | ') === 'В меню', sent.btns.join(' | '));
-
-  // Если с доски всё-таки унесло, дальше идти некуда — провал уже назван выше
-  if (sent.onBoard) await page.click('.r-actions .btn-ghost');
-  await page.waitForTimeout(700);
-  const resume = await page.evaluate(() => ({
-    online: !document.getElementById('screenOnline').classList.contains('hidden'),
-    play: document.getElementById('tRkPlay').textContent
-  }));
-  check('после матча вернулись в онлайн, а не провалились обратно', resume.online);
-  check('незакрытая рейтинговая игра предлагает продолжить',
-    resume.play === 'Рейтинговая игра уже идёт', resume.play);
-  await done(page);
-}
-
 // ------------------------------------------------------------ карточка итогов
 async function testRoundCard(browser) {
   console.log('\nКарточка итогов раунда');
@@ -3179,7 +2898,7 @@ async function testAccountDelete(browser) {
   console.log('\nУдаление аккаунта');
 
   const page = await newGame(browser, { user: 'Лев' });
-  await page.click('#tModeOnline');
+  await page.click('#friendsBtn');
   await page.waitForTimeout(500);
   await page.click('#accountChip');
   await page.waitForTimeout(250);
@@ -3205,10 +2924,10 @@ async function testAccountDelete(browser) {
   }));
   check('удаление спрашивает отдельным окном', ask.open && !ask.account);
   check('в вопросе названо имя', ask.text.indexOf('Лев') >= 0, ask.text);
-  check('и сказано, что именно исчезнет',
-    ask.text.indexOf('Рейтинг') >= 0 && ask.text.indexOf('навсегда') >= 0, ask.text);
-  check('и что игры у соперников останутся',
-    ask.text.indexOf('останутся у соперников') >= 0, ask.text);
+  check('и сказано, что именно исчезнет: друзья, монеты и покупки — без рейтинга',
+    /Друзья, рекорды, монеты и покупки/.test(ask.text) && ask.text.indexOf('навсегда') >= 0 && !/Рейтинг/.test(ask.text), ask.text);
+  check('и что игры у друзей останутся',
+    ask.text.indexOf('останутся у друзей') >= 0, ask.text);
   check('уйти из окна можно', ask.stay === 'Отмена', ask.stay);
   check('кнопка удаления названа прямо', ask.go === 'Удалить навсегда', ask.go);
 
@@ -3470,21 +3189,9 @@ async function testFriendChat(browser) {
     note.bad && note.text.indexOf('Слишком часто') >= 0, note.text);
   await page.evaluate(() => { window.__talkError = null; });
 
-  // Позвать на рейтинг прямо из переписки
-  const modes = await page.evaluate(() =>
-    [...document.querySelectorAll('#chatModes .rk-mode')].map(b => b.dataset.mode));
-  check('позвать можно в любую из четырёх разновидностей',
-    modes.join() === '0,1,2,3', modes.join());
-  await page.evaluate(() => { document.getElementById('chatModesFold').open = true; });
-  await page.click('#chatModes .rk-mode[data-mode="2"]');
-  await page.waitForTimeout(600);
-  const inv = await page.evaluate(() => ({
-    sent: window.__rankedChallenge,
-    note: document.getElementById('chatNote').textContent
-  }));
-  check('вызов на рейтинг ушёл с нужным режимом',
-    inv.sent && inv.sent.to === 'Кира' && inv.sent.mode === 2, JSON.stringify(inv.sent));
-  check('и об этом сказано', inv.note.indexOf('Вызов отправлен') >= 0, inv.note);
+  // Из переписки зовут только в дружескую игру: игр на звёзды больше нет
+  check('в переписке нет вызова на рейтинг', await page.evaluate(() =>
+    !document.getElementById('chatModes') && !document.getElementById('chatModesFold')));
 
   // Дружеская игра настраивается — уводит в то же окно вызова
   await page.click('#tChatFriendly');
@@ -3506,7 +3213,7 @@ async function testPushNotifications(browser) {
 
   // Ключа на сервере нет — переключателя быть не должно
   let page = await newGame(browser, { user: 'Лев', push: {} });
-  await page.click('#tModeOnline');
+  await page.click('#friendsBtn');
   await page.waitForTimeout(400);
   await page.click('#accountChip');
   await page.waitForTimeout(700);
@@ -3517,7 +3224,7 @@ async function testPushNotifications(browser) {
 
   // Ключ есть — появляется кнопка
   page = await newGame(browser, { user: 'Лев', push: { key: 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI' } });
-  await page.click('#tModeOnline');
+  await page.click('#friendsBtn');
   await page.waitForTimeout(400);
   await page.click('#accountChip');
   await page.waitForTimeout(700);
@@ -3561,7 +3268,7 @@ async function testPushNotifications(browser) {
   // Другой язык — подписка должна уехать с ним, а не с русским
   const KEY = 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI';
   page = await newGame(browser, { user: 'Лев', lang: 'fr', push: { key: KEY } });
-  await page.click('#tModeOnline');
+  await page.click('#friendsBtn');
   await page.waitForTimeout(400);
   await page.click('#accountChip');
   await page.waitForTimeout(700);
@@ -3575,7 +3282,7 @@ async function testPushNotifications(browser) {
   // Телефон отказал
   page = await newGame(browser, { user: 'Лев', push: { key: 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI' } });
   await page.evaluate(() => { window.__push.permission = 'denied'; });
-  await page.click('#tModeOnline');
+  await page.click('#friendsBtn');
   await page.waitForTimeout(400);
   await page.click('#accountChip');
   await page.waitForTimeout(700);
@@ -3594,7 +3301,7 @@ async function testPushNotifications(browser) {
   // Подписка не завелась — на айфоне это про домашний экран
   page = await newGame(browser, { user: 'Лев', push: { key: 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI' } });
   await page.evaluate(() => { window.__push.subscribeFails = true; });
-  await page.click('#tModeOnline');
+  await page.click('#friendsBtn');
   await page.waitForTimeout(400);
   await page.click('#accountChip');
   await page.waitForTimeout(700);
@@ -3609,7 +3316,7 @@ async function testPushNotifications(browser) {
   page = await newGame(browser, { user: 'Лев', push: {
     key: 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI',
     ios: true, noPushManager: true } });
-  await page.click('#tModeOnline');
+  await page.click('#friendsBtn');
   await page.waitForTimeout(400);
   await page.click('#accountChip');
   await page.waitForTimeout(700);
@@ -3624,7 +3331,7 @@ async function testPushNotifications(browser) {
   // На обычном телефоне этой подсказки быть не должно: она там неуместна
   page = await newGame(browser, { user: 'Лев', push: {
     key: 'BBfy2eKdFPotrpnneRKep1FWCJ89mIlNtvGSLKB34dMs1e2JOzQL0rNr-RzSNKi8lmYIiUqCQc03G8He8_TR5yI' } });
-  await page.click('#tModeOnline');
+  await page.click('#friendsBtn');
   await page.waitForTimeout(400);
   await page.click('#accountChip');
   await page.waitForTimeout(700);
@@ -3708,11 +3415,9 @@ async function testNewLook(browser) {
   check('под каждым режимом — одна короткая подпись', menu.every(m => m.subs === 1),
     menu.map(m => m.subs).join(','));
 
-  // Одиночный режим на очки назывался «Игра на рейтинг» — почти как кнопка
-  // «Играть на рейтинг» внутри «Игры онлайн», хотя это совсем другой режим
+  // Одиночный режим на очки назывался «Игра на рейтинг»; рейтинга больше нет
   const runName = await page.evaluate(() => document.getElementById('tModeRun').textContent);
-  check('одиночный режим на очки называется «Испытание»', runName === 'Испытание', runName);
-  check('и больше не путается с рейтингом онлайн', runName.indexOf('рейтинг') < 0, runName);
+  check('одиночный режим на очки называется «Испытание»', runName === 'Испытание' && runName.indexOf('рейтинг') < 0, runName);
 
   // Два блока по тому, нужен ли интернет: подпись стоит перед своими режимами
   const groups = await page.evaluate(() => {
@@ -3721,7 +3426,7 @@ async function testNewLook(browser) {
                                                             : k.className.replace('mode-btn ', ''));
   });
   check('меню разбито на «без интернета» и «нужен интернет»',
-    groups.join(',') === 'G:Нужен интернет,run wide,online wide,G:Без интернета,solo tile,duel tile,bot tile', groups.join(','));
+    groups.join(',') === 'G:Нужен интернет,run wide,G:Без интернета,solo tile,duel tile,bot tile', groups.join(','));
   for (const lang of ['en', 'fr', 'de']) {
     await setLang(page, lang);
     const heads = await page.evaluate(() =>
@@ -4772,61 +4477,6 @@ async function testBots(browser) {
   check('после бота «Игра с другом» — снова с именами и без бота',
     again.names && !again.pick && await page.evaluate(() => vsBot === null && !/🤖/.test(D.names[1])));
   await done(page);
-
-  // ---- Рейтинг: ожидание и партия с ботом
-  page = await newGame(browser, { user: 'Максим' });
-  await page.evaluate(() => { window.__rankedQ.botWait = 15; openOnlineEntry(); });
-  await page.waitForTimeout(300);
-  await page.click('#tRkPlay');
-  await page.waitForTimeout(200);
-  await page.evaluate(() => { window.__rankedQ.joined = Date.now() - 6000; return loadRanked(true); });
-  const soon = await page.evaluate(() => document.getElementById('rkWaitSub').textContent);
-  check('в очереди сказано, когда будет бот', /через (8|9) с сыграете с ботом/.test(soon), soon);
-  await page.evaluate(() => { window.__rankedQ.joined = Date.now() - 20000; return loadRanked(true); });
-  const now = await page.evaluate(() => document.getElementById('rkWaitSub').textContent);
-  check('после 15 секунд — «Зовём бота»', /Зовём бота/.test(now), now);
-  await page.evaluate(() => { delete window.__rankedQ.botWait; return loadRanked(true); });
-  const old = await page.evaluate(() => document.getElementById('rkWaitSub').textContent);
-  check('без ботов на сервере о боте не говорим', !/бот/i.test(old), old);
-
-  await page.evaluate(() => {
-    Object.assign(window.__match, { names: ['Максим', '@bot:fox'], botSeat: 1, ranked: true, rankedMode: 0,
-      moves: [{ seat: 0, guess: 50, tier: 3 }, { seat: 1, guess: 35, tier: 4 }], cur: 0 });
-    window.__rankedQ.matchId = 1;
-    return loadRanked(true);
-  });
-  await page.waitForTimeout(300);
-  const board = await page.evaluate(() => ({
-    game: !document.getElementById('screenGame').classList.contains('hidden'),
-    p1: (document.querySelector('#pname1 .p-nm') || {}).textContent,
-    drawn: !!document.querySelector('#pname1 .p-bot svg.icon-art'),
-    who: [...document.querySelectorAll('#historyList .h-who')].map(e => e.textContent) }));
-  check('нашёлся бот — открылась доска с ним', board.game && board.p1 === 'Лис 🤖' && board.drawn, JSON.stringify(board));
-  check('ходы бота подписаны его именем', board.who.includes('Лис 🤖'), board.who.join());
-
-  await page.evaluate(() => {
-    Object.assign(window.__match, { roundOver: true, matchOver: true, status: 'finished', wins: [3, 1],
-      roundWinner: 0, eloDelta: [10, 0], elo: 1010 });
-    return refreshMatch(true);
-  });
-  // Число рейтинга не показываем нигде — ни с ботом, ни с человеком
-  await page.waitForTimeout(200);
-  const endBot = await page.evaluate(() => ({ elo: !!document.querySelector('#resultBox .r-elo'), text: document.getElementById('resultBox').textContent }));
-  check('в итоге партии с ботом числа рейтинга нет', !endBot.elo && !/Рейтинг:|1\s?010/.test(endBot.text), endBot.text);
-  await page.evaluate(() => { window.__match.botSeat = null; return refreshMatch(true); });
-  await page.waitForTimeout(200);
-  check('и с человеком тоже', await page.evaluate(() => !/Рейтинг:/.test(document.getElementById('resultBox').textContent)));
-
-  // Реванш с ботом начинается сразу, без «ждём согласия»
-  await page.evaluate(() => { window.__match.botSeat = 1; return refreshMatch(true); });
-  await page.evaluate(() => {
-    const b = [...document.querySelectorAll('#resultBox .btn')].find(x => /Реванш/.test(x.textContent));
-    b.click();
-  });
-  await page.waitForTimeout(300);
-  const re = await page.evaluate(() => ({ id: online && online.id, sent: online && online.rematchSent, n: window.__rematched }));
-  check('реванш с ботом открывает новую партию сразу', re.n === 1 && re.id === 99 && !re.sent, JSON.stringify(re));
-  await done(page);
 }
 
 // ------------------------------------------ разбор онлайн-партии
@@ -4925,161 +4575,6 @@ async function testOnlineReview(browser) {
   await page.waitForTimeout(400);
   check('у новой партии свой разбор', await page.evaluate(() =>
     window.__reviewCalls === 3 && !!document.getElementById('reviewBtn')));
-  await done(page);
-}
-
-// ------------------------------------------ лиги и сезоны
-async function testLeagues(browser) {
-  console.log('\nЛиги и сезоны');
-  const LADDER = { season: '2026-09', endsIn: 4 * 86400 + 3000, stars: 64, streak: 2, best: 70, games: 12, peak: 2,
-                   badges: [{ season: '2026-07', league: 1 }, { season: '2026-08', league: 2 }] };
-  let page = await newGame(browser, { user: 'Максим' });
-  const pos = await page.evaluate(() => [0, 1, 29, 30, 45, 64, 149, 150].map(v => leagueLabel(v) + '|' + starsLine(v)));
-  check('звёзды → лига, ранг и звёзды в ранге',
-    pos.join(',') === '🥉 Бронза 10|☆☆☆,🥉 Бронза 10|★☆☆,🥉 Бронза 1|★★☆,🥈 Серебро 10|☆☆☆,' +
-                      '🥈 Серебро 5|☆☆☆,🥇 Золото 9|★☆☆,💎 Алмаз 1|★★☆,👑 Легенда|', pos.join(','));
-
-  // Без лиг на сервере — всё по-старому: число рейтинга и топ по рейтингу
-  await page.evaluate(() => openOnlineEntry());
-  await page.waitForTimeout(500);
-  const old = await page.evaluate(() => ({ elo: document.getElementById('rkElo').textContent.replace(/\s/g, ' '),
-    stars: document.getElementById('rkStars').classList.contains('hidden'),
-    top: document.getElementById('tRkTop').textContent }));
-  check('сервер без лиг: как раньше — число рейтинга', old.elo === '1 000' && old.stars && old.top === 'Топ по рейтингу',
-    JSON.stringify(old));
-  await done(page);
-
-  page = await newGame(browser, { user: 'Максим' });
-  await page.evaluate(L => {
-    window.__ladder = L;
-    window.__ladderTop = [{ username: 'Кира', stars: 150 }, { username: 'Максим', stars: 64 }];
-  }, LADDER);
-  await page.evaluate(() => openOnlineEntry());
-  await page.waitForTimeout(500);
-  const hero = await page.evaluate(() => ({
-    emblem: !!document.querySelector('#rkEmblem:not(.hidden) svg.lg-emblem'),
-    elo: document.getElementById('rkElo').textContent, stars: document.getElementById('rkStars').textContent,
-    sub: document.getElementById('rkEloSub').textContent, top: document.getElementById('tRkTop').textContent,
-    rows: [...document.querySelectorAll('#rkTopList .rk-top-row')].map(r => r.querySelector('.rk-who').textContent + ':' +
-                                                                         r.querySelector('.rk-pts').textContent) }));
-  // Медаль-эмодзи заменил герб лиги рисунком
-  check('на экране онлайна — герб, лига и звёзды вместо числа',
-    hero.emblem && hero.elo === 'Золото 9' && hero.stars === '★☆☆', JSON.stringify(hero));
-  check('сказано, какой сезон и сколько осталось', hero.sub === 'Сезон: сентябрь · осталось 4 дн.', hero.sub);
-  check('топ сезона — по лигам', hero.top === 'Топ сезона' && hero.rows.join() === 'Кира:👑 Легенда,Максим:🥇 Золото 9',
-    JSON.stringify(hero.rows));
-  const legend = await page.evaluate(() => {
-    ladderInfo = Object.assign({}, ladderInfo, { stars: 150, endsIn: 3600 });
-    renderRanked(null);
-    return { elo: document.getElementById('rkElo').textContent,
-             stars: document.getElementById('rkStars').textContent.replace(/\s/g, ' '),
-             sub: document.getElementById('rkEloSub').textContent };
-  });
-  // Число рейтинга не показываем никому: лестница — лиги и звёзды
-  check('Легенде — только лига, без числа рейтинга; в последний день — «последний день»',
-    legend.elo === 'Легенда' && legend.stars === '' && /последний день/.test(legend.sub), JSON.stringify(legend));
-  const calls = await page.evaluate(() => window.__ladderCalls);
-  await page.evaluate(() => loadRanked(true));
-  check('лестница не спрашивается на каждом опросе', await page.evaluate(n => window.__ladderCalls === n, calls));
-
-  // Итог партии: звёзды вместо числа рейтинга
-  const result = async stars => {
-    await page.evaluate(st => {
-      window.__matchReview = [{ round: 1, seat: 0, guess: 50, tier: 8, timeout: false, forced: false, limited: false }];
-      window.__matchStars = st;
-      window.__match.id = (window.__match.id || 1) + 1;
-      Object.assign(window.__match, { names: ['Максим', '@bot:fox'], botSeat: 1, ranked: true, rankedMode: 0,
-        roundOver: true, matchOver: true, status: 'finished', wins: st.delta[0] < 0 ? [1, 3] : [3, 1],
-        roundWinner: st.delta[0] < 0 || (st.delta[0] === 0 && st.after[0] % 15 === 0) ? 1 : 0,
-        eloDelta: [10, 0], elo: 1010, moves: [{ seat: 0, guess: 50, tier: 8 }] });
-      return openMatch(window.__match.id);
-    }, stars);
-    await page.waitForTimeout(400);
-    return page.evaluate(() => ({
-      main: (document.querySelector('#resultBox .r-stars-main') || {}).textContent || '',
-      note: (document.querySelector('#resultBox .r-stars-note') || {}).textContent || '',
-      elo: !!document.querySelector('#resultBox .r-elo') }));
-  };
-  let r = await result({ delta: [2, 0], after: [60, null], unlock: [2, null] });
-  check('победа: +2 за серию, новая лига и открытые иконки',
-    r.main === '+2 ★ · 🥇 Золото 10 ☆☆☆' && r.note === 'серия побед · Новая лига: 🥇 Золото! · В профиле открыто: 🦚 🐉', JSON.stringify(r));
-  check('число рейтинга в итоге не показывается, когда есть звёзды', !r.elo);
-  r = await result({ delta: [-1, 0], after: [40, null], unlock: [null, null] });
-  check('поражение: минус звезда', r.main === '−1 ★ · 🥈 Серебро 7 ★☆☆' && r.note === '', JSON.stringify(r));
-  r = await result({ delta: [0, 0], after: [45, null], unlock: [null, null] });
-  check('поражение на ступени: звезда не ушла, и сказано почему',
-    r.main === '±0 ★ · 🥈 Серебро 5 ☆☆☆' && /ниже этого ранга не упасть/.test(r.note), JSON.stringify(r));
-  r = await result({ delta: [0, 0], after: [150, null], unlock: [null, null] });
-  check('Легенда: без звёзд, только лига', r.main === '👑 Легенда', JSON.stringify(r));
-  // Сдача соперника: причина и звёзды видны вместе
-  await page.evaluate(() => { window.__match.forfeitBy = 1; });
-  r = await result({ delta: [1, 0], after: [41, null], unlock: [null, null] });
-  check('при сдаче соперника — и причина, и звезда', r.main === '+1 ★ · 🥈 Серебро 7 ★★☆' &&
-    await page.evaluate(() => /вышел из игры/.test((document.querySelector('#resultBox .r-forfeit') || {}).textContent || '')),
-    JSON.stringify(r));
-  await page.evaluate(() => { window.__match.forfeitBy = null; window.__matchStars = null; });
-  const noStars = await page.evaluate(() => {
-    window.__match.id += 1;
-    // Реванш с человеком: бота нет, звёзд нет
-    Object.assign(window.__match, { ladder: false, botSeat: null, names: ['Максим', 'Кира'] });
-    return openMatch(window.__match.id);
-  }).then(() => page.waitForTimeout(400)).then(() => page.evaluate(() => ({
-    stars: !!document.querySelector('#resultBox .r-stars'), elo: !!document.querySelector('#resultBox .r-elo'),
-    note: [...document.querySelectorAll('#resultBox .r-forfeit')].map(e => e.textContent).join('|') })));
-  // Реванш с человеком звёзд не даёт — и игра говорит об этом, а не
-  // показывает вместо звёзд число рейтинга
-  check('партия без звёзд (реванш) — «без звёзд», числа рейтинга нет',
-    !noStars.stars && !noStars.elo && noStars.note.includes('Без звёзд'), JSON.stringify(noStars));
-  await page.evaluate(() => { delete window.__match.ladder; });
-  await done(page);
-
-  // Профиль: лига, значки сезонов, награды под замком
-  page = await newGame(browser, { user: 'Максим', profile: { color: null } });
-  await page.evaluate(L => { window.__ladder = L; }, LADDER);
-  await page.click('#accountChip');
-  await page.waitForTimeout(500);
-  const pf = await page.evaluate(() => document.getElementById('pfLeague').textContent);
-  check('в профиле — лига и значки прошлых сезонов', pf === '🥇 Золото 9 ★☆☆Сезоны: 🥈 07.2026  🥇 08.2026', pf);
-  await page.click('#pfAvatar');
-  await page.waitForTimeout(150);
-  const grid = await page.evaluate(() => ({
-    worlds: ADV_WORLDS.length,
-    icons: [...document.querySelectorAll('#avGrid .av-tile')].length,
-    locked: [...document.querySelectorAll('#avGrid .av-tile.locked')].map(e => e.dataset.icon).join(''),
-    colorsLocked: [...document.querySelectorAll('#avGrid .av-color.locked')].map(e => e.dataset.color).join(',') }));
-  check('награды видны все, закрыты — лиги выше достигнутой',
-    grid.icons === 41 + grid.worlds + 10 &&
-    grid.locked === '🦩🐳🦖🦜👑🌟🧙🦍🦑🐲🛸' + Array.from({ length: grid.worlds - 5 }, (_, w) => 'adv-' + (w + 6) * 10).join('') &&
-    grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
-    JSON.stringify(grid));
-  const before = await page.evaluate(() => window.__profile.calls.length);
-  await page.click('.av-tile[data-icon="🦖"]');
-  await page.waitForTimeout(150);
-  const lock = await page.evaluate(n => ({ note: document.getElementById('avNote').textContent,
-    sent: window.__profile.calls.slice(n).filter(c => c.name === 'set_avatar').length,
-    open: !document.getElementById('avGrid').classList.contains('hidden') }), before);
-  check('закрытая иконка не ставится, и сказано, где откроется',
-    lock.note === 'Откроется в лиге «Алмаз»' && lock.sent === 0 && lock.open, JSON.stringify(lock));
-  await page.click('.av-tile[data-icon="🐉"]');
-  await page.waitForTimeout(200);
-  check('открытая награда ставится', await page.evaluate(() => window.__profile.avatar === '🐉'));
-  await page.click('#pfAvatar');   // выбор иконки сворачивает сетку
-  await page.waitForTimeout(100);
-  await page.click('.av-color[data-color="#0ea5e9"]');
-  await page.waitForTimeout(150);
-  check('закрытый цвет не ставится', await page.evaluate(() => window.__profile.color !== '#0ea5e9' &&
-    /Алмаз/.test(document.getElementById('avNote').textContent)));
-  await done(page);
-
-  // Сервер без лиг — наград в сетке нет
-  page = await newGame(browser, { user: 'Максим', profile: { color: null } });
-  await page.click('#accountChip');
-  await page.waitForTimeout(400);
-  await page.click('#pfAvatar');
-  await page.waitForTimeout(150);
-  check('сервер без лиг: сетка как раньше, лиги в профиле нет', await page.evaluate(() =>
-    document.querySelectorAll('#avGrid .av-tile').length === 41 + ADV_WORLDS.length &&
-    document.getElementById('pfLeague').classList.contains('hidden')));
   await done(page);
 }
 
@@ -5300,10 +4795,10 @@ async function testFogWholeRound(browser) {
 
 // Партия с человеком: ждём обоих, отсчёт 3-2-1, «Готов» между раундами
 async function testMatchFlow(browser) {
-  console.log('\nОнлайн: начало партии и перерыв');
+  console.log('\nПартия с другом: начало и перерыв');
   const page = await newGame(browser, { user: 'Лев' });
   await page.evaluate(() => {
-    Object.assign(window.__match, { lobby: true, lobbyLeft: 270, present: [true, false], ladder: false });
+    Object.assign(window.__match, { lobby: true, lobbyLeft: 270, present: [true, false] });
     openMatch(1);
   });
   await page.waitForTimeout(500);
@@ -5319,7 +4814,8 @@ async function testMatchFlow(browser) {
   check('соперника нет — «Ждём Кира» и сколько до отмены',
     v.bannerShown && v.banner.includes('Ждём Кира') && /отмена через 4:(2\d|30)/.test(v.banner), v.banner);
   check('пока ждём — ни поля ввода, ни часов хода', !v.input && !v.clock, JSON.stringify(v));
-  check('ещё до начала сказано, что партия без звёзд', v.banner.includes('Без звёзд'), v.banner);
+  // Звёзд и рейтинга больше нет (миграция 062): говорить о них незачем
+  check('до начала — ни слова про звёзды', !/звёзд/i.test(v.banner), v.banner);
 
   // Соперник пришёл — отсчёт
   await page.evaluate(() => { Object.assign(window.__match, { lobby: false, lobbyLeft: null, startsIn: 2, present: [true, true] }); refreshMatch(true); });
@@ -5375,16 +4871,6 @@ async function testMatchFlow(browser) {
   check('соперник не пришёл — «Партия отменена», ходить нельзя', v.banner.includes('Партия отменена — Кира') && !v.input && !v.clock,
     JSON.stringify(v));
 
-  // С ботом «Готов» не нужен: кнопка как раньше
-  await page.evaluate(() => {
-    Object.assign(window.__match, { status: 'active', botSeat: 1, names: ['Лев', '@bot:panda'], roundOver: true, roundWinner: 0,
-                                    nextIn: 9, waitReady: false, ready: [false, true] });
-    refreshMatch(true);
-  });
-  await page.waitForTimeout(400);
-  v = await view();
-  check('с ботом — «Следующий раунд» без ожидания', v.btns[0] && v.btns[0].t === 'Следующий раунд' && !v.next.includes('ждёт'),
-    JSON.stringify(v));
   await page.context().close();
 }
 
@@ -5456,8 +4942,6 @@ async function testBlockReport(browser) {
     [...document.querySelectorAll('#friendSheet button')].filter(b => !b.classList.contains('hidden')).map(b => b.textContent));
   check('в переписке «⋯» — без «Написать»', fromChat.join() === '🏅 Достижения,Убрать из друзей,⚠️ Пожаловаться,🚫 Заблокировать,Отмена',
     fromChat.join());
-  const label = await page.evaluate(() => document.getElementById('tChatRanked').textContent);
-  check('вызов «по правилам рейтинга» подписан: без звёзд', label.includes('без звёзд'), label);
   await page.click('#fsBlock');
   await page.waitForTimeout(100);
   await page.click('#blGo');
@@ -5492,27 +4976,24 @@ async function testTutorial(browser) {
   const menu = () => page.evaluate(() => ({
     card: !document.getElementById('tutCard').classList.contains('hidden'),
     title: document.getElementById('tTutTitle').textContent, sub: document.getElementById('tTutSub').textContent,
-    runLocked: document.querySelector('.mode-btn.online').classList.contains('locked'),
+    runLocked: !onlineOpen(),
     trialLocked: document.querySelector('.mode-btn.run').classList.contains('locked'),
-    lockText: document.getElementById('tOnlineLock').classList.contains('hidden') ? '' : document.getElementById('tOnlineLock').textContent
+    online: !!document.querySelector('.mode-btn.online')
   }));
   let m = await menu();
   check('новичку — карточка «Обучение · урок 1 из 3»', m.card && m.title === 'Обучение · урок 1 из 3' && m.sub === 'Как читать подсказки',
     JSON.stringify(m));
-  check('онлайн закрыт до уроков 1–2, Испытание открыто сразу', m.runLocked && !m.trialLocked && m.lockText === '🔒 после уроков 1–2', JSON.stringify(m));
-  await page.click('.mode-btn.online');
+  check('«Друзья» закрыты до уроков 1–2, Испытание открыто сразу, плитки онлайна нет', m.runLocked && !m.trialLocked && !m.online,
+    JSON.stringify(m));
+  await page.click('#friendsBtn');
   await page.waitForTimeout(150);
   const gate = await page.evaluate(() => ({
     open: !document.getElementById('gateModal').classList.contains('hidden'),
+    text: document.getElementById('gateText').textContent,
     go: document.getElementById('gateGo').textContent, skip: document.getElementById('gateSkip').textContent,
-    online: !document.getElementById('screenOnline').classList.contains('hidden') }));
-  check('закрытый режим предлагает урок или пропустить', gate.open && !gate.online && gate.go === '🎓 Начать урок 1' &&
-    gate.skip === 'Пропустить обучение', JSON.stringify(gate));
-  await page.evaluate(() => closeGate());
-  await page.click('#friendsBtn');
-  await page.waitForTimeout(150);
-  check('и «Друзья» в шапке тоже закрыты', await page.evaluate(() => document.getElementById('screenFriends').classList.contains('hidden') &&
-    !document.getElementById('gateModal').classList.contains('hidden')));
+    friends: !document.getElementById('screenFriends').classList.contains('hidden') }));
+  check('«Друзья» предлагают урок или пропустить', gate.open && !gate.friends && /«Друзья» откроются/.test(gate.text) &&
+    gate.go === '🎓 Начать урок 1' && gate.skip === 'Пропустить обучение', JSON.stringify(gate));
 
   // Урок 1: тренировка 1–20, подсказки по шагам
   await page.click('#gateGo');
@@ -5555,7 +5036,7 @@ async function testTutorial(browser) {
   check('дальше — про жетон «+1 ход»', (await coach()).includes('+1 ход'), await coach());
   await guess(33);
   res = await page.evaluate(() => ({ line: (document.querySelector('#resultBox .r-lesson') || {}).textContent, st: tutState() }));
-  check('урок 2 пройден — онлайн открыт', res.line === '🎓 Урок 2 пройден! · 🔓 Онлайн открыт' && res.st.done.join() === '1,2',
+  check('урок 2 пройден — «Друзья» открыты', res.line === '🎓 Урок 2 пройден! · 🔓 «Друзья» открыты' && res.st.done.join() === '1,2',
     JSON.stringify(res));
 
   // Урок 3: бонусы; первый бонус объясняется карточкой
@@ -5590,14 +5071,14 @@ async function testTutorial(browser) {
   await page.waitForTimeout(250);
   m = await menu();
   const prefs = await page.evaluate(() => ({ bonus: bonusMode, n: bonusCountChoice, lesson }));
-  check('после обучения — карточки нет, онлайн открыт', !m.card && !m.runLocked, JSON.stringify(m));
+  check('после обучения — карточки нет, «Друзья» открыты', !m.card && !m.runLocked, JSON.stringify(m));
   check('свои настройки игрока урок вернул как было', !prefs.bonus && prefs.n === 0 && prefs.lesson === null, JSON.stringify(prefs));
   await page.context().close();
 
   // Пропустить
   page = await newGame(browser, { newbie: true });
   await page.evaluate(() => { currentLang = 'ru'; applyTranslations(); });
-  await page.click('.mode-btn.online');
+  await page.click('#friendsBtn');
   await page.waitForTimeout(150);
   await page.click('#gateSkip');
   await page.waitForTimeout(150);
@@ -5635,24 +5116,6 @@ async function testTutorial(browser) {
   await page.waitForTimeout(400);
   const av = await page.evaluate(() => ({ fin: window.__tutorialFinished || 0, avatar: window.__profile.avatar }));
   check('выбор 🎓 сначала отмечает обучение в базе, потом ставит иконку', av.fin >= 1 && av.avatar === '🎓', JSON.stringify(av));
-  await page.context().close();
-
-  // Ученик
-  page = await newGame(browser, { user: 'Максим' });
-  await page.evaluate(() => {
-    window.__ladder = { season: '2026-09', endsIn: 4 * 86400, stars: 7, streak: 0, best: 7, games: 3, peak: 0, badges: [], apprentice: 7 };
-    openOnlineEntry();
-  });
-  await page.waitForTimeout(600);
-  const ap = await page.evaluate(() => document.getElementById('rkApprentice').classList.contains('hidden') ? '' :
-    document.getElementById('rkApprentice').textContent);
-  check('на экране рейтинга — сколько партий Ученика осталось', ap === '🎓 Ученик · без потери звёзд: ещё 7', ap);
-  const apRes = await page.evaluate(() => {
-    D.roundWinner = 1;
-    const box = starsResult({ delta: [0, 1], after: [7, 20] }, 0);
-    return box ? box.textContent : '';
-  });
-  check('проиграл Учеником — «звезда не снята»', apRes.includes('Ученик: звезда не снята'), apRes);
   await page.context().close();
 }
 
@@ -5793,12 +5256,12 @@ async function testInviteLink(browser) {
     st.note === 'Теперь вы друзья: Лев' && st.left === null, JSON.stringify(st));
   await page.context().close();
 
-  // Новичок без аккаунта: сначала вход, потом добавить; онлайн открыт сразу
+  // Новичок без аккаунта: сначала вход, потом добавить; «Друзья» открыты сразу
   page = await open({ newbie: true }, 'ABCD2345');
   st = await page.evaluate(() => ({
-    add: document.getElementById('inAdd').textContent, locked: document.querySelector('.mode-btn.online').classList.contains('locked'),
+    add: document.getElementById('inAdd').textContent, locked: !onlineOpen(),
     card: !document.getElementById('tutCard').classList.contains('hidden') }));
-  check('новичок по приглашению: «Войти или зарегистрироваться», онлайн не закрыт, уроки предложены',
+  check('новичок по приглашению: «Войти или зарегистрироваться», «Друзья» не закрыты, уроки предложены',
     st.add === 'Войти или зарегистрироваться' && !st.locked && st.card, JSON.stringify(st));
   await page.click('#inAdd');
   await page.waitForTimeout(300);
@@ -5823,7 +5286,7 @@ async function testInviteLink(browser) {
 
 // Задания дня, достижения, итоги сезона (миграция 041)
 async function testProgress(browser) {
-  console.log('\nЗадания дня, достижения, итоги сезона');
+  console.log('\nЗадания дня и достижения');
   const fs = require('fs'), path = require('path');
   const PROG = { day: '2026-09-29', streak: 2, bestStreak: 4, doneToday: false, secondsLeft: 5 * 3600 + 100,
     quests: [{ code: 'play2', goal: 2, progress: 1 }, { code: 'win1', goal: 1, progress: 1 }, { code: 'run_best3', goal: 3, progress: 0 }],
@@ -5850,7 +5313,8 @@ async function testProgress(browser) {
   const dbQuests = [...qMig.match(/create or replace function quest_pool\(\)[\s\S]*?\$\$;/)[0].matchAll(/'([a-z_0-9]+)'/g)].map(m => m[1]);
   check('достижения: 71 код лестницами, те же, что в базе, в том же порядке', js.ach.length === 71 && js.ach.join() === dbAch.join(), js.ach.join() + ' / ' + dbAch.join());
   check('иконки за серию — те же, что в базе', js.icons.join() === dbIcons.join(), js.icons.join() + ' / ' + dbIcons.join());
-  check('у каждого задания из базы есть текст', dbQuests.length === 11 && dbQuests.every(c => js.q.includes(c)), dbQuests.join());
+  check('у каждого задания из базы есть текст, лишних нет', dbQuests.length === 9 && dbQuests.every(c => js.q.includes(c)) &&
+    js.q.length === 9, dbQuests.join() + ' / ' + js.q.join());
   check('тексты заданий и достижений есть на всех 4 языках', js.langs.every(Boolean), JSON.stringify(js.langs));
 
   // Карточка в меню
@@ -5864,7 +5328,7 @@ async function testProgress(browser) {
   let c = await card();
   check('в меню — «📅 Задания дня», серия 🔥 2', c.shown && c.title === '📅 Задания дня' && c.streak === '🔥 2', JSON.stringify(c));
   check('три задания с прогрессом; выполненное отмечено',
-    c.rows.join('|') === '·○Сыграть 2 партии онлайн1/2|✓✅Выиграть партию на звёзды1/1|·○Пройти 3 раунда Испытания за одну попытку0/3', c.rows.join('|'));
+    c.rows.join('|') === '·○Сыграть 2 любые игры1/2|✓✅Одержать победу — в Приключении или над другом1/1|·○Пройти 3 раунда Испытания за одну попытку0/3', c.rows.join('|'));
   check('внизу — когда новые и какая иконка следующая', c.foot === 'Новые задания через 5 ч · Серия 7 дн. — иконка 🚀', c.foot);
   check('часовой пояс отправлен', await page.evaluate(() => (window.__progressCalls || []).some(a => typeof a.p_tz === 'string' && a.p_tz.length > 0)));
 
@@ -5884,9 +5348,11 @@ async function testProgress(browser) {
     rows: [...document.querySelectorAll('#pfAchGrid .lad-row')].map(x => x.dataset.ladder + ':' + x.dataset.tier),
     wins: (document.querySelector('#pfAchGrid .lad-row[data-ladder="wins"]') || {}).textContent || '' }));
   check('профиль: серия заданий и лучшая', pf.streakShown && pf.streak === '📅 Серия заданий: 3 дн. · лучшая 4', pf.streak);
-  check('профиль: «🏅 Достижения: 2 из 71», по строке на лестницу со ступенью',
-    pf.head === '🏅 Достижения: 2 из 71' && pf.rows.join() === 'wins:1,games:0,streak:0,firstTry:0,modes:0,league:0,quests:0,run:0,friends:0,rivals:0,tutorial:1,advStars:0,advWorlds:0,advGold:0',
+  // Лиг нет (миграция 062): их лестница и ступени — только у того, кто их получил
+  check('профиль: «🏅 Достижения: 2 из 66», по строке на лестницу со ступенью, лиг нет',
+    pf.head === '🏅 Достижения: 2 из 66' && pf.rows.join() === 'wins:1,games:0,streak:0,firstTry:0,modes:0,quests:0,run:0,friends:0,rivals:0,tutorial:1,advStars:0,advWorlds:0,advGold:0',
     JSON.stringify(pf));
+  check('победы — «Победы», без «онлайн»', /Победы ·/.test(pf.wins) && !/онлайн/i.test(pf.wins), pf.wins);
   check('у лестницы — что открыто и что дальше', /Первая победа/.test(pf.wins) && /Дальше: 5 побед/.test(pf.wins), pf.wins);
   // Новые лестницы и верх старых: сколько до следующей ступени
   const lad = await page.evaluate(() => {
@@ -5974,28 +5440,6 @@ async function testProgress(browser) {
   await p4.waitForTimeout(300);
   check('у друга пока ничего — «Пока ни одного»', await p4.evaluate(() => document.getElementById('achNote').textContent === 'Пока ни одного'));
   await p4.context().close();
-
-  // Итоги сезона — один раз
-  const LAD = { season: '2026-09', endsIn: 20 * 86400, stars: 33, streak: 0, best: 33, games: 0, peak: 2, badges: [{ season: '2026-08', league: 2 }],
-    apprentice: 0, summary: { season: '2026-08', league: 2, best: 64, games: 12, wins: 7 } };
-  const p5 = await newGame(browser, { user: 'Лев', ladder: LAD });
-  await p5.evaluate(() => loadLadder());
-  await p5.waitForTimeout(300);
-  const ss = await p5.evaluate(() => ({ open: !document.getElementById('seasonModal').classList.contains('hidden'),
-    title: document.getElementById('ssTitle').textContent, league: document.getElementById('ssLeague').textContent,
-    best: document.getElementById('ssBest').textContent, games: document.getElementById('ssGames').textContent,
-    now: document.getElementById('ssNow').textContent, go: document.getElementById('ssGo').textContent }));
-  check('итоги сезона: месяц, лига, лучшее, партии и победы, с чего новый',
-    ss.open && /^Итоги сезона: август 2026$/i.test(ss.title) && ss.league === '🥇Золото' && ss.best === 'Лучшее: 🥇 Золото 9' &&
-    ss.games === 'Партий: 12 · Побед: 7' && ss.now === 'Новый сезон начинается с: 🥈 Серебро 9' && ss.go === 'Вперёд!', JSON.stringify(ss));
-  await p5.click('#ssGo');
-  await p5.waitForTimeout(300);
-  await p5.evaluate(() => loadLadder());
-  await p5.waitForTimeout(300);
-  const ss2 = await p5.evaluate(() => ({ seen: window.__seasonSeen, open: !document.getElementById('seasonModal').classList.contains('hidden') }));
-  check('«Вперёд!» — база помнит, что видели; второй раз не всплывает',
-    ss2.seen && ss2.seen[0] === '2026-08' && !ss2.open, JSON.stringify(ss2));
-  await p5.context().close();
 }
 
 // Мгновенные сигналы через Realtime (миграция 042)
@@ -6270,9 +5714,7 @@ async function testRedesign(browser) {
   const PROG = { day: '2026-10-28', streak: 2, bestStreak: 8, doneToday: false, secondsLeft: 3600,
     quests: [{ code: 'play2', goal: 2, progress: 1 }, { code: 'win1', goal: 1, progress: 1 }, { code: 'run_best3', goal: 3, progress: 0 }],
     achievements: [], stats: {} };
-  const LAD = { season: '2026-10', endsIn: 20 * 86400, stars: 40, streak: 1, best: 40, games: 12, peak: 1, badges: [] };
-
-  const page = await newGame(browser, { user: 'Максим', progress: PROG, ladder: LAD });
+  const page = await newGame(browser, { user: 'Максим', progress: PROG });
   await page.evaluate(() => { localStorage.setItem('hc_run_best_максим', '1240'); showScreen('mode'); });
   await page.waitForTimeout(400);
   // Оформление одно — тёмное, и в светлом телефоне тоже
@@ -6289,15 +5731,12 @@ async function testRedesign(browser) {
     (await page.locator('#tabbar').textContent()).includes('Профиль'));
   check('в шапке только название', await page.locator('.top-controls button').count() === 0);
 
-  // Под онлайн-режимами — своё: рекорд и лига
+  // Под Испытанием — своё: рекорд
   await page.waitForTimeout(300);
   check('под Испытанием — рекорд', /1\s240/.test(await page.locator('#tRunInfo').textContent()) &&
     await page.locator('#tRunInfo').isVisible(), await page.locator('#tRunInfo').textContent());
-  check('под игрой онлайн — лига, без ряда звёздочек', /Серебро 7/.test(await page.locator('#tOnlineInfo').textContent()) &&
-    !/★/.test(await page.locator('#tOnlineInfo').textContent()),
-    await page.locator('#tOnlineInfo').textContent());
-  check('онлайн — выше режимов без интернета', await page.evaluate(() =>
-    document.querySelector('.mode-btn.online').getBoundingClientRect().top <
+  check('плитки онлайна нет, Испытание — выше режимов без интернета', await page.evaluate(() => !document.querySelector('.mode-btn.online') &&
+    document.querySelector('.mode-btn.run').getBoundingClientRect().top <
     document.querySelector('.mode-btn.solo').getBoundingClientRect().top));
   const tiles = await page.evaluate(() => ['solo', 'duel', 'bot'].map(k =>
     document.querySelector('.mode-btn.' + k).getBoundingClientRect()).map(r => ({ top: Math.round(r.top), w: Math.round(r.width) })));
@@ -6995,30 +6434,46 @@ async function testTrialSurprises(browser) {
   await page.context().close();
 }
 
-// Онлайн, часть 3а: сундук дня, серия, сезонный путь, рамки и титулы
-async function testOnlinePass(browser) {
-  console.log('\nОнлайн: сундук, серия, сезонный путь');
+// Карточка дня в главном меню (миграции 053 и 062): сундук, серия, путь и
+// «Испытание выходных». Сундук открывает любая игра — и без интернета тоже
+async function testDailyCard(browser) {
+  console.log('\nКарточка дня: сундук, путь, «Испытание выходных»');
   const page = await newGame(browser, { user: 'Максим' });
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     window.__online = { day: '2026-10-30', played: false, chestOpened: false, chest: null, streak: 2, bestStreak: 2, freezeLeft: true,
-      season: '2026-10', xp: 250, levelXp: 100, maxLevel: 30, seasonLeft: 86400 * 5,
+      season: '2026-10', xp: 250, levelXp: 100, maxLevel: 30, seasonLeft: 86400 * 5, playXp: 0, playXpCap: 150,
       rewards: [{ level: 3, kind: 'phrase', code: 'lava' }, { level: 12, kind: 'frame', code: 'fire' }, { level: 9, kind: 'title', code: 'hunter' }],
-      streakRewards: [{ days: 3, kind: 'phrase', code: 'streak' }], owned: [], frame: null, title: null };
+      streakRewards: [{ days: 3, kind: 'phrase', code: 'streak' }], owned: [], frame: null, title: null,
+      weekend: { on: false, points: 0, claim3: null, claim5: null, frame: 'cup-11', startsIn: 3 * 86400 + 600, endsIn: 0 } };
     tutSave({ done: [1, 2, 3], skipped: true, veteran: true });
+    await loadOnlineInfo();
+    showScreen('mode');
   });
-  await page.evaluate(() => loadOnlineInfo());
-  await page.waitForTimeout(150);
-  const menu = await page.evaluate(() => document.getElementById('tOnlineInfo').textContent);
-  check('в меню на плитке онлайна — про сундук, без серии и значков', /Сыграйте — сундук/.test(menu) && !/🔥/.test(menu), menu);
-  await page.evaluate(() => openOnline());
-  await page.waitForTimeout(500);
-  const card = await page.evaluate(() => ({ text: document.getElementById('olDaily').textContent,
-    locked: !!document.querySelector('#olDaily .od-chest.locked'), lvl: document.querySelector('#olDaily .od-lvl').textContent }));
-  check('до партии сундук закрыт и сказано почему', card.locked && /Сыграйте партию/.test(card.text), card.text);
-  check('ступень пути и очки до следующей', card.lvl === '2/30' && /50\/100/.test(card.text), JSON.stringify(card));
-  await page.evaluate(async () => { window.__online.played = true; window.__chestSurprise = { kind: 'phrase', code: 'genius' }; await loadOnlineInfo(); });
-  check('после партии — кнопка «Открыть сундук»', await page.locator('#odChest').isVisible());
-  await page.evaluate(() => openChest());
+  await page.waitForTimeout(200);
+  const card = await page.evaluate(() => ({ inMenu: !!document.querySelector('#screenMode #olDaily:not(.hidden)'),
+    text: document.getElementById('olDaily').textContent, off: document.getElementById('odCup').classList.contains('off'),
+    locked: !!document.querySelector('#olDaily .od-chest.locked'), lvl: document.querySelector('#olDaily .od-lvl').textContent,
+    online: !!document.querySelector('.mode-btn.online, #screenOnline') }));
+  check('карточка дня — в главном меню, онлайна со случайными соперниками нет', card.inMenu && !card.online, JSON.stringify(card));
+  check('до игры сундук закрыт: «Сыграйте любую игру»', card.locked && /Сыграйте любую игру/.test(card.text), card.text);
+  check('ступень пути и очки до следующей', card.lvl === '2/30' && /50\/100/.test(card.text), card.text);
+  check('в будни «Испытание выходных» — одной строкой: когда начнётся', card.off && /Испытание выходных/.test(card.text) &&
+    /через 3 дня/.test(card.text), card.text);
+
+  // Тренировка без интернета — тоже игра: база отмечает день, сундук открывается
+  await page.evaluate(() => openSetup('solo'));
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(200);
+  const s1 = await page.evaluate(() => secret);
+  await page.fill('#guessInput', String(s1));
+  await page.click('#tSubmitGuess');
+  await page.waitForTimeout(400);
+  const after = await page.evaluate(() => ({ sent: (window.__localDone || []).join(), played: window.__online.played }));
+  check('конец Тренировки — в базу («solo»), день отмечен', after.sent === 'solo' && after.played, JSON.stringify(after));
+  await page.evaluate(() => quitToMenu());
+  await page.waitForTimeout(200);
+  check('после игры — кнопка «Открыть сундук» в меню', await page.locator('#odChest').isVisible());
+  await page.evaluate(() => { window.__chestSurprise = { kind: 'phrase', code: 'genius' }; openChest(); });
   await page.waitForTimeout(500);
   const chest = await page.evaluate(() => ({ shown: !document.getElementById('chestModal').classList.contains('hidden'),
     text: document.getElementById('chestBody').textContent, card: document.getElementById('olDaily').textContent }));
@@ -7031,33 +6486,112 @@ async function testOnlinePass(browser) {
   await page.evaluate(() => openPassModal());
   await page.waitForTimeout(200);
   const pass = await page.evaluate(() => ({ rows: [...document.querySelectorAll('#passList .pl-row')].map(r => r.dataset.level + (r.classList.contains('got') ? '+' : '-')),
-    sub: document.getElementById('passSub').textContent }));
+    sub: document.getElementById('passSub').textContent, how: document.getElementById('passHow').textContent,
+    streak: document.getElementById('passStreak').textContent }));
   check('путь: награды по ступеням, полученные отмечены', pass.rows.join() === '2+,3-,9-,12-' && /Ступень 2 из 30/.test(pass.sub), JSON.stringify(pass));
+  check('путь: очки за любую игру, до 150 в день; серия — без «онлайн»', /любая игра/.test(pass.how) && /150/.test(pass.how) &&
+    !/онлайн/i.test(pass.how + pass.streak), pass.how + ' | ' + pass.streak);
   await page.evaluate(() => closePassModal());
-  // Рамка и титул: чужое не надеть, своё — видно в профиле
-  await page.evaluate(async () => { window.__online.owned.push({ kind: 'frame', code: 'fire' }, { kind: 'title', code: 'hunter' }); await loadOnlineInfo(); openLogoutModal(); });
+
+  // Рамки: «Обычная» — первой; из лиг — только полученные, с названием лиги
+  await page.evaluate(async () => {
+    window.__online.owned.push({ kind: 'frame', code: 'fire' }, { kind: 'title', code: 'hunter' }, { kind: 'frame', code: 'silver' });
+    await loadOnlineInfo(); openLogoutModal();
+  });
   await page.waitForTimeout(400);
+  const frames = await page.evaluate(() => [...document.querySelectorAll('#pfFrames .st-frame')]
+    .map(b => b.querySelector('[data-frame]').dataset.frame + ':' + b.textContent));
+  check('рамки: «Обычная» первой, из лиг — только полученное «Серебро»', frames[0] === 'base:Обычная' &&
+    frames.includes('silver:Серебро') && !frames.some(f => /^(bronze|gold|platinum|diamond|legend):/.test(f)), frames.join(' | '));
   await page.evaluate(() => chooseStyle('frame', 'ice'));
   const lockedNote = await page.evaluate(() => document.getElementById('styleNote').textContent);
   check('чужая рамка — сказано, где взять', /ступень|серия|сундук/.test(lockedNote), lockedNote);
-  await page.evaluate(async () => { await chooseStyle('frame', 'fire'); await chooseStyle('title', 'hunter'); });
+  await page.evaluate(async () => { await chooseStyle('frame', 'silver'); await chooseStyle('title', 'hunter'); });
   await page.waitForTimeout(200);
   const pf = await page.evaluate(() => ({ frame: document.getElementById('pfAvatar').dataset.frame, title: document.getElementById('pfTitle').textContent,
     sent: window.__online.frame + '/' + window.__online.title }));
-  check('надел рамку «Огонь» и титул — видно в профиле и ушло в базу', pf.frame === 'fire' && pf.title === 'Охотник за числами' && pf.sent === 'fire/hunter',
-    JSON.stringify(pf));
+  check('надел рамку лиги «Серебро» и титул — видно в профиле и ушло в базу', pf.frame === 'silver' && pf.title === 'Охотник за числами' &&
+    pf.sent === 'silver/hunter', JSON.stringify(pf));
+  await page.evaluate(async () => { await chooseStyle('frame', null); closeLogoutModal(); });
+  check('сняв рамку, кружок — с обычной', await page.evaluate(() => document.getElementById('pfAvatar').dataset.frame) === 'base');
+
+  // «Испытание выходных»: очки — за Испытание на 5+ раундов и бой Приключения на ★★★
+  await page.evaluate(async () => {
+    Object.assign(window.__online.weekend, { on: true, points: 2, startsIn: 0, endsIn: 86400 + 3600 });
+    window.__wallet = { coins: 0, gems: 0, today: 0, cap: 300 };
+    window.__chestSurprise = { kind: 'phrase', code: 'oops' };
+    await loadOnlineInfo();
+  });
+  let wk = await page.evaluate(() => ({ text: document.getElementById('odCup').textContent, claims: document.querySelectorAll('.cup-claim').length }));
+  check('выходные идут: за что очко, сколько осталось, «Очки: 2/5»', /Испытание на 5\+ раундов/.test(wk.text) && /★★★/.test(wk.text) &&
+    /25 ч/.test(wk.text) && /Очки: 2\/5/.test(wk.text) && wk.claims === 0 && !/побед|турнир|звёзды ×2/i.test(wk.text), wk.text);
+  await page.evaluate(async () => { window.__online.weekend.points = 3; await loadOnlineInfo(); });
+  wk = await page.evaluate(() => [...document.querySelectorAll('.cup-claim')].map(b => b.id).join());
+  check('3 очка — «Забрать» у сундука', wk === 'cupClaim3', wk);
+  await page.evaluate(() => claimWeekend(3));
+  await page.waitForTimeout(500);
+  let modal = await page.evaluate(() => ({ title: document.getElementById('chestTitle').textContent, body: document.getElementById('chestBody').textContent,
+    shown: !document.getElementById('chestModal').classList.contains('hidden') }));
+  check('сундук выходных: очки, сюрприз и 1 💎', modal.shown && modal.title === 'Сундук выходных' && /\+50/.test(modal.body) &&
+    /Сюрприз/.test(modal.body) && /\+1 💎/.test(modal.body), JSON.stringify(modal));
+  await page.evaluate(async () => { closeChest(); window.__online.weekend.points = 5; await loadOnlineInfo(); });
+  const mon = await page.evaluate(() => document.querySelector('.cup-goal[data-goal="5"]').textContent);
+  check('за 5 очков — рамка месяца «Выходные: ноябрь»', /Выходные: ноябрь/.test(mon), mon);
+  await page.evaluate(() => claimWeekend(5));
+  await page.waitForTimeout(400);
+  modal = await page.evaluate(() => ({ body: document.getElementById('chestBody').textContent, own: passOwns('frame', 'cup-11'),
+    checks: document.querySelectorAll('.cup-goal i').length }));
+  check('5 очков — рамка ноября и 2 💎, обе награды отмечены', /Новая рамка/.test(modal.body) && /\+2 💎/.test(modal.body) &&
+    modal.own && modal.checks === 2, JSON.stringify(modal));
+  await page.evaluate(() => { closeChest(); openLogoutModal(); });
+  await page.waitForTimeout(300);
+  const pick = await page.evaluate(() => [...document.querySelectorAll('#pfFrames [data-frame]')].map(x => x.dataset.frame).filter(f => /^cup-|tourney/.test(f)));
+  check('в профиле из рамок выходных — только полученная', pick.join() === 'cup-11', pick.join());
+  await page.evaluate(() => closeLogoutModal());
+
+  // Игра вдвоём на одном телефоне и проигранный бой Приключения — тоже игры.
+  // Выигранный бой присылает adventure_result, а не это
+  await page.evaluate(() => { localDoneAt = 0; window.__localDone = []; openSetup('duel'); });
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { stopBot(); D.winsNeeded = 1; D.cur = 0; duelPlay(secret); });
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { quitToMenu(); localDoneAt = 0; BOT_SPEED = 1000; startAdventure(0); stopBot(); D.cur = 1; duelPlay(secret); stopBot(); });
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { quitToMenu(); localDoneAt = 0; startAdventure(0); stopBot(); D.cur = 0; duelPlay(secret); stopBot(); });
+  await page.waitForTimeout(300);
+  const sent = await page.evaluate(() => ({ local: window.__localDone.join(), adv: JSON.stringify(window.__advResults || []) }));
+  check('вдвоём — «duel», проигрыш в Приключении — «adv», победа — через adventure_result', sent.local === 'duel,adv' &&
+    /\[0,/.test(sent.adv), JSON.stringify(sent));
+
   // Без миграции 053 ничего этого нет и ничего не ломается
-  const none = await page.evaluate(async () => { window.__online = null; await loadOnlineInfo(); closeLogoutModal(); openOnline();
+  const none = await page.evaluate(async () => { quitToMenu(); window.__online = null; await loadOnlineInfo();
     return { card: document.getElementById('olDaily').classList.contains('hidden'), say: sayCodesFor().length === SAY_CODES.length }; });
   check('без миграции карточки нет, фразы обычные', none.card && none.say, JSON.stringify(none));
   for (const lang of ['en', 'fr', 'de']) {
-    const ok = await page.evaluate(l => { const P = i18n[l].pass;
+    const ok = await page.evaluate(l => { const P = i18n[l].pass, W = P.weekend;
       return PASS_FRAMES.every(k => P.frames[k]) && PASS_TITLES.every(k => P.titles[k]) && PASS_PHRASES.every(k => i18n[l].say[k]) &&
-        P.chestOpen && P.how && P.locked && P.menuChest; }, lang);
-    check(lang + ': сундук, путь, рамки, титулы и фразы переведены', ok);
+        P.chestOpen && P.how && P.locked && P.menuChest && P.frameBase && P.whereLeague && i18n[l].leagues.length === 6 &&
+        ['title', 'on', 'off', 'last', 'how', 'points', 'g3', 'g5b', 'claim', 'chest', 'big', 'frame', 'where', 'whereM'].every(k => W[k]) &&
+        ['play2', 'play3', 'win1', 'win2', 'adv_win2', 'adv_stars3', 'run1', 'run_rounds5', 'run_best3'].every(k => i18n[l].prog.q[k]); }, lang);
+    check(lang + ': сундук, путь, рамки, «Испытание выходных» и задания переведены', ok);
   }
   await page.context().close();
+
+  // Без входа — ни карточки, ни отчётов об играх
+  const guest = await newGame(browser);
+  await guest.evaluate(() => openSetup('solo'));
+  await guest.click('#tStartMatch');
+  await guest.waitForTimeout(200);
+  const s2 = await guest.evaluate(() => secret);
+  await guest.fill('#guessInput', String(s2));
+  await guest.click('#tSubmitGuess');
+  await guest.waitForTimeout(300);
+  const g = await guest.evaluate(() => ({ sent: (window.__localDone || []).length, card: document.getElementById('olDaily').classList.contains('hidden') }));
+  check('гость: карточки нет, в базу ничего не уходит', g.sent === 0 && g.card, JSON.stringify(g));
+  await guest.context().close();
 }
+
 
 // Магазин (миграция 061): вкладка, витрина, кошелёк, покупка, надеть купленное
 async function testShop(browser) {
@@ -7083,11 +6617,17 @@ async function testShop(browser) {
     tabs: [...document.querySelectorAll('#shopTabs .sh-tab')].map(b => b.textContent).join('|'),
     items: document.querySelectorAll('#shopGrid .sh-item').length, rare: document.querySelectorAll('#shopGrid .sh-item.rare').length,
     first: document.querySelector('#shopGrid .sh-item').textContent, earn: document.querySelectorAll('#shopEarn .sh-earn-row').length,
+    earnText: document.getElementById('shopEarn').textContent,
     trophy: document.getElementById('shopTrophy').textContent }));
   check('витрина: кошелёк 🪙 160 и 💎 3, сколько сегодня из 300', shop.shown && shop.wallet === '🪙 160|💎 3' && /40 из 300/.test(shop.note), JSON.stringify(shop));
   check('пять разделов, иконок 20, из них 10 редких за 💎', shop.tabs === 'Иконки|Рамки|Фоны|Титулы|Фразы' && shop.items === 20 && shop.rare === 10, JSON.stringify(shop));
   check('у товара имя и цена', /Листовой зайчик/.test(shop.first) && /150 🪙/.test(shop.first), shop.first);
   check('как копить — восемь строк, трофеи не продаются', shop.earn === 8 && /не продаются/.test(shop.trophy), JSON.stringify(shop));
+  // Онлайна со случайными соперниками нет (миграция 062): монеты — за игру с
+  // другом, кристаллы — за «Испытание выходных»
+  check('как копить: игра с другом и «Испытание выходных», без онлайна и турнира',
+    /Игра с другом: победа — 15/.test(shop.earnText) && /Испытание выходных: 3 очка — 1 💎/.test(shop.earnText) &&
+    !/онлайн|турнир|режиме дня/i.test(shop.earnText + shop.note + shop.trophy), shop.earnText + ' | ' + shop.note);
   // Покупка за монеты, затем надеть
   await page.click('#shopGrid .sh-item[data-code="shop-01"]');
   await page.waitForTimeout(200);
@@ -7159,15 +6699,15 @@ async function testShop(browser) {
   check('в профиле — рамка «Галактика» и титул, ссылки «Ещё — в магазине»', pf.frame === 'galaxy' && pf.title === 'Мыслитель' &&
     pf.links === '🛍️ Ещё — в магазине|🛍️ Ещё — в магазине', JSON.stringify(pf));
   await page.evaluate(() => closeLogoutModal());
-  // Монеты после игры: всплывашка, кристаллы турнира — в сундуке
+  // Монеты после игры: всплывашка, кристаллы «Испытания выходных» — в сундуке
   await page.evaluate(() => { window.__advPay = { coins: 15, gems: 5 }; advReport(0, 3); });
   await page.waitForTimeout(300);
   const toast = await page.evaluate(() => { const el = document.getElementById('walletToast');
     return { text: el && el.textContent, show: !!el && el.classList.contains('show'), wallet: shopWallet.coins + '/' + shopWallet.gems }; });
   check('бой Приключения: всплывашка «+15 🪙 +5 💎», кошелёк вырос', toast.show && /\+15 🪙/.test(toast.text) && /\+5 💎/.test(toast.text), JSON.stringify(toast));
-  const cup = await page.evaluate(() => { showCupChest({ goal: 3, xp: 50, surprise: null, frame: null, gems: 1 });
+  const cup = await page.evaluate(() => { showWeekendChest({ goal: 3, xp: 50, surprise: null, frame: null, gems: 1 });
     const t = document.getElementById('chestBody').textContent; closeChest(); return t; });
-  check('сундук турнира: +1 💎', /\+1 💎/.test(cup) && /Кристаллы/.test(cup), cup);
+  check('сундук выходных: +1 💎', /\+1 💎/.test(cup) && /Кристаллы/.test(cup), cup);
   // Без миграции 061 — «сейчас не отвечает», без входа — «войти»
   const off = await page.evaluate(async () => { window.__wallet = null; await openShop();
     const r = { note: document.getElementById('shopNote').textContent, items: document.querySelectorAll('#shopGrid .sh-item').length };
@@ -7210,146 +6750,22 @@ async function testShop(browser) {
   await p2.context().close();
 }
 
-// Режим дня и турнир выходных (миграция 054)
-async function testDailyWeekend(browser) {
-  console.log('\nОнлайн: режим дня и турнир выходных');
-  const page = await newGame(browser, { user: 'Максим' });
-  await page.evaluate(() => {
-    window.__online = { day: '2026-11-07', played: true, chestOpened: true, chest: { xp: 30, streak: 1 }, streak: 1, bestStreak: 1, freezeLeft: true,
-      season: '2026-11', xp: 250, levelXp: 100, maxLevel: 30, seasonLeft: 86400 * 20, rewards: [], streakRewards: [], owned: [], frame: null, title: null,
-      daily: { variant: 'blitz', next: 'chaos', endsIn: 3 * 3600 },
-      weekend: { on: true, wins: 2, claim3: null, claim5: null, startsIn: 0, endsIn: 86400 + 3600 } };
-    window.__chestSurprise = { kind: 'phrase', code: 'oops' };
-    tutSave({ done: [1, 2, 3], skipped: true, veteran: true });
-    openOnline();
-  });
-  await page.waitForTimeout(600);
-  // Режим дня — готовая кнопка в «Своей игре» (миграция 056)
-  await page.click('#rkRules .rr-btn');
-  await page.waitForTimeout(200);
-  const card = await page.evaluate(() => document.querySelector('#rulesBody .ru-daily').textContent);
-  check('в «Своей игре» — кнопка правил дня: что сегодня, правило, ×2', /Правила дня: ⚡ Блиц/.test(card) && /10 секунд/.test(card) &&
-    /×2/.test(card), card);
-  await page.click('#rulesBody .ru-daily');
-  await page.click('#rulesOk');
-  await page.waitForTimeout(300);
-  const sel = await page.evaluate(() => ({ daily: !!playRules.daily, bar: document.getElementById('rkRules').textContent,
-    saved: localStorage.getItem('hc_rules') }));
-  check('выбраны правила дня — видно строкой и запомнено', sel.daily && /Блиц/.test(sel.bar) && sel.saved === '{"daily":true}', JSON.stringify(sel));
-  await page.evaluate(() => startRanked());
-  await page.waitForTimeout(200);
-  check('«Играть» встаёт в очередь режима дня', await page.evaluate(() => window.__rankedQ.mode === 4));
-  await page.evaluate(() => cancelRanked());
-
-  // Турнир: 2 победы — обе награды закрыты
-  let cup = await page.evaluate(() => ({ text: document.getElementById('odCup').textContent, claims: document.querySelectorAll('.cup-claim').length }));
-  check('турнир идёт: звёзды ×2, сколько осталось, победы 2/5', /Звёзды ×2/.test(cup.text) && /25 ч/.test(cup.text) && /2\/5/.test(cup.text) && cup.claims === 0, cup.text);
-  await page.evaluate(async () => { window.__online.weekend.wins = 3; await loadOnlineInfo(); });
-  cup = await page.evaluate(() => ({ claims: [...document.querySelectorAll('.cup-claim')].map(b => b.id) }));
-  check('3 победы — «Забрать» у сундука', cup.claims.join() === 'cupClaim3', cup.claims.join());
-  await page.evaluate(() => claimCup(3));
-  await page.waitForTimeout(500);
-  let modal = await page.evaluate(() => ({ title: document.getElementById('chestTitle').textContent, body: document.getElementById('chestBody').textContent,
-    shown: !document.getElementById('chestModal').classList.contains('hidden') }));
-  check('сундук турнира: очки и сюрприз', modal.shown && modal.title === 'Сундук турнира' && /\+50/.test(modal.body) && /Сюрприз/.test(modal.body), JSON.stringify(modal));
-  await page.evaluate(async () => { closeChest(); window.__online.weekend.wins = 5; await loadOnlineInfo(); await claimCup(5); });
-  await page.waitForTimeout(400);
-  modal = await page.evaluate(() => ({ body: document.getElementById('chestBody').textContent, own: passOwns('frame', 'tourney'),
-    checks: document.querySelectorAll('.cup-goal i').length }));
-  check('5 побед — рамка «Турнир», обе награды отмечены', /Новая рамка/.test(modal.body) && /Турнир/.test(modal.body) && modal.own && modal.checks === 2,
-    JSON.stringify(modal));
-  await page.evaluate(async () => { closeChest(); openLogoutModal(); });
-  await page.waitForTimeout(300);
-  const fr = await page.evaluate(() => !!document.querySelector('#pfFrames .st-frame:not(.locked) [data-frame="tourney"]'));
-  check('рамку «Турнир» можно надеть в профиле', fr);
-  await page.evaluate(() => closeLogoutModal());
-
-  // Рамка месяца и таблица (миграция 055)
-  await page.evaluate(async () => {
-    Object.assign(window.__online.weekend, { frame: 'cup-11', wins: 5, claim5: null });
-    window.__cupTop = { week: '2026-45', on: true,
-      top: [{ username: 'Тимур', wins: 7 }, { username: 'Максим', wins: 5 }],
-      friends: [{ username: 'Максим', wins: 5 }, { username: 'Кира', wins: 0 }] };
-    await loadOnlineInfo();
-  });
-  const mon = await page.evaluate(() => document.querySelector('.cup-goal[data-goal="5"]').textContent);
-  check('за 5 побед — рамка этого месяца: «Турнир: ноябрь»', /Турнир: ноябрь/.test(mon), mon);
-  await page.evaluate(() => claimCup(5));
-  await page.waitForTimeout(300);
-  check('получена рамка ноября', await page.evaluate(() => passOwns('frame', 'cup-11')));
-  await page.evaluate(async () => { closeChest(); await openCupTable(); });
-  await page.waitForTimeout(300);
-  const tb = await page.evaluate(() => ({ shown: !document.getElementById('cupModal').classList.contains('hidden'),
-    fr: [...document.querySelectorAll('#cupFriends .rk-top-row')].map(r => r.textContent),
-    top: [...document.querySelectorAll('#cupTop .rk-top-row')].map(r => r.textContent),
-    me: document.querySelectorAll('#cupTop .rk-top-row.me').length }));
-  check('таблица: друзья (и с нулём) и лучшие, я отмечен', tb.shown && tb.fr.length === 2 && /Кира0 🏆/.test(tb.fr[1]) &&
-    tb.top.length === 2 && /Тимур7 🏆/.test(tb.top[0]) && tb.me === 1, JSON.stringify(tb));
-  await page.evaluate(() => closeCupTable());
-  await page.evaluate(() => openLogoutModal());
-  await page.waitForTimeout(300);
-  const pick = await page.evaluate(() => [...document.querySelectorAll('#pfFrames [data-frame]')].map(x => x.dataset.frame).filter(f => /^cup-|tourney/.test(f)));
-  check('в профиле из рамок турнира — только полученные и текущая', pick.join() === 'tourney,cup-11', pick.join());
-  await page.evaluate(() => closeLogoutModal());
-
-  // Будни: одной строкой — когда начнётся
-  await page.evaluate(async () => { Object.assign(window.__online.weekend, { on: false, wins: 0, claim3: null, claim5: null, startsIn: 3 * 86400 + 600, endsIn: 0 });
-    await loadOnlineInfo(); });
-  cup = await page.evaluate(() => ({ off: document.getElementById('odCup').classList.contains('off'), text: document.getElementById('odCup').textContent }));
-  check('в будни: «Начнётся в субботу · через 3 дня»', cup.off && /через 3 дня/.test(cup.text), cup.text);
-
-  // В партии режима дня перед стартом сказано правило; на выходных — ×2
-  await page.evaluate(async () => { window.__online.weekend.on = true; await loadOnlineInfo();
-    Object.assign(window.__match, { ranked: true, rankedMode: 4, ladder: true, rangeMin: 1, rangeMax: 100, bonusesOn: false, turnSeconds: 10,
-      lobby: false, lobbyLeft: null, startsIn: 3, present: [true, true] });
-    openMatch(1); });
-  await page.waitForTimeout(500);
-  const banner = await page.evaluate(() => ({ text: document.getElementById('turnBanner').textContent, variant: online.variant }));
-  check('отсчёт Блица: «10 секунд на ход» и «звёзды ×2»', banner.variant === 'blitz' && /10 секунд на ход/.test(banner.text) &&
-    /звёзды ×2/.test(banner.text), JSON.stringify(banner));
-  const v2 = await page.evaluate(() => {
-    const st = { rankedMode: 4, rangeMax: 50, bonusesOn: false }, st2 = { rankedMode: 4, rangeMax: 100, bonusesOn: true };
-    const f = s => s.rankedMode !== DAILY_MODE ? null : s.rangeMax === 50 ? 'mini' : s.bonusesOn ? 'chaos' : 'blitz';
-    return f(st) + '/' + f(st2) + '/' + f({ rankedMode: 2, rangeMax: 100, bonusesOn: true });
-  });
-  check('Мини-матч и Хаос узнаются по правилам партии', v2 === 'mini/chaos/null', v2);
-
-  // Без миграции 054 режима дня и турнира нет, выбор возвращается к обычному
-  const none = await page.evaluate(async () => { playRules = { daily: true };
-    delete window.__online.daily; delete window.__online.weekend; await loadOnlineInfo(); openOnline();
-    return { daily: !document.querySelector('#rulesBody .ru-daily') || true, cup: !document.getElementById('odCup'), mode: rankedMode,
-      rules: !playRules.daily }; });
-  check('без миграции 054 — ни правил дня, ни турнира, правила обычные', none.rules && none.cup, JSON.stringify(none));
-  for (const lang of ['en', 'fr', 'de']) {
-    const ok = await page.evaluate(l => { const P = i18n[l].pass;
-      return DAILY_VARIANTS.every(v => P.daily[v] && P.daily[v + 'D']) && P.daily.perk && P.daily.next && P.cup.title && P.cup.on &&
-        P.cup.off && P.cup.claim && P.cup.starsX2 && P.frames.tourney && P.whereCup && P.cup.table && P.cup.whereCupM &&
-        PASS_FRAMES.every(f => P.frames[f]) && i18n[l].prog.q.daily2 && i18n[l].prog.q.daily_win1; }, lang);
-    check(lang + ': режим дня и турнир переведены', ok);
-  }
-  await page.context().close();
-}
 
 // Разбор «понятно ли ребёнку»: главное — на первом экране, слова — одни и те же
 async function testKidClarity(browser) {
   console.log('\nПонятно ребёнку: кнопки на виду, слова одни');
   let page = await newGame(browser, { user: 'Максим' });
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     window.__online = { day: '2026-11-01', played: false, chestOpened: false, chest: null, streak: 3, bestStreak: 6, freezeLeft: true,
       season: '2026-11', xp: 640, levelXp: 100, maxLevel: 30, seasonLeft: 86400 * 29, rewards: [{ level: 9, kind: 'title', code: 'hunter' }],
-      streakRewards: [], owned: [], frame: null, title: null, daily: { variant: 'chaos', next: 'mini', endsIn: 3600 },
-      weekend: { on: true, wins: 1, claim3: null, claim5: null, frame: 'cup-11', startsIn: 0, endsIn: 3600 } };
+      streakRewards: [], owned: [], frame: null, title: null,
+      weekend: { on: true, points: 1, claim3: null, claim5: null, frame: 'cup-11', startsIn: 0, endsIn: 3600 } };
     tutSave({ done: [1, 2, 3], skipped: true, veteran: true });
-    openOnline();
+    await loadOnlineInfo();
+    showScreen('mode');
   });
-  await page.waitForTimeout(700);
-  const play = await page.evaluate(() => { const r = document.getElementById('tRkPlay').getBoundingClientRect();
-    const tab = document.getElementById('tabbar').getBoundingClientRect();
-    return { top: Math.round(r.top), bottom: Math.round(r.bottom), tab: Math.round(tab.top), h: innerHeight }; });
-  check('онлайн: «Играть» видна без прокрутки и не под нижним меню', play.top > 0 && play.bottom <= play.tab, JSON.stringify(play));
-  const pick = await page.evaluate(() => document.querySelector('#rkRules .rr-btn').textContent);
-  check('правила — строкой, рядом «⚙️ Своя игра»', pick === '⚙️ Своя игра', pick);
-  const next = await page.evaluate(() => document.querySelector('.od-next small').textContent);
+  await page.waitForTimeout(500);
+  const next = await page.evaluate(() => document.querySelector('#screenMode .od-next small').textContent);
   check('у награды пути — «ступень 9», а не просто число', next === 'ступень 9', next);
   await page.context().close();
 
@@ -7665,15 +7081,16 @@ async function testTablet(browser) {
     const page = await ctx.newPage();
     page.on('pageerror', e => check('без ошибок JS', false, e.message));
     await applyStub(page, { user: 'Лев' });
-    await page.addInitScript(() => { window.__play = { elo: 1000, games: 0, offers: [] }; });
     await page.goto(GAME_URL);
     await page.waitForTimeout(400);
     const r = await page.evaluate(() => ({ zoom: getComputedStyle(document.documentElement).zoom, hs: document.documentElement.scrollWidth > innerWidth + 1 }));
     check(w + '×' + h + ': игра крупнее (×' + z + '), без прокрутки вбок', r.zoom === z && !r.hs, JSON.stringify(r));
-    // Горизонтально — «Испытание» и «Онлайн» рядом, вертикально — друг под другом
+    // «Испытание» — во всю ширину меню, под ним три плитки в ряд
     const row = await page.evaluate(() => { const a = document.querySelector('.mode-btn.run').getBoundingClientRect(),
-      b = document.querySelector('.mode-btn.online').getBoundingClientRect(); return Math.abs(a.top - b.top) < 2; });
-    check(w + '×' + h + ': меню — ' + (w > h ? 'Испытание и Онлайн рядом' : 'друг под другом'), row === (w > h), String(row));
+      l = document.querySelector('#screenMode .mode-list').getBoundingClientRect(),
+      t = ['solo', 'duel', 'bot'].map(k => document.querySelector('.mode-btn.' + k).getBoundingClientRect());
+      return { full: Math.abs(a.width - l.width) < 2, row: t.every(x => Math.abs(x.top - t[0].top) < 2) }; });
+    check(w + '×' + h + ': меню — Испытание во всю ширину, три плитки в ряд', row.full && row.row, JSON.stringify(row));
     // Испытание: «Начать» и Испытание дня — рядом только горизонтально
     await page.evaluate(() => openRunEntry());
     await page.waitForTimeout(400);
@@ -8333,7 +7750,6 @@ async function testScreensEverywhere(browser) {
     const page = await ctx.newPage();
     page.on('pageerror', e => check('без ошибок JS', false, e.message));
     await applyStub(page, { user: 'Лев' });
-    await page.addInitScript(() => { window.__play = { elo: 1000, games: 0, offers: [] }; });
     await page.goto(GAME_URL);
     await page.waitForTimeout(400);
     const tag = w + '×' + h;
@@ -8408,21 +7824,6 @@ async function testScreensEverywhere(browser) {
   const av1 = await page.evaluate(() => document.querySelectorAll('#avGrid .av-tile').length);
   check('профиль: сетка иконок — только по нажатию', av0 === 0 && av1 > 20, av0 + ' → ' + av1);
   await done(page);
-
-  // Онлайн набок: «Играть» стоит прямо над нижним меню, а не посреди экрана
-  const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
-  page = await ctx.newPage();
-  await applyStub(page, { user: 'Лев' });
-  await page.addInitScript(() => { window.__play = { elo: 1000, games: 0, offers: [] }; });
-  await page.goto(GAME_URL);
-  await page.waitForTimeout(300);
-  await openAuth(page);
-  await page.evaluate(() => openOnline());
-  await page.waitForTimeout(600);
-  const pb = await page.evaluate(() => { const b = document.getElementById('rkPlayBar').getBoundingClientRect(), t = document.getElementById('tabbar').getBoundingClientRect();
-    return Math.round(t.top - b.bottom); });
-  check('онлайн набок: «Играть» прямо над нижним меню', Math.abs(pb) <= 2, pb + 'px');
-  await ctx.close();
 
   // iPad горизонтально: окно профиля выше экрана — прокручивается, верх не за краем
   const ip = await browser.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
@@ -8583,7 +7984,7 @@ async function testAudit(browser) {
   await page.evaluate(() => { BOT_SPEED = 1000; quitToMenu(); });
   await done(page);
 
-  // Профиль: карандаш на кружке — рисунком; чат: другие режимы свёрнуты
+  // Профиль: карандаш на кружке — рисунком; чат: только дружеская игра
   page = await newGame(browser, { user: 'Лев', profile: {} });
   await page.click('#accountChip');
   await page.waitForTimeout(400);
@@ -8595,15 +7996,14 @@ async function testAudit(browser) {
   await page.click('#tProfileDone');
   await page.evaluate(() => { window.__friends = [{ username: 'Аня', relation: 'friend' }]; openChat('Аня'); });
   await page.waitForTimeout(500);
-  const chat = await page.evaluate(() => ({ open: document.getElementById('chatModesFold').open,
-    head: document.getElementById('tChatRanked').textContent,
-    tiles: document.querySelectorAll('#chatModes .rk-mode').length }));
-  check('в переписке другие режимы свёрнуты под одной строкой', !chat.open && chat.head === 'Другие режимы — без звёзд' && chat.tiles === 4,
+  const chat = await page.evaluate(() => ({ friendly: document.getElementById('tChatFriendly').textContent,
+    ranked: !!document.getElementById('chatModesFold') || !!document.querySelector('#screenChat .rk-mode') }));
+  check('в переписке — только «Дружеская игра», режимов на звёзды нет', chat.friendly === 'Дружеская игра' && !chat.ranked,
     JSON.stringify(chat));
   await done(page);
 
   // Переводы: в английском кавычки свои, французский — на «tu», немецкий — на «du»,
-  // жетон везде называется одинаково, кнопка «на звёзды» — про звёзды
+  // жетон везде называется одинаково
   page = await newGame(browser);
   const tone = await page.evaluate(() => {
     const flat = (o, out = []) => {
@@ -8621,149 +8021,15 @@ async function testAudit(browser) {
         (s.match(/\b[a-zé]+ez\b/g) || []).some(w => w !== 'chez' && w !== 'assez')),
       // «Ihr seid jetzt Freunde» — «вы оба» на «ты», это правильно; вежливое — Sie/Ihre/Ihnen
       de: flat(i18n.de).filter(s => /\b(Sie|Ihre|Ihren|Ihnen)\b|Jeton|Um Punkte|Gewertet/.test(s)),
-      ru: flat(i18n.ru).filter(s => /\((л?а)\)/.test(s)),
-      deStars: i18n.de.online.rkPlay };
+      ru: flat(i18n.ru).filter(s => /\((л?а)\)/.test(s)) };
   });
   check('английский: без «ёлочек»', tone.en.length === 0, tone.en.join(' | '));
-  check('французский: на «tu», жетон и кнопка называются одинаково', tone.fr.length === 0, tone.fr.join(' | '));
-  check('немецкий: на «du», жетон — «Marke», кнопка — «Um Sterne spielen»',
-    tone.de.length === 0 && tone.deStars === 'Um Sterne spielen', tone.de.join(' | ') + ' / ' + tone.deStars);
+  check('французский: на «tu», жетон называется одинаково', tone.fr.length === 0, tone.fr.join(' | '));
+  check('немецкий: на «du», жетон — «Marke»', tone.de.length === 0, tone.de.join(' | '));
   check('русский: без «пришёл(ла)»', tone.ru.length === 0, tone.ru.join(' | '));
   await done(page);
 }
 
-
-// Лиги и награды: путь по лигам, звёзды на весь экран, уведомление о
-// достижении, рисунки наград
-async function testLeagueShow(browser) {
-  console.log('\nЛиги и награды: путь, звёзды на весь экран, уведомление, рисунки');
-  const LAD = { season: '2026-10', endsIn: 25 * 86400, stars: 37, streak: 1, best: 40, games: 14, peak: 1, badges: [], apprentice: 0 };
-  // Путь по лигам
-  let page = await newGame(browser, { user: 'Лев', profile: {}, ladder: LAD });
-  await page.evaluate(() => loadLadder());
-  await page.click('.mode-btn.online');
-  await page.waitForTimeout(700);
-  await page.click('#rkHero');
-  await page.waitForTimeout(300);
-  const path = await page.evaluate(() => ({
-    open: !document.getElementById('pathModal').classList.contains('hidden'),
-    leagues: [...document.querySelectorAll('#pathList .path-league')].map(b => b.dataset.league + (b.classList.contains('current') ? '*' : '')),
-    here: (document.querySelector('#pathList .pl-rank.here') || {}).firstChild ? document.querySelector('#pathList .pl-rank.here').firstChild.textContent : null,
-    passed: document.querySelectorAll('#pathList .path-league.current .pl-rank.passed').length,
-    floors: document.querySelectorAll('#pathList .path-league.current .pl-rank.floor').length,
-    rew: [...document.querySelectorAll('#pathList .path-league[data-league="2"] .r-item')].map(e => e.classList.contains('locked')) }));
-  // 37 звёзд — Серебро, ранг 8 (30…32 — ранг 10, 33…35 — ранг 9, 36…38 — ранг 8)
-  check('путь по лигам: все лиги сверху вниз, текущая — Серебро',
-    path.open && path.leagues.join() === '5,4,3,2,1*,0', JSON.stringify(path));
-  check('«вы здесь» — ранг 8, пройдено 10 и 9, ступени 🛡 на 10 и 5',
-    path.here === '8' && path.passed === 2 && path.floors === 2, JSON.stringify(path));
-  check('награды Золота ещё закрыты', path.rew.length === 2 && path.rew.every(Boolean), JSON.stringify(path.rew));
-  await page.context().close();
-
-  // Звёзды на весь экран: Серебро 1 ★★ → +2 → Золото 10 ★
-  page = await newGame(browser, { user: 'Лев', ladder: LAD });
-  await page.evaluate(() => {
-    Object.assign(window.__match, { ranked: true, rankedMode: 0, ladder: true, moves: [{ seat: 0, guess: 50, tier: 4 }], cur: 0 });
-    window.__matchStars = { delta: [2, 0], after: [61, null], unlock: [2, null] };
-    openMatch(1);
-  });
-  await page.waitForTimeout(700);
-  await page.evaluate(() => { Object.assign(window.__match, { roundOver: true, roundWinner: 0, matchOver: true, status: 'finished', wins: [3, 0] }); refreshMatch(true); });
-  await page.waitForTimeout(600);
-  const s0 = await page.evaluate(() => ({ open: !document.getElementById('starsShow').classList.contains('hidden'),
-    title: document.getElementById('shTitle').textContent, on: document.querySelectorAll('#shStars .sh-star.on').length }));
-  check('после партии на звёзды — показ на весь экран, сначала «было»: Серебро 1 ★★',
-    s0.open && s0.title === 'Серебро 1' && s0.on === 2, JSON.stringify(s0));
-  await page.waitForTimeout(4200);
-  const s1 = await page.evaluate(() => ({ title: document.getElementById('shTitle').textContent,
-    on: document.querySelectorAll('#shStars .sh-star.on').length, big: document.getElementById('shStage').classList.contains('big'),
-    note: document.getElementById('shNote').textContent, rewards: document.querySelectorAll('#shRewards:not(.hidden) .sh-rew').length,
-    tap: document.getElementById('shTap').classList.contains('on') }));
-  check('звёзды прошли по одной: Золото 10 ★, новая лига — лучи и награды',
-    s1.title === 'Золото 10' && s1.on === 1 && s1.big && /Новая лига: Золото/.test(s1.note) && s1.rewards === 3 && s1.tap, JSON.stringify(s1));
-  await page.click('#starsShow');
-  await page.waitForTimeout(600);
-  check('нажатие закрывает', await page.evaluate(() => document.getElementById('starsShow').classList.contains('hidden')));
-  // Та же партия ещё раз — второй раз не показываем
-  await page.evaluate(() => { onlineReview = null; online.justFinished = true; return loadOnlineReview(); });
-  await page.waitForTimeout(300);
-  check('та же партия второй раз праздник не показывает', await page.evaluate(() => document.getElementById('starsShow').classList.contains('hidden')));
-  await page.context().close();
-
-  // Открыл уже законченную партию (из списка) — праздника нет: он — для только что сыгранной
-  page = await newGame(browser, { user: 'Лев', ladder: LAD });
-  await page.evaluate(() => {
-    Object.assign(window.__match, { id: 55, ranked: true, ladder: true, roundOver: true, roundWinner: 0, matchOver: true,
-      status: 'finished', wins: [3, 0], moves: [{ seat: 0, guess: 50, tier: 8 }] });
-    window.__matchStars = { delta: [1, 0], after: [38, null], unlock: [null, null] };
-    openMatch(55);
-  });
-  await page.waitForTimeout(900);
-  check('старая партия из списка — без праздника', await page.evaluate(() => document.getElementById('starsShow').classList.contains('hidden')));
-  await page.context().close();
-
-  // Поражение — звезда гаснет; нажатие сразу показывает итог
-  page = await newGame(browser, { user: 'Лев', ladder: LAD });
-  const loss = await page.evaluate(async () => {
-    showStarsShow({ delta: [-1], after: [36] }, 0, 777);
-    const before = document.querySelectorAll('#shStars .sh-star.on').length;
-    starsShowTap();
-    return { before, after: document.querySelectorAll('#shStars .sh-star.on').length,
-             title: document.getElementById('shTitle').textContent, note: document.getElementById('shNote').textContent };
-  });
-  // 37 звёзд — ранг 8 и одна звезда в нём; поражение её гасит
-  check('поражение: было ★ в ранге 8, стало пусто; итог «−1 ★»', loss.before === 1 && loss.after === 0 &&
-    loss.title === 'Серебро 8' && loss.note === '−1 ★', JSON.stringify(loss));
-  const floor = await page.evaluate(() => {
-    starsShowTap();
-    showStarsShow({ delta: [0], after: [45] }, 0, 778);
-    starsShowTap();
-    return document.getElementById('shNote').textContent;
-  });
-  check('ступень: «🛡 … ниже не упасть»', /^🛡/.test(floor), floor);
-  await page.context().close();
-
-  // Уведомление о новом достижении: медленно выезжает, одно за другим
-  page = await newGame(browser, { user: 'Лев', profile: {},
-    progress: { day: '2026-10-01', streak: 0, bestStreak: 0, doneToday: false, secondsLeft: 3600, quests: [],
-                achievements: [{ code: 'first_win' }], stats: { wins: 1 } } });
-  await page.waitForTimeout(500);
-  check('первый заход — уже открытое уведомлением не сыплется',
-    await page.evaluate(() => document.getElementById('achToast').classList.contains('hidden')));
-  await page.evaluate(() => { window.__progress.achievements.push({ code: 'wins_5' }); return loadProgress(); });
-  await page.waitForTimeout(1200);
-  const toast = await page.evaluate(() => ({ shown: document.getElementById('achToast').classList.contains('show'),
-    head: document.getElementById('atHead').textContent, name: document.getElementById('atName').textContent,
-    dur: getComputedStyle(document.getElementById('achToast')).transitionDuration }));
-  check('новое достижение — «🏅 Новое достижение · 5 побед», выезжает медленно',
-    toast.shown && toast.head === '🏅 Новое достижение' && toast.name === '5 побед' && parseFloat(toast.dur) >= 0.8, JSON.stringify(toast));
-  await page.context().close();
-
-  // Рисунки наград: наградная иконка — рисунком, фон — металлом
-  page = await newGame(browser, { user: 'Лев', profile: { avatar: '🦅', color: '#d946ef' } });
-  await page.evaluate(() => { setMyAvatar('🦅'); setMyColor('#d946ef'); updateAccountChip(); });
-  await page.waitForTimeout(200);
-  const chip = await page.evaluate(() => {
-    const el = document.querySelector('#accountChip .avatar, #accountChip [data-avatar-for]') || document.getElementById('accountChip');
-    return { svg: !!el.querySelector('svg.icon-art'), bg: el.style.background, shine: el.classList.contains('shine') };
-  });
-  check('наградная иконка 🦅 — рисунком, фон Легенды — градиент с переливом',
-    chip.svg && /gradient/.test(chip.bg) && chip.shine, JSON.stringify(chip));
-  const plain = await page.evaluate(() => { setMyAvatar('🦊'); setMyColor('#34d399'); updateAccountChip();
-    const el = document.querySelector('#accountChip [data-avatar-for]') || document.getElementById('accountChip');
-    return { text: el.textContent, svg: !!el.querySelector('svg'), shine: el.classList.contains('shine') }; });
-  check('обычная иконка — тоже рисунком, без перелива', plain.text === '🦊' && plain.svg && !plain.shine, JSON.stringify(plain));
-  // Иконка, которой в наборе уже нет (у друга, пока база не обновлена), — эмодзи
-  const gone = await page.evaluate(() => { avatarCache['Старый'] = { icon: '🐮', color: '' };
-    const el = document.createElement('span'); paintAvatar(el, 'Старый');
-    return { text: el.textContent, svg: !!el.querySelector('svg') }; });
-  check('иконка не из набора — эмодзи вместо рисунка', gone.text === '🐮' && !gone.svg, JSON.stringify(gone));
-  // Все иконки, которые можно выбрать, нарисованы
-  const drawn = await page.evaluate(() => AVATAR_CHOICES.concat(LEAGUE_REWARDS.filter(r => r.kind === 'icon').map(r => r.value),
-    QUEST_ICONS.map(q => q.icon), [TUTORIAL_ICON]).filter(i => !iconArt(i, 0)));
-  check('у каждой иконки набора и наград есть рисунок', drawn.length === 0, drawn.join());
-  await page.context().close();
-}
 
 // Старый PIN из 4 цифр — профиль предлагает сменить на 6
 async function testPinShort(browser) {
@@ -9324,7 +8590,6 @@ async function testKeyPage(browser) {
     await testOnlineMatch(browser);
     await testOnlineClock(browser);
     await testPhrases(browser);
-    await testRanked(browser);
     await testRoundCard(browser);
     await testAccountDelete(browser);
     await testAwayAlerts(browser);
@@ -9340,7 +8605,6 @@ async function testKeyPage(browser) {
     await testDuelReview(browser);
     await testBots(browser);
     await testOnlineReview(browser);
-    await testLeagues(browser);
     await testPolish(browser);
     await testQuitConfirm(browser);
     await testFogWholeRound(browser);
@@ -9356,7 +8620,6 @@ async function testKeyPage(browser) {
     await testSplitFiles();
     await testUxPass(browser);
     await testLineSmooth(browser);
-    await testLeagueShow(browser);
     await testAudit(browser);
     await testRedesign(browser);
     await testRunStage(browser);
@@ -9365,8 +8628,7 @@ async function testKeyPage(browser) {
     await testAdventureBonus(browser);
     await testTrainBonusFx(browser);
     await testTrialSurprises(browser);
-    await testOnlinePass(browser);
-    await testDailyWeekend(browser);
+    await testDailyCard(browser);
     await testShop(browser);
     await testKidClarity(browser);
     await testOnlineAdvBonuses(browser);

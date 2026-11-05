@@ -100,7 +100,7 @@ async function openPlayer(browser, db, lang) {
     // Обучение проверяет run.js; здесь игроки его уже прошли
     if (localStorage.getItem('hc_tutorial') === null) {
       localStorage.setItem('hc_tutorial', JSON.stringify({ done: [1, 2, 3], skipped: false }));
-      // Все бонусы онлайна, и четыре из Приключения (миграция 057) тоже: иначе
+      // Все бонусы партий с другом, и четыре из Приключения (миграция 057) тоже: иначе
       // случайный ход на 🩻/🌗/🛡️/🧊 открывал окно-объяснение поверх кнопок
       localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'rush', 'lava', 'skip', 'gift', 'memory', 'near',
         'xray', 'half', 'shield', 'freeze']));
@@ -112,7 +112,7 @@ async function openPlayer(browser, db, lang) {
 }
 
 async function registerPlayer(p, name, pin) {
-  await p.page.click('#tModeOnline');
+  await p.page.click('#friendsBtn');
   await p.page.waitForTimeout(300);
   await p.page.click('#tRunChoiceRegister');
   await p.page.waitForTimeout(200);
@@ -126,8 +126,8 @@ async function registerPlayer(p, name, pin) {
   rebuildDatabase();
   const db = new Client({ host: '/var/run/postgresql', user: 'root', database: 'hotcold_test' });
   await db.connect();
-  // «Сейчас» для базы — обычная среда: в выходные звёзды ×2, и проверки звёзд
-  // зависели бы от дня запуска (миграция 054). Игра ходит в базу через это же соединение
+  // «Сейчас» для базы — обычная среда: в выходные идёт «Испытание выходных»,
+  // и проверки зависели бы от дня запуска. Игра ходит в базу через это же соединение
   await db.query("set hc.now = '2026-11-04T12:00:00+00'");
   // Сценарии миграций оставляют после себя игроков — для чистоты берём своих
   await db.query("delete from students where username in ('Тимур','Лада','Артур')");
@@ -143,7 +143,7 @@ async function registerPlayer(p, name, pin) {
   await registerPlayer(B, 'Лада', '222222');
   check('оба аккаунта зарегистрированы в настоящей базе',
     (await db.query("select count(*) from students where username in ('Тимур','Лада')")).rows[0].count === '2');
-  check('после регистрации открылся рейтинг', await A.page.locator('#screenOnline').isVisible());
+  check('после регистрации открылись «Друзья»', await A.page.locator('#screenFriends').isVisible());
 
   // Друзья — отдельный экран, к нему идут из меню
   await A.page.click('#navPlay');
@@ -154,9 +154,8 @@ async function registerPlayer(p, name, pin) {
   await B.page.click('#friendsBtn');
   await A.page.waitForTimeout(500);
   await B.page.waitForTimeout(500);
-  check('экран друзей отдельный от рейтинга',
-    (await A.page.locator('#screenFriends').isVisible()) &&
-    !(await A.page.locator('#screenOnline').isVisible()));
+  check('экран друзей открывается из нижнего меню', await A.page.locator('#screenFriends').isVisible() &&
+    !(await A.page.locator('#screenOnline').count()));
   await A.page.fill('#friendSearch', 'ла');
   await A.page.click('#tFindBtn');
   await A.page.waitForTimeout(600);
@@ -296,7 +295,6 @@ async function registerPlayer(p, name, pin) {
   check('окно разбора партии открывается', (await A.page.locator('#tReviewTitle').textContent()) === 'Разбор партии');
   await A.page.click('#tReviewClose');
 
-  // ===== Рейтинговый онлайн: очередь, автоматический подбор, сдача по молчанию
   // После дружеской игры кнопка «В меню» возвращает к друзьям
   await A.page.click('.r-actions .btn-ghost');
   await B.page.click('.r-actions .btn-ghost');
@@ -306,82 +304,40 @@ async function registerPlayer(p, name, pin) {
     (await A.page.locator('#screenFriends').isVisible()) &&
     (await B.page.locator('#screenFriends').isVisible()));
 
-  // Рейтинг: «Своя игра» — −100…100 с бонусами, самая непохожая на обычную
+  // ===== Игра с другом — игра (миграция 062): день отмечен, очки пути, монеты
+  const days = (await db.query("select username, played, play_xp from online_days where username in ('Тимур','Лада') " +
+                               'order by username')).rows;
+  check('партия с другом открыла обоим сундук дня и дала очки пути: победителю 20, проигравшему 10',
+    days.length === 2 && days.every(d => d.played) && days.find(d => d.username === 'Лада').play_xp === 20 &&
+    days.find(d => d.username === 'Тимур').play_xp === 10, JSON.stringify(days));
+  const coins = (await db.query("select username, coins from wallet where username in ('Тимур','Лада') order by username")).rows;
+  check('и монеты: победителю 15 🪙, проигравшему 5 🪙',
+    coins.length === 2 && coins.find(c => c.username === 'Лада').coins === 15 && coins.find(c => c.username === 'Тимур').coins === 5,
+    JSON.stringify(coins));
+
+  // Тренировка без интернета — тоже игра: база отмечает день (local_game_done)
+  await db.query("delete from online_days where username = 'Тимур'");
   await A.page.click('#navPlay');
-  await B.page.click('#navPlay');
   await A.page.waitForTimeout(300);
-  await B.page.waitForTimeout(300);
-  await A.page.click('#tModeOnline');
-  await B.page.click('#tModeOnline');
-  await A.page.waitForTimeout(600);
-  await B.page.waitForTimeout(600);
-  for (const P of [A, B]) {
-    await P.page.click('#rkRules .rr-btn');
-    await P.page.waitForTimeout(200);
-    await P.page.click('#rulesBody .ru-chip[data-k="range"][data-v="pm100"]');
-    await P.page.click('#rulesOk');
-    await P.page.waitForTimeout(500);
-  }
-
-  await A.page.click('#tRkPlay');
+  await A.page.evaluate(() => openSetup('solo'));
+  await A.page.click('#tStartMatch');
+  await A.page.waitForTimeout(300);
+  const soloSecret = await A.page.evaluate(() => secret);
+  await A.page.fill('#guessInput', String(soloSecret));
+  await A.page.click('#tSubmitGuess');
+  await A.page.waitForTimeout(1200);
+  const solo = (await db.query("select played, play_xp from online_days where username = 'Тимур'")).rows[0];
+  check('конец Тренировки отмечен в настоящей базе: сундук открыт, +10 очков пути',
+    solo && solo.played === true && solo.play_xp === 10, JSON.stringify(solo));
+  await A.page.evaluate(() => quitToMenu());
   await A.page.waitForTimeout(900);
-  check('первый встал в очередь и ждёт', await A.page.locator('#rkWaitBox').isVisible());
-  check('очередь записана в базу',
-    (await db.query("select count(*) from ranked_queue where username = 'Тимур'")).rows[0].count === '1');
-  const waitText = await A.page.locator('#rkWaitSub').textContent();
-  check('в ожидании написано, что соперника ещё нет',
-    waitText.indexOf('только вы') >= 0, waitText);
-
-  await B.page.click('#tRkPlay');
-  await B.page.waitForTimeout(1500);
-  const rk = (await db.query('select * from matches where ranked order by id desc limit 1')).rows[0];
-  check('матч создан по выбранным правилам (рейтинг общий, режим 0)',
-    rk && rk.status === 'active' && rk.wins_needed === 3 && rk.ranked_mode === 0 &&
-    rk.range_min === -100 && rk.range_max === 100 && rk.bonuses_on === true && rk.frost === true,
-    JSON.stringify(rk && { s: rk.status, m: rk.ranked_mode, lo: rk.range_min,
-                           hi: rk.range_max, b: rk.bonuses_on, f: rk.frost }));
-  check('бонусы для этих правил действительно разложены',
-    (await db.query('select count(*) from match_bonuses where match_id = $1', [rk.id]))
-      .rows[0].count !== '0');
-  check('второму сразу открылась доска', await B.page.locator('#screenGame').isVisible());
-
-  // Ждавшего в матч затягивает его же опрос очереди — без нажатий
-  await A.page.waitForTimeout(4200);
-  check('ждавшего подбор сам перенёс на доску', await A.page.locator('#screenGame').isVisible());
-  const bothRanked = await A.page.evaluate(() => online && online.ranked);
-  check('клиент знает, что игра рейтинговая', bothRanked === true, String(bothRanked));
-  check('очередь после подбора пуста',
-    (await db.query('select count(*) from ranked_queue')).rows[0].count === '0');
-
-  // Молчание: у хода второго игрока просрочен срок и один пропуск уже был
-  const bSeat = await B.page.evaluate(() => online.seat);
-  await db.query('update matches set cur = $2, timeouts[$2 + 1] = 1, ' +
-                 "turn_deadline = now() - interval '1 second' where id = $1", [rk.id, bSeat]);
-  await A.page.waitForTimeout(2600);
-  const gone = (await db.query('select forfeit_by, match_over, elo_applied, elo_delta, status ' +
-                               'from matches where id = $1', [rk.id])).rows[0];
-  check('второй пропуск подряд закончил матч сдачей',
-    gone.match_over === true && gone.status === 'finished' && gone.forfeit_by === bSeat,
-    JSON.stringify(gone));
-  check('рейтинг посчитан один раз', gone.elo_applied === true);
-
-  const elos = (await db.query("select username, mode, elo, games from elo_ratings " +
-                               "where username in ('Тимур','Лада') order by username")).rows;
-  const lada = elos.find(r => r.username === 'Лада');
-  const timur = elos.find(r => r.username === 'Тимур');
-  check('оставшийся вырос, ушедший упал',
-    timur && lada && timur.elo > 1000 && lada.elo < 1000 &&
-    timur.games === 1 && lada.games === 1, JSON.stringify(elos));
-  check('рейтинг записан в общий (режим 0, миграция 056)',
-    elos.every(r => r.mode === 0) && elos.length === 2, JSON.stringify(elos));
-
-  // В карточке число разделено пробелами по-русски: сравниваем без них
-  const card = (await A.page.locator('#resultBox').textContent()).replace(/[\s\u00a0\u202f]/g, '');
-  check('оставшемуся объяснили, что соперник ушёл', card.indexOf('Ладавышелизигры') >= 0, card);
-  // Партия из очереди — на звёзды: вместо числа рейтинга звезда и лига
-  check('и показали звезду за победу и лигу',
-    card.indexOf('+1★·🥉Бронза10★☆☆') >= 0 && card.indexOf('Рейтинг:') < 0, card);
-  check('причина стоит раньше счёта', card.indexOf('вышелизигры') < card.indexOf('0:0'), card);
+  check('в главном меню — «Открыть сундук»', await A.page.locator('#screenMode #odChest').isVisible());
+  await A.page.click('#odChest');
+  await A.page.waitForTimeout(1200);
+  const opened = (await db.query("select chest_at is not null as opened from online_days where username = 'Тимур'")).rows[0];
+  check('сундук открыт через настоящую базу', opened && opened.opened === true &&
+    !(await A.page.locator('#chestModal').evaluate(e => e.classList.contains('hidden'))), JSON.stringify(opened));
+  await A.page.evaluate(() => closeChest());
 
   // ---------- Профиль: иконка, смена имени и PIN — через настоящий SQL ----------
   // «Тимур» стоит по алфавиту после «Лады», «Артур» — перед ней: в парах, что
@@ -484,81 +440,12 @@ async function registerPlayer(p, name, pin) {
     (await A.page.evaluate(() => localStorage.getItem('hc_run_user'))) === 'Артур' &&
     (await A.page.locator('#screenFriends').isVisible()));
 
-  // ---- Соперник-«человек» в рейтинге (миграция 050): никого нет 5–25 секунд —
-  // играет бот, но выглядит и ведёт себя как обычный игрок
   await B.page.evaluate(() => { quitToMenu(); });
-  await B.page.click('#tModeOnline');
-  await B.page.waitForTimeout(700);
-  await B.page.evaluate(() => setPlayRules({ range: '100', bonuses: false, wins: 3 }));
-  await B.page.waitForTimeout(400);
-  await B.page.click('#tRkPlay');
-  await B.page.waitForTimeout(900);
-  check('с ботом: игрок встал в очередь', await B.page.locator('#rkWaitBox').isVisible());
-  const botSoon = await B.page.locator('#rkWaitSub').textContent();
-  check('в очереди ни слова про бота', !/бот|🤖/i.test(botSoon), botSoon);
-  await db.query("update ranked_queue set joined_at = now() - interval '26 seconds' where username = 'Лада'");
-  await B.page.waitForTimeout(3600);
-  const bm = (await db.query("select * from matches where p0 = 'Лада' and bot_seat is not null " +
-                             "order by id desc limit 1")).rows[0];
-  const isPerson = bm && (await db.query('select 1 from bot_people where username = $1', [bm.p1])).rows.length === 1;
-  check('через 26 секунд — партия с «человеком»', bm && bm.status === 'active' && bm.bot_seat === 1 &&
-    isPerson && !/^@bot:/.test(bm.p1) && bm.ranked_mode === 0, JSON.stringify(bm && { p1: bm.p1, s: bm.status }));
-  check('доска открылась сама', await B.page.locator('#screenGame').isVisible());
-  // Титул под ником (миграция 053) бывает и у соперника-«человека» — он не часть ника
-  const botLabel = await B.page.evaluate(() => { const el = document.getElementById('pname1').cloneNode(true);
-    el.querySelectorAll('.p-title').forEach(x => x.remove()); return el.textContent; });
-  check('соперник подписан ником, без 🤖', botLabel.trim() === bm.p1 && !/🤖/.test(botLabel), botLabel);
-  const botFlag = await B.page.evaluate(() => online && online.botSeat);
-  check('игра не знает, что это бот', botFlag === null, String(botFlag));
-  // Бот «заходит» через 1–4 секунды, потом 3-2-1. Сдвигаем время в прошлое
-  await db.query("update matches set accepted_at = now() - interval '5 seconds' where id = $1", [bm.id]);
-  await B.page.waitForTimeout(2600);
-  await db.query("update matches set start_at = now() - interval '1 second', turn_deadline = now() + interval '30 seconds' " +
-                 "where id = $1 and not lobby", [bm.id]);
-  await B.page.waitForTimeout(2200);
-
-  const miss = bm.secret === 50 ? 51 : 50;
-  await B.page.fill('#guessInput', String(miss));
-  await B.page.click('#tSubmitGuess');
-  await B.page.waitForTimeout(600);
-  const humanMoves = +(await db.query('select count(*) from match_moves where match_id = $1 and seat = 0', [bm.id])).rows[0].count;
-  check('после старта человек сходил', humanMoves === 1, String(humanMoves));
-  // Раздумья бота — несколько секунд; сдвигаем начало его хода в прошлое
-  await db.query("update matches set turn_deadline = now() + interval '3 seconds' where id = $1", [bm.id]);
-  await B.page.waitForTimeout(2600);
-  const botMoves = +(await db.query('select count(*) from match_moves where match_id = $1 and seat = 1', [bm.id])).rows[0].count;
-  check('бот походил сам, пока игрок смотрит на доску', botMoves >= 1, String(botMoves));
-  const whoRows = await B.page.evaluate(() => [...document.querySelectorAll('#historyList .h-who')].map(e => e.textContent));
-  check('ход соперника виден у игрока под его ником', !whoRows.some(w => /🤖/.test(w)), whoRows.join());
-
-  await B.page.evaluate(() => leaveGame());
-  await B.page.waitForTimeout(200);
-  await B.page.click('#tResignGo');
-  await B.page.waitForTimeout(900);
-  const bEnd = (await db.query('select status, elo_delta from matches where id = $1', [bm.id])).rows[0];
-  const skill = (await db.query("select level, streak from bot_skill where username = 'Лада' and mode = 0")).rows[0];
-  check('сдача боту — поражение, рейтинг вдвое меньше',
-    bEnd.status === 'finished' && bEnd.elo_delta[0] === -10 && bEnd.elo_delta[1] === 0, JSON.stringify(bEnd));
-  check('после поражения следующий бот слабее',
-    // Старт — по общему рейтингу Лады (980 после партии с Тимуром): 0,28 − 0,07
-    skill && Math.abs(skill.level - 0.21) < 0.001 && skill.streak === -1, JSON.stringify(skill));
-  // Лиги: партия из очереди с ботом идёт в лестницу; из Бронзы 10 ниже не упасть
-  const lad = (await db.query("select stars, games, streak from ladder where username = 'Лада'")).rows[0];
-  const bStars = (await db.query('select ladder, star_delta, star_after from matches where id = $1', [bm.id])).rows[0];
-  // Вторая партия Лады на звёзды: первой была сдача по молчанию в рейтинге
-  check('партия с ботом — на звёзды, поражение в начале Бронзы звезды не отняло',
-    bStars.ladder === true && lad && lad.games === 2 && lad.stars === 0 &&
-    bStars.star_delta[0] === 0 && bStars.star_after[0] === 0, JSON.stringify({ lad, bStars }));
-  await B.page.evaluate(() => backToOnline());
-  await B.page.waitForTimeout(1200);
-  const heroB = await B.page.evaluate(() => document.getElementById('rkElo').textContent);
-  const emblemB = await B.page.evaluate(() => !!document.querySelector('#rkEmblem:not(.hidden) svg.lg-emblem'));
-  check('на экране онлайна — герб и лига из настоящей базы', heroB === 'Бронза 10' && emblemB, heroB);
 
   // Задания дня: засчитывает база по настоящим партиям
   const decided = (await db.query("select count(*)::int as n from matches m where match_winner(m) is not null and 'Лада' in (m.p0, m.p1)")).rows[0].n;
   const ladaStats = (await db.query("select online_games, online_wins from player_stats where username = 'Лада'")).rows[0];
-  check('партии Лады с исходом посчитаны базой', decided >= 3 && ladaStats && ladaStats.online_games === decided,
+  check('партии Лады с исходом посчитаны базой', decided >= 1 && ladaStats && ladaStats.online_games === decided,
     JSON.stringify({ decided, ladaStats }));
   await B.page.evaluate(() => quitToMenu());
   await B.page.waitForTimeout(1200);
@@ -568,10 +455,10 @@ async function registerPlayer(p, name, pin) {
   check('в меню — задания дня из настоящей базы, прогресс как в базе',
     qc.shown && qc.rows.length === 3 && qc.rows.join() === dq.map(q => q.code + ' ' + Math.min(q.progress, q.goal) + '/' + q.goal).join(),
     JSON.stringify({ qc, dq }));
-  // Первое задание — «сыграть онлайн» или «на звёзды»: у Лады 3 партии с исходом, из них 2 на звёзды.
-  // Задание про Приключение или режим дня этими партиями не двигается
-  const want = { ladder2: lad.games, play2: decided, play3: decided }[dq[0].code] || 0;
-  check('партии онлайн продвинули первое задание (или не тронули чужое)',
+  // Первое задание — «сыграть любые игры» или «бои Приключения»: у Лады одна партия с другом.
+  // Задание про Приключение ею не двигается
+  const want = { play2: decided, play3: decided }[dq[0].code] || 0;
+  check('партия с другом продвинула первое задание (или не тронула чужое)',
     dq[0].progress === Math.min(dq[0].goal, want), JSON.stringify(dq[0]));
 
   // «В игре сейчас» через настоящую базу: первый отметился — второй видит точку
@@ -592,8 +479,10 @@ async function registerPlayer(p, name, pin) {
   check('итог Испытания из телефона записан в базу', rr && rr.score === 1300 && rr.rounds === 3, JSON.stringify(rr));
   await B.page.evaluate(() => leaveRun());
 
-  check('у бота рейтинга нет',
-    (await db.query("select count(*) from elo_ratings e join students s on s.username = e.username where s.is_bot")).rows[0].count === '0');
+  check('ни очереди, ни рейтинга, ни ботов в базе нет',
+    (await db.query("select count(*) from information_schema.tables where table_schema = 'public' " +
+                    "and table_name in ('ranked_queue', 'elo_ratings', 'ladder', 'bot_people', 'weekend_cup')")).rows[0].count === '0' &&
+    (await db.query('select count(*) from students where is_bot')).rows[0].count === '0');
 
   const calls = A.log.concat(B.log);
   check('профиль шёл через настоящие функции базы',
@@ -603,8 +492,8 @@ async function registerPlayer(p, name, pin) {
   check('всё шло через настоящие функции базы',
     calls.includes('match_guess') && calls.includes('match_state') &&
     calls.includes('send_phrase') && calls.includes('challenge_friend') &&
-    calls.includes('play_join') && calls.includes('play_status') &&
-    calls.includes('match_review') && calls.includes('ladder_status') && calls.includes('ladder_top'),
+    calls.includes('match_review') && calls.includes('my_online') && calls.includes('local_game_done') &&
+    calls.includes('open_chest') && !calls.some(c => /ladder|play_join|play_status|ranked|elo_/.test(c)),
     [...new Set(calls)].join(', '));
 
   await browser.close();

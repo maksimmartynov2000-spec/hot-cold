@@ -69,11 +69,6 @@ function stubSupabase(opts) {
             if (!A) return { data: null, error: { message: 'not_friends' } };
             return { data: A, error: null };
           }
-          if (name === 'season_summary_seen') {
-            (window.__seasonSeen = window.__seasonSeen || []).push(args.p_season);
-            if (window.__ladder) window.__ladder.summary = null;
-            return { data: true, error: null };
-          }
           // Приглашения (миграция 039): чей код — window.__invites {код: имя}
           if (name === 'my_invite_code') return { data: 'ABCD2345', error: null };
           if (name === 'invite_owner') return { data: (window.__invites || {})[String(args.p_code).toUpperCase()] || null, error: null };
@@ -183,9 +178,9 @@ function stubSupabase(opts) {
           }
 
           // Матчи: заглушка ведёт себя как сервер — держит состояние, проверяет
-          // очередь и НЕ отдаёт загаданное число, пока раунд не кончился
+          // очередь хода и НЕ отдаёт загаданное число, пока раунд не кончился
           // Забег: заглушка считает его так же, как сервер, и так же не отдаёт
-          // загаданное число — иначе проверки рейтинга смотрели бы в пустоту
+          // загаданное число — иначе проверки Испытания смотрели бы в пустоту
           // Сундук, серия и путь (миграция 053). window.__online не задан — база без 053
           if (['my_online', 'open_chest', 'set_frame', 'set_title', 'faces_for'].includes(name) && !window.__online) {
             return { data: null, error: { message: 'Could not find the function public.' + name } };
@@ -217,26 +212,30 @@ function stubSupabase(opts) {
             O.owned.push({ kind: it.kind, code: it.code });
             return { data: { coins: W.coins, gems: W.gems, kind: it.kind, code: it.code }, error: null };
           }
-          // Таблица турнира (миграция 055): window.__cupTop
-          if (name === 'cup_top') {
-            if (!window.__cupTop) return { data: null, error: { message: 'Could not find the function public.cup_top' } };
-            return { data: JSON.parse(JSON.stringify(window.__cupTop)), error: null };
-          }
-          // Турнир выходных (миграция 054): weekend в __online
+          // «Испытание выходных» (миграция 062): weekend в __online, очки — points
           if (name === 'weekend_claim') {
             const W = window.__online && window.__online.weekend;
             if (!W) return { data: null, error: { message: 'Could not find the function public.weekend_claim' } };
             const k = 'claim' + args.p_goal;
-            if (W.wins < args.p_goal) return { data: null, error: { message: 'cup_locked' } };
+            if ((W.points || 0) < args.p_goal) return { data: null, error: { message: 'cup_locked' } };
             if (W[k]) return { data: Object.assign({ already: true }, W[k]), error: null };
             const fr = W.frame || 'tourney';
             const O = window.__online, own = O.owned.some(o => o.kind === 'frame' && o.code === fr);
-            W[k] = args.p_goal === 5 && !own ? { goal: 5, xp: 50, frame: fr, surprise: null }
-              : { goal: args.p_goal, xp: args.p_goal === 3 ? 50 : 100, frame: null, surprise: window.__chestSurprise || null };
+            const gems = args.p_goal === 3 ? 1 : 2;
+            W[k] = args.p_goal === 5 && !own ? { goal: 5, xp: 50, frame: fr, surprise: null, gems: gems }
+              : { goal: args.p_goal, xp: args.p_goal === 3 ? 50 : 100, frame: null, surprise: window.__chestSurprise || null, gems: gems };
             if (W[k].frame) O.owned.push({ kind: 'frame', code: W[k].frame });
             if (W[k].surprise) O.owned.push(W[k].surprise);
             O.xp += W[k].xp;
+            if (window.__wallet) window.__wallet.gems += gems;
             return { data: W[k], error: null };
+          }
+          // Игра без интернета кончилась (миграция 062): window.__localDone — что
+          // присылала игра; день отмечен, +10 очков пути
+          if (name === 'local_game_done') {
+            (window.__localDone = window.__localDone || []).push(args.p_kind);
+            if (window.__online) { window.__online.played = true; window.__online.xp += 10; }
+            return { data: { xp: 10 }, error: null };
           }
           if (name === 'set_frame') { window.__online.frame = args.p_frame; return { data: args.p_frame, error: null }; }
           if (name === 'set_title') { window.__online.title = args.p_title; return { data: args.p_title, error: null }; }
@@ -298,16 +297,6 @@ function stubSupabase(opts) {
           }
           if (name === 'list_matches') return { data: window.__matches || [], error: null };
           if (name === 'match_state') return { data: window.__matchState(), error: null };
-          // Лиги: без window.__ladder заглушка ведёт себя как сервер без миграции
-          if (name === 'ladder_status') {
-            window.__ladderCalls = (window.__ladderCalls || 0) + 1;
-            if (!window.__ladder) return { data: null, error: { message: 'function ladder_status does not exist' } };
-            return { data: window.__ladder, error: null };
-          }
-          if (name === 'ladder_top') {
-            if (!window.__ladder) return { data: null, error: { message: 'function ladder_top does not exist' } };
-            return { data: window.__ladderTop || [], error: null };
-          }
           if (name === 'match_review') {
             window.__reviewCalls = (window.__reviewCalls || 0) + 1;
             if (window.__reviewError) return { data: null, error: { message: window.__reviewError } };
@@ -369,44 +358,6 @@ function stubSupabase(opts) {
             M.moves = []; M.tokens = [1, 1]; M.cur = 1 - M.starter; M.starter = M.cur;
             return { data: true, error: null };
           }
-          // Рейтинговый онлайн: очередь и подбор живут в window.__rankedQ,
-          // тест сам решает, когда соперник «нашёлся»
-          // «Играть» и «Своя игра» (миграция 056): window.__play — очередь по
-          // правилам; не задан — база до 056, игра ходит в старую очередь
-          if ((name === 'play_status' || name === 'play_join') && !window.__play) {
-            return { data: null, error: { message: 'Could not find the function public.' + name } };
-          }
-          if (name === 'play_join') {
-            const P = window.__play;
-            P.joined = args.p_rules;
-            if (P.matchId) return { data: { matchId: P.matchId }, error: null };
-            P.inQueue = true; P.rules = args.p_rules; P.since = Date.now();
-            return { data: { matchId: null, waiting: true, rules: args.p_rules }, error: null };
-          }
-          if (name === 'play_status') {
-            const P = window.__play;
-            return { data: { matchId: P.matchId || null, inQueue: !!P.inQueue && !P.matchId, rules: P.rules || null,
-              waited: P.inQueue ? Math.floor((Date.now() - (P.since || Date.now())) / 1000) : 0, queue: 1,
-              offers: P.offers || [], elo: P.elo || 1000, games: P.games || 0, lastAgo: window.__rankedQ.lastAgo }, error: null };
-          }
-          if (name === 'ranked_status') return { data: window.__ranked(args.p_mode), error: null };
-          if (name === 'join_ranked_queue') {
-            const Q = window.__rankedQ;
-            if (Q.matchId) return { data: { matchId: Q.matchId }, error: null };
-            Q.inQueue = true;
-            Q.mode = args.p_mode;
-            Q.joined = Date.now();
-            return { data: { matchId: null, waiting: true }, error: null };
-          }
-          if (name === 'leave_ranked_queue') {
-            window.__rankedQ.inQueue = false;
-            if (window.__play) window.__play.inQueue = false;
-            return { data: true, error: null };
-          }
-          if (name === 'elo_leaderboard') {
-            const top = window.__eloTop || {};
-            return { data: Array.isArray(top) ? top : (top[args.p_mode] || []), error: null };
-          }
           // Переписка с другом: заглушка держит ленту в window.__talk
           if (name === 'friend_thread') {
             const T = window.__talk[args.p_to] || (window.__talk[args.p_to] = []);
@@ -425,10 +376,6 @@ function stubSupabase(opts) {
             const T = window.__talk[args.p_to] || (window.__talk[args.p_to] = []);
             T.push({ id: T.length + 1, mine: true, code: null, text: String(args.p_text).trim(), ago: 0 });
             return { data: T.length, error: null };
-          }
-          if (name === 'challenge_friend_ranked') {
-            window.__rankedChallenge = { to: args.p_to, mode: args.p_mode };
-            return { data: 77, error: null };
           }
           if (name === 'push_config') return { data: window.__push.key, error: null };
           if (name === 'save_push_subscription') {
@@ -487,8 +434,6 @@ function stubSupabase(opts) {
                movesLog: R.movesLog.slice(), frost: R.frost, best: R.best };
     };
 
-    // Четыре режима: тест задаёт рейтинги через window.__rankedQ.ratings,
-    // а очередь — одна на всех, как и на сервере
     // Уведомления: настоящую подписку в тесте не завести, поэтому браузерные
     // части подменяются целиком, а проверяется наша логика вокруг них
     window.__push = { key: null, permission: 'granted', subscribeFails: false,
@@ -533,23 +478,6 @@ function stubSupabase(opts) {
                                      opts.profile || {});
     window.__profile.calls = [];
     window.__talk = {};
-    window.__rankedQ = { inQueue: false, mode: 0, matchId: null, queue: 1,
-                         lastAgo: null, joined: 0,
-                         ratings: { 0: { elo: 1000, games: 0 }, 1: { elo: 1000, games: 0 },
-                                    2: { elo: 1000, games: 0 }, 3: { elo: 1000, games: 0 } } };
-    window.__ranked = function (mode) {
-      const Q = window.__rankedQ;
-      const m = mode === undefined ? 0 : mode;
-      const mine = Q.ratings[m] || { elo: 1000, games: 0 };
-      const queued = Q.inQueue && !Q.matchId;
-      return { mode: m, matchId: Q.matchId,
-               inQueue: queued && Q.mode === m,
-               queueMode: queued ? Q.mode : null,
-               waited: queued ? Math.floor((Date.now() - Q.joined) / 1000) : 0,
-               queue: Q.queue, elo: mine.elo, games: mine.games,
-               ratings: Q.ratings, lastAgo: Q.lastAgo, botWait: Q.botWait };
-    };
-
     // Сервер отдаёт число только когда раунд кончился — заглушка обязана так же,
     // иначе проверка «ответ не виден» пройдёт впустую
     window.__match = { id: 1, seat: 0, status: 'active', names: ['Лев', 'Кира'],
@@ -574,12 +502,7 @@ function stubSupabase(opts) {
         rush: M.rush || [0, 0], nearBonus: !!M.nearBonus,
         lastBonus: M.lastBonus || null, lastBonusBy: M.lastBonusBy || 0,
         lastTimeout: !!M.lastTimeout, forced: M.forced || null, chat: M.chat || [],
-        ranked: !!M.ranked,
-        rankedMode: M.rankedMode === undefined ? null : M.rankedMode,
-        botSeat: M.botSeat === undefined ? null : M.botSeat,
         forfeitBy: M.forfeitBy === undefined ? null : M.forfeitBy,
-        eloDelta: M.eloDelta || null,
-        elo: M.elo === undefined ? 1000 : M.elo,
         turnSeconds: M.turnSeconds || 30,
         secondsLeft: M.secondsLeft === undefined ? 30 : M.secondsLeft,
         // Начало партии и перерыв (миграция 035). Без них — как партия, что уже идёт
@@ -588,7 +511,6 @@ function stubSupabase(opts) {
         startsIn: M.startsIn === undefined ? null : M.startsIn,
         nextIn: M.nextIn === undefined ? (M.roundOver && !M.matchOver ? 10 : null) : M.nextIn,
         ready: M.ready || [false, false],
-        ladder: M.ladder === undefined ? true : !!M.ladder,
         // Бонусы из Приключения (миграция 057): знание — только своё
         shield: M.shield || [false, false], frozen: M.frozen || [false, false],
         shieldTrap: M.shieldTrap || null, know: M.know || { parity: null, half: null },
@@ -608,7 +530,6 @@ function stubSupabase(opts) {
     // Новичку не ставим: любой ключ hc_ делает его «старым игроком» (tutInit)
     if (!opts.freshSetup && !opts.newbie && localStorage.getItem('hc_range') === null) localStorage.setItem('hc_range', '1000');
     if (opts.progress) window.__progress = opts.progress;
-    if (opts.ladder) window.__ladder = opts.ladder;
     if (opts.user) {
       localStorage.setItem('hc_run_user', opts.user);
       localStorage.setItem('hc_run_pin', '1234');

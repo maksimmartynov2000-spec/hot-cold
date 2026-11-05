@@ -218,10 +218,8 @@ body {
 .pf-avatar.guest { background: rgb(var(--ink) / 0.1); color: var(--text); border-width: 1px; }
 .pf-name { font-size: 20px; font-weight: 800; }
 .pf-sub { font-size: 12px; color: rgb(var(--ink) / 0.5); margin: 2px 0 16px; }
-.pf-league { font-size: 14px; font-weight: 700; color: var(--yellow); margin: -10px 0 14px; }
 .pf-streak { font-size: 13px; font-weight: 700; color: #fb923c; margin: -8px 0 14px; }
-.pf-league .pf-badges { display: block; font-size: 12px; font-weight: 600; color: rgb(var(--ink) / 0.55); margin-top: 2px; }
-/* Награда за лигу, до которой ещё не дошёл: видна, но под замком */
+/* Награда, которой ещё нет (с пути, из сундука): видна, но под замком */
 .av-tile.locked, .av-color.locked { opacity: 0.35; position: relative; }
 .av-tile.locked::after, .av-color.locked::after {
   content: '🔒'; position: absolute; right: -2px; bottom: -2px; font-size: 11px; opacity: 1;
@@ -532,45 +530,6 @@ select.field option { background: var(--surface); color: var(--text); }
 .lad-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #f59e0b, #fbbf24); }
 .lad-next { font-size: 12px; color: rgb(var(--ink) / 0.55); }
 .lad-pips { font-size: 9px; letter-spacing: 1px; color: rgba(251, 191, 36, 0.8); margin-top: 3px; }
-/* Звёзды после партии — на весь экран */
-.stars-show { position: fixed; inset: 0; z-index: 250; display: flex; align-items: center; justify-content: center;
-              background: radial-gradient(circle at 50% 40%, rgba(40, 34, 96, 0.96), rgba(8, 10, 28, 0.97));
-              opacity: 0; transition: opacity 0.4s ease; cursor: pointer; }
-.stars-show.on { opacity: 1; }
-.sh-stage { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center;
-            width: min(360px, calc(100vw - 32px)); }
-.sh-rays { position: absolute; top: 70px; left: 50%; width: 520px; height: 520px; margin: -260px 0 0 -260px;
-           border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.6s;
-           background: repeating-conic-gradient(rgba(251, 191, 36, 0.16) 0 8deg, transparent 8deg 22deg);
-           -webkit-mask: radial-gradient(circle, #000 20%, transparent 70%); mask: radial-gradient(circle, #000 20%, transparent 70%);
-           animation: shSpin 14s linear infinite; }
-.sh-stage.big .sh-rays { opacity: 1; }
-@keyframes shSpin { to { transform: rotate(360deg); } }
-.sh-emblem { position: relative; width: 150px; height: 150px; transition: transform 0.35s ease-in;
-             filter: drop-shadow(0 8px 24px var(--lg-glow, rgba(0,0,0,0.4))); }
-.sh-emblem svg { width: 150px; height: 150px; }
-.sh-emblem.flip { transform: rotateY(90deg) scale(0.9); }
-.sh-stage.big .sh-emblem { animation: shPulse 1.2s ease-in-out 2; }
-@keyframes shPulse { 50% { transform: scale(1.15); } }
-.sh-title { font-size: 26px; font-weight: 900; margin-top: 8px; color: #fff; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
-.sh-stars { display: flex; gap: 14px; margin-top: 12px; min-height: 52px; }
-.sh-star { font-size: 46px; line-height: 1; color: rgba(255, 255, 255, 0.16); transition: color 0.2s, text-shadow 0.2s; }
-.sh-star.on { color: #fbbf24; text-shadow: 0 0 18px rgba(251, 191, 36, 0.8); }
-.sh-star.gain { animation: shGain 0.55s cubic-bezier(.2, 1.6, .4, 1); }
-@keyframes shGain { 0% { transform: scale(0.2) rotate(-60deg); } 60% { transform: scale(1.5) rotate(10deg); } 100% { transform: scale(1); } }
-.sh-star.lose { animation: shLose 0.6s ease; }
-@keyframes shLose { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); }
-                    60% { transform: translateX(-5px) scale(0.9); } 80% { transform: translateX(4px) scale(0.85); } }
-.sh-note { font-size: 16px; font-weight: 700; color: #fde68a; margin-top: 14px; min-height: 22px; }
-.sh-rewards { display: flex; gap: 12px; justify-content: center; margin-top: 12px; }
-.sh-rewards .sh-rew { width: 64px; height: 64px; border-radius: 50%; padding: 6px; animation: shGain 0.6s ease both; }
-.sh-tap { font-size: 13px; color: rgba(255, 255, 255, 0.45); margin-top: 26px; opacity: 0; transition: opacity 0.5s; }
-.sh-tap.on { opacity: 1; }
-@media (prefers-reduced-motion: reduce) {
-  .sh-rays, .sh-stage.big .sh-emblem, .sh-star.gain, .sh-star.lose { animation: none; }
-  .sh-emblem { transition: none; }
-}
-
 /* Уведомление о достижении: выезжает медленно, чтобы его заметили */
 .ach-toast { position: fixed; left: 50%; top: 14px; z-index: 300; width: min(360px, calc(100vw - 32px));
              display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 16px;
@@ -582,10 +541,6 @@ select.field option { background: var(--surface); color: var(--text); }
 .ach-toast .at-head { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #fbbf24; }
 .ach-toast .at-name { font-size: 17px; font-weight: 800; margin-top: 2px; color: #fff; }
 @media (prefers-reduced-motion: reduce) { .ach-toast { transition: opacity 0.4s; transform: translate(-50%, 0); } }
-.season-card .ss-league { font-size: 22px; font-weight: 800; color: #fbbf24; margin: 4px 0 10px; }
-.season-card .ss-league .big { display: block; font-size: 48px; line-height: 1.1; }
-.season-card .ss-line { font-size: 15px; margin: 4px 0; }
-.season-card .ss-line.muted { font-size: 13px; color: rgb(var(--ink) / 0.5); margin-top: 10px; }
 .mode-btn .m-title { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
 .mode-btn .m-sub { font-size: 13px; color: rgba(255, 255, 255, 0.55); line-height: 1.35; }
 /* Вход и регистрация: подпись под названием, а не сбоку — рядом с длинным
@@ -595,9 +550,7 @@ select.field option { background: var(--surface); color: var(--text); }
 .mode-btn.duel { border-left: 3px solid var(--p1); }
 .mode-btn.solo { border-left: 3px solid var(--p0); }
 .mode-btn.run { border-left: 3px solid #4ade80; }
-.mode-btn.online { border-left: 3px solid #38bdf8; }
 .mode-btn.bot { border-left: 3px solid #a78bfa; }
-.r-stars { margin-top: 8px; text-align: center; }
 /* Салют при победе */
 .confetti { position: fixed; left: 50%; top: 40%; width: 0; height: 0; pointer-events: none; z-index: 60; }
 .confetti span {
@@ -613,8 +566,6 @@ select.field option { background: var(--surface); color: var(--text); }
 .r-pop { animation: r-pop 0.7s ease-out; }
 @keyframes r-pop { 0% { transform: scale(0.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .r-pop { animation: none; } }
-.r-stars-main { font-size: 17px; font-weight: 800; color: var(--yellow); }
-.r-stars-note { font-size: 12px; font-weight: 600; color: rgb(var(--ink) / 0.6); margin-top: 2px; }
 /* Выбор бота: пять персонажей столбиком, от слабого к сильному. В ряд
    на телефоне не влезали имена: «Чере…», «Дель…» */
 .bot-pick { display: flex; flex-direction: column; gap: 5px; }
@@ -633,7 +584,7 @@ select.field option { background: var(--surface); color: var(--text); }
 .p-bot .icon-art { display: block; }
 .bot-tile .bt-power { font-size: 11px; letter-spacing: 1px; color: #a78bfa; white-space: nowrap; }
 
-/* ---------- Онлайн: друзья ---------- */
+/* ---------- Друзья ---------- */
 .friend-list { margin-bottom: 4px; }
 .friend-row {
   display: flex;
@@ -810,7 +761,6 @@ select.field option { background: var(--surface); color: var(--text); }
   text-overflow: ellipsis;
 }
 .chat-pad button:disabled { opacity: 0.4; }
-.chat-modes-fold { margin-top: 10px; }
 /* Сколько сообщений не прочитано — прямо на имени друга */
 .fr-unread {
   background: #38bdf8;
@@ -822,118 +772,8 @@ select.field option { background: var(--surface); color: var(--text); }
   margin-left: 6px;
 }
 
-/* ---------- Рейтинговый онлайн ---------- */
-/* Разновидности рейтинга. Подпись на кнопке и есть описание правил:
-   «−100…100 · бонусы» говорит ровно то, что нужно знать до игры */
-.rk-modes {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-.rk-mode {
-  background: rgb(var(--ink) / 0.05);
-  border: 1px solid rgb(var(--ink) / 0.12);
-  color: rgb(var(--ink) / 0.6);
-  border-radius: 10px;
-  padding: 8px 6px;
-  font-family: inherit;
-  cursor: pointer;
-  text-align: center;
-}
-/* В одну строку: «−100…100 · бонусы» переносилась, и кнопки выходили
-   разной высоты */
-.rk-mode .rm-name { font-size: 13px; font-weight: 700; white-space: nowrap; }
-.rk-mode .rm-range { font-size: 11px; font-weight: 600; opacity: 0.6; margin-top: 2px; }
-#rkModes .rk-mode { padding: 11px 4px; }
-.rk-mode.active {
-  background: rgba(251, 191, 36, 0.14);
-  border-color: rgba(251, 191, 36, 0.5);
-  color: var(--yellow);
-}
-/* Рейтинг выбранной разновидности — крупно, один раз. Раньше он стоял и на
-   кнопке, и строкой ниже: два одинаковых числа рядом */
-.rk-hero { text-align: center; padding: 10px 0 16px; }
-.rk-elo { font-size: 44px; font-weight: 800; line-height: 1.05; color: var(--yellow);
-          font-variant-numeric: tabular-nums; }
-.rk-elo-sub { font-size: 13px; color: rgb(var(--ink) / 0.5); margin-top: 4px; }
-/* Герб лиги над названием; весь блок нажимается — открывает путь по лигам */
-#rkHero { cursor: pointer; }
-.rk-emblem { display: flex; justify-content: center; margin-bottom: 2px; filter: drop-shadow(0 4px 12px var(--lg-glow, transparent)); }
-.rk-path-link { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 700; color: #a5b4fc; }
-.pf-league { cursor: pointer; }
-/* Путь по лигам */
-.path-card { max-height: 88vh; overflow-y: auto; text-align: left; }
-.path-card .modal-text { text-align: center; margin-bottom: 4px; }
-.path-sub { text-align: center; font-size: 13px; color: rgb(var(--ink) / 0.55); margin-bottom: 10px; }
-.path-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
-.path-league { padding: 10px 12px; border-radius: 14px; background: rgb(var(--ink) / 0.05);
-               border: 1px solid rgb(var(--ink) / 0.08); }
-.path-league.current { border-color: rgba(251, 191, 36, 0.6); background: rgba(251, 191, 36, 0.08);
-                       box-shadow: 0 0 18px rgba(251, 191, 36, 0.15); }
-.path-league.ahead { opacity: 0.85; }
+/* Окно пути: заголовок блока серии */
 .pl-head { display: flex; align-items: center; gap: 10px; }
-.pl-name { font-size: 16px; font-weight: 800; }
-.pl-here { font-size: 12px; font-weight: 800; color: var(--yellow); margin-left: 6px; }
-.pl-rew { font-size: 12px; color: rgb(var(--ink) / 0.6); margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.pl-rew .r-item { font-size: 18px; line-height: 1; }
-.pl-rew .r-item.locked { filter: grayscale(1); opacity: 0.4; }
-.pl-rew .r-swatch { width: 16px; height: 16px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,0.3); }
-.pl-rew .r-swatch.locked { opacity: 0.35; }
-.pl-ranks { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; margin-top: 10px; }
-.pl-rank { position: relative; text-align: center; font-size: 12px; font-weight: 800; padding: 5px 0 4px; border-radius: 7px;
-           background: rgb(var(--ink) / 0.06); color: rgb(var(--ink) / 0.55); }
-.pl-rank.passed { background: rgba(251, 191, 36, 0.22); color: var(--yellow-soft); }
-.pl-rank.here { background: #fbbf24; color: #0f1430; box-shadow: 0 0 10px rgba(251, 191, 36, 0.6); }
-.pl-rank .pl-star { display: block; font-size: 7px; letter-spacing: -1px; line-height: 1; margin-top: 1px; }
-.pl-rank.floor::after { content: '🛡'; position: absolute; top: -7px; right: -4px; font-size: 10px; }
-.pl-legend { font-size: 13px; color: rgb(var(--ink) / 0.7); margin-top: 6px; }
-.rk-elo.league { font-size: 32px; }
-.rk-stars { font-size: 26px; letter-spacing: 4px; color: var(--yellow); line-height: 1.2; }
-.rk-top { margin-top: 26px; }
-.lb-row.rk-top-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 8px; border-radius: 10px; font-size: 14px; border-bottom: none;
-}
-.rk-top-row + .rk-top-row { margin-top: 2px; }
-.rk-top-row.me { background: rgba(251, 191, 36, 0.12); color: var(--yellow); font-weight: 700; }
-.rk-top-row .rk-place { width: 24px; height: 24px; line-height: 24px; border-radius: 50%;
-                        text-align: center; flex: 0 0 auto; font-size: 13px;
-                        color: rgb(var(--ink) / 0.45); font-weight: 800; }
-.rk-top-row .rk-place.p1 { background: #fbbf24; color: #0f1430; }
-.rk-top-row .rk-place.p2 { background: #cbd5e1; color: #0f1430; }
-.rk-top-row .rk-place.p3 { background: #d97706; color: #0f1430; }
-.rk-top-row .rk-who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rk-top-row .rk-pts { font-variant-numeric: tabular-nums; font-weight: 700; }
-.rk-wait { margin-top: 10px; }
-/* Пока ищем соперника, единственное, что меняется, — это строка ожидания.
-   Она должна быть заметна, но не мигать: точки дорисовываются в тексте */
-.rk-wait-text {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--yellow);
-  text-align: center;
-  padding: 6px 0 4px;
-  font-variant-numeric: tabular-nums;
-}
-.rk-wait-sub {
-  font-size: 13px;
-  line-height: 1.5;
-  color: rgb(var(--ink) / 0.55);
-  text-align: center;
-  padding-bottom: 10px;
-  white-space: pre-line;
-}
-.rk-row-tag {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--yellow);
-  border: 1px solid rgba(251, 191, 36, 0.4);
-  border-radius: 6px;
-  padding: 1px 5px;
-  margin-left: 6px;
-  white-space: nowrap;
-}
 .r-forfeit { font-size: 13px; color: rgb(var(--ink) / 0.55); margin-top: 6px; }
 
 /* ---------- Настройка дуэли ---------- */
@@ -1393,7 +1233,6 @@ select.field option { background: var(--surface); color: var(--text); }
 .bonus-card .bc-title { font-size: 18px; font-weight: 800; margin: 6px 0 4px; }
 .r-next { margin-top: 10px; font-size: 13px; color: rgb(var(--ink) / 0.55); text-align: center; }
 .turn-banner.count { font-size: 1.4em; letter-spacing: 0.02em; }
-.turn-banner .tb-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: rgb(var(--ink) / 0.6); letter-spacing: 0; }
 
 /* Панель отнятого хода живёт на месте поля ввода и выглядит так же
    заметно: этот ход — событие, а не пауза */
@@ -1649,7 +1488,7 @@ select.field option { background: var(--surface); color: var(--text); }
   border-bottom: 1px solid rgb(var(--ink) / 0.06);
 }
 
-/* ---------- Хаб режима на рейтинг ---------- */
+/* ---------- Хаб Испытания ---------- */
 .run-result {
   background: rgb(var(--ink) / 0.06);
   border: 1px solid rgb(var(--ink) / 0.15);
@@ -1665,8 +1504,6 @@ select.field option { background: var(--surface); color: var(--text); }
   margin-bottom: 10px;
 }
 .run-result p { margin: 0; font-size: 14px; }
-.run-result .rr-best { margin-top: 10px; font-size: 15px; font-weight: 700; color: var(--yellow); }
-.run-result .rr-error { margin-top: 10px; font-size: 13px; color: #f87171; }
 .run-result #shareBtn { margin-top: 14px; }
 
 #screenRunHub .frost-row { margin: 4px 0 14px; }
@@ -1783,7 +1620,6 @@ select.field option { background: var(--surface); color: var(--text); }
 .mode-btn.duel   { background: linear-gradient(135deg, #ffc233, #ff8a3d); }
 .mode-btn.bot    { background: linear-gradient(135deg, #a66bff, #6a5cff); }
 .mode-btn.run    { background: linear-gradient(135deg, #2bd18f, #11a6a6); }
-.mode-btn.online { background: linear-gradient(135deg, #42c8ff, #4f74ff); }
 .mode-btn.tut    { background: linear-gradient(135deg, #f472b6, #a855f7); }
 .mode-btn:hover { filter: brightness(1.05); }
 .mode-btn .m-icon { width: 52px; height: 52px; font-size: 30px; border-radius: 16px; background: rgba(255, 255, 255, 0.25); }
@@ -1801,7 +1637,7 @@ input[type=number], input[type=text], input[type=password], select.field {
 #guessInput { font-size: 22px; text-align: center; }
 
 /* Плитки — история, плашки игроков, строки списков, окна выбора */
-.quest-card, .info-bar, .history-item, .pcard, .lb-row, .fold-head, .friend-row, .rk-mode, .lad-row, .bot-tile {
+.quest-card, .info-bar, .history-item, .pcard, .lb-row, .fold-head, .friend-row, .lad-row, .bot-tile {
   background: var(--tile); box-shadow: var(--tile-edge); }
 .info-bar { border-radius: 18px; }
 .info-bar .attempts { color: var(--gold); font-weight: 900; font-size: 16px; }
@@ -1814,8 +1650,6 @@ input[type=number], input[type=text], input[type=password], select.field {
 .pcard { border-radius: 20px; border-width: 3px; }
 .pcard .p-name { font-weight: 900; font-size: 17px; }
 .turn-banner { border-width: 3px !important; border-radius: 18px; font-weight: 900; font-size: 17px; }
-.rk-mode { border-radius: 16px; border-width: 2px; }
-.rk-mode .rm-name { font-weight: 900; }
 .screen-title { font-size: 24px; font-weight: 900; }
 .lb-row { border-radius: 14px; }
 .fold-head { border-radius: 16px; font-weight: 800; }
@@ -1840,9 +1674,9 @@ body.on-game .tabbar { display: none; }
   min-width: 18px; height: 18px; line-height: 18px; font-size: 11px; font-weight: 900; text-align: center; box-sizing: border-box; }
 .tab .avatar-btn { width: 28px; height: 28px; border-width: 2px; font-size: 13px; vertical-align: top; box-shadow: none; }
 /* «В меню» на экранах с нижним меню не нужно: «Играть» — та же кнопка */
-#tOnlineBack, #tFriendsBack, #tRunToMenu { display: none; }
+#tFriendsBack, #tRunToMenu { display: none; }
 
-/* Главный: онлайн — широкими карточками, без интернета — три плитки в ряд */
+/* Главный: Испытание — широкой карточкой, без интернета — три плитки в ряд */
 #screenMode .mode-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 #screenMode .mode-list > :not(.tile) { grid-column: 1 / -1; }
 #screenMode .mode-group { margin: 6px 4px -4px; font-weight: 900; letter-spacing: 0.08em; }
@@ -1915,10 +1749,6 @@ body.on-game #guessInput, body.on-game #tSubmitGuess { min-height: 56px; }
 .p-turn { position: absolute; top: -10px; right: 12px; padding: 0 8px; border-radius: 8px; color: #fff;
   font-size: 12px; font-weight: 900; line-height: 18px; white-space: nowrap; }
 .say-bubble { padding: 6px 12px; font-size: 14px; border-radius: 14px; }
-
-/* Онлайн */
-#screenOnline .rk-hero { border-radius: 24px; background: linear-gradient(160deg, rgb(var(--ink) / 0.10), rgb(var(--ink) / 0.03));
-  padding: 16px 12px 14px; margin: 10px 0 14px; }
 
 /* Узкий телефон: строка статуса и пять кнопок должны остаться в одну строку */
 @media (max-width: 380px) {
@@ -2014,12 +1844,11 @@ body.on-game #guessInput, body.on-game #tSubmitGuess { min-height: 56px; }
 /* Значки режимов и меню — рисунками */
 .mode-btn .m-icon { background-position: center; background-repeat: no-repeat; background-size: 86%; }
 .mode-btn.solo .m-icon, .mode-btn.duel .m-icon, .mode-btn.bot .m-icon, .mode-btn.run .m-icon,
-.mode-btn.online .m-icon, .mode-btn.tut .m-icon { font-size: 0; }
+.mode-btn.tut .m-icon { font-size: 0; }
 .mode-btn.solo .m-icon { background-image: url(icons/m-solo.webp); }
 .mode-btn.duel .m-icon { background-image: url(icons/m-duel.webp); }
 .mode-btn.bot .m-icon { background-image: url(icons/m-adventure.webp); }
 .mode-btn.run .m-icon { background-image: url(icons/m-run.webp); }
-.mode-btn.online .m-icon { background-image: url(icons/m-online.webp); }
 .mode-btn.tut .m-icon { background-image: url(icons/1f393.webp); }
 #navPlay .tab-ic, #friendsBtn .tab-ic { width: 30px; font-size: 0; background: center / contain no-repeat; }
 #navPlay .tab-ic { background-image: url(icons/m-play.webp); }
@@ -2151,20 +1980,11 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
   background: rgba(255, 194, 51, 0.16); border: 2px solid rgba(255, 194, 51, 0.55); color: #ffd166;
   font-size: 14px; font-weight: 800; line-height: 1.35; text-align: left; cursor: pointer; }
 .pf-warn::after { content: ' ›'; }
-/* Онлайн: разновидности — одной строкой-переключателем; диапазон — у выбранной */
-#screenOnline #rkModes { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px;
-  border-radius: 16px; background: rgb(var(--ink) / 0.08); margin: 0 0 6px; }
-#screenOnline #rkModes .rk-mode { border: none; box-shadow: none; background: transparent; padding: 8px 2px; border-radius: 12px; }
-#screenOnline #rkModes .rm-name { font-size: 12px; white-space: normal; line-height: 1.2; color: var(--muted); }
-#screenOnline #rkModes .rm-range { display: none; }
-#screenOnline #rkModes .rk-mode.active { background: var(--accent); box-shadow: 0 3px 0 var(--accent-depth); }
-#screenOnline #rkModes .rk-mode.active .rm-name { color: #fff; }
-#screenOnline #rkModes .rk-mode.active .rm-range { display: block; color: #fff; opacity: 0.85; font-size: 11px; }
 
 /* ---- Мягкие анимации ---- */
 @keyframes screenIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes itemIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
-#screenMode:not(.hidden), #screenSetup:not(.hidden), #screenAdventure:not(.hidden), #screenOnline:not(.hidden),
+#screenMode:not(.hidden), #screenSetup:not(.hidden), #screenAdventure:not(.hidden),
 #screenFriends:not(.hidden), #screenRunHub:not(.hidden) { animation: screenIn 0.25s ease-out; }
 .history-list .history-item:first-child { animation: itemIn 0.3s ease-out; }
 .mode-btn, .chip, .adv-tile, .tab { transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s; }
@@ -2173,7 +1993,7 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .tab .tab-ic { transition: transform 0.12s; }
 .modal-card { animation: pop 0.22s ease-out; }
 @media (prefers-reduced-motion: reduce) {
-  #screenMode, #screenSetup, #screenAdventure, #screenOnline, #screenFriends, #screenRunHub,
+  #screenMode, #screenSetup, #screenAdventure, #screenFriends, #screenRunHub,
   .history-list .history-item:first-child, .modal-card { animation: none !important; }
 }
 
@@ -2325,7 +2145,7 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .rs-mult { color: #ff8a3d; }
 .rg-medal { margin: 8px 0; font-size: 18px; font-weight: 900; color: var(--gold); }
 
-/* Рамка своего кружка в профиле: кольцо цвета лиги с переливом, как у боссов
+/* Рамка своего кружка в профиле: кольцо выбранной рамки с переливом, как у боссов
    в Приключении. Кольцо — отдельный слой (::before), карандаш — ::after */
 .pf-avatar { width: 92px; height: 92px; margin: 10px auto 14px; position: relative; overflow: visible !important;
   border: 3px solid #fff; box-shadow: 0 6px 0 rgba(0, 0, 0, 0.28), 0 0 26px var(--fr-glow, rgba(255, 209, 102, 0.55)); }
@@ -2368,7 +2188,7 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .avatar[data-frame="champion"], .pr-frame[data-frame="champion"] { --fr-solid: #facc15; }
 .avatar[data-frame="streak"], .pr-frame[data-frame="streak"] { --fr-solid: #fb7185; }
 .avatar[data-frame="tourney"], .pr-frame[data-frame="tourney"] { --fr-solid: #f59e0b; }
-/* Рамки турнира по месяцам (миграция 055): январь — лёд, … декабрь — праздник */
+/* Рамки выходных по месяцам (миграция 055): январь — лёд, … декабрь — праздник */
 .pf-avatar[data-frame="cup-01"] { --fr: conic-gradient(from 0deg, #e0f2fe, #7dd3fc, #ffffff, #bae6fd, #7dd3fc, #ffffff, #e0f2fe); --fr-glow: rgba(186, 230, 253, 0.9); }
 .pf-avatar[data-frame="cup-02"] { --fr: conic-gradient(from 0deg, #fbcfe8, #f472b6, #ffffff, #e11d48, #f472b6, #ffffff, #fbcfe8); --fr-glow: rgba(244, 114, 182, 0.9); }
 .pf-avatar[data-frame="cup-03"] { --fr: conic-gradient(from 0deg, #d9f99d, #4ade80, #fef08a, #22c55e, #4ade80, #fef08a, #d9f99d); --fr-glow: rgba(74, 222, 128, 0.85); }
@@ -2393,9 +2213,13 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .avatar[data-frame="cup-10"], .pr-frame[data-frame="cup-10"] { --fr-solid: #f97316; }
 .avatar[data-frame="cup-11"], .pr-frame[data-frame="cup-11"] { --fr-solid: #b91c1c; }
 .avatar[data-frame="cup-12"], .pr-frame[data-frame="cup-12"] { --fr-solid: #16a34a; }
-.pr-frame[data-frame="bronze"] { --fr-solid: #d08a4f; } .pr-frame[data-frame="silver"] { --fr-solid: #e2e8f0; }
-.pr-frame[data-frame="gold"] { --fr-solid: #facc15; } .pr-frame[data-frame="platinum"] { --fr-solid: #5eead4; }
-.pr-frame[data-frame="diamond"] { --fr-solid: #93c5fd; } .pr-frame[data-frame="legend"] { --fr-solid: #c084fc; }
+/* Рамки лиг — из коллекции (лиг нет с миграции 062): и в выборе, и на кружках друзей */
+.pr-frame[data-frame="bronze"], .avatar[data-frame="bronze"] { --fr-solid: #d08a4f; }
+.pr-frame[data-frame="silver"], .avatar[data-frame="silver"] { --fr-solid: #e2e8f0; }
+.pr-frame[data-frame="gold"], .avatar[data-frame="gold"] { --fr-solid: #facc15; }
+.pr-frame[data-frame="platinum"], .avatar[data-frame="platinum"] { --fr-solid: #5eead4; }
+.pr-frame[data-frame="diamond"], .avatar[data-frame="diamond"] { --fr-solid: #93c5fd; }
+.pr-frame[data-frame="legend"], .avatar[data-frame="legend"] { --fr-solid: #c084fc; }
 .pr-frame[data-frame="base"] { --fr-solid: #ff8a3d; }
 .pr-art { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 34px; height: 34px;
   border-radius: 50%; background: var(--tile); font-size: 18px; vertical-align: middle; }
@@ -2403,8 +2227,8 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .pr-art.pr-icon { background: rgba(255, 255, 255, 0.1); }
 .pr-art .icon-art { width: 28px; height: 28px; }
 
-/* Карточка дня на экране онлайна */
-.ol-daily { margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
+/* Карточка дня в главном меню: сундук, серия, путь, «Испытание выходных» */
+.ol-daily { display: flex; flex-direction: column; gap: 8px; }
 .od-top { display: flex; gap: 8px; }
 .od-chest { all: unset; flex: 1; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 18px;
   font-size: 15px; font-weight: 900; background: var(--surface); cursor: pointer; font-size: 26px; }
@@ -2475,21 +2299,7 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .board.duel .pcard .p-pips { white-space: nowrap; }
 .board.duel .pcard .token-btn { white-space: nowrap; }
 
-/* ---- Режим дня (миграция 054): карточка над переключателем режимов ---- */
-.rk-daily { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%;
-  margin: 0 0 8px; padding: 12px 14px; border-radius: 18px; cursor: pointer; color: var(--text);
-  background: linear-gradient(140deg, rgba(56, 189, 248, 0.22), rgba(167, 139, 250, 0.2)); border: 2px solid rgba(125, 211, 252, 0.35); }
-.rk-daily[data-variant="chaos"] { background: linear-gradient(140deg, rgba(244, 114, 182, 0.24), rgba(251, 146, 60, 0.2)); border-color: rgba(251, 146, 60, 0.4); }
-.rk-daily[data-variant="mini"] { background: linear-gradient(140deg, rgba(74, 222, 128, 0.22), rgba(45, 212, 191, 0.18)); border-color: rgba(74, 222, 128, 0.4); }
-.rk-daily.active { border-color: var(--accent); box-shadow: 0 3px 0 var(--accent-depth), 0 0 18px rgba(255, 194, 51, 0.35); }
-.rk-daily .dm-head { grid-column: 1; font-size: 12px; font-weight: 800; color: var(--muted); }
-.rk-daily .dm-name { grid-column: 1; font-size: 20px; font-weight: 900; line-height: 1.15; }
-.rk-daily .dm-rule { grid-column: 1; font-size: 13px; font-weight: 700; line-height: 1.3; }
-.rk-daily .dm-perk { grid-column: 2; grid-row: 1 / span 3; align-self: center; max-width: 92px; text-align: center; font-size: 11px;
-  font-weight: 900; line-height: 1.25; padding: 6px 8px; border-radius: 12px; background: rgba(0, 0, 0, 0.25); color: #fde68a; }
-.rk-daily .dm-next { grid-column: 1 / span 2; margin-top: 4px; font-size: 11px; font-weight: 700; color: var(--muted); }
-
-/* ---- Турнир выходных ---- */
+/* ---- «Испытание выходных» (миграция 062) ---- */
 .od-cup { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 18px; background: var(--surface); }
 .od-cup.on { background: linear-gradient(150deg, rgba(245, 158, 11, 0.32), rgba(220, 38, 38, 0.18)); border: 2px solid rgba(245, 158, 11, 0.55); }
 .od-cup.off { gap: 2px; padding: 10px 14px; }
@@ -2497,6 +2307,7 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .od-cup small { font-size: 12px; font-weight: 700; color: var(--muted); }
 .od-cup.on .cup-head small { color: #fde68a; }
 .cup-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.cup-how { margin-top: -4px; font-size: 12px; font-weight: 700; line-height: 1.35; color: rgb(var(--ink) / 0.75); }
 .cup-bar { position: relative; height: 24px; border-radius: 12px; background: rgba(0, 0, 0, 0.3); overflow: hidden; }
 .cup-bar > span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 12px; background: linear-gradient(90deg, #fde047, #f59e0b, #ef4444); }
 .cup-bar em { position: relative; display: block; text-align: center; line-height: 24px; font-style: normal; font-size: 12px; font-weight: 900; }
@@ -2512,58 +2323,13 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
   background: linear-gradient(150deg, #ffb347, #ff6b3d); box-shadow: 0 3px 0 #b8321b; animation: od-pulse 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .cup-claim { animation: none; } }
 
-/* ---- Таблица турнира ---- */
-.cup-table { all: unset; cursor: pointer; align-self: center; padding: 6px 14px; border-radius: 12px; font-size: 13px; font-weight: 900;
-  background: rgba(0, 0, 0, 0.25); color: #fde68a; }
-.cup-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-
-/* ---- Онлайн: «Играть» закреплена над нижним меню ---- */
-body.on-online #rkPlayBar { position: fixed; left: 0; right: 0; z-index: 45; padding: 10px 16px 8px;
-  bottom: calc(62px + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, transparent, var(--bar) 30%); }
-body.on-online #rkPlayBar > * { max-width: 520px; margin-left: auto; margin-right: auto; }
-body.on-online #rkPlayBar #tRkPlay { margin: 0 auto; }
-body.on-online #rkPlayBar .rk-wait { margin-top: 0; padding: 10px 12px; border-radius: 18px; background: var(--surface); }
-body.on-online #screenOnline { padding-bottom: 120px; } /* точнее — fitPlayBar() по высоте панели */
 .train-panel.after-start { margin-top: 18px; }
-.rk-daily .dm-next { grid-column: 1; }
-.rk-daily .dm-pick { grid-column: 2; align-self: end; justify-self: center; margin-top: 4px; padding: 4px 10px; border-radius: 10px;
-  font-size: 12px; font-weight: 900; background: rgb(var(--ink) / 0.12); white-space: nowrap; }
-.rk-daily.active .dm-pick { background: var(--accent); color: #fff; }
 .auth-why { margin: -4px 0 14px; font-size: 14px; line-height: 1.4; color: var(--muted); }
 /* Испытание: главная «Начать» первой; кнопка Испытания дня — своя, фиолетовая,
    чтобы две оранжевые не спорили, какая главнее */
 #screenRunHub .run-start-main { margin-bottom: 10px; }
 .btn.btn-daily { background: linear-gradient(150deg, #a78bfa, #7c3aed); box-shadow: 0 4px 0 #4c1d95; }
 
-/* ---- «Играть» и «Своя игра» (миграция 056) ---- */
-.rk-rules { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; padding: 10px 12px; border-radius: 18px; background: var(--surface); }
-.rk-rules .rr-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.rk-rules .rr-text small { font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.rk-rules .rr-text b { font-size: 15px; font-weight: 900; line-height: 1.3; }
-.rk-rules .rr-btn { all: unset; cursor: pointer; padding: 8px 12px; border-radius: 12px; font-size: 13px; font-weight: 900; white-space: nowrap;
-  background: rgb(var(--ink) / 0.12); }
-.ru-row { margin: 10px 0 0; text-align: left; }
-.ru-head { font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
-.ru-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.ru-chip { all: unset; cursor: pointer; flex: 1; min-width: 70px; text-align: center; padding: 10px 8px; border-radius: 14px; font-size: 14px;
-  font-weight: 900; background: rgb(var(--ink) / 0.08); }
-.ru-chip.on { background: var(--accent); color: #fff; box-shadow: 0 3px 0 var(--accent-depth); }
-.ru-daily { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; width: 100%; margin-top: 14px; padding: 10px 14px;
-  border-radius: 16px; font-size: 15px; font-weight: 900; text-align: left;
-  background: linear-gradient(140deg, rgba(56, 189, 248, 0.22), rgba(167, 139, 250, 0.2)); border: 2px solid rgba(125, 211, 252, 0.35); }
-.ru-daily small { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 2px; }
-.ru-daily.on { border-color: var(--accent); box-shadow: 0 0 14px rgba(255, 138, 61, 0.35); }
-.ru-reset { all: unset; cursor: pointer; display: block; margin: 12px auto 0; font-size: 13px; font-weight: 800; color: var(--muted); }
-.rk-offers { margin-bottom: 8px; padding: 10px 12px; border-radius: 18px; background: var(--surface); }
-.rk-offers .of-head { font-size: 12px; font-weight: 800; color: var(--muted); margin-bottom: 6px; }
-.rk-offers .of-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
-.rk-offers .of-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.rk-offers .of-text small { font-size: 12px; color: var(--muted); }
-.rk-offers .of-go { all: unset; cursor: pointer; padding: 7px 12px; border-radius: 12px; font-size: 13px; font-weight: 900; color: #fff;
-  background: linear-gradient(150deg, #22c55e, #16a34a); box-shadow: 0 3px 0 #166534; }
-/* Вкладки режимов скрыты с миграции 056 — их display: grid !important выше не должен их показывать */
-#screenOnline #rkModes.hidden { display: none !important; }
 /* Название бонуса — в одну строку: при длинном описании «◐ Половина» переносилась */
 .bonus-line .b-name { white-space: nowrap; flex-shrink: 0; }
 
@@ -2580,7 +2346,6 @@ body.on-online #screenOnline { padding-bottom: 120px; } /* точнее — fitP
 .info-bar .mini-toggle, .info-bar #tMenu { min-width: 38px; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
 /* «?» у переключателей и мелкие ссылки-кнопки — с запасом вокруг */
 .hint-q { flex-basis: 32px; height: 32px; line-height: 32px; }
-.ru-reset { padding: 10px 14px; }
 .friend-row button.x { min-width: 38px; min-height: 36px; }
 .fr-btn.more, #chatMore, .chat-more { min-width: 40px; min-height: 36px; }
 
@@ -2595,26 +2360,19 @@ body.on-online #screenOnline { padding-bottom: 120px; } /* точнее — fitP
 @media (min-width: 1024px) and (pointer: coarse) {
   html { zoom: 1.25; }
 }
-/* Закреплённая «Играть» — по центру и шириной как поле ввода в партии: на
-   масштабированном планшете растянутая на всю ширину панель съезжала влево */
-body.on-online #rkPlayBar { max-width: 560px; margin: 0 auto; }
 
-/* ---- iPad горизонтально: меню в две колонки ----
-   Широкий экран: «Испытание» и «Игра онлайн» — рядом, под ними три плитки,
-   ниже задания дня. Колонка меню шире, чтобы не было пустых полей по бокам */
+/* ---- iPad горизонтально: меню шире ----
+   «Испытание» — во всю ширину, под ним три плитки, ниже задания дня.
+   Колонка меню шире, чтобы не было пустых полей по бокам */
 @media (min-width: 1024px) and (orientation: landscape) and (pointer: coarse) {
   body.on-mode .card { max-width: 860px; }
-  #screenMode .mode-list { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  #screenMode .mode-list > .mode-btn.wide { grid-column: span 3; }
-  #screenMode .mode-list > .mode-btn.tile { grid-column: span 2; }
 }
 
-/* ---- iPad горизонтально: Испытание и онлайн в две колонки ----
-   Испытание: слева «Начать», «Мороз и Жара», рекорд и медали; справа
-   Испытание дня и «Как играть». Онлайн: слева сундук, путь и турнир; справа
-   правила, лига и топ. «Играть» онлайна по-прежнему закреплена внизу */
+/* ---- iPad горизонтально: Испытание в две колонки ----
+   Слева «Начать», «Мороз и Жара», рекорд и медали; справа Испытание дня
+   и «Как играть» */
 @media (min-width: 1024px) and (orientation: landscape) and (pointer: coarse) {
-  body.on-runHub .card, body.on-online .card { max-width: 900px; }
+  body.on-runHub .card { max-width: 900px; }
 
   #screenRunHub:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; align-items: start; }
   #screenRunHub > * { grid-column: 1 / -1; }
@@ -2626,10 +2384,6 @@ body.on-online #rkPlayBar { max-width: 560px; margin: 0 auto; }
   #screenRunHub > .frost-row { grid-row: 3; }
   #screenRunHub > #trialBest { grid-row: 4 / span 2; }
 
-  #screenOnline:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; align-items: start; }
-  #screenOnline > * { grid-column: 1 / -1; }
-  #screenOnline > #olDaily:not(.hidden) { grid-column: 1; grid-row: 2; margin-bottom: 0; }
-  #screenOnline > #olDaily:not(.hidden) ~ #olRanked { grid-column: 2; grid-row: 2; }
 }
 
 /* ---- iPad горизонтально: Приключение — два мира в ряд ----
@@ -2682,7 +2436,7 @@ body.on-online #rkPlayBar { max-width: 560px; margin: 0 auto; }
 
 /* ---- Телефон набок: низкий экран ----
    Нижнее меню — в одну строку (значок рядом с подписью): по высоте вдвое
-   ниже. Меню, Испытание, онлайн и Приключение — в две колонки, как на iPad */
+   ниже. Испытание и Приключение — в две колонки, как на iPad */
 @media (orientation: landscape) and (max-height: 500px) {
   .tabbar { padding: 3px 12px calc(3px + env(safe-area-inset-bottom)); }
   .tab { flex-direction: row; justify-content: center; align-items: center; gap: 8px; min-height: 42px; }
@@ -2701,7 +2455,7 @@ body.on-online #rkPlayBar { max-width: 560px; margin: 0 auto; }
 .modal-backdrop { overflow-y: auto; overscroll-behavior: contain; }
 .modal-backdrop > .modal-card { margin-top: auto; margin-bottom: auto; flex-shrink: 0; }
 @media (min-width: 744px) and (pointer: coarse) {
-  .modal-card, .path-card { max-height: none; }
+  .modal-card { max-height: none; }
 }
 
 /* Подпись вкладки — своей строкой с первого кадра: текст приходит из
@@ -2709,11 +2463,8 @@ body.on-online #rkPlayBar { max-width: 560px; margin: 0 auto; }
 .tab > span:last-child { display: block; min-height: 1.25em; line-height: 1.25; }
 @media (orientation: landscape) and (pointer: coarse) and (min-width: 640px) and (max-width: 1023px) {
   body.on-mode .card { max-width: 860px; }
-  #screenMode .mode-list { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  #screenMode .mode-list > .mode-btn.wide { grid-column: span 3; }
-  #screenMode .mode-list > .mode-btn.tile { grid-column: span 2; }
 
-  body.on-runHub .card, body.on-online .card { max-width: 900px; }
+  body.on-runHub .card { max-width: 900px; }
   #screenRunHub:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; align-items: start; }
   #screenRunHub > * { grid-column: 1 / -1; }
   #screenRunHub > #tRunStart, #screenRunHub > .frost-row, #screenRunHub > #trialBest { grid-column: 1; }
@@ -2723,11 +2474,6 @@ body.on-online #rkPlayBar { max-width: 560px; margin: 0 auto; }
   #screenRunHub > #tRunStart { grid-row: 2; }
   #screenRunHub > .frost-row { grid-row: 3; }
   #screenRunHub > #trialBest { grid-row: 4 / span 2; }
-
-  #screenOnline:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; align-items: start; }
-  #screenOnline > * { grid-column: 1 / -1; }
-  #screenOnline > #olDaily:not(.hidden) { grid-column: 1; grid-row: 2; margin-bottom: 0; }
-  #screenOnline > #olDaily:not(.hidden) ~ #olRanked { grid-column: 2; grid-row: 2; }
 
   body.on-adventure .card { max-width: 980px; }
   #advMap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }

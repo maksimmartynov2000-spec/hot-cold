@@ -40,14 +40,12 @@
   <div id="screenMode">
     <div class="mode-list">
       <!-- У каждого режима значок и строка «что это». Без неё «Игра с другом»
-           и «Друзья» в шапке читались как одно и то же, а «Испытание» (раньше —
-           «Игра на рейтинг»)
-           и «Игра онлайн» — как два входа в рейтинг -->
-      <!-- Два блока по тому, нужен ли интернет: тренировка и игра вдвоём
-           целиком работают без сети (их кеширует service worker), испытание
-           и игра онлайн без сети не откроются — там вход и общая таблица -->
+           и «Друзья» в шапке читались как одно и то же -->
+      <!-- Два блока по тому, нужен ли интернет: тренировка, игра вдвоём и
+           Приключение целиком работают без сети (их кеширует service worker),
+           Испытание без сети не откроется — там вход и общая таблица -->
       <!-- Обучение для новичка: три коротких урока. Пока не пройдены первые
-           два, онлайн закрыт — как в Hearthstone, где сначала учебные бои -->
+           два, «Друзья» закрыты — как в Hearthstone, где сначала учебные бои -->
       <button class="mode-btn tut hidden" id="tutCard" onclick="startNextLesson()">
         <span class="m-icon">🎓</span>
         <span class="m-text">
@@ -56,7 +54,7 @@
         </span>
       </button>
       <div class="mode-group" id="tGroupOnline"></div>
-      <!-- Под названием — своё: рекорд Испытания и лига. Так видно, ради чего
+      <!-- Под названием — своё: рекорд Испытания. Так видно, ради чего
            заходить, не открывая экран -->
       <button class="mode-btn run wide" onclick="openRunEntry()">
         <span class="m-icon">🏆</span>
@@ -64,15 +62,6 @@
           <span class="m-title" id="tModeRun"></span>
           <span class="m-sub hidden" id="tRunLock"></span>
           <span class="m-sub hidden" id="tRunInfo"></span>
-        </span>
-        <span class="m-go">›</span>
-      </button>
-      <button class="mode-btn online wide" onclick="openOnlineEntry()">
-        <span class="m-icon">🌐</span>
-        <span class="m-text">
-          <span class="m-title" id="tModeOnline"></span>
-          <span class="m-sub hidden" id="tOnlineLock"></span>
-          <span class="m-sub hidden" id="tOnlineInfo"></span>
         </span>
         <span class="m-go">›</span>
       </button>
@@ -99,6 +88,10 @@
           <span class="m-sub hidden" id="tAdvInfo"></span>
         </span>
       </button>
+      <!-- Сундук дня, серия, сезонный путь и «Испытание выходных» — у вошедшего
+           (миграции 053 и 062): открываются любой игрой -->
+      <div class="ol-daily hidden" id="olDaily"></div>
+      <div class="fr-note hidden" id="odNote"></div>
       <!-- Задания дня — только у вошедшего: засчитывает их база.
            Свёрнуты в одну строку: сколько сделано и полоса. Сами задания —
            по нажатию: смотрят их раз в день, а место в меню нужно всегда -->
@@ -404,58 +397,7 @@
     </div>
   </div>
 
-  <!-- ЭКРАН: онлайн. Сейчас это друзья; вызовы на игру встанут сюда же -->
-  <!-- Рейтинг. Сверху вниз — ровно в том порядке, в каком решают: во что
-       играть, сколько у меня очков, играть. Всё прочее — ниже и только когда
-       есть что показать -->
-  <div id="screenOnline" class="hidden">
-    <div class="screen-title" id="tOnlineScreen"></div>
-    <!-- Сундук дня, серия и сезонный путь (миграция 053) -->
-    <div class="ol-daily hidden" id="olDaily"></div>
-
-    <div id="olRanked">
-      <button class="rk-daily hidden" id="rkDaily" onclick="setRankedMode(DAILY_MODE)"></button>
-      <div class="rk-modes" id="rkModes"></div>
-      <!-- Правила: «Быстрая игра» или свои; «Своя игра» — окно с переключателями (миграция 056) -->
-      <div class="rk-rules" id="rkRules"></div>
-      <div class="rk-hero" id="rkHero" onclick="if (ladderInfo) openPath()">
-        <div class="rk-emblem hidden" id="rkEmblem"></div>
-        <div class="rk-elo" id="rkElo"></div>
-        <div class="rk-stars hidden" id="rkStars"></div>
-        <div class="rk-elo-sub" id="rkEloSub"></div>
-        <div class="rk-elo-sub hidden" id="rkApprentice"></div>
-        <div class="rk-path-link hidden" id="rkPathLink"></div>
-      </div>
-      <div class="fr-note hidden" id="rkNote"></div>
-      <!-- «Играть» — всегда на виду, над нижним меню: сундук, путь и турнир
-           выше не должны уводить её за край экрана -->
-      <div class="rk-play-bar" id="rkPlayBar">
-        <div class="rk-offers hidden" id="rkOffers"></div>
-        <button class="btn btn-block" id="tRkPlay" onclick="startRanked()"></button>
-        <div class="rk-wait hidden" id="rkWaitBox">
-          <div class="rk-wait-text" id="rkWaitText"></div>
-          <div class="rk-wait-sub" id="rkWaitSub"></div>
-          <button class="btn-ghost btn-block" id="tRkCancel" onclick="cancelRanked()"></button>
-        </div>
-      </div>
-      <!-- Идущие рейтинговые игры. Пусто — блока нет: «игра не идёт» и так
-           видно по тому, что вы не в игре -->
-      <div class="fr-block hidden" id="rkGamesBox">
-        <div class="lb-title" id="tRkGames"></div>
-        <div id="rkGamesList" class="friend-list"></div>
-      </div>
-      <div class="rk-top">
-        <div class="lb-title" id="tRkTop"></div>
-        <div id="rkTopList" class="lb-list"></div>
-      </div>
-    </div>
-
-    <div class="run-hub-actions">
-      <button class="btn-ghost btn-block" id="tOnlineBack" onclick="quitToMenu()">Menu</button>
-    </div>
-  </div>
-
-  <!-- ЭКРАН: друзья. Отдельно от рейтинга — это разные занятия -->
+  <!-- ЭКРАН: друзья — партии с ними на разных телефонах и переписка -->
   <div id="screenFriends" class="hidden">
     <div class="screen-title" id="tFriendsScreen"></div>
     <div id="olFriends">
@@ -553,11 +495,6 @@
     <div class="fr-block">
       <div class="lb-title" id="tChatInvite"></div>
       <button class="btn btn-block" id="tChatFriendly" onclick="challengeFromChat()"></button>
-      <!-- Режимы по правилам рейтинга нужны редко — свёрнуты под одной строкой -->
-      <details class="fold chat-modes-fold" id="chatModesFold">
-        <summary class="fold-head" id="tChatRanked"></summary>
-        <div class="fold-body"><div class="rk-modes" id="chatModes"></div></div>
-      </details>
     </div>
 
     <div class="run-hub-actions">
@@ -565,7 +502,7 @@
     </div>
   </div>
 
-  <!-- ЭКРАН: хаб режима на рейтинг (старт/результат/топ) -->
+  <!-- ЭКРАН: хаб Испытания (старт/результат/топ) -->
   <div id="screenRunHub" class="hidden">
     <div class="screen-title" id="tRunScreen"></div>
     <div id="runHubMessage"></div>
@@ -608,7 +545,7 @@
     class="avatar-btn" id="accountFace"><span id="accountChipName"></span></span></span><span id="tNavMe"></span></button>
 </nav>
 
-<!-- Пауза в игре на рейтинг -->
+<!-- Пауза в Испытании -->
 <!-- Разбор партии: точность, сводка по оценкам и каждый ход с лучшим вариантом -->
 <div class="modal-backdrop hidden" id="reviewModal" onclick="if (event.target === this) closeReview()">
   <div class="modal-card review-card">
@@ -630,7 +567,7 @@
   </div>
 </div>
 
-<!-- Выход из рейтинговой игры: спрашиваем, потому что это поражение -->
+<!-- Сдаться в партии с другом: спрашиваем, потому что это поражение -->
 <div class="modal-backdrop hidden" id="resignModal">
   <div class="modal-card">
     <div class="modal-text" id="tResignTitle"></div>
@@ -708,28 +645,6 @@
   </div>
 </div>
 
-<!-- «Своя игра»: диапазон, бонусы, до скольки побед, время, правила дня -->
-<div class="modal-backdrop hidden" id="rulesModal" onclick="if (event.target === this) closeRulesModal()">
-  <div class="modal-card pass-card">
-    <div class="ps-title" id="rulesTitle"></div>
-    <div id="rulesBody"></div>
-    <button class="btn btn-block" style="margin-top:14px" id="rulesOk" onclick="saveRulesModal()"></button>
-  </div>
-</div>
-
-<!-- Таблица турнира выходных (миграция 055) -->
-<div class="modal-backdrop hidden" id="cupModal" onclick="if (event.target === this) closeCupTable()">
-  <div class="modal-card pass-card">
-    <div class="ps-title" id="cupTitle"></div>
-    <div class="ps-sub" id="cupSub"></div>
-    <div class="pl-head" id="tCupFriends"></div>
-    <div class="cup-list" id="cupFriends"></div>
-    <div class="pl-head" id="tCupTop"></div>
-    <div class="cup-list" id="cupTop"></div>
-    <button class="btn btn-block" style="margin-top:14px" id="cupOk" onclick="closeCupTable()"></button>
-  </div>
-</div>
-
 <!-- Вспышка бонуса: поверх доски на секунду, нажатиям не мешает -->
 <div class="bonus-flash" id="bonusFlash" aria-live="polite">
   <div class="bf-card"><span class="bf-ic" id="bfIcon"></span><b class="bf-name" id="bfName"></b><span class="bf-who" id="bfWho"></span></div>
@@ -779,7 +694,6 @@
     <div class="pf-title hidden" id="pfTitle"></div>
     <div class="pf-sub" id="tAccountTitle"></div>
     <!-- Лига и значки прошлых сезонов: одна строка под именем -->
-    <div class="pf-league hidden" id="pfLeague" onclick="if (ladderInfo) { closeLogoutModal(); openPath(); }"></div>
     <div class="pf-streak hidden" id="pfStreak"></div>
     <div class="pf-streak hidden" id="pfAdv"></div>
 
@@ -793,7 +707,7 @@
         <div class="fr-note hidden" id="avNote"></div>
       </div>
 
-      <!-- Рамка кружка и титул под именем — из наград онлайна -->
+      <!-- Рамка кружка и титул под именем — из наград пути, сундука и магазина -->
       <details class="fold pf-fold hidden" id="pfStyle" style="margin-bottom:8px">
         <summary class="fold-head" id="tPfStyle"></summary>
         <div class="fold-body">
@@ -937,7 +851,7 @@
   </div>
 </div>
 
-<!-- Онлайн закрыт, пока не пройдены два урока. Можно пропустить -->
+<!-- «Друзья» закрыты, пока не пройдены два урока. Можно пропустить -->
 <div class="modal-backdrop hidden" id="gateModal" onclick="if (event.target === this) closeGate()">
   <div class="modal-card">
     <div class="modal-text" id="gateText"></div>
@@ -983,33 +897,6 @@
   </div>
 </div>
 
-<!-- Путь по лигам: все лиги и ранги, где игрок сейчас, что впереди -->
-<div class="modal-backdrop hidden" id="pathModal" onclick="if (event.target === this) closePath()">
-  <div class="modal-card path-card">
-    <div class="modal-text" id="pathTitle"></div>
-    <div class="path-sub" id="pathSub"></div>
-    <details class="fold" id="pathRulesFold">
-      <summary class="fold-head" id="pathRulesHead"></summary>
-      <ul class="fold-body run-rules-list" id="pathRules"></ul>
-    </details>
-    <div class="path-list" id="pathList"></div>
-    <button class="btn btn-block" style="margin-top:14px" id="pathClose" onclick="closePath()"></button>
-  </div>
-</div>
-
-<!-- Звёзды после партии на рейтинг — на весь экран, как в Hearthstone -->
-<div class="stars-show hidden" id="starsShow" onclick="starsShowTap()">
-  <div class="sh-stage" id="shStage">
-    <div class="sh-rays"></div>
-    <div class="sh-emblem" id="shEmblem"></div>
-    <div class="sh-title" id="shTitle"></div>
-    <div class="sh-stars" id="shStars"></div>
-    <div class="sh-note" id="shNote"></div>
-    <div class="sh-rewards hidden" id="shRewards"></div>
-    <div class="sh-tap" id="shTap"></div>
-  </div>
-</div>
-
 <!-- Новое достижение: медленно выезжает сверху -->
 <div class="ach-toast hidden" id="achToast" role="status">
   <div id="atMedal"></div>
@@ -1024,19 +911,6 @@
     <div class="ach-grid" id="achGrid"></div>
     <div class="fr-note hidden" id="achNote"></div>
     <button class="btn btn-block" style="margin-top:14px" id="achClose" onclick="closeFriendAch()"></button>
-  </div>
-</div>
-
-<!-- Итоги сезона: показываются один раз, при первом входе в новом сезоне -->
-<div class="modal-backdrop hidden" id="seasonModal">
-  <div class="modal-card season-card">
-    <div class="modal-text" id="ssTitle"></div>
-    <div class="ss-league" id="ssLeague"></div>
-    <div class="ss-line" id="ssBest"></div>
-    <div class="ss-line" id="ssGames"></div>
-    <div class="ss-line" id="ssNow"></div>
-    <div class="ss-line muted" id="ssBadge"></div>
-    <button class="btn btn-block" style="margin-top:14px" id="ssGo" onclick="closeSeasonSummary()"></button>
   </div>
 </div>
 

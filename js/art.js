@@ -79,7 +79,7 @@ const ICON_ART = new Set([
 // Иконки магазина «Стихии» — shop-01…shop-20 (миграция 061)
 const ADV_ART = 500;
 const SHOP_ART = 20;
-const NAMED_ART = ['m-solo', 'm-duel', 'm-adventure', 'm-run', 'm-online', 'm-play', 'm-friends', 'm-settings',
+const NAMED_ART = ['m-solo', 'm-duel', 'm-adventure', 'm-run', 'm-play', 'm-friends', 'm-settings',
   't-0', 't-1', 't-2', 't-3', 't-4', 't-5', 't-6', 't-7', 't-8',
   'b-extra', 'b-fog', 'b-blind', 'b-rush', 'b-skip', 'b-gift', 'b-memory', 'b-token']
   .concat(Array.from({ length: ADV_ART }, (_, i) => 'adv-' + String(i + 1).padStart(2, '0')))
