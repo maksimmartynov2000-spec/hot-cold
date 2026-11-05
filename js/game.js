@@ -356,14 +356,21 @@ function bonusNearRadius() {
 // «С другом» на одном телефоне: к прежним трём — четыре из Приключения
 // (рентген, половина, щит, заморозка), как и в онлайне. «Спешки» здесь нет:
 // у хода нет часов
-const BONUS_GOOD = ['extra', 'fog', 'blind', 'xray', 'half', 'shield', 'freeze'];
+// Новые полезные: делится ли на 3 и на 5, компас («больше или меньше этого
+// числа»), воришка (чужой «⚡ +1 ход» — себе) и зеркало (следующая помеха
+// уходит сопернику)
+const BONUS_GOOD = ['extra', 'fog', 'blind', 'xray', 'half', 'shield', 'freeze',
+                    'div3', 'div5', 'compass', 'thief', 'mirror'];
 const BONUS_TRAP = ['skip', 'gift', 'memory'];
 const BONUS_TYPES = BONUS_GOOD.concat(BONUS_TRAP);
 const BONUS_TRAP_SHARE = 1 / 3;
-// Бонусы Приключения — только в нём. Рентген — чётное ли загаданное,
-// половина — в какой половине прямой, щит — отбивает следующую ловушку,
+// Бонусы мира в Приключении. Рентген — чётное ли загаданное, половина — в
+// какой половине прямой, щит — отбивает следующую ловушку или помеху,
 // заморозка — соперник пропускает ход. Лава вернулась в Огненные горы
-const BONUS_ADV = ['xray', 'half', 'shield', 'freeze', 'lava'];
+const BONUS_ADV = ['xray', 'half', 'shield', 'freeze', 'lava', 'div3', 'div5', 'compass', 'thief', 'mirror'];
+// Цифры загаданного — только в бою с боссом: каждая сужает выбор в 10 раз,
+// в обычном бою победу решал бы тот, кто первым на неё наступил
+const BONUS_BOSS = ['tens', 'units'];
 // Полезные бонусы онлайн-партии (миграция 057): к прежним — четыре из
 // Приключения. Копия online_bonus_good() из базы, сверяется тестом
 const BONUS_ONLINE = ['extra', 'fog', 'blind', 'rush', 'xray', 'half', 'shield', 'freeze'];
@@ -412,9 +419,10 @@ function placeBonuses() {
   const set = bonusSet || { good: BONUS_GOOD, trap: BONUS_TRAP };
   const count = Math.max(1, Math.min(set.count || bonusCount(), rangeCount() - 1));
   const traps = set.trap.length ? Math.round(count * BONUS_TRAP_SHARE) : 0;
-  // Первый в наборе (бонус мира в Приключении) ложится всегда, остальные — вперемешку
-  const good = set.good.slice(0, set.first ? 1 : 0)
-    .concat(set.good.slice(set.first ? 1 : 0).sort(() => Math.random() - 0.5));
+  // Первые в наборе (бонус мира в Приключении, у босса — ещё цифра) ложатся
+  // всегда, остальные — вперемешку. first: true — один, число — сколько
+  const lead = set.first === true ? 1 : (set.first || 0);
+  const good = set.good.slice(0, lead).concat(set.good.slice(lead).sort(() => Math.random() - 0.5));
   const trap = set.trap.slice().sort(() => Math.random() - 0.5);
   const pool = [];
   for (let i = 0; i < count - traps; i++) pool.push(good[i % good.length]);
@@ -1087,6 +1095,7 @@ function startRound() {
   D.shortMemory = [false, false];
   D.know = [{}, {}];
   D.shield = [false, false];
+  D.mirror = [false, false];
   D.frozen = [false, false];
   D.nearBonus = false;
   D.lastBonus = null;
@@ -1163,8 +1172,17 @@ function duelPlay(guess, forced) {
   // запас ходов — и ровно это игрок и увидит в строке под подсказкой
   let type = hit ? hit.type : null;
   if (type && bonusBlocked(type, 1 - D.cur)) type = 'extra';
-  // Щит отбивает ловушку: она снята с прямой, но не сработала
-  if (type && BONUS_TRAP.indexOf(type) >= 0 && D.shield && D.shield[D.cur]) {
+  // Зеркало отражает ловушку в соперника, щит просто отбивает: она снята с
+  // прямой, но на наступившего не сработала. Зеркало — первым: оно сильнее,
+  // а щит останется на следующий раз
+  let reflected = null;
+  if (hit) D.shieldedText = null;
+  if (type && BONUS_TRAP.indexOf(type) >= 0 && D.mirror && D.mirror[D.cur]) {
+    D.mirror[D.cur] = false;
+    D.shieldedTrap = type;
+    reflected = type;
+    type = 'mirrorUsed';
+  } else if (type && BONUS_TRAP.indexOf(type) >= 0 && D.shield && D.shield[D.cur]) {
     D.shield[D.cur] = false;
     if (hit) hit.taken = true;
     D.shieldedTrap = type;
@@ -1172,9 +1190,12 @@ function duelPlay(guess, forced) {
   }
   D.lastBonus = type;
   D.lastBonusBy = D.cur;
-  if (hit && type !== 'shieldUsed') {
+  if (hit && reflected) {
     hit.taken = true;
-    applyBonus(type, D.cur);
+    applyBonus(reflected, 1 - D.cur, guess);
+  } else if (hit && type !== 'shieldUsed') {
+    hit.taken = true;
+    applyBonus(type, D.cur, guess);
   }
 
   const usedDouble = D.armed;
@@ -1213,8 +1234,9 @@ function bonusBlocked(type, victim) {
   return false;
 }
 
-// Полезные бонусы бьют по сопернику, ловушки — по тому, кто наступил
-function applyBonus(type, by) {
+// Полезные бонусы бьют по сопернику, ловушки — по тому, кто наступил.
+// guess — число, на котором лежал бонус (компасу нужно, от чего мерить)
+function applyBonus(type, by, guess) {
   const rival = 1 - by;
   if (rival === 1 && vsBot && vsBot.adv && typeof advImmune === 'function' &&
       (type === 'fog' || type === 'blind' || type === 'freeze') && advImmune(type)) return;
@@ -1234,6 +1256,45 @@ function applyBonus(type, by) {
   if (type === 'shield') D.shield[by] = true;
   // Заморозка — пропуск следующего хода у соперника
   if (type === 'freeze') { D.skip[rival] = true; D.frozen[rival] = true; }
+  // Делимость и цифры загаданного — по модулю: у −45 те же цифры, что у 45
+  const a = Math.abs(secret);
+  if (type === 'div3') D.know[by].div3 = a % 3 === 0;
+  if (type === 'div5') D.know[by].div5 = a % 5 === 0;
+  if (type === 'tens') D.know[by].tens = Math.floor(a / 10) % 10;
+  if (type === 'units') D.know[by].units = a % 10;
+  // Компас: загаданное больше числа, на котором лежал бонус, или меньше
+  if (type === 'compass' && typeof guess === 'number' && guess !== secret) {
+    const k = D.know[by];
+    if (secret > guess) k.gt = k.gt === undefined ? guess : Math.max(k.gt, guess);
+    else k.lt = k.lt === undefined ? guess : Math.min(k.lt, guess);
+  }
+  // Воришка: «⚡ +1 ход» соперника — себе, а если у того пусто — из запаса
+  if (type === 'thief') {
+    if (D.tokens[rival] > 0) D.tokens[rival]--;
+    D.tokens[by]++;
+  }
+  if (type === 'mirror') D.mirror[by] = true;
+}
+
+// Подходит ли число v ко всему, что известно из бонусов и правил: чётность,
+// половина, больше/меньше, делимость на 3 и 5, цифры. Общая проверка для бота
+// и для «среднего игрока» в симуляции баланса
+function knowAllows(k, v) {
+  if (!k) return true;
+  const a = Math.abs(v);
+  if (k.parity !== undefined && a % 2 !== k.parity) return false;
+  if (k.half === 'low' && v > halfMark()) return false;
+  if (k.half === 'high' && v <= halfMark()) return false;
+  if (k.gt !== undefined && v <= k.gt) return false;
+  if (k.lt !== undefined && v >= k.lt) return false;
+  if (k.div3 !== undefined && (a % 3 === 0) !== k.div3) return false;
+  if (k.div5 !== undefined && (a % 5 === 0) !== k.div5) return false;
+  if (k.tens !== undefined && Math.floor(a / 10) % 10 !== k.tens) return false;
+  if (k.units !== undefined && a % 10 !== k.units) return false;
+  return true;
+}
+function knowAny(k) {
+  return !!k && Object.keys(k).some(key => k[key] !== undefined && k[key] !== null);
 }
 
 // Граница половин: «не больше» неё — нижняя половина
@@ -1251,6 +1312,10 @@ function knowText(p) {
   if (k.half) out.push((k.half === 'low' ? B.low : B.high).replace('{m}', formatNum(halfMark())));
   if (k.gt !== undefined) out.push(B.gt.replace('{n}', formatNum(k.gt)));
   if (k.lt !== undefined) out.push(B.lt.replace('{n}', formatNum(k.lt)));
+  if (k.div3 !== undefined) out.push(k.div3 ? B.div3 : B.notDiv3);
+  if (k.div5 !== undefined) out.push(k.div5 ? B.div5 : B.notDiv5);
+  if (k.tens !== undefined) out.push(B.tens.replace('{d}', k.tens));
+  if (k.units !== undefined) out.push(B.units.replace('{d}', k.units));
   return out;
 }
 
@@ -1428,12 +1493,12 @@ function renderBonusLine() {
   const desc = (L.bonusDesc[D.lastBonus] || '')
     .replace('{a}', escapeHtml(D.names[by]))
     .replace('{b}', escapeHtml(D.names[rival]))
-    .replace('{t}', escapeHtml(L.bonusNames[D.shieldedTrap] || ''));
+    .replace('{t}', escapeHtml(D.shieldedText || L.bonusNames[D.shieldedTrap] || ''));
   // Рядом может лежать и ловушка, поэтому значок нейтральный: сигнал больше
   // не «иди сюда», а «здесь что-то есть — решай сам»
   box.innerHTML = D.lastBonus
-    ? '<span class="b-name">' + bonusArtHtml(D.lastBonus === 'shieldUsed' ? 'shield' : D.lastBonus,
-        BONUS_ICON[D.lastBonus === 'shieldUsed' ? 'shield' : D.lastBonus] || '🎁') + ' ' + L.bonusNames[D.lastBonus] + '</span>' +
+    ? '<span class="b-name">' + bonusArtHtml(bonusIconKind(D.lastBonus), BONUS_ICON[bonusIconKind(D.lastBonus)] || '🎁') +
+        ' ' + L.bonusNames[D.lastBonus] + '</span>' +
       '<span class="b-desc">' + desc + '</span>'
     : '<span class="b-name">❓ ' + L.bonusNear + '</span>';
 }
@@ -2233,7 +2298,8 @@ function renderPlayers() {
                    [D.skip[p] && !(D.frozen && D.frozen[p]), bonusArtHtml('skip', '⏭'), L.bonusNames.skip],
                    [D.frozen && D.frozen[p], '🧊', L.bonusNames.freeze],
                    [D.shortMemory[p], bonusArtHtml('memory', '🧠'), L.bonusNames.memory],
-                   [D.shield && D.shield[p], '🛡️', L.bonusNames.shield]].filter(f => f[0]);
+                   [D.shield && D.shield[p], '🛡️', L.bonusNames.shield],
+                   [D.mirror && D.mirror[p], '🪞', L.bonusNames.mirror]].filter(f => f[0]);
     // Знание из бонусов: своё — словами, чужое — только значком. В онлайне
     // сервер присылает только своё (миграция 057)
     const know = knowText(p);
@@ -3700,16 +3766,11 @@ function botCandidates(moves, seat, flags, careless) {
   });
   // Названные числа — не загаданное: их видно в списке ходов
   seen.forEach(m => { const i = m.guess - RANGE_MIN; if (i >= 0 && i < cand.length) cand[i] = 0; });
-  // Знание из бонусов (рентген, половина) бот тоже использует
+  // Знание из бонусов (рентген, половина, делимость, цифры, компас) и от
+  // правил Приключения («больше/меньше» — k.gt / k.lt) бот тоже использует
   const k = flags.know;
-  if (k && (k.parity !== undefined || k.half)) {
-    const mid = halfMark();
-    for (let i = 0; i < cand.length; i++) {
-      const v = i + RANGE_MIN;
-      if (k.parity !== undefined && Math.abs(v) % 2 !== k.parity) cand[i] = 0;
-      if (k.half === 'low' && v > mid) cand[i] = 0;
-      if (k.half === 'high' && v <= mid) cand[i] = 0;
-    }
+  if (knowAny(k)) {
+    for (let i = 0; i < cand.length; i++) if (cand[i] && !knowAllows(k, i + RANGE_MIN)) cand[i] = 0;
   }
   // Ответы честные, загаданное всегда среди возможных. На всякий случай
   if (!cand.includes(1)) cand.fill(1);
@@ -3960,8 +4021,23 @@ const BONUS_SOUNDS = {
   skip: [[294, 0.18, 0, 'square', 147]],
   gift: [[659, 0.12], [494, 0.2, 0.12, 'triangle']],
   memory: [[392, 0.12, 0, 'triangle'], [330, 0.12, 0.12, 'triangle'], [262, 0.2, 0.24, 'triangle']],
-  shieldUsed: [[784, 0.08, 0, 'square'], [1175, 0.25, 0.07, 'triangle']]
+  shieldUsed: [[784, 0.08, 0, 'square'], [1175, 0.25, 0.07, 'triangle']],
+  div3: [[523, 0.08], [659, 0.08, 0.09], [523, 0.14, 0.18]],
+  div5: [[587, 0.08], [880, 0.16, 0.09]],
+  tens: [[440, 0.07, 0, 'square'], [880, 0.16, 0.08, 'square']],
+  units: [[660, 0.07, 0, 'square'], [990, 0.16, 0.08, 'square']],
+  compass: [[698, 0.1, 0, 'triangle'], [1047, 0.2, 0.1, 'triangle', 932]],
+  thief: [[784, 0.06], [659, 0.06, 0.07], [988, 0.18, 0.14]],
+  mirror: [[1319, 0.1, 0, 'triangle'], [1760, 0.22, 0.08, 'triangle']],
+  mirrorUsed: [[1760, 0.08, 0, 'triangle'], [1319, 0.08, 0.07, 'triangle'], [2093, 0.22, 0.14, 'triangle']]
 };
+// Щит и зеркало в деле — значок самого щита или зеркала
+function bonusIconKind(kind) {
+  return kind === 'shieldUsed' || kind === 'shieldRule' ? 'shield'
+    : kind === 'mirrorUsed' || kind === 'mirrorRule' ? 'mirror' : kind;
+}
+BONUS_SOUNDS.shieldRule = BONUS_SOUNDS.shieldUsed;
+BONUS_SOUNDS.mirrorRule = BONUS_SOUNDS.mirrorUsed;
 function soundForBonus(kind) {
   (BONUS_SOUNDS[kind] || []).forEach(([f, s, d, type, to]) => playTone(f, s, (d || 0) + 0.12, type, to));
   buzz(BONUS_TRAP.indexOf(kind) >= 0 ? [60, 40, 60] : 30);
@@ -3997,12 +4073,11 @@ function showBonusFlash(kind, by) {
   const L = t();
   const trap = BONUS_TRAP.indexOf(kind) >= 0;
   box.className = 'bonus-flash ' + (trap ? 'trap' : 'good') + ' k-' + kind;
-  document.getElementById('bfIcon').innerHTML = bonusArtHtml(kind === 'shieldUsed' ? 'shield' : kind,
-    BONUS_ICON[kind === 'shieldUsed' ? 'shield' : kind] || '🎁');
+  document.getElementById('bfIcon').innerHTML = bonusArtHtml(bonusIconKind(kind), BONUS_ICON[bonusIconKind(kind)] || '🎁');
   document.getElementById('bfName').textContent = L.bonusNames[kind] || '';
   document.getElementById('bfWho').textContent = (L.bonusDesc[kind] || '')
     .replace('{a}', D.names[by] || '').replace('{b}', D.names[1 - by] || '')
-    .replace('{t}', L.bonusNames[D.shieldedTrap] || '');
+    .replace('{t}', D.shieldedText || L.bonusNames[D.shieldedTrap] || '');
   void box.offsetWidth;
   box.classList.add('show');
   clearTimeout(bonusFxTimer);

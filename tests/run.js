@@ -4103,8 +4103,9 @@ async function testAvatarColor(browser) {
     tiles: document.querySelectorAll('#avGrid .av-tile').length }));
   check('в выборе двадцать цветов четырьмя рядами, последние — градиенты',
     pick.colors.length === 20 && pick.rows === 4 && pick.colors.slice(-4).every(c => /^grad-/.test(c)), JSON.stringify(pick));
-  // Иконки за боссов — по одной на мир: 15 миров
-  check('и по-прежнему буква, 40 иконок и 15 боссов', pick.tiles === 56, String(pick.tiles));
+  // Иконки за боссов — по одной на мир
+  const nW = await page.evaluate(() => ADV_WORLDS.length);
+  check('и по-прежнему буква, 40 иконок и по иконке за босса каждого мира', pick.tiles === 41 + nW, pick.tiles + ' / ' + nW);
 
   await page.click('#avGrid .av-color[data-color="#a78bfa"]');
   await page.waitForTimeout(300);
@@ -4151,7 +4152,7 @@ async function testAvatarColor(browser) {
     tiles: document.querySelectorAll('#avGrid .av-tile').length,
     label: document.getElementById('tAvatarStart').textContent }));
   check('без миграции цвета выбора цвета нет, иконки на месте',
-    old.colors === 0 && old.tiles === 56 && old.label === 'Сменить иконку', JSON.stringify(old));
+    old.colors === 0 && old.tiles === 41 + await page.evaluate(() => ADV_WORLDS.length) && old.label === 'Сменить иконку', JSON.stringify(old));
   await done(page);
 }
 
@@ -5042,11 +5043,13 @@ async function testLeagues(browser) {
   await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   const grid = await page.evaluate(() => ({
+    worlds: ADV_WORLDS.length,
     icons: [...document.querySelectorAll('#avGrid .av-tile')].length,
     locked: [...document.querySelectorAll('#avGrid .av-tile.locked')].map(e => e.dataset.icon).join(''),
     colorsLocked: [...document.querySelectorAll('#avGrid .av-color.locked')].map(e => e.dataset.color).join(',') }));
   check('награды видны все, закрыты — лиги выше достигнутой',
-    grid.icons === 56 + 10 && grid.locked === '🦩🐳🦖🦜👑🌟🧙🦍🦑🐲🛸' + Array.from({ length: 10 }, (_, w) => 'adv-' + (w + 6) * 10).join('') &&
+    grid.icons === 41 + grid.worlds + 10 &&
+    grid.locked === '🦩🐳🦖🦜👑🌟🧙🦍🦑🐲🛸' + Array.from({ length: grid.worlds - 5 }, (_, w) => 'adv-' + (w + 6) * 10).join('') &&
     grid.colorsLocked === '#14b8a6,#0ea5e9,#d946ef',
     JSON.stringify(grid));
   const before = await page.evaluate(() => window.__profile.calls.length);
@@ -5075,7 +5078,7 @@ async function testLeagues(browser) {
   await page.click('#pfAvatar');
   await page.waitForTimeout(150);
   check('сервер без лиг: сетка как раньше, лиги в профиле нет', await page.evaluate(() =>
-    document.querySelectorAll('#avGrid .av-tile').length === 56 &&
+    document.querySelectorAll('#avGrid .av-tile').length === 41 + ADV_WORLDS.length &&
     document.getElementById('pfLeague').classList.contains('hidden')));
   await done(page);
 }
@@ -6413,8 +6416,8 @@ async function testBonusGuide(browser) {
       shown: !document.getElementById('bonusGuide').classList.contains('hidden'),
       heads: document.querySelectorAll('#bgList .bg-head').length,
       rows: [...document.querySelectorAll('#bgList .bg-row')].map(r => r.textContent.trim()) }));
-    check(lang + ': в списке 4 помощи, 3 ловушки и 5 бонусов Приключения, у каждой название и описание',
-      g.shown && g.heads === 3 && g.rows.length === 12 && g.rows.every(r => r.length > 25 && !/undefined/.test(r)),
+    check(lang + ': в списке 13 помощей, 3 ловушки и 3 бонуса только Приключения, у каждой название и описание',
+      g.shown && g.heads === 3 && g.rows.length === 19 && g.rows.every(r => r.length > 25 && !/undefined/.test(r)),
       JSON.stringify(g).slice(0, 300));
     await page.click('#bgOk');
     await page.waitForTimeout(100);
@@ -6442,7 +6445,8 @@ async function testAdventure(browser) {
     bosses: [...document.querySelectorAll('#advMap .adv-tile.boss')].map(e => +e.dataset.n),
     art: document.querySelectorAll('#advMap .adv-tile svg.icon-art').length,
     diff: (document.querySelector('#advDiff .ad-btn.on') || {}).dataset.diff }));
-  check('карта: 15 миров, раскрыт первый — 10 соперников с портретами', map.shown && map.worlds === 15 && map.open === '0' &&
+  const nWorlds = await page.evaluate(() => ADV_WORLDS.length);
+  check('карта: все миры, раскрыт первый — 10 соперников с портретами', map.shown && map.worlds === nWorlds && nWorlds >= 15 && map.open === '0' &&
     map.tiles === 10 && map.art === 10, JSON.stringify(map));
   check('открыт только первый, остальные под замком', map.next.join() === '0' && map.locked === 9, JSON.stringify(map));
   // Раскрыть все миры: 150 соперников, десятый в каждом — босс
@@ -6453,7 +6457,7 @@ async function testAdventure(browser) {
     for (let w = 1; w < ADV_WORLDS.length; w++) advToggleWorld(w);
     return r;
   });
-  check('десятый в каждом мире — босс', all.tiles === 150 && all.bosses.join() === Array.from({ length: 15 }, (_, w) => w * 10 + 9).join(),
+  check('десятый в каждом мире — босс', all.tiles === nWorlds * 10 && all.bosses.join() === Array.from({ length: nWorlds }, (_, w) => w * 10 + 9).join(),
     JSON.stringify(all));
   check('сложность по умолчанию — нормальная', map.diff === 'normal');
 
@@ -6739,12 +6743,13 @@ async function testAdventureBonus(browser) {
     closeLogoutModal();
     return r;
   });
-  // 150 соперников, но портреты боссов миров 6–15 — иконки за боссов: среди соперников их нет
-  check('в выборе — 140 иконок Приключения, открыт только мир на ★★★', icons.n === 140 && icons.open.length === 10 &&
-    icons.open[0] === 'adv-01' && icons.open[9] === 'adv-10' && /10 из 140/.test(icons.head), JSON.stringify(icons).slice(0, 300));
+  // Портреты боссов с шестого мира — иконки за боссов: среди соперников их нет
+  const nChar = await page.evaluate(() => ADV_TOTAL - (ADV_WORLDS.length - 5));
+  check('в выборе — все иконки соперников, открыт только мир на ★★★', icons.n === nChar && icons.open.length === 10 &&
+    icons.open[0] === 'adv-01' && icons.open[9] === 'adv-10' && icons.head.includes('10 из ' + nChar), JSON.stringify(icons).slice(0, 300));
   check('закрытая иконка говорит, что нужно', /Джунгли/.test(icons.note) && /6 из 10/.test(icons.note), icons.note);
   check('на карте — цель мира: открыто или сколько из 10', /в профиле/.test(icons.goals[0]) && /6\/10/.test(icons.goals[1]), icons.goals.join(' | '));
-  check('в профиле — счётчик иконок', /иконок 10 из 140/.test(icons.pf), icons.pf);
+  check('в профиле — счётчик иконок', icons.pf.includes('иконок 10 из ' + nChar), icons.pf);
 
   // Профиль и друзья
   const pf = await page.evaluate(async () => {
@@ -6754,14 +6759,18 @@ async function testAdventureBonus(browser) {
     closeFriendAch();
     return { friend };
   });
-  check('у друга видны звёзды и миры Приключения', pf.friend === '🗺️ Приключение: ⭐ 21 из 450 · миров 1 из 15', pf.friend);
+  const nW2 = await page.evaluate(() => ADV_WORLDS.length);
+  check('у друга видны звёзды и миры Приключения', pf.friend === '🗺️ Приключение: ⭐ 21 из ' + nW2 * 30 + ' · миров 1 из ' + nW2, pf.friend);
 
   // Переводы
   for (const lang of ['en', 'fr', 'de']) {
     const tx = await page.evaluate(l => {
       currentLang = l; applyTranslations();
       const T = t();
-      return BONUS_ADV.every(k => T.bonusNames[k] && T.tut.bcDesc[k] && (k === 'lava' || T.bonusDesc[k])) &&
+      return BONUS_ADV.concat(BONUS_BOSS).every(k => T.bonusNames[k] && T.tut.bcDesc[k] && (k === 'lava' || T.bonusDesc[k])) &&
+        ['mirrorUsed', 'shieldRule', 'mirrorRule'].every(k => T.bonusNames[k] && /\{a\}/.test(T.bonusDesc[k]) && /\{t\}/.test(T.bonusDesc[k])) &&
+        ['div3', 'notDiv3', 'div5', 'notDiv5', 'tens', 'units', 'gt', 'lt'].every(k => T.bonusKnow[k]) &&
+        ['storm', 'traps', 'first'].every(k => (T.adv.worldRules[k] || []).length === 3) && T.adv.ruleLabel && /\{b\}/.test(T.adv.bossBonus) &&
         T.forced.freeze && T.bonusKnow.even && T.adv.winStars && T.adv.pfLine && T.prog.q.adv_win2 &&
         T.prog.q.adv_stars3 && T.prog.lad.advStars.forms && T.prog.lad.advWorlds.forms && T.online.rematchAsk;
     }, lang);
@@ -7256,8 +7265,9 @@ async function testOnlineAdvBonuses(browser) {
     while (n && n.classList.contains('bg-row')) { rows.push(n.querySelector('b').textContent); n = n.nextElementSibling; }
     return h.textContent + ': ' + rows.join(',');
   }));
-  check('список бонусов: Рентген, Половина, Щит, Заморозка — среди полезных', /Рентген,Половина,Щит,Заморозка/.test(guide[0]) &&
-    guide[2] === 'Только в Приключении: Шальной бросок', guide.join(' | '));
+  check('список бонусов: Рентген, Половина, Щит, Заморозка и новые — среди полезных',
+    /Рентген,Половина,Щит,Заморозка,Делится на 3\?,Делится на 5\?,Компас,Воришка,Зеркало$/.test(guide[0]) &&
+    guide[2] === 'Только в Приключении: Шальной бросок,Цифра десятков,Последняя цифра', guide.join(' | '));
   await page.context().close();
 }
 
@@ -7292,6 +7302,165 @@ async function testLocalAdvBonuses(browser) {
   const ft = await page.evaluate(() => document.getElementById('forcedText').textContent);
   check('и сказано — «Заморозка»', /Заморозка/.test(ft), ft);
   await page.context().close();
+}
+
+// Новые бонусы: делимость на 3 и 5, цифры у боссов, компас, воришка, зеркало.
+// И правила миров: буря бонусов, ловушки у всех, соперник первым
+async function testNewBonuses(browser) {
+  console.log('\nНовые бонусы и правила миров');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeDuel');
+  await page.waitForTimeout(150);
+  await page.selectOption('#rangeMax', '100');
+  await page.evaluate(() => { const b = document.getElementById('bonusSetup'); if (b && !b.checked) b.click(); });
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  const k = await page.evaluate(() => {
+    const out = {};
+    secret = 45;
+    D.know = [{}, {}];
+    applyBonus('div3', 0); applyBonus('div5', 0);
+    out.div = [D.know[0].div3, D.know[0].div5];
+    applyBonus('tens', 0); applyBonus('units', 0);
+    out.digits = [D.know[0].tens, D.know[0].units];
+    out.text = knowText(0).join(' · ');
+    renderAll();
+    out.chip = document.getElementById('peff0').textContent;
+    // 45 — единственное число от 1 до 100 с цифрами 4 и 5: бот это знает
+    const cand = botCandidates([], 0, { know: D.know[0] }, false);
+    out.cand = [...cand].map((c, i) => c ? i + RANGE_MIN : 0).filter(Boolean).join();
+    // Компас мерит от числа, на котором лежал, и сужает с двух сторон
+    applyBonus('compass', 1, 30); applyBonus('compass', 1, 60); applyBonus('compass', 1, 20);
+    out.compass = [D.know[1].gt, D.know[1].lt].join();
+    out.compassText = knowText(1).join(' · ');
+    // Не делится — тоже знание
+    secret = 44; D.know[1] = {};
+    applyBonus('div3', 1); applyBonus('div5', 1);
+    out.notDiv = knowText(1).join(' · ');
+    const c2 = botCandidates([], 1, { know: D.know[1] }, false);
+    out.botNotDiv = [...c2].every((c, i) => !c || ((i + RANGE_MIN) % 3 !== 0 && (i + RANGE_MIN) % 5 !== 0));
+    // Воришка: «⚡» соперника — себе; у соперника пусто — из запаса
+    D.tokens = [0, 2]; applyBonus('thief', 0); out.thief = D.tokens.join();
+    D.tokens = [0, 0]; applyBonus('thief', 0); out.thiefEmpty = D.tokens.join();
+    return out;
+  });
+  check('➗3 и ➗5: у 45 — делится на оба', k.div[0] === true && k.div[1] === true, JSON.stringify(k));
+  check('цифры босса: у 45 десятков 4, последняя 5', k.digits.join() === '4,5', JSON.stringify(k));
+  check('знание словами у своего имени', /делится на 3/.test(k.chip) && /делится на 5/.test(k.chip) &&
+    /цифра десятков 4/.test(k.chip) && /последняя цифра 5/.test(k.chip), k.chip);
+  check('бот с этим знанием ищет только 45', k.cand === '45', k.cand);
+  check('компас: больше 30, меньше 60 (20 ничего не добавил)', k.compass === '30,60' && /больше 30/.test(k.compassText) &&
+    /меньше 60/.test(k.compassText), JSON.stringify(k));
+  check('44 — «не делится на 3», «не делится на 5», бот их пропускает', /не делится на 3/.test(k.notDiv) &&
+    /не делится на 5/.test(k.notDiv) && k.botNotDiv, k.notDiv);
+  check('воришка: забрал «⚡» у соперника, у пустого — из запаса', k.thief === '1,1' && k.thiefEmpty === '1,0', JSON.stringify(k));
+
+  // Зеркало на доске: игрок 1 берёт зеркало, потом наступает на ловушку — она уходит игроку 2
+  await page.evaluate(() => {
+    secret = 40; D.cur = 0; D.skip = [false, false]; D.know = [{}, {}];
+    D.bonuses = [{ value: 70, type: 'mirror', taken: false }, { value: 20, type: 'skip', taken: false }];
+  });
+  const step = async g => { await page.fill('#guessInput', String(g)); await page.click('#tSubmitGuess'); await page.waitForTimeout(350);
+    await page.evaluate(() => { document.querySelectorAll('.curtain:not(.hidden), #curtain:not(.hidden)').forEach(c => c.click());
+      const bc = document.getElementById('bonusCard'); if (bc) bc.classList.add('hidden'); }); };
+  await step(70);
+  const m1 = await page.evaluate(() => ({ mirror: D.mirror[0], flags: document.getElementById('peff0').textContent }));
+  check('зеркало: у игрока 1, значок 🪞 у имени', m1.mirror && /🪞/.test(m1.flags), JSON.stringify(m1));
+  await step(50);
+  await step(20);
+  const m2 = await page.evaluate(() => ({ skip: D.skip.join(), mirror: D.mirror[0], last: D.lastBonus, cur: D.cur,
+    forced: forcedTurn(), line: document.getElementById('bonusLine').textContent }));
+  check('зеркало отразило «Пропуск хода» в соперника — пропускает он', m2.skip === 'false,true' && !m2.mirror &&
+    m2.last === 'mirrorUsed' && m2.cur === 1 && m2.forced === 'skip', JSON.stringify(m2));
+  check('и об этом сказано', /зеркало отразило ловушку «Пропуск хода»/.test(m2.line), m2.line);
+  await page.evaluate(() => quitToMenu());
+
+  // Приключение: правила миров и цифра у босса
+  const w = await page.evaluate(() => {
+    localStorage.setItem(advKey(), String(ADV_TOTAL)); localStorage.setItem(advStarsKey(), '3'.repeat(ADV_TOTAL)); BOT_SPEED = 1000;
+    const find = rule => ADV_WORLDS.findIndex(W => W.rule === rule);
+    const plain = w => [...Array(9).keys()].map(i => w * 10 + i).find(n => !advChar(n).R.bonus && !advChar(n).R.first);
+    const out = { worlds: ADV_WORLDS.slice(5).map(W => W.bonus + (W.rule ? ':' + W.rule : '')).join() };
+    let n = plain(find('storm'));
+    startAdventure(n); stopBot();
+    out.storm = { n: D.bonuses.length, auto: autoBonusCountFor(rangeCount()), traps: bonusSet.trap.length };
+    quitToMenu();
+    n = plain(find('traps'));
+    startAdventure(n); stopBot();
+    out.traps = { set: bonusSet.trap.length, on: D.bonuses.filter(b => BONUS_TRAP.includes(b.type)).length };
+    quitToMenu();
+    n = plain(find('first'));
+    startAdventure(n); stopBot();
+    out.first = { starter: D.starter, cur: D.cur };
+    D.round = 2; startRound(); stopBot();
+    out.first.cur2 = D.cur;
+    quitToMenu();
+    // Обычный мир без правила: первым ходит игрок
+    n = plain(ADV_WORLDS.findIndex((W, i) => i >= 5 && !W.rule));
+    startAdventure(n); stopBot();
+    out.plain = { cur: D.cur, traps: bonusSet.trap.length, n: D.bonuses.length, auto: autoBonusCountFor(rangeCount()) };
+    quitToMenu();
+    // Боссы с шестого мира: цифра лежит всегда, через мир — десятков или последняя
+    out.boss = [4, 5, 6].map(w => {
+      startAdventure(w * 10 + 9); stopBot();
+      const r = { w, digit: advBossDigit(vsBot.adv), lead: bonusSet.good.slice(0, bonusSet.first).join(),
+                  on: D.bonuses.some(b => b.type === 'tens' || b.type === 'units') };
+      quitToMenu();
+      return r;
+    });
+    // Карточка: правило мира и цифра босса
+    const sw = find('storm');
+    openAdventure(); openAdvCard(sw * 10 + 9);
+    out.card = document.getElementById('acFacts').textContent;
+    closeAdvCard();
+    advToggleWorld(sw);
+    out.tags = document.querySelector('#advMap .adv-world[data-w="' + sw + '"] .aw-tags').textContent;
+    out.name = document.querySelector('#advMap .adv-world[data-w="' + sw + '"] .aw-name').textContent;
+    return out;
+  });
+  check('бонусы миров 6–15 и правила', w.worlds.split(',').slice(0, 10).join() ===
+    'shield,freeze,compass,div3,half:storm,div5,xray,thief:first,lava:traps,mirror', w.worlds);
+  check('буря бонусов: бонусов вдвое больше', w.storm.n === 2 * w.storm.auto && w.storm.traps === 0, JSON.stringify(w.storm));
+  check('ловушки у всех: и у обычного соперника', w.traps.set === 3 && w.traps.on > 0, JSON.stringify(w.traps));
+  check('соперник первым — в каждом раунде', w.first.starter === 1 && w.first.cur === 1 && w.first.cur2 === 1, JSON.stringify(w.first));
+  check('мир без правила: первым — игрок, бонусов обычно, ловушек нет', w.plain.cur === 0 && w.plain.traps === 0 &&
+    w.plain.n === w.plain.auto, JSON.stringify(w.plain));
+  check('босс пятого мира — без цифры, шестого — последняя, седьмого — десятков', w.boss[0].digit === null &&
+    w.boss[1].digit === 'units' && w.boss[1].on && w.boss[1].lead === 'shield,units' &&
+    w.boss[2].digit === 'tens' && w.boss[2].on && w.boss[2].lead === 'freeze,tens', JSON.stringify(w.boss));
+  check('в карточке босса — цифра и правило мира', /у босса ещё 🔢 Последняя цифра|у босса ещё 🔟 Цифра десятков/.test(w.card) &&
+    /Правило мира: 🌪️ Буря бонусов — Бонусов вдвое больше/.test(w.card), w.card);
+  check('на карте у имени мира — значки бонуса и правила, имя без них', w.tags === '🌗🌪️' && !/🌪️/.test(w.name), JSON.stringify(w));
+
+  // Щит и зеркало встречают и помеху из правила соперника
+  const g = await page.evaluate(async () => {
+    await advLoadPack();
+    startAdventure(50); stopBot();
+    const R = advCtx();
+    const out = {};
+    D.shield[0] = true;
+    R.skip(0); R.fire('rule');
+    out.shield = { skip: D.skip[0], shield: D.shield[0], last: D.lastBonus, text: D.shieldedText };
+    renderAll();
+    out.line = document.getElementById('bonusLine').textContent;
+    D.mirror[0] = true;
+    R.fog(0); R.fire('rule');
+    out.mirror = { fog: D.fog.join(), mirror: D.mirror[0], last: D.lastBonus };
+    renderAll();
+    out.line2 = document.getElementById('bonusLine').textContent;
+    // Без щита и зеркала помеха работает как раньше
+    R.memory(0); R.fire('rule');
+    out.plain = D.shortMemory[0];
+    out.title = advFireTitle(50, 'rule');
+    quitToMenu();
+    return out;
+  });
+  check('щит отбил помеху правила — ход не пропущен, сказано, что именно', !g.shield.skip && !g.shield.shield &&
+    g.shield.last === 'shieldRule' && g.shield.text === g.title && g.line.includes('щит отбил «' + g.title + '»'), JSON.stringify(g));
+  check('зеркало отразило помеху правила в соперника', g.mirror.fog === 'false,true' && !g.mirror.mirror &&
+    g.mirror.last === 'mirrorRule' && /зеркало отразило/.test(g.line2), JSON.stringify(g));
+  check('без защиты помеха правила работает', g.plain === true, JSON.stringify(g));
+  await done(page);
 }
 
 // Полная проверка «что дёргается и куда не попасть»
@@ -7628,13 +7797,14 @@ async function testAdvWorlds(browser) {
              bossIcons: ADV_ICONS.slice(5, ADV_WORLDS.length).join(), last: ADV_ICONS[ADV_WORLD_MAX - 1], art: art.length,
              files: art.map(iconFile), rules: new Set(Array.from({ length: ADV_TOTAL }, (_, n) => advChar(n).rule)).size };
   });
-  check('15 миров, 150 соперников; у героев 51–150 правила — записи из известных «когда» и «что»',
-    data.worlds === 15 && data.total === 150 && data.heroes === 100 && !data.bad.length && data.rules === 150, JSON.stringify(data.bad));
+  check('миры с шестого: у героев правила — записи из известных «когда» и «что»',
+    data.worlds >= 15 && data.total === data.worlds * 10 && data.heroes >= data.total - 50 && data.heroes % 100 === 0 &&
+    !data.bad.length && data.rules === data.total, JSON.stringify([data.worlds, data.total, data.heroes, data.bad]));
   check('сочетания «когда → что» у новых героев не повторяются', data.combos === data.uniq, data.combos + ' / ' + data.uniq);
-  check('иконки за боссов новых миров — их портреты adv-60 … adv-150', data.bossIcons === Array.from({ length: 10 }, (_, w) => 'adv-' + (w + 6) * 10).join() &&
+  check('иконки за боссов новых миров — их портреты adv-60, adv-70 …', data.bossIcons === Array.from({ length: data.worlds - 5 }, (_, w) => 'adv-' + (w + 6) * 10).join() &&
     data.last === 'adv-500', data.bossIcons);
   const missing = data.files.filter(f => !fs.existsSync(path.join(__dirname, '..', f)));
-  check('портреты всех 150 соперников — в icons/', data.art === 150 && !missing.length, missing.slice(0, 5).join());
+  check('портреты всех соперников открытых миров — в icons/', data.art === data.total && !missing.length, missing.slice(0, 5).join());
 
   // Открытие по звёздам: мир 6 — после босса Космоса и 20 ⭐ в Космосе
   const gate = await page.evaluate(() => {
@@ -7702,26 +7872,29 @@ async function testAdvWorlds(browser) {
     r.back = document.querySelectorAll('#advMap .adv-tile').length;
     return r;
   });
-  check('карта: 15 миров, раскрыт только текущий (Пустыня), в нём следующий — 74-й', map.worlds === 15 && map.shown === '7' &&
+  check('карта: все миры строками, раскрыт только текущий (Пустыня), в нём следующий — 74-й', map.worlds === data.worlds && map.shown === '7' &&
     map.tiles === 10 && map.next === '73' && map.head === 'true', JSON.stringify(map));
   check('нажатие на мир раскрывает и сворачивает его', map.two === 20 && map.back === 10 && map.badge === '🍬' &&
     map.name === 'Сладкое королевство', JSON.stringify(map));
-  check('у закрытых миров — что их откроет; внизу — «Ещё 35 миров — скоро»', map.gates === 7 && map.soon === '🌍 Ещё 35 миров — скоро',
+  check('у закрытых миров — что их откроет; внизу — сколько миров ещё впереди', map.gates === data.worlds - 8 &&
+    map.soon === '🌍 Ещё ' + (50 - data.worlds) + ' миров — скоро',
     JSON.stringify(map));
 
   // Сила волнами: внутри волны растёт, первый мир волны — передышка
-  const wave = await page.evaluate(() => Array.from({ length: 10 }, (_, k) => advWaveBase(k + 5)));
-  check('волны: мир 6 и мир 11 — передышка, внутри волны сильнее', wave.every((v, k) => k % 5 === 0 || v > wave[k - 1]) &&
-    wave[5] < wave[4] && wave[5] > wave[0], wave.join(' '));
-  const bonus = await page.evaluate(() => Array.from({ length: 10 }, (_, k) => {
+  const wave = await page.evaluate(() => Array.from({ length: 45 }, (_, k) => advWaveBase(k + 5)));
+  check('волны: первый мир волны — передышка, внутри волны сильнее, от волны к волне сильнее',
+    wave.every((v, k) => k % 5 === 0 ? !k || (v < wave[k - 1] && v > wave[k - 5]) : v > wave[k - 1] || v === 0.9), wave.join(' '));
+  const bonus = await page.evaluate(() => Array.from({ length: ADV_WORLDS.length - 5 }, (_, k) => {
     advTest((k + 5) * 10);
     const r = { w: k + 6, has: bonusMode && D.bonuses.length >= 0, min: RANGE_MIN, max: RANGE_MAX,
                 field: !!bonusSet && bonusSet.good[0] === ADV_WORLDS[k + 5].bonus };
     quitToMenu();
     return r;
   }));
-  check('числа миров 6–15 и бонус мира в наборе', bonus.map(b => b.min + '..' + b.max).join() ===
-    '1..50,-50..50,1..150,1..200,1..300,1..100,1..150,1..200,1..300,1..500' && bonus.every(b => b.has && b.field), JSON.stringify(bonus));
+  const RANGES = ['1..50', '-50..50', '1..150', '1..200', '1..300', '1..100', '1..150', '1..200', '1..300', '1..500',
+                  '1..100', '1..150', '-150..150', '1..300', '1..500', '1..150', '1..200', '1..300', '-200..200', '1..500'];
+  check('числа миров с шестого и бонус мира в наборе', bonus.length >= 10 &&
+    bonus.map(b => b.min + '..' + b.max).join() === RANGES.slice(0, bonus.length).join() && bonus.every(b => b.has && b.field), JSON.stringify(bonus));
 
   // Правила новых героев — на настоящей доске
   const r = await page.evaluate(() => {
@@ -7787,6 +7960,37 @@ async function testAdvWorlds(browser) {
     JSON.stringify([r.start, r.first, r.tens]));
   check('Сахарная Королева: забирает ваш «⚡», четвёртым ходом раунда берёт себе', r.queen === '1:1 0:2 0:3', r.queen);
 
+  // Новые действия и манеры хода партии 2 — прямо на идущей партии
+  const acts = await page.evaluate(() => {
+    advTest(50, 25);
+    const R = advCtx(), out = {};
+    out.blind = [ADV_ACT.blindYou(R) !== false && D.blind[0], ADV_ACT.blindYou(R) === false, ADV_ACT.fogYou(R) === false].join();
+    advTest(50, 25); const R2 = advCtx(); R2.fog(0);
+    out.blindAfterFog = ADV_ACT.blindYou(R2) === false && !D.blind[0];
+    D.tokens = [2, 0]; ADV_ACT.swapTokens(R2); out.swap = D.tokens.join(':');
+    D.tokens = [1, 1]; out.swapEqual = ADV_ACT.swapTokens(R2) === false;
+    ADV_ACT.giveBoth(R2); out.both = D.tokens.join(':');
+    D.tokens = [1, 1]; ADV_ACT.burnMe(R2); out.burnMe = D.tokens.join(':') + ' ' + (ADV_ACT.burnMe(R2) === false);
+    ADV_ACT.knowDir(R2, { guess: 10 });
+    const cand = botCandidates([], 1, { know: D.know[1] }, false);
+    out.knowDir = D.know[1].gt === 10 && !cand.slice(0, 10 - RANGE_MIN + 1).some(Boolean) && cand[25 - RANGE_MIN] === 1;
+    // Растёт вверх: ближайшее возможное выше своего прошлого; любит семёрки: число с 7
+    advTest(50, 40); D.cur = 1; duelPlay(12); stopBot();
+    const c2 = botCandidates(history.map(h => ({ guess: h.guess, labelIndex: h.meta.labelIndex, p: h.p })), 1, {}, false);
+    const up = ADV_PICKS.up(advCtx(), c2, 30);
+    out.up = up > 12 && c2[up - RANGE_MIN] === 1 && ![...Array(up - 13).keys()].some(i => c2[13 + i - RANGE_MIN]);
+    const c3 = new Array(RANGE_MAX - RANGE_MIN + 1).fill(1);
+    out.lucky = String(ADV_PICKS.lucky(advCtx(), c3, 30));
+    quitToMenu();
+    return out;
+  });
+  check('новые действия: слепота (не вместе с туманом), обмен «⚡», всем по «⚡», свой «⚡» — роняет',
+    acts.blind === 'true,true,true' && acts.blindAfterFog && acts.swap === '0:2' && acts.swapEqual && acts.both === '2:2' &&
+    acts.burnMe === '1:0 true', JSON.stringify(acts));
+  check('сам узнаёт «больше/меньше» — и бот этим пользуется', acts.knowDir === true, JSON.stringify(acts));
+  check('манеры хода: «растёт вверх» — ближайшее возможное выше, «любит семёрки» — число с 7', acts.up === true && /7/.test(acts.lucky),
+    JSON.stringify(acts));
+
   // Загаданное число правила не трогают, и ни одно правило не роняет игру
   const same = await page.evaluate(() => {
     let ok = true;
@@ -7811,9 +8015,11 @@ async function testAdvWorlds(browser) {
       await advLoadPack(l);
       const P = ADV_PACKS[l], bad = [];
       if (!P) { out.push(l + ':нет'); continue; }
-      if (P.worlds.length !== ADV_WORLDS.length - 5 || P.worlds.some(w => !w)) bad.push('worlds');
-      if (P.names.length !== ADV_TOTAL - 50 || new Set(i18n[l].adv.names.concat(P.names)).size !== ADV_TOTAL) bad.push('names');
-      if (P.cast.length !== ADV_TOTAL - 50) bad.push('cast');
+      // Тексты могут быть готовы раньше портретов: героев в файле — не меньше, чем открыто
+      if (P.worlds.length < ADV_WORLDS.length - 5 || P.worlds.length * 10 !== P.names.length || P.worlds.some(w => !w)) bad.push('worlds');
+      if (P.names.length < ADV_TOTAL - 50 || P.names.length > ADV_HEROES.length ||
+          new Set(i18n[l].adv.names.concat(P.names)).size !== 50 + P.names.length) bad.push('names');
+      if (P.cast.length !== P.names.length) bad.push('cast');
       P.cast.forEach((c, i) => {
         const h = ADV_HEROES[i];
         const keys = h.boss ? ['a1t', 'a1d', 'a2t', 'a2d', 'hi', 'a1', 'a2', 'luck', 'worry', 'win', 'lose'] : ['t', 'd', 'hi', 'rule', 'luck', 'worry', 'win', 'lose'];
@@ -8131,9 +8337,9 @@ async function testAudit(browser) {
   check('−1000…1000 и 2000 бонусов — на поле ровно 2000, все на разных числах, кроме загаданного',
     opts.includes('2000') && bon.min === -1000 && bon.max === 1000 && bon.n === 2000 && bon.uniq === 2000 && !bon.onSecret && bon.typed,
     JSON.stringify(bon));
-  // С другом — и четыре из Приключения: рентген, половина, щит, заморозка
-  check('«Бросок в лаву» убран: среди 2000 бонусов его нет, остальные виды есть (и 4 из Приключения)',
-    bon.kinds === 'blind,extra,fog,freeze,gift,half,memory,shield,skip,xray', bon.kinds);
+  // С другом — все полезные, и из Приключения тоже: рентген, половина, щит, заморозка, ➗3, ➗5, компас, воришка, зеркало
+  check('«Бросок в лаву» убран: среди 2000 бонусов его нет, остальные виды есть (и 9 из Приключения)',
+    bon.kinds === 'blind,compass,div3,div5,extra,fog,freeze,gift,half,memory,mirror,shield,skip,thief,xray', bon.kinds);
   await page.evaluate(() => quitToMenu());
   await done(page);
 
@@ -8545,7 +8751,8 @@ async function testProfile(browser) {
     return { n: tiles.length, first: tiles[0].textContent, firstLetter: tiles[0].classList.contains('letter'),
              sel: tiles.filter(t => t.classList.contains('sel')).map(t => t.dataset.icon) };
   });
-  check('в профиле буква, 40 иконок и 15 иконок боссов', grid.n === 56 && grid.firstLetter && grid.first === 'М',
+  const nWb = await page.evaluate(() => ADV_WORLDS.length);
+  check('в профиле буква, 40 иконок и иконки боссов', grid.n === 41 + nWb && grid.firstLetter && grid.first === 'М',
     JSON.stringify(grid));
   check('выбранная иконка отмечена', grid.sel.join() === '🦊', grid.sel.join());
 
@@ -8578,7 +8785,7 @@ async function testProfile(browser) {
     const tops = new Set([...document.querySelectorAll('#avGrid .av-tile')].map(t => Math.round(t.getBoundingClientRect().top)));
     return { w: r.width, h: r.height, rows: tops.size };
   });
-  check('клетки иконок крупные, по пять в ряд', tile.w >= 44 && tile.h >= 44 && tile.rows === Math.ceil(56 / 5),
+  check('клетки иконок крупные, по пять в ряд', tile.w >= 44 && tile.h >= 44 && tile.rows === Math.ceil((41 + nWb) / 5),
     JSON.stringify(tile));
 
   // Закрыл профиль с раскрытой сеткой — в следующий раз она снова свёрнута
@@ -8951,6 +9158,7 @@ async function testKeyPage(browser) {
     await testKidClarity(browser);
     await testOnlineAdvBonuses(browser);
     await testLocalAdvBonuses(browser);
+    await testNewBonuses(browser);
     await testNoJumps(browser);
     await testTablet(browser);
     await testScreensEverywhere(browser);

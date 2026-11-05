@@ -21,7 +21,9 @@
 // Всего миров в замысле — 50; выходят партиями, готовые — в ADV_WORLDS.
 // С шестого мира — волны по пять миров (см. advLevel), у героев — правила-данные
 // (ADV_HEROES), тексты — отдельным файлом на язык (js/adv-<язык>.js).
-// frost — у всех соперников мира числа с минусом
+// frost — у всех соперников мира числа с минусом. rule — особое правило мира:
+// storm — бонусов вдвое больше, traps — ловушки в каждом бою (не только у
+// босса), first — каждый раунд первым ходит соперник
 const ADV_WORLD_MAX = 50;
 const ADV_WORLDS = [
   { key: 'forest', range: 20, color: '#2bd18f', boss: '🧙', bonus: 'shield' },
@@ -32,15 +34,15 @@ const ADV_WORLDS = [
   // Волна 2
   { key: 'candy', range: 50, color: '#ff6fb1', bonus: 'shield' },
   { key: 'arctic', range: 100, color: '#5aa9ff', bonus: 'freeze', frost: true },
-  { key: 'desert', range: 150, color: '#e0a23a', bonus: 'half' },
-  { key: 'farm', range: 200, color: '#6fc04a', bonus: 'xray' },
-  { key: 'sky', range: 300, color: '#8f9dff', bonus: 'lava' },
+  { key: 'desert', range: 150, color: '#e0a23a', bonus: 'compass' },
+  { key: 'farm', range: 200, color: '#6fc04a', bonus: 'div3' },
+  { key: 'sky', range: 300, color: '#8f9dff', bonus: 'half', rule: 'storm' },
   // Волна 3
-  { key: 'garden', range: 100, color: '#d66bff', bonus: 'shield' },
-  { key: 'dino', range: 150, color: '#a8b83a', bonus: 'freeze' },
-  { key: 'pirate', range: 200, color: '#e0574f', bonus: 'half' },
-  { key: 'spooky', range: 300, color: '#5b5bd6', bonus: 'xray' },
-  { key: 'castle', range: 500, color: '#e6b422', bonus: 'lava' }
+  { key: 'garden', range: 100, color: '#d66bff', bonus: 'div5' },
+  { key: 'dino', range: 150, color: '#a8b83a', bonus: 'xray' },
+  { key: 'pirate', range: 200, color: '#e0574f', bonus: 'thief', rule: 'first' },
+  { key: 'spooky', range: 300, color: '#5b5bd6', bonus: 'lava', rule: 'traps' },
+  { key: 'castle', range: 500, color: '#e6b422', bonus: 'mirror' }
 ];
 // Иконка за босса: у первых пяти миров — эмодзи, дальше — портрет самого
 // босса. Список — на все 50 миров. Копия — в базе (adventure_icons), сверяется тестом
@@ -224,14 +226,17 @@ const ADV_RULES = {
 //     его (ваш) k-й ход в раунде; meEvery:k / youEvery:k / every:k — каждый
 //     k-й ход: его, ваш, любой. Без хода: start — начало раунда; youArm / meArm
 //     — взвели «⚡ +1 ход»
-//   что: giveYou / giveMe — «⚡ +1 ход» вам или ему; steal — ваш «⚡» уходит
-//     ему; burn — ваш «⚡» пропадает; skipYou / freezeYou / skipMe — пропуск
-//     хода (freeze — ещё и 🧊); again — тот, кто сходил, ходит ещё раз;
-//     double — следующий ход соперника двойной; hide — этот ход не видно;
-//     fogYou — до конца раунда не видно его ходов; memoryYou — видны только два
-//     последних хода; lavaYou — ваш следующий ход — шальной бросок; tellDir /
-//     tellParity / tellHalf — говорит вам «больше/меньше», чётность, половину;
+//   что: giveYou / giveMe / giveBoth — «⚡ +1 ход» вам, ему, обоим; steal — ваш
+//     «⚡» уходит ему; burn — ваш «⚡» пропадает, burnMe — его; swapTokens —
+//     меняетесь «⚡»; skipYou / freezeYou / skipMe — пропуск хода (freeze — ещё
+//     и 🧊); again — тот, кто сходил, ходит ещё раз; double — следующий ход
+//     соперника двойной; hide — этот ход не видно; fogYou — до конца раунда не
+//     видно его ходов, blindYou — своих; memoryYou — видны только два последних
+//     хода; lavaYou — ваш следующий ход — шальной бросок; tellDir / tellParity /
+//     tellHalf — говорит вам «больше/меньше», чётность, половину; knowDir /
 //     knowParity / knowHalf — знает сам
+//   pick — как выбирает число: tens (круглые), mirror (зеркально вашему), creep
+//     (шажками), up (всё выше), lucky (с семёркой)
 function advTrend(R, m) {
   const mine = history.filter(h => h.p === m.p && !h.timeout);
   const i = mine.indexOf(m);
@@ -272,14 +277,21 @@ const ADV_ACT = {
   again: R => { R.again(); },
   double: R => { R.round.double = true; },
   hide: (R, m) => { R.hide(m); },
-  fogYou: R => { if (D.fog[0]) return false; R.fog(0); },
+  // Туман и слепота вместе закрыли бы всё — как и у бонусов, второго нет
+  fogYou: R => { if (D.fog[0] || D.blind[0]) return false; R.fog(0); },
+  blindYou: R => { if (D.blind[0] || D.fog[0]) return false; R.blind(0); },
   memoryYou: R => { if (D.shortMemory[0]) return false; R.memory(0); },
   lavaYou: R => { R.lava(0); },
   tellDir: (R, m) => { const k = R.dir(m.guess); R.know(0, k, m.guess); return { k: R.word(k, m.guess) }; },
   tellParity: R => { R.know(0, 'parity'); return { k: R.word('parity') }; },
   tellHalf: R => { R.know(0, 'half'); return { k: R.word('half') }; },
   knowParity: R => { R.know(1, 'parity'); },
-  knowHalf: R => { R.know(1, 'half'); }
+  knowHalf: R => { R.know(1, 'half'); },
+  // Сам узнаёт, больше загаданное этого числа или меньше. Вам не скажет
+  knowDir: (R, m) => { R.know(1, R.dir(m.guess), m.guess); },
+  swapTokens: () => { if (D.tokens[0] === D.tokens[1]) return false; D.tokens.reverse(); },
+  giveBoth: R => { R.give(0, 1); R.give(1, 1); },
+  burnMe: R => { if (!D.tokens[1]) return false; R.take(1, 1); }
 };
 // Свой способ выбирать число: null — как обычно
 const ADV_PICKS = {
@@ -299,6 +311,23 @@ const ADV_PICKS = {
     if (!mine.length) return null;
     const v = RANGE_MIN + RANGE_MAX - mine[mine.length - 1].guess;
     return v >= RANGE_MIN && v <= RANGE_MAX && cand[v - RANGE_MIN] && !R.named(v) ? v : null;
+  },
+  // Растёт вверх: ближайшее возможное число выше своего прошлого
+  up: (R, cand) => {
+    const me = history.filter(h => h.p === 1);
+    if (!me.length || R.left(cand) <= 6) return null;
+    for (let v = me[me.length - 1].guess + 1; v <= RANGE_MAX; v++) if (cand[v - RANGE_MIN] && !R.named(v)) return v;
+    return null;
+  },
+  // Любит семёрки: число с цифрой 7 поближе к задуманному, пока возможных много
+  lucky: (R, cand, plan) => {
+    if (R.left(cand) <= 6) return null;
+    for (let d = 0; d <= RANGE_MAX - RANGE_MIN; d++) {
+      for (const v of [plan - d, plan + d]) {
+        if (v >= RANGE_MIN && v <= RANGE_MAX && cand[v - RANGE_MIN] && !R.named(v) && /7/.test(String(v))) return v;
+      }
+    }
+    return null;
   },
   // Маленькими шажками рядом со своим прошлым числом
   creep: (R, cand) => {
@@ -371,115 +400,225 @@ function advCompile(spec) {
 // героя n = 50 + индекс; тексты — в js/adv-<язык>.js в том же порядке
 const ADV_HEROES = [
   // 6 · Сладкое королевство (51–60)
-  { icon: '🍬', on: ['youCold', 'skipYou', 1], level: -0.21 },
-  { icon: '🍒', on: ['meHot', 'giveYou', 1], level: -0.12 },
-  { icon: '🍭', on: ['youN:1', 'fogYou', 1], level: -0.23 },
-  { icon: '🏃', on: ['youHot', 'double', 1], level: -0.17 },
-  { icon: '🥮', on: ['meN:2', 'giveMe', 1], level: -0.02 },
-  { icon: '🎂', on: ['youN:1', 'tellParity', 1], level: 0.13 },
-  { icon: '🍩', on: ['youCloser', 'skipMe', 1], level: 0.29 },
-  { icon: '💤', on: ['youN:2', 'skipMe', 1], level: 0.29 },
-  { icon: '🍦', on: ['youWarm', 'memoryYou', 1], level: 0.06 },
-  { boss: true, icon: '👑', a1icon: '🍫', a1: ['youCloser', 'steal', 1], a2icon: '💰', a2: ['every:4', 'giveMe', 1], level: 0.29 },
+  { icon: '🍬', on: ['youCold', 'skipYou', 1], level: -0.29 },
+  { icon: '🍒', on: ['meHot', 'giveYou', 1], level: -0.19 },
+  { icon: '🍭', on: ['youN:1', 'fogYou', 1], level: -0.36 },
+  { icon: '🏃', on: ['youHot', 'double', 1], level: -0.26 },
+  { icon: '🥮', on: ['meN:2', 'giveMe', 1], level: 0.02 },
+  { icon: '🎂', on: ['youN:1', 'tellParity', 1], level: 0.16 },
+  { icon: '🍩', on: ['youCloser', 'skipMe', 1], level: 0.5 },
+  { icon: '💤', on: ['youN:2', 'skipMe', 1], level: 0.5 },
+  { icon: '🍦', on: ['youWarm', 'memoryYou', 1], level: -0.03 },
+  { boss: true, icon: '👑', a1icon: '🍫', a1: ['youCloser', 'steal', 1], a2icon: '💰', a2: ['every:4', 'giveMe', 1], level: 0.35 },
   // 7 · Ледяная Арктика (61–70)
-  { icon: '⛄', on: ['youN:1', 'lavaYou', 1], level: 0.05 },
-  { icon: '🌨️', on: ['youColder', 'fogYou', 1], level: -0.09 },
-  { icon: '🎣', on: ['meColder', 'giveMe', 1], level: 0.02 },
-  { icon: '🧭', on: ['meHot', 'tellDir', 1], level: 0.05 },
-  { icon: '🌙', on: ['meEvery:3', 'hide', 0], level: 0.04 },
-  { icon: '🔔', on: ['youWarm', 'tellDir', 1], level: 0.06 },
-  { icon: '❄️', on: ['youVeryHot', 'freezeYou', 1], level: -0.06 },
-  { icon: '🐟', on: ['youColder', 'giveMe', 1], level: 0.02 },
-  { icon: '🛷', on: ['meN:2', 'double', 1], level: -0.06 },
-  { boss: true, icon: '👑', a1icon: '🌪️', a1: ['youN:2', 'fogYou', 1], a2icon: '🥶', a2: ['youCloser', 'freezeYou', 1], level: -0.17 },
+  { icon: '⛄', on: ['youN:1', 'lavaYou', 1] },
+  { icon: '🌨️', on: ['youColder', 'fogYou', 1], level: -0.03 },
+  { icon: '🎣', on: ['meColder', 'giveMe', 1], level: -0.01 },
+  { icon: '🧭', on: ['meHot', 'tellDir', 1], level: 0.03 },
+  { icon: '🌙', on: ['meEvery:3', 'hide', 0], level: -0.01 },
+  { icon: '🔔', on: ['youWarm', 'tellDir', 1], level: 0.13 },
+  { icon: '❄️', on: ['youVeryHot', 'freezeYou', 1] },
+  { icon: '🐟', on: ['youColder', 'giveMe', 1], level: 0.01 },
+  { icon: '🛷', on: ['meN:2', 'double', 1], level: -0.08 },
+  { boss: true, icon: '👑', a1icon: '🌪️', a1: ['youN:2', 'fogYou', 1], a2icon: '🥶', a2: ['youCloser', 'freezeYou', 1], level: -0.2 },
   // 8 · Жаркая пустыня (71–80)
-  { icon: '💦', on: ['youHot', 'burn', 1], level: -0.14 },
-  { icon: '👂', on: ['youN:2', 'tellHalf', 1], level: -0.02 },
-  { icon: '🔭', on: ['meEvery:2', 'tellDir', 0], level: 0.01 },
-  { icon: '🦂', on: ['youCloser', 'lavaYou', 1], level: -0.11 },
-  { icon: '😎', on: ['meWarm', 'skipMe', 1], level: 0.29 },
-  { icon: '🥎', on: ['meColder', 'again', 1], level: -0.05 },
-  { icon: '🔁', pick: 'mirror' },
-  { icon: '🌵', on: ['youWarm', 'hide', 1], level: -0.09 },
-  { icon: '😱', on: ['meN:1', 'skipYou', 1], level: 0.09 },
-  { boss: true, icon: '👑', a1icon: '🏜️', a1: ['youN:3', 'memoryYou', 1], a2icon: '🏺', a2: ['youVeryHot', 'lavaYou', 1], level: -0.38 },
+  { icon: '💦', on: ['youHot', 'burn', 1], level: -0.11 },
+  { icon: '👂', on: ['youN:2', 'tellHalf', 1], level: -0.06 },
+  { icon: '🔭', on: ['meEvery:2', 'tellDir', 0], level: 0.09 },
+  { icon: '🦂', on: ['youCloser', 'lavaYou', 1], level: -0.17 },
+  { icon: '😎', on: ['meWarm', 'skipMe', 1], level: 0.22 },
+  { icon: '🥎', on: ['meColder', 'again', 1], level: -0.07 },
+  { icon: '🔁', pick: 'mirror', level: 0.12 },
+  { icon: '🌵', on: ['youWarm', 'hide', 1], level: -0.07 },
+  { icon: '😱', on: ['meN:1', 'skipYou', 1], level: 0.04 },
+  { boss: true, icon: '👑', a1icon: '🏜️', a1: ['youN:3', 'memoryYou', 1], a2icon: '🏺', a2: ['youVeryHot', 'lavaYou', 1], level: -0.34 },
   // 9 · Весёлая ферма (81–90)
-  { icon: '🥛', on: ['youCold', 'giveYou', 1], level: 0.01 },
-  { icon: '🐽', on: ['youColder', 'memoryYou', 1], level: -0.27 },
-  { icon: '🛑', on: ['meN:2', 'skipMe', 1], level: 0.41 },
-  { icon: '📣', on: ['meN:1', 'tellDir', 1], level: 0.02 },
-  { icon: '🎯', pick: 'tens', level: -0.01 },
-  { icon: '🐎', on: ['meHot', 'double', 1], level: -0.14 },
-  { icon: '🐕', on: ['youColder', 'skipYou', 1], level: -0.03 },
-  { icon: '🎴', on: ['meN:2', 'hide', 1], level: -0.1 },
-  { icon: '🧀', on: ['youVeryCold', 'giveMe', 1], level: 0.1 },
-  { boss: true, icon: '👑', a1icon: '🐦', a1: ['youWarm', 'steal', 1], a2icon: '🌾', a2: ['meColder', 'double', 1], level: -0.19 },
+  { icon: '🥛', on: ['youCold', 'giveYou', 1], level: 0.02 },
+  { icon: '🐽', on: ['youColder', 'memoryYou', 1], level: -0.29 },
+  { icon: '🛑', on: ['meN:2', 'skipMe', 1], level: 0.43 },
+  { icon: '📣', on: ['meN:1', 'tellDir', 1], level: 0.09 },
+  { icon: '🎯', pick: 'tens', level: -0.02 },
+  { icon: '🐎', on: ['meHot', 'double', 1], level: -0.18 },
+  { icon: '🐕', on: ['youColder', 'skipYou', 1], level: -0.1 },
+  { icon: '🎴', on: ['meN:2', 'hide', 1], level: -0.11 },
+  { icon: '🧀', on: ['youVeryCold', 'giveMe', 1], level: 0.13 },
+  { boss: true, icon: '👑', a1icon: '🐦', a1: ['youWarm', 'steal', 1], a2icon: '🌾', a2: ['meColder', 'double', 1], level: -0.27 },
   // 10 · Облачный город (91–100)
-  { icon: '🦜', on: ['youVeryHot', 'tellDir', 1], level: -0.18 },
-  { icon: '🌺', on: ['meN:1', 'again', 1], level: -0.05 },
-  { icon: '🦩', on: ['every:5', 'skipMe', 1], level: 0.32 },
-  { icon: '🦅', on: ['meN:2', 'knowParity', 1], level: -0.25 },
-  { icon: '🌫️', on: ['youN:3', 'hide', 1], level: -0.18 },
-  { icon: '🎈', on: ['meCloser', 'again', 1], level: -0.08 },
-  { icon: '✉️', on: ['youColder', 'giveYou', 1], level: 0.07 },
-  { icon: '🪂', on: ['meColder', 'hide', 0], level: 0.19 },
+  { icon: '🦜', on: ['youVeryHot', 'tellDir', 1], level: -0.12 },
+  { icon: '🌺', on: ['meN:1', 'again', 1], level: -0.17 },
+  { icon: '🦩', on: ['every:5', 'skipMe', 1], level: 0.28 },
+  { icon: '🦅', on: ['meN:2', 'knowParity', 1], level: -0.29 },
+  { icon: '🌫️', on: ['youN:3', 'hide', 1], level: -0.13 },
+  { icon: '🎈', on: ['meCloser', 'again', 1] },
+  { icon: '✉️', on: ['youColder', 'giveYou', 1], level: 0.06 },
+  { icon: '🪂', on: ['meColder', 'hide', 0], level: 0.22 },
   { icon: '📦', on: ['youN:2', 'giveYou', 1], level: 0.2 },
   { boss: true, icon: '👑', a1icon: '🌩️', a1: ['youCloser', 'skipYou', 1], a2icon: '🌧️', a2: ['every:4', 'hide', 1], level: -0.28 },
   // 11 · Цветочный сад (101–110)
-  { icon: '🍯', on: ['meHot', 'giveMe', 1], level: -0.05 },
-  { icon: '🌈', on: ['youWarm', 'tellParity', 1], level: 0.08 },
-  { icon: '📖', on: ['meN:3', 'knowHalf', 1], level: -0.01 },
-  { icon: '🐌', pick: 'creep', think: [2.5, 4], level: -0.12 },
-  { icon: '🎻', on: ['every:3', 'tellParity', 1], level: 0.12 },
-  { icon: '🚁', on: ['meWarm', 'again', 1], level: -0.1 },
-  { icon: '💪', on: ['youArm', 'skipMe', 1], level: 0.05 },
-  { icon: '🌸', on: ['meCloser', 'giveYou', 1], level: 0.08 },
-  { icon: '🕳️', on: ['meN:3', 'again', 1] },
-  { boss: true, icon: '👑', a1icon: '🐝', a1: ['youCloser', 'fogYou', 1], a2icon: '🪤', a2: ['youVeryHot', 'skipYou', 1], level: -0.12 },
+  { icon: '🍯', on: ['meHot', 'giveMe', 1], level: -0.04 },
+  { icon: '🌈', on: ['youWarm', 'tellParity', 1], level: 0.05 },
+  { icon: '📖', on: ['meN:3', 'knowHalf', 1] },
+  { icon: '🐌', pick: 'creep', think: [2.5, 4], level: -0.14 },
+  { icon: '🎻', on: ['every:3', 'tellParity', 1], level: 0.13 },
+  { icon: '🚁', on: ['meWarm', 'again', 1], level: -0.13 },
+  { icon: '💪', on: ['youArm', 'skipMe', 1], level: 0.11 },
+  { icon: '🌸', on: ['meCloser', 'giveYou', 1], level: 0.11 },
+  { icon: '🕳️', on: ['meN:3', 'again', 1], level: -0.09 },
+  { boss: true, icon: '👑', a1icon: '🐝', a1: ['youCloser', 'fogYou', 1], a2icon: '🪤', a2: ['youVeryHot', 'skipYou', 1], level: -0.14 },
   // 12 · Долина динозавров (111–120)
-  { icon: '🦏', on: ['meVeryHot', 'skipYou', 1], level: -0.04 },
-  { icon: '🦔', on: ['youArm', 'burn', 1], level: -0.05 },
-  { icon: '🪶', on: ['youColder', 'double', 1], level: -0.06 },
-  { icon: '🦒', on: ['meN:3', 'tellHalf', 1], level: 0.05 },
-  { icon: '🔨', on: ['youVeryHot', 'burn', 1], level: -0.03 },
-  { icon: '💨', on: ['meN:2', 'again', 1], think: [0.5, 1.2], level: -0.06 },
-  { icon: '🥚', on: ['meN:1', 'skipMe', 1], level: 0.22 },
+  { icon: '🦏', on: ['meVeryHot', 'skipYou', 1], level: -0.06 },
+  { icon: '🦔', on: ['youArm', 'burn', 1], level: -0.1 },
+  { icon: '🪶', on: ['youColder', 'double', 1], level: -0.07 },
+  { icon: '🦒', on: ['meN:3', 'tellHalf', 1], level: 0.02 },
+  { icon: '🔨', on: ['youVeryHot', 'burn', 1] },
+  { icon: '💨', on: ['meN:2', 'again', 1], think: [0.5, 1.2], level: -0.04 },
+  { icon: '🥚', on: ['meN:1', 'skipMe', 1], level: 0.31 },
   { icon: '🎺', on: ['youCold', 'tellDir', 0], level: 0.04 },
-  { icon: '🌊', on: ['meWarm', 'hide', 1], level: -0.03 },
-  { boss: true, icon: '👑', a1icon: '🦖', a1: ['meHot', 'freezeYou', 1], a2icon: '👣', a2: ['meN:4', 'double', 1], level: -0.02 },
+  { icon: '🌊', on: ['meWarm', 'hide', 1], level: -0.11 },
+  { boss: true, icon: '👑', a1icon: '🦖', a1: ['meHot', 'freezeYou', 1], a2icon: '👣', a2: ['meN:4', 'double', 1], level: -0.03 },
   // 13 · Пиратский остров (121–130)
-  { icon: '📢', on: ['meColder', 'tellDir', 0] },
-  { icon: '🏴‍☠️', on: ['youHot', 'steal', 1], level: -0.14 },
-  { icon: '💎', on: ['youVeryHot', 'giveYou', 1], level: 0.03 },
-  { icon: '⭐', on: ['start', 'tellParity', 0], level: 0.4 },
-  { icon: '📯', on: ['meN:3', 'freezeYou', 1], level: -0.16 },
-  { icon: '🦞', on: ['youCloser', 'hide', 1], level: -0.14 },
-  { icon: '🗺️', on: ['meN:2', 'tellHalf', 1], level: 0.13 },
-  { icon: '🗝️', on: ['youColder', 'steal', 1], level: -0.03 },
+  { icon: '📢', on: ['meColder', 'tellDir', 0], level: -0.07 },
+  { icon: '🏴‍☠️', on: ['youHot', 'steal', 1], level: -0.13 },
+  { icon: '💎', on: ['youVeryHot', 'giveYou', 1] },
+  { icon: '⭐', on: ['start', 'tellParity', 0], level: 0.48 },
+  { icon: '📯', on: ['meN:3', 'freezeYou', 1], level: -0.18 },
+  { icon: '🦞', on: ['youCloser', 'hide', 1], level: -0.04 },
+  { icon: '🗺️', on: ['meN:2', 'tellHalf', 1], level: 0.08 },
+  { icon: '🗝️', on: ['youColder', 'steal', 1], level: -0.02 },
   { icon: '💥', on: ['meVeryHot', 'lavaYou', 1], level: -0.1 },
-  { boss: true, icon: '👑', a1icon: '⚔️', a1: ['youVeryHot', 'steal', 1], a2icon: '💣', a2: ['every:5', 'skipYou', 1], level: -0.18 },
+  { boss: true, icon: '👑', a1icon: '⚔️', a1: ['youVeryHot', 'steal', 1], a2icon: '💣', a2: ['every:5', 'skipYou', 1], level: -0.23 },
   // 14 · Деревня Хэллоуин (131–140)
-  { icon: '👻', on: ['meHot', 'hide', 1], level: -0.06 },
-  { icon: '🎃', on: ['youN:2', 'tellDir', 1], level: 0.03 },
-  { icon: '🧹', on: ['meVeryHot', 'again', 1], level: 0.09 },
-  { icon: '🩹', on: ['youN:3', 'skipYou', 1], level: -0.1 },
-  { icon: '🔌', on: ['meN:2', 'lavaYou', 1], level: -0.04 },
-  { icon: '🕸️', on: ['youWarm', 'skipYou', 1], level: -0.05 },
-  { icon: '😵', on: ['youColder', 'lavaYou', 1], level: -0.01 },
-  { icon: '🌕', on: ['every:6', 'double', 1], level: 0.1 },
-  { icon: '🫧', on: ['meCloser', 'skipYou', 1], level: 0.07 },
-  { boss: true, icon: '👑', a1icon: '🦇', a1: ['meVeryHot', 'fogYou', 1], a2icon: '🧛', a2: ['youCloser', 'burn', 1], level: -0.31 },
+  { icon: '👻', on: ['meHot', 'hide', 1], level: -0.08 },
+  { icon: '🎃', on: ['youN:2', 'tellDir', 1], level: 0.07 },
+  { icon: '🧹', on: ['meVeryHot', 'again', 1], level: 0.03 },
+  { icon: '🩹', on: ['youN:3', 'skipYou', 1], level: -0.12 },
+  { icon: '🔌', on: ['meN:2', 'lavaYou', 1], level: -0.1 },
+  { icon: '🕸️', on: ['youWarm', 'skipYou', 1], level: 0.01 },
+  { icon: '😵', on: ['youColder', 'lavaYou', 1], level: -0.02 },
+  { icon: '🌕', on: ['every:6', 'double', 1], level: 0.15 },
+  { icon: '🫧', on: ['meCloser', 'skipYou', 1], level: 0.02 },
+  { boss: true, icon: '👑', a1icon: '🦇', a1: ['meVeryHot', 'fogYou', 1], a2icon: '🧛', a2: ['youCloser', 'burn', 1], level: -0.33 },
   // 15 · Королевский замок (141–150)
-  { icon: '🐸', on: ['youVeryCold', 'again', 1], level: 0.05 },
+  { icon: '🐸', on: ['youVeryCold', 'again', 1], level: 0.06 },
   { icon: '📜', on: ['youN:1', 'skipYou', 1], level: 0.02 },
-  { icon: '🃏', on: ['every:3', 'lavaYou', 1], level: -0.22 },
-  { icon: '🩰', on: ['meCloser', 'hide', 1], level: -0.13 },
-  { icon: '🦚', on: ['meN:1', 'tellHalf', 1], level: 0.12 },
-  { icon: '🧲', on: ['meCloser', 'steal', 1], level: -0.16 },
-  { icon: '🤺', on: ['meHot', 'burn', 1], level: -0.12 },
-  { icon: '♞', on: ['meN:2', 'tellParity', 1], first: true, level: 0.52 },
-  { icon: '🌉', on: ['youN:2', 'steal', 1], level: -0.24 },
-  { boss: true, icon: '👑', a1icon: '🦁', a1: ['youVeryHot', 'memoryYou', 1], a2icon: '👑', a2: ['meWarm', 'double', 1], level: -0.2 }
+  { icon: '🃏', on: ['every:3', 'lavaYou', 1], level: -0.14 },
+  { icon: '🩰', on: ['meCloser', 'hide', 1], level: -0.18 },
+  { icon: '🦚', on: ['meN:1', 'tellHalf', 1], level: 0.21 },
+  { icon: '🧲', on: ['meCloser', 'steal', 1], level: -0.13 },
+  { icon: '🤺', on: ['meHot', 'burn', 1], level: -0.07 },
+  { icon: '♞', on: ['meN:2', 'tellParity', 1], first: true, level: 0.3 },
+  { icon: '🌉', on: ['youN:2', 'steal', 1], level: -0.05 },
+  { boss: true, icon: '👑', a1icon: '🦁', a1: ['youVeryHot', 'memoryYou', 1], a2icon: '👑', a2: ['meWarm', 'double', 1], level: -0.17 },
+  // 16 · Саванна (151–160)
+  { icon: '🐤', on: ['youCloser', 'tellParity', 1] },
+  { icon: '🌼', on: ['meCold', 'giveYou', 1] },
+  { icon: '🏁', on: ['meN:1', 'double', 1], level: -0.1 },
+  { icon: '😆', on: ['youColder', 'tellDir', 1], level: 0.04 },
+  { icon: '🙈', on: ['youHot', 'hide', 1], level: -0.04 },
+  { icon: '🌿', on: ['meCloser', 'double', 1], level: -0.02 },
+  { icon: '🐃', on: ['every:4', 'skipYou', 1], level: -0.11 },
+  { icon: '👀', on: ['meN:2', 'knowHalf', 1], level: 0.13 },
+  { icon: '✒️', on: ['youN:3', 'tellHalf', 1], level: 0.11 },
+  { boss: true, icon: '👑', a1icon: '🔄', a1: ['youCloser', 'swapTokens', 1], a2icon: '🐾', a2: ['youHot', 'skipYou', 1], level: 0.18 },
+  // 17 · Страна игрушек (161–170)
+  { icon: '🌀', on: ['youCloser', 'giveMe', 1], level: -0.08 },
+  { icon: '🐴', on: ['meWarm', 'tellDir', 1], level: 0.05 },
+  { icon: '🧦', on: ['youN:2', 'lavaYou', 1], level: -0.1 },
+  { icon: '🚂', on: ['meN:3', 'double', 1], level: -0.03 },
+  { icon: '🪆', on: ['meN:3', 'hide', 1], level: -0.01 },
+  { icon: '🪀', on: ['youColder', 'again', 1], level: 0.15 },
+  { icon: '🥁', on: ['every:3', 'skipYou', 1], level: -0.1 },
+  { icon: '🐷', on: ['youN:2', 'burn', 1], level: -0.09 },
+  { icon: '✈️', on: ['meColder', 'skipMe', 1], level: 0.16 },
+  { boss: true, icon: '👑', a1icon: '🧱', a1: ['meVeryHot', 'blindYou', 1], a2icon: '🏰', a2: ['every:4', 'double', 1], level: -0.27 },
+  // 18 · Тёмная бездна (171–180)
+  { icon: '🏮', on: ['youCold', 'tellParity', 1], level: 0.11 },
+  { icon: '🐙', on: ['meHot', 'fogYou', 1], level: -0.27 },
+  { icon: '✨', on: ['meN:1', 'knowHalf', 1], level: 0.01 },
+  { icon: '🛡️', on: ['youArm', 'giveMe', 1], level: -0.05 },
+  { icon: '😇', on: ['youVeryCold', 'giveYou', 1], level: 0.14 },
+  { icon: '🦐', on: ['meCloser', 'lavaYou', 1], level: -0.11 },
+  { icon: '😮', on: ['youVeryHot', 'hide', 1], level: -0.02 },
+  { icon: '🫠', on: ['every:3', 'skipMe', 1], level: 0.32 },
+  { icon: '🪞', on: ['meHot', 'knowParity', 1], level: -0.1 },
+  { boss: true, icon: '👑', a1icon: '🌑', a1: ['meHot', 'blindYou', 1], a2icon: '🐚', a2: ['youColder', 'burn', 1], level: -0.25 },
+  // 19 · Бамбуковая роща (181–190)
+  { icon: '🐒', on: ['meWarm', 'steal', 1], level: -0.3 },
+  { icon: '🍎', on: ['youN:3', 'giveYou', 1], level: 0.06 },
+  { icon: '💃', on: ['meN:4', 'skipMe', 1], level: 0.08 },
+  { icon: '🎏', on: ['every:5', 'giveYou', 1], level: 0.08 },
+  { icon: '🎐', on: ['meVeryHot', 'hide', 1], level: -0.21 },
+  { icon: '🍃', on: ['youN:1', 'hide', 1], level: -0.12 },
+  { icon: '💡', on: ['youColder', 'tellHalf', 1], level: 0.32 },
+  { icon: '🧶', on: ['youWarm', 'burn', 1], level: -0.12 },
+  { icon: '🎋', pick: 'up', level: 0.21 },
+  { boss: true, icon: '👑', a1icon: '🧘', a1: ['meN:2', 'knowDir', 1], a2icon: '🎍', a2: ['youWarm', 'freezeYou', 1], level: -0.14 },
+  // 20 · Город часов (191–200)
+  { icon: '🕊️', on: ['every:6', 'tellHalf', 1], level: -0.09 },
+  { icon: '⏰', on: ['youN:3', 'lavaYou', 1], level: -0.33 },
+  { icon: '⏳', on: ['meN:4', 'again', 1], level: -0.12 },
+  { icon: '⌚', on: ['youVeryCold', 'skipYou', 1], level: 0.11 },
+  { icon: '⚙️', on: ['meCloser', 'burn', 1], level: -0.11 },
+  { icon: '🔧', on: ['meN:1', 'giveMe', 1], level: -0.06 },
+  { icon: '🎼', on: ['every:2', 'tellDir', 1], level: 0.23 },
+  { icon: '🔑', on: ['meEvery:3', 'knowDir', 0], level: 0.22 },
+  { icon: '🔍', on: ['youHot', 'giveMe', 1], level: 0.14 },
+  { boss: true, icon: '👑', a1icon: '🕰️', a1: ['every:4', 'freezeYou', 1], a2icon: '⏩', a2: ['meHot', 'again', 1], level: -0.15 },
+  // 21 · Австралия (201–210)
+  { icon: '🦘', on: ['youN:1', 'double', 1], level: -0.11 },
+  { icon: '🐨', on: ['youWarm', 'skipMe', 1], level: 0.04 },
+  { icon: '🟫', on: ['youCold', 'burn', 1], level: -0.04 },
+  { icon: '📡', on: ['meN:2', 'tellDir', 1], level: 0.08 },
+  { icon: '🪡', on: ['youWarm', 'giveMe', 1], level: -0.08 },
+  { icon: '🗯️', on: ['every:3', 'tellDir', 1] },
+  { icon: '😂', on: ['youColder', 'skipMe', 1], level: 0.22 },
+  { icon: '😊', on: ['youCloser', 'giveBoth', 1], level: -0.05 },
+  { icon: '🔥', on: ['meN:1', 'burn', 1], level: -0.09 },
+  { boss: true, icon: '👑', a1icon: '🐊', a1: ['youHot', 'freezeYou', 1], a2icon: '☀️', a2: ['meN:3', 'giveMe', 1], level: -0.19 },
+  // 22 · Цирк (211–220)
+  { icon: '7️⃣', pick: 'lucky', level: -0.04 },
+  { icon: '☂️', on: ['meCloser', 'knowHalf', 1], level: -0.02 },
+  { icon: '🤹', on: ['every:3', 'giveMe', 1], level: -0.1 },
+  { icon: '🎊', on: ['meVeryHot', 'burnMe', 1], level: 0.17 },
+  { icon: '🦙', on: ['youColder', 'hide', 1], level: 0.03 },
+  { icon: '🏋️', on: ['meHot', 'steal', 1], level: -0.12 },
+  { icon: '🐞', on: ['every:2', 'double', 1], level: -0.14 },
+  { icon: '🍿', on: ['every:4', 'tellParity', 1], level: 0.43 },
+  { icon: '🎩', on: ['meWarm', 'fogYou', 1], level: -0.24 },
+  { boss: true, icon: '👑', a1icon: '🎪', a1: ['every:5', 'double', 1], a2icon: '🧐', a2: ['youCloser', 'knowDir', 1], level: -0.07 },
+  // 23 · Хрустальные пещеры (221–230)
+  { icon: '🪨', on: ['youCold', 'giveMe', 1], level: -0.07 },
+  { icon: '💗', on: ['meColder', 'giveYou', 1], level: 0.04 },
+  { icon: '🔮', on: ['youN:2', 'knowHalf', 1], level: 0.11 },
+  { icon: '🔦', on: ['youHot', 'tellParity', 1], level: 0.27 },
+  { icon: '💧', on: ['meN:2', 'freezeYou', 1], level: -0.09 },
+  { icon: '💠', on: ['youVeryHot', 'blindYou', 1], level: -0.22 },
+  { icon: '🕯️', on: ['meCloser', 'knowParity', 1], level: 0.03 },
+  { icon: '🪔', on: ['every:3', 'knowParity', 1], level: -0.21 },
+  { icon: '⛏️', on: ['youCloser', 'tellHalf', 1], level: 0.16 },
+  { boss: true, icon: '👑', a1icon: '🔷', a1: ['youN:3', 'burn', 1], a2icon: '🧊', a2: ['meCloser', 'freezeYou', 1], level: -0.05 },
+  // 24 · Зимняя сказка (231–240)
+  { icon: '☃️', on: ['youCold', 'freezeYou', 1], level: -0.16 },
+  { icon: '🥜', on: ['meN:2', 'burn', 1], level: -0.27 },
+  { icon: '🎄', on: ['youN:1', 'giveYou', 1], level: 0.1 },
+  { icon: '🧤', on: ['youCold', 'skipMe', 1] },
+  { icon: '🎶', on: ['meN:3', 'tellParity', 1], level: 0.2 },
+  { icon: '🫙', on: ['every:3', 'hide', 1], level: -0.1 },
+  { icon: '🎁', on: ['meN:3', 'giveYou', 1], level: 0.24 },
+  { icon: '☕', on: ['youColder', 'giveBoth', 1], level: 0.19 },
+  { icon: '🐈', on: ['meVeryHot', 'steal', 1], level: -0.23 },
+  { boss: true, icon: '👑', a1icon: '🌬️', a1: ['every:6', 'freezeYou', 1], a2icon: '🎅', a2: ['meN:2', 'giveBoth', 1], level: -0.32 },
+  // 25 · Радужная страна (241–250)
+  { icon: '🦄', on: ['meN:1', 'knowParity', 1], level: -0.37 },
+  { icon: '☁️', on: ['meWarm', 'tellHalf', 1], level: -0.04 },
+  { icon: '🟣', on: ['youN:3', 'freezeYou', 1], level: -0.27 },
+  { icon: '🌦️', on: ['every:7', 'giveYou', 1], level: 0.21 },
+  { icon: '🖌️', on: ['youN:1', 'knowHalf', 1], level: 0.14 },
+  { icon: '☔', on: ['meHot', 'skipYou', 1], level: 0.1 },
+  { icon: '🔺', on: ['youHot', 'tellDir', 1], level: 0.18 },
+  { icon: '🪁', on: ['every:2', 'giveMe', 1], level: -0.01 },
+  { icon: '⚪', on: ['meN:4', 'fogYou', 1], level: 0.08 },
+  { boss: true, icon: '👑', a1icon: '🐉', a1: ['youVeryHot', 'fogYou', 1], a2icon: '🔀', a2: ['meHot', 'swapTokens', 1], level: -0.29 }
 ];
 const advHeroRules = [];
 function advHeroRule(n) {
@@ -538,7 +677,7 @@ function advLoadPack(lang) {
 // мира — поправка мира, а у героя — своя (level в ADV_HEROES): правило, что
 // помогает вам, — соперник умнее, и наоборот. Цель «среднего игрока» на
 // «Нормально» — в первом мире волны около 57% побед, к пятому — около 33%
-const ADV_BRAIN_SHIFT = [-0.03, -0.04, -0.1, -0.11, 0, 0.11, -0.07, -0.08, -0.1, -0.05, 0.04, -0.04, -0.04, -0.17, -0.12];
+const ADV_BRAIN_SHIFT = [-0.03, -0.04, -0.1, -0.11, 0, 0.2, -0.04, -0.06, -0.07, -0.06, 0.06, -0.01, -0.03, -0.18, -0.17, 0.02, -0.01, -0.08, -0.07, -0.12, 0.08, -0.02, -0.08, -0.02, -0.1];
 // С шестого мира — волны по пять миров: внутри волны сильнее, первый мир
 // волны — передышка, от волны к волне чуть сильнее
 function advWaveBase(w) {
@@ -591,10 +730,19 @@ function advCtx() {
     bonusIn: cand => { const b = D.bonuses.find(b => !b.taken && cand[b.value - RANGE_MIN] && !R.named(b.value)); return b ? b.value : null; },
     give: (p, k) => { D.tokens[p] = Math.min(9, D.tokens[p] + k); },
     take: (p, k) => { D.tokens[p] = Math.max(0, D.tokens[p] - k); },
-    skip: (p, freeze) => { D.skip[p] = true; if (freeze) D.frozen[p] = true; },
-    fog: p => { if (!D.fog[p]) { D.fog[p] = true; D.fogFrom[p] = 0; } },
-    memory: p => { D.shortMemory[p] = true; },
-    lava: p => { D.autoLava[p] = true; },
+    // Помеха на игрока проходит через щит и зеркало: зеркало отправляет её
+    // сопернику, щит просто отбивает. Что именно сработало — помним до fire
+    guard: (p, go) => {
+      if (p !== 0) return go(p);
+      if (D.mirror && D.mirror[0]) { D.mirror[0] = false; round.guarded = 'mirrorRule'; return go(1); }
+      if (D.shield && D.shield[0]) { D.shield[0] = false; round.guarded = 'shieldRule'; return; }
+      go(0);
+    },
+    skip: (p, freeze) => R.guard(p, q => { D.skip[q] = true; if (freeze) D.frozen[q] = true; }),
+    fog: p => R.guard(p, q => { if (!D.fog[q]) { D.fog[q] = true; D.fogFrom[q] = 0; } }),
+    blind: p => R.guard(p, q => { if (!D.blind[q]) { D.blind[q] = true; D.blindFrom[q] = 0; } }),
+    memory: p => R.guard(p, q => { D.shortMemory[q] = true; }),
+    lava: p => R.guard(p, q => { D.autoLava[q] = true; }),
     again: () => { D.extraTurn = true; },
     hide: m => { m.ruleHidden = true; },
     dir: x => (secret > x ? 'gt' : 'lt'),
@@ -616,6 +764,9 @@ function advCtx() {
     // экрана, дальше — репликой в пузыре. В начале раунда — в очередь: экран
     // партии ещё не открыт
     fire: (kind, vars) => {
+      // Помеху отбил щит или отразило зеркало: вместо реплики правила —
+      // вспышка щита или зеркала с названием правила
+      if (round.guarded) return advGuarded(c, kind);
       const text = advLine(c.n, kind, vars);
       if (!text) return;
       round.firedNow = true;
@@ -626,6 +777,19 @@ function advCtx() {
     }
   };
   return R;
+}
+
+// Щит или зеркало встретили правило соперника. Вспышку покажет движок
+// (checkBonusFx): как у бонуса, только с названием правила
+function advGuarded(c, kind) {
+  const round = advRoundState();
+  if (!round || !round.guarded) return;
+  D.lastBonus = round.guarded;
+  D.lastBonusBy = 0;
+  // Тексты героев с шестого мира грузятся отдельно: пока их нет — имя героя
+  D.shieldedText = advFireTitle(c.n, kind || 'rule') || advName(c.n);
+  round.guarded = null;
+  round.firedNow = true;
 }
 
 // Реплика соперника: hi, rule, a1, a2, luck, worry, win, lose
@@ -659,8 +823,9 @@ function advRoundStart() {
   const R = advCtx();
   if (!R) return;
   R.round.queue = [];
-  if (R.rule.first) { D.starter = 1; D.cur = 1; }
+  if (R.rule.first || R.c.world.rule === 'first') { D.starter = 1; D.cur = 1; }
   if (R.rule.start) R.rule.start(R);
+  if (R.round.guarded) advGuarded(R.c, 'rule');
   const queue = R.round.queue;
   R.round.queue = null;
   // Экран партии откроется чуть позже: реплики — после него. В первом раунде
@@ -683,6 +848,7 @@ function advAfterMove(m) {
   if (!R || D.roundOver) return;
   R.round.firedNow = false;
   if (R.rule.after) R.rule.after(R, m);
+  if (R.round.guarded) advGuarded(R.c, 'rule');
   if (R.round.firedNow) return;
   // Без правила — реплика на удачный ход: свой или ваш, раз за раунд
   if (m.p === 1 && advVeryHot(R, m) && R.once('luck')) advSay('luck');
@@ -715,6 +881,12 @@ function advRoundEndLine() {
   if (!vsBot || !vsBot.adv) return;
   const botWon = D.roundWinner === 1;
   advSay(D.matchOver ? (botWon ? 'win' : 'lose') : (botWon ? 'luck' : 'worry'));
+}
+
+// Цифра загаданного в бою с боссом — с шестого мира, через мир: десятков или
+// последняя
+function advBossDigit(c) {
+  return c.boss && c.w >= 5 ? (c.w % 2 ? 'units' : 'tens') : null;
 }
 
 function advDiff() {
@@ -942,7 +1114,10 @@ function renderAdventure(scroll) {
     head.onclick = () => advToggleWorld(w);
     // Имя сверху, счёт под ним: длинное имя не рвёт счёт на куски. У закрытого
     // мира счёта нет (там всегда 0) — что его откроет, сказано строкой ниже
-    head.innerHTML = '<span class="aw-title"><span class="aw-name">' + escapeHtml(advWorldName(w)) + '</span>' +
+    // Рядом с именем — бонус мира и значок правила: видно, чего ждать, ещё до боя
+    const rule = W.rule && A.worldRules[W.rule];
+    head.innerHTML = '<span class="aw-title"><span class="aw-top"><span class="aw-name">' + escapeHtml(advWorldName(w)) + '</span>' +
+      '<span class="aw-tags">' + bonusArtHtml(W.bonus, BONUS_ICON[W.bonus]) + (rule ? rule[0] : '') + '</span></span>' +
       (open ? '<span class="aw-count">' + A.progress.replace('{n}', beaten) +
         ' · <span class="aw-stars">⭐ ' + advWorldStars(w) + '/' + ADV_PER_WORLD * 3 + '</span></span>' : '') + '</span>' +
       '<span class="aw-reward' + (advWorldDone(w) ? ' got' : '') + '" title="' + escapeHtml(A.reward) + '">' +
@@ -1032,14 +1207,18 @@ function openAdvCard(n) {
   const range = (c.R.frost || c.world.frost) ? L.placeholderTpl.replace('{a}', formatNum(-half)).replace('{b}', formatNum(half))
     : L.placeholderTpl.replace('{a}', '1').replace('{b}', formatNum(c.world.range));
   const best = advStarAt(n);
-  const bk = c.world.bonus;
+  // Бонус мира, у босса с шестого мира — ещё цифра загаданного; ниже — правило мира
+  const bk = c.world.bonus, digit = advBossDigit(c), rule = c.world.rule && A.worldRules[c.world.rule];
+  const bonusOf = k => '<b>' + bonusArtHtml(k, BONUS_ICON[k]) + ' ' + escapeHtml(L.bonusNames[k]) + '</b>';
   document.getElementById('acFacts').innerHTML =
     '<span>' + escapeHtml(A.range) + ': <b>' + range + '</b></span>' +
     '<span>' + escapeHtml(A.wins) + ' <b>' + (c.boss ? 2 : 1) + '</b></span>' +
     '<span class="ac-best">' + escapeHtml(A.best) + ': <b class="s' + best + '">' + advStarRow(best) + '</b></span>' +
-    '<button type="button" class="ac-bonus" onclick="openBonusGuide(\'' + bk + '\')">' + escapeHtml(A.worldBonus) + ': <b>' +
-      bonusArtHtml(bk, BONUS_ICON[bk]) + ' ' + escapeHtml(L.bonusNames[bk]) + '</b>' +
-      (c.boss || c.R.bonus === 'magic' ? ' · ' + escapeHtml(A.traps) : '') + '</button>' +
+    '<button type="button" class="ac-bonus" onclick="openBonusGuide(\'' + bk + '\')">' + escapeHtml(A.worldBonus) + ': ' +
+      bonusOf(bk) + (digit ? ', ' + escapeHtml(A.bossBonus).replace('{b}', bonusOf(digit)) : '') +
+      (c.boss || c.R.bonus === 'magic' || c.world.rule === 'traps' ? ' · ' + escapeHtml(A.traps) : '') + '</button>' +
+    (rule ? '<span class="ac-rule">' + escapeHtml(A.ruleLabel) + ': <b>' + rule[0] + ' ' + escapeHtml(rule[1]) + '</b> — ' +
+      escapeHtml(rule[2]) + '</span>' : '') +
     '<span class="ac-gold">' + escapeHtml(advWorldGold(c.w) ? A.goldDone : A.cardGold.replace('{n}', advWorldThree(c.w))) + '</span>';
   const go = document.getElementById('acGo');
   // Закрыт: не обыгран прошлый соперник — или мир ждёт звёзд в прошлом мире
@@ -1081,15 +1260,19 @@ function startAdventure(n) {
   applyRangeToInputs();
   // Бонусы — у всех: бонус мира ложится всегда, ловушки — у босса и у
   // Осьминога Жонглёра (у него бонусов вдвое больше). У Ящера Рыцаря — втрое
-  // больше, и только полезные
+  // больше, и только полезные. С шестого мира у босса ещё и цифра загаданного
+  // (десятков или последняя — через мир), она тоже ложится всегда. Правило
+  // мира: «буря» — бонусов вдвое больше, «ловушки» — ловушки в каждом бою
   const magic = c.R.bonus === 'magic', knight = c.R.bonus === 'knight';
   const allGood = ['xray', 'half', 'shield', 'freeze'].filter(k => k !== c.world.bonus);
+  const digit = advBossDigit(c);
+  const mult = (magic ? 2 : knight ? 3 : 1) * (c.world.rule === 'storm' ? 2 : 1);
   bonusMode = true;
   bonusSet = {
-    first: true,
-    good: [c.world.bonus, 'extra', 'fog', 'blind'].concat(magic || knight ? allGood : []),
-    trap: (c.boss || magic) ? BONUS_TRAP : [],
-    count: magic ? 2 * autoBonusCountFor(rangeCount()) : knight ? 3 * autoBonusCountFor(rangeCount()) : 0
+    first: digit ? 2 : 1,
+    good: [c.world.bonus].concat(digit ? [digit] : [], ['extra', 'fog', 'blind'], magic || knight ? allGood : []),
+    trap: (c.boss || magic || c.world.rule === 'traps') ? BONUS_TRAP : [],
+    count: mult > 1 ? mult * autoBonusCountFor(rangeCount()) : 0
   };
   vsBot = { adv: c, diff: diff, bot: { key: c.icon, icon: c.icon, color: c.world.color, level: advLevel(c),
                            think: advThink(c), greet: 'luck', react: 'nice' } };
@@ -1101,7 +1284,7 @@ function startAdventure(n) {
   D.wins = [0, 0];
   D.round = 1;
   D.matchOver = false;
-  D.starter = c.R.first ? 1 : 0;
+  D.starter = (c.R.first || c.world.rule === 'first') ? 1 : 0;
   startRound();
   applyTranslations();
   showScreen('game');
