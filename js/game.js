@@ -1221,7 +1221,7 @@ function duelPlay(guess, forced) {
   D.extraTurn = false;
   // «+1 ход» Лиса Огонька — три хода подряд: после второго взводится ещё раз
   if (usedDouble && distance !== 0 && D.armedExtra > 0) { D.armedExtra--; D.armed = true; }
-  // Метеорит: следующий ход — чей бы он ни был — делается сам
+  // Звездопад (фея мира 5): следующий ход — чей бы он ни был — делается сам
   if (D.lavaNext) { D.lavaNext = false; if (!D.roundOver) D.autoLava[D.cur] = true; }
   renderAll();
 }

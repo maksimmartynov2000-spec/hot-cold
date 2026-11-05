@@ -221,13 +221,13 @@ const ADV_RULES = {
     if (best !== null && R.once('cat')) R.fire('rule');
     return best; } },
   moon: { icon: '🌙', level: -0.25, after(R, m) { if (m.p === 1 && R.count(1) % 2 === 0) { R.hide(m); if (R.once('moon')) R.fire('rule'); } } },
-  meteor: { icon: '☄️', after(R, m) {
-    // Каждый третий ход — метеорит: следующий ход, чей бы он ни был, делается сам
+  meteor: { icon: '🌠', after(R, m) {
+    // Каждый третий ход — звездопад: следующий ход, чей бы он ни был, делается сам
     if (history.length % 3 === 0 && R.tier(m) < 8) { D.lavaNext = true; R.fire('rule'); } } },
   whale: { icon: '🐋', level: -0.08, start(R) { R.know(0, 'half'); R.know(1, 'half'); R.fire('rule', { k: R.word('half') }); } },
   // Обмен: сам знает половину, а вам говорит чётность
   eyes: { icon: '👁️', level: -0.25, start(R) { R.know(1, 'half'); R.know(0, 'parity'); R.fire('rule', { k: R.word('parity') }); } },
-  comet: { icon: '💫', level: -0.15, think: [0.3, 0.8], after(R, m) { if (advFirstBotMove(R, m)) R.fire('rule'); } },
+  comet: { icon: '🎯', level: -0.15, think: [0.3, 0.8], after(R, m) { if (advFirstBotMove(R, m)) R.fire('rule'); } },
   blackhole: { icon: '🌀', frost: true, after(R, m) { if (m.p === 0 && R.tier(m) === 0) { R.hide(m); R.fire('rule'); } } },
   ufo: { icon: '👑', a1icon: '🛸', a2icon: '🚀', boss: true,
     turn(R) { if (R.round.teleport) { R.round.teleport = false; D.armed = true; } },

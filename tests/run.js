@@ -7680,7 +7680,7 @@ async function testAdvRules(browser) {
   r.moon = await page.evaluate(() => { advTest(43, 100); play(1, 1); play(0, 1); play(1, 2); return history.filter(h => h.p === 1).map(h => hiddenRow(1, h)).join(); });
   check('Лунный зайка: каждый второй его ход спрятан', r.moon === 'false,true', r.moon);
   r.meteor = await page.evaluate(() => { advTest(44, 100); play(0, 1); play(1, 1); play(0, 1); return { next: D.cur, lava: D.autoLava[D.cur] }; });
-  check('Метеорит: третий ход — следующий делается сам', r.meteor.lava === true, JSON.stringify(r.meteor));
+  check('Фея Звездопад: третий ход — следующий делается сам', r.meteor.lava === true, JSON.stringify(r.meteor));
   r.whale = await page.evaluate(() => { advTest(45, 100); advRoundStart(); return [D.know[0].half, D.know[1].half].join(); });
   check('Кит: оба знают половину', r.whale === 'low,low', r.whale);
   r.eyes = await page.evaluate(() => { advTest(46, 100); advRoundStart(); return [D.know[1].parity === undefined ? '-' : D.know[1].parity, D.know[1].half, D.know[0].half || '-'].join(); });
