@@ -1,0 +1,132 @@
+# Замены: живые герои вместо вещей, сладостей, растений с глазками и погоды.
+# Номер — как у портрета (adv-NNN), правило и сила героя остаются прежними.
+# Новые темы миров: 6 Остров лемуров, 17 Драконья долина, 20 Станция НЛО,
+# 24 Эпоха мамонтов, 27 Тридевятое царство, 32 Долина пирамид.
+# (номер, имя по-русски, описание для Gemini). Боссы — номер на 0.
+HEROES = [
+ # 6 · Остров лемуров (вместо Сладкого королевства)
+ (51, 'Жук-жираф Каланча', 'a giraffe weevil, a small red-and-black beetle with an extremely long neck, smiling'),
+ (52, 'Лемур Кольцехвост', 'a ring-tailed lemur holding a ripe mango, its long black-and-white striped tail curled up behind it'),
+ (53, 'Ай-ай Полуночник', 'an aye-aye lemur with huge round orange eyes, big bat-like ears and one long thin finger raised, a tiny crescent moon above it'),
+ (54, 'Сифака Попрыгун', 'a white sifaka lemur leaping sideways in a dancing pose with arms up, a chocolate-brown cap of fur on its head'),
+ (55, 'Мышиный лемур Запасик', 'a tiny mouse lemur with enormous eyes hugging its own plump furry tail'),
+ (56, 'Черепаха Лучистая', 'a radiated tortoise with a high dome shell patterned with bright yellow star-like rays, looking wise and kind'),
+ (57, 'Геккон Листохвост', 'a leaf-tailed gecko whose flat tail looks exactly like a dry brown leaf, pretending to be a leaf with a sly smile'),
+ (58, 'Тенрек Засоня', 'a sleepy streaked tenrec, a small spiky hedgehog-like animal with yellow and black stripes, yawning'),
+ (59, 'Лягушка Помидорка', 'a round tomato frog, bright red and puffed up like a ball, croaking happily'),
+ (60, 'Владыка Фосса', 'a sleek fossa, a slender cat-like animal with reddish-brown fur and a very long tail, wearing a small golden crown'),
+ # Живые вместо вещей в мирах 8–15
+ (78, 'Песчаная кошка Тень', 'a sand cat, a small desert wild cat with sandy fur, very wide ears and big green eyes, peeking out from behind a dune'),
+ (90, 'Гусь Генерал', 'a bossy white farm goose with its chest puffed out, wearing a general\'s sash with medals and a small golden crown'),
+ (95, 'Стриж Мельк', 'a sleek dark swift bird in fast flight with long sickle-shaped wings and motion streaks behind it'),
+ (96, 'Альбатрос Парусник', 'a white albatross gliding with very long wings spread wide, calm and proud'),
+ (100, 'Громовая Птица', 'a majestic thunderbird, a huge eagle-like spirit bird with storm-blue feathers and small lightning sparks around its wings, wearing a small crown'),
+ (123, 'Попугай Пиастр', 'a red-and-blue macaw parrot wearing a tiny pirate bandana and holding a gold coin in its beak'),
+ (132, 'Горгулья Указка', 'a small friendly stone gargoyle with little bat wings, pointing the way with one finger and smiling'),
+ (139, 'Гоблин Шмыг', 'a mischievous little green goblin with big pointy ears and a cheeky grin, wearing a patched hood'),
+ (148, 'Барсук Храбрец', 'a brave badger knight in shiny silver armor holding a small shield with a white stripe emblem'),
+ # 19 · Бамбуковая роща
+ (189, 'Гиббон Лиана', 'a white-handed gibbon swinging from a green vine on one very long arm, looking upward'),
+ # 17 · Драконья долина (вместо Страны игрушек)
+ (161, 'Дракончик Жарик', 'a small chubby black-and-red dragon blowing on a glowing ember held in its paws'),
+ (162, 'Виверна Флюгер', 'a slim green wyvern with wings for arms, pointing with its arrow-shaped tail'),
+ (163, 'Дракончик Апчхи', 'a tiny orange baby dragon with a runny nose sneezing a puff of sparks'),
+ (164, 'Дракон Ветрокрыл', 'a sky-blue dragon flapping its large feathery wings hard'),
+ (165, 'Дракончик Мираж', 'a shimmering see-through purple dragon that is half invisible, winking playfully'),
+ (166, 'Дракончик Добряк', 'a round friendly golden dragon with a warm smile, holding out a helping paw'),
+ (167, 'Дракон Рокот', 'a stocky dark-green dragon with small horns roaring a loud but friendly roar'),
+ (168, 'Дракон Скряга', 'a little red dragon hugging a pile of gold coins with a greedy but cute grin'),
+ (169, 'Пернатый змей Перо', 'a feathered serpent, a long flying snake-like dragon covered in bright green and blue feathers'),
+ (170, 'Король Драконов', 'a mighty crimson dragon king with golden horns, a long flowing mane and a crown'),
+ # 20 · Станция НЛО (вместо Города часов)
+ (191, 'Пришелец Гуп', 'a cute little purple alien with one big eye and long wobbly antennae, waving hello'),
+ (192, 'Тихоходка Невесомка', 'a cute chubby tardigrade (water bear) floating in space, waving its tiny paws'),
+ (193, 'Марсианин Двоюн', 'a small red Martian with two smiling heads and four little arms'),
+ (194, 'Космический слизень Лип', 'a friendly glowing purple space slug with eye stalks, leaving a sparkly trail'),
+ (195, 'Звёздный ёж Искрун', 'a hedgehog-like alien whose spikes are glowing, crackling electric sparks'),
+ (196, 'Мышь-космонавт Пилотка', 'a little mouse astronaut in a white spacesuit with a star badge, giving a thumbs up'),
+ (197, 'Пришелец Локатор', 'a round blue alien with a big satellite-dish antenna on its head, listening carefully'),
+ (198, 'Осьминог-телепат Мыслик', 'a pink alien octopus with a big glowing head and closed eyes, reading minds'),
+ (199, 'Пёс-космонавт Ракета', 'an eager puppy in an orange spacesuit with a small rocket backpack'),
+ (200, 'Большая Медведица', 'the Great Bear constellation as a big friendly bear made of glowing stars and deep-blue night sky, wearing a crown'),
+ # 22 · Цирк
+ (214, 'Тигрёнок Кольцо', 'a tiger cub in a circus collar jumping through a hoop'),
+ (218, 'Хомяк Кувырок', 'a hamster acrobat doing a somersault in a little circus vest'),
+ # 23 · Хрустальные пещеры
+ (221, 'Звездорыл Копун', 'a star-nosed mole with a pink star-shaped nose, holding a glowing crystal'),
+ (223, 'Протей Белянка', 'an olm, a pale pink cave salamander with feathery gills and tiny eyes, smiling'),
+ (226, 'Кристальная ящерка Блеск', 'a small lizard whose back is covered with sparkling crystal spikes'),
+ (228, 'Пещерный сверчок Скрипун', 'a cave cricket with extremely long antennae and long legs, listening'),
+ # 24 · Эпоха мамонтов (вместо Зимней сказки; Рысёнок Кис остаётся)
+ (231, 'Мамонтёнок Шерстик', 'a baby woolly mammoth with long shaggy brown fur and small curved tusks'),
+ (232, 'Саблезуб Клык', 'a saber-toothed kitten with two long friendly fangs, grinning'),
+ (233, 'Шерстистый носорог Буран', 'a woolly rhinoceros calf with thick shaggy fur and a big horn, smiling kindly'),
+ (234, 'Пещерный медведь Берлога', 'a sleepy cave bear cub curled up and yawning'),
+ (235, 'Большерогий олень Рогач', 'a giant deer (megaloceros) fawn with enormous wide antlers, trumpeting'),
+ (236, 'Пещерный лев Засада', 'a cave lion cub with a short pale mane, crouching in fresh snow as if hiding'),
+ (237, 'Глиптодонт Броня', 'a glyptodont, a giant armadillo-like animal with a dome shell made of hexagon plates'),
+ (238, 'Ленивец Великан', 'a giant ground sloth standing on its hind legs with arms open for a hug'),
+ (240, 'Царь Мамонтов', 'a huge old woolly mammoth king with long white tusks, frost on its fur and a crown'),
+ # 25 · Радужная страна (единорог, пегас и дракон остаются)
+ (243, 'Кельпи Омут', 'a kelpie, a magical water horse with a mane like flowing seaweed and waves'),
+ (244, 'Утка-мандаринка Узорка', 'a mandarin duck with bright orange, blue and purple patterned feathers'),
+ (245, 'Цилинь Мудрец', 'a qilin, a gentle deer-dragon creature with rainbow scales, a single antler and a flowing mane'),
+ (246, 'Медуза Жгучка', 'a rainbow jellyfish with a shimmering bell and long glowing tentacles, smiling'),
+ (247, 'Райская птица Танцорка', 'a bird of paradise with a dazzling fan of colorful plumes, dancing'),
+ (248, 'Лори Нектарка', 'a rainbow lorikeet parrot with a blue head, green wings and an orange chest, sipping nectar'),
+ (249, 'Кальмар Мерцалка', 'a firefly squid with tiny glowing blue lights all over its body, puffing a little cloud of ink'),
+ # 26 · Болото
+ (253, 'Норка Шустрячок', 'a sleek dark-brown mink with a cheeky smile, sneaking'),
+ (258, 'Бобр Запруда', 'a beaver holding a stick, standing by a small dam of twigs'),
+ # 27 · Тридевятое царство (вместо Музыкальной долины)
+ (261, 'Сирин Певунья', 'Sirin, a magical bird from Russian fairy tales with a kind girl\'s face, colorful feathers and a small kokoshnik headdress, singing'),
+ (262, 'Конёк-Горбунок', 'the Little Humpbacked Horse from a Russian fairy tale, a small horse with a hump and very long ears'),
+ (263, 'Леший Мохнач', 'a friendly forest spirit (leshy) with a beard of moss, bark skin and small twig antlers'),
+ (264, 'Змей Горыныч', 'a cute three-headed green dragon from Russian fairy tales, each head with a different funny expression'),
+ (265, 'Домовёнок Шуршун', 'a little house spirit (domovoi), a small shaggy bearded creature peeking out from behind a stove corner'),
+ (266, 'Жар-птица Огнепёрка', 'the Firebird, a magical bird with glowing golden-orange feathers and a long flaming tail'),
+ (267, 'Сокол Финист', 'a bright falcon with sharp eyes and a little red cape, from a Russian fairy tale'),
+ (268, 'Баба-Яга', 'a funny, kind-looking Baba Yaga in a headscarf flying in a wooden mortar with a broom'),
+ (269, 'Царевна-Лягушка', 'a frog princess with a tiny golden crown, holding an arrow'),
+ (270, 'Кощей Бессмертный', 'Koschei the Deathless as a funny thin old king with a long beard, a black cape and a crown'),
+ # 28 · Горные вершины
+ (274, 'Пищуха Сеносбор', 'a pika, a small round mountain animal like a tiny rabbit, carrying a bundle of hay'),
+ (278, 'Горный козёл Скалолаз', 'an ibex with huge curved horns standing on a rock ledge'),
+ (279, 'Бородач Зоркий', 'a bearded vulture with orange chest feathers and a black beard of feathers, looking far away'),
+ # 29 · Фабрика роботов
+ (282, 'Робокот Винтик', 'a cute robot cat with a shiny metal body and little sparks coming from its ears'),
+ (284, 'Робосорока Хапуга', 'a robot magpie with black-and-white metal feathers holding a shiny bolt in its beak'),
+ (285, 'Андроид Заряд', 'a friendly android boy with a glowing battery-level indicator on its chest'),
+ (286, 'Робокраб Клешня', 'a robot crab with two big shiny claws, one of them raised'),
+ (287, 'Робопчела Сканер', 'a robot bee with scanner lenses for eyes and glowing wings'),
+ # 31 · Осенний лес
+ (303, 'Ласка Листопадка', 'a weasel with a red autumn leaf on its head, peeking out'),
+ (307, 'Глухарь Ворчун', 'a capercaillie, a big dark forest grouse with a fanned tail and red eyebrows, grumbling'),
+ # 32 · Долина пирамид (вместо Волшебной кухни)
+ (311, 'Ибис Писец', 'a sacred ibis bird with a long curved beak holding a papyrus scroll'),
+ (312, 'Скарабей Катун', 'a shiny blue-green scarab beetle rolling a ball'),
+ (313, 'Кошка Бастет', 'an elegant black Egyptian cat wearing a golden collar and a gold earring'),
+ (314, 'Шакалёнок Анубис', 'a jackal pup with tall ears and a gold-and-blue Egyptian collar'),
+ (315, 'Сокол Гор', 'a falcon with the Eye of Horus marking around its eye'),
+ (316, 'Бегемотик Таурт', 'a clumsy cheerful baby hippo with a lotus flower on its head'),
+ (317, 'Крокодильчик Себек', 'a little Nile crocodile peeking out of the water with only its eyes and snout above the surface'),
+ (318, 'Мангуст Хват', 'a mongoose standing upright and alert'),
+ (319, 'Цапля Бенну', 'a grey heron with a golden sun disc behind its head, the Egyptian Bennu bird'),
+ (320, 'Солнечный Ра', 'a falcon-headed sun king with a golden sun disc above his head and a pharaoh\'s headdress'),
+ # 34 · Страна снов
+ (332, 'Калан Дремуша', 'a sea otter floating on its back fast asleep, holding a small pebble'),
+ (333, 'Мотылёк Ночница', 'a pale green luna moth with long tail wings, glowing softly'),
+ (337, 'Долгопят Ночник', 'a tarsier with enormous round eyes clinging to a branch, holding a glowing dream bubble'),
+ (338, 'Пингвинёнок Лунатик', 'a sleepwalking penguin chick in pajamas with eyes closed and flippers forward'),
+ # 35 · Кузница гномов (Гномик Молоточек и Король Гномов остаются)
+ (342, 'Дух огня Полыхай', 'a small friendly fire spirit made of warm flames with a happy face'),
+ (343, 'Гномиха Звонка', 'a dwarf blacksmith girl with braids, a leather apron and a small hammer'),
+ (344, 'Крот Рудокоп', 'a mole miner with a helmet lamp pushing a little cart of ore'),
+ (345, 'Тролль Пыхтун', 'a big friendly stone troll with mossy hair, puffing out a cloud of forge smoke'),
+ (346, 'Кобольд Самородок', 'a kobold, a small friendly mine spirit with big ears and a glowing nose, holding a gold nugget'),
+ (347, 'Гном Старатель', 'a prospector dwarf holding a gold pan with a big lucky grin'),
+ (348, 'Гном Секира', 'a dwarf warrior with a horned helmet and a small axe, shouting a battle cry'),
+ (349, 'Медведь Молотобоец', 'a strong brown bear blacksmith in a leather apron swinging a big hammer'),
+]
+# Листы: пять по 20 (5×4) и шестой на 6 (3×2), герои — подряд
+SHEETS = [HEROES[0:20], HEROES[20:40], HEROES[40:60], HEROES[60:80], HEROES[80:100], HEROES[100:]]

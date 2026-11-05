@@ -1,4 +1,4 @@
-WORLDS = ['Süßigkeitenreich', 'Eisige Arktis', 'Sonnenwüste', 'Lustiger Bauernhof', 'Wolkenstadt',
+WORLDS = ['Lemureninsel', 'Eisige Arktis', 'Sonnenwüste', 'Lustiger Bauernhof', 'Wolkenstadt',
           'Blumengarten', 'Dinotal', 'Pirateninsel', 'Halloweendorf', 'Königsschloss']
 H = []
 def r(n, t, d, hi, rule, luck, worry, win, lose):
@@ -11,29 +11,29 @@ FOG_F = 'Bis zum Rundenende siehst du ihre Züge nicht'
 MEM = 'Bis zum Rundenende siehst du nur die letzten zwei Züge'
 LAVA = 'Dein nächster Zug geschieht von selbst — ein wilder Wurf'
 
-# 6 · Süßigkeitenreich
-r('Gummibär Wackel', 'Klebrig', 'Bist du „Kalt“ oder weiter weg, bleibst du im Gelee kleben und setzt einen Zug aus. Einmal pro Runde.',
-  'Ich bin süß und klebrig! 🍬', 'Kleben geblieben? Setz einen Zug aus!', 'Mmm, das riecht nach Sieg!', 'Oh, du bist zu nah dran!', 'Ein süßer Sieg! 🍬', 'Ich bin geschmolzen…')
-r('Muffin Kirsche', 'Kirsche obendrauf', f'Ist er „Sehr heiß“ oder näher, freut er sich so sehr, dass er dir einen {K} schenkt. Einmal pro Runde.',
-  'Hallo! Greif zu! 🍒', 'Hier, eine Kirsche — „⚡ +1 Zug“!', 'Ich bin fast durchgebacken — heiß!', 'Du bist heiß wie ein Ofen!', 'Der Sieg ist die Kirsche obendrauf!', 'Oh nein, angebrannt…')
-r('Pudel Zuckerwatte', 'Zuckerwolke', f'Nach deinem ersten Zug hüllt er dich in Zuckerwatte: {FOG}.',
-  'Ich bin flauschig und süß! 🍭', 'Puff! Zuckerwolke!', 'Ich glaube, ich bin nah dran!', 'Iss meine Zuckerwatte nicht — sonst errätst du’s!', 'Ein flauschiger Sieg!', 'Meine Zuckerwatte ist geschmolzen… 🍭')
-r('Lebkuchenmann Krümel', 'Fang mich doch!', 'Bist du „Sehr heiß“ oder näher, läuft er weg: Beim nächsten Mal zieht er zweimal hintereinander. Einmal pro Runde.',
-  'Lauf, lauf, so schnell du kannst! 🏃', 'Fang mich doch — ich renne doppelt!', 'Ich bin fast da!', 'Oh, du holst mich ein!', 'Nicht gefangen! Ha!', 'Du hast mich doch gefangen…')
-r('Hamster Makrone', 'Backen-Vorrat', f'Mit seinem zweiten Zug holt er sich einen {K} aus den Backen.',
-  'Ich hab alles gut verstaut! 🥮', 'Mampf! Ein „⚡ +1 Zug“ aus der Backe!', 'Ich rieche was Leckeres!', 'Hey, Finger weg von meinem Vorrat!', 'Ein Vorrat an Sieg — meiner!', 'Mein Vorrat ist alle…')
-r('Nilpferd Torte', 'Wünsch dir was', 'Nach deinem ersten Zug pustet das Nilpferd eine Kerze aus und verrät dir, ob die Zahl gerade oder ungerade ist.',
-  'Ich hab Geburtstag! 🎂', 'Puh! Die Zahl ist {k}!', 'Das Geschenk ist ganz nah!', 'Du hast fast alle meine Kerzen ausgepustet!', 'Der schönste Geburtstag!', 'Wenigstens ist die Torte noch da 🎂')
-r('Welpe Donut', 'Schwanzwedeln', 'Wirst du wärmer, freut er sich so sehr, dass er seinen nächsten Zug aussetzt. Einmal pro Runde.',
-  'Wuff! Spielen wir? 🍩', 'Juhu, wärmer! Ich wedle — und setze aus!', 'Schnüffel-schnüffel — hier irgendwo!', 'Du bist so nah — gleich hüpfe ich!', 'Wuff! Gefunden!', 'Gut gemacht, wuff!')
-r('Schäfchen Flausch', 'Schäfchen zählen', 'Nach deinem zweiten Zug fängt das Schäfchen an, Schäfchen zu zählen — es schläft ein und setzt aus.',
-  'Mäh, ich bin weich wie Marshmallow ☁️', 'Ein Schäfchen, zwei Schäfchen… Chrrr…', 'Oh, fast getroffen!', 'Mäh! Fast erraten!', 'Süße Träume — ich hab gewonnen!', 'Verschlafen… mäh.')
-r('Eistüte Kugel', 'Kältekick', f'Bist du „Warm“ oder näher, friert dein Gedächtnis ein: {MEM}. Einmal pro Runde.',
-  'Ich bin die Coolste im Reich! 🍦', 'Brrr! Du merkst dir nur zwei Züge!', 'Ich schmelze — also ist es heiß!', 'Oh, gleich schmelze ich!', 'Ein eiskalter Sieg! 🍦', 'Alles geschmolzen…')
-b('Die Zuckerkönigin', 'Süße Steuer', f'Wirst du wärmer, nimmt sie sich deinen {K}. Einmal pro Runde.',
-  'Königsschatz', f'Beim vierten Zug der Runde holt sie sich einen {K} aus der Schatzkammer.',
-  'Das Süßigkeitenreich gehört mir! 👑', 'Steuer! Dein „⚡“ kommt in meine Schatzkammer!', 'Die Schatzkammer ist voll — ein „⚡ +1 Zug“ für mich!',
-  'Meine Krone riecht den Sieg!', 'Ach, was für ein frecher Untertan!', 'Die Königin gewinnt! 👑', 'Na gut… du bist ein süßer Sieger!')
+# 6 · Lemureninsel
+r('Giraffenkäfer Stelze', 'Schranke', 'Bist du „Kalt“ oder weiter weg, senkt er seinen langen Hals wie eine Schranke: Du setzt einen Zug aus. Einmal pro Runde.',
+  'Siehst du meinen Hals? Der längste der Insel! 🦒', 'Schranke runter — setz einen Zug aus!', 'Von hier oben sieht man die Antwort besser!', 'Oh, du bist schon an meinem Hals!', 'Ich habe mich bis zum Sieg gestreckt!', 'Langer Hals, aber der Sieg gehört dir…')
+r('Katta Ringel', 'Mango für alle', 'Ist er „Sehr heiß“ oder näher, freut er sich so sehr, dass er eine Mango teilt: einen „⚡ +1 Zug“ für dich. Einmal pro Runde.',
+  'Hallo! Siehst du meinen Schwanz? Das ist meine Fahne! 🥭', 'Hier, eine Mango — ein „⚡ +1 Zug“!', 'Ich rieche reife Mangos — sehr heiß!', 'He, du schleichst dich an meine Mango heran!', 'Schwanz hoch — ich gewinne!', 'Na gut, heute gehört die Mango dir.')
+r('Fingertier Mitternacht', 'Mitternacht', 'Nach deinem ersten Zug bricht Mitternacht an: Bis zum Rundenende siehst du seine Züge nicht.',
+  'Ich gehe nur nachts aus… 🌙', 'Mitternacht! Du siehst meine Züge nicht!', 'Im Dunkeln sehe ich am besten!', 'Siehst du etwa auch im Dunkeln?!', 'Die Nacht gehört mir!', 'Es dämmert schon… du gewinnst.')
+r('Sifaka Hopser', 'Sifaka-Tanz', 'Bist du „Sehr heiß“ oder näher, fängt er an zu tanzen: Beim nächsten Mal zieht er zweimal hintereinander. Einmal pro Runde.',
+  'Ich gehe nicht — ich tanze! 🕺', 'Hopp-hopp! Zwei Züge hintereinander!', 'Ein paar Sprünge, und ich bin nah!', 'Oh, du hast meinen Rhythmus erwischt!', 'Ein Siegestanz!', 'Ich habe mich müde getanzt…')
+r('Mausmaki Vorrat', 'Schwanz-Speicher', 'Mit seinem zweiten Zug holt er sich einen „⚡ +1 Zug“ aus seinem dicken Schwanz.',
+  'Ich bin klein, aber ich spare alles! 🐭', 'Mein Schwanz-Speicher — ein „⚡ +1 Zug“ für mich!', 'Oh, ich rieche den Sieg!', 'Finger weg von meinem Vorrat!', 'Mein Vorrat hat sich gelohnt!', 'Mein Vorrat ist alle…')
+r('Strahlenschildkröte Uroma', 'Weiser Rat', 'Nach deinem ersten Zug gibt sie dir einen weisen Rat: ob die Zahl gerade oder ungerade ist.',
+  'Ich bin hundert Jahre alt — ich weiß viel 🐢', 'Alte Weisheit: Die Zahl ist {k}!', 'Langsam, aber sicher!', 'Du bist schneller, als ich dachte!', 'Langsam, aber sicher zum Sieg!', 'Ach, die Jugend… du gewinnst.')
+r('Blattschwanzgecko Laubi', 'Ich bin ein Blatt', 'Wirst du wärmer, erstarrt er wie ein trockenes Blatt und setzt seinen nächsten Zug aus. Einmal pro Runde.',
+  'Finde mich doch! 🍂', 'Ich bin ein Blatt… nur ein Blatt… ich setze aus.', 'Ich raschle direkt neben der Antwort!', 'Schau mich nicht an, ich bin ein Blatt!', 'Ha! Du hast mich nicht entdeckt!', 'Entdeckt… ich bin ein schlechtes Blatt.')
+r('Tanrek Schlafmütze', 'Winterschlaf', 'Nach deinem zweiten Zug gähnt er, schläft ein und setzt einen Zug aus.',
+  'Uaaah… hallo… 🥱', 'Chrrr… weck mich in einem Zug…', 'Sogar verschlafen bin ich nah!', 'Ich bin aufgewacht — und du bist schon nah!', 'Gewonnen — und weiterschlafen!', 'Ich habe verschlafen…')
+r('Tomatenfrosch Tomi', 'Lautes Quaken', 'Bist du „Warm“ oder näher, quakt er so laut, dass du den Faden verlierst: Bis zum Rundenende siehst du nur die letzten zwei Züge. Einmal pro Runde.',
+  'Quak! Ich bin rund und rot wie eine Tomate! 🐸', 'QUAAAK! Du merkst dir nur zwei Züge!', 'Quak! Sehr heiß!', 'Quak… du hast dich angeschlichen!', 'Quak-quak — ich gewinne!', 'Quak… mir ist die Luft ausgegangen.')
+b('Der Fossa-Fürst', 'Sprung', 'Wirst du wärmer, springt er los und nimmt sich deinen „⚡ +1 Zug“. Einmal pro Runde.',
+  'Beute', 'Beim vierten Zug der Runde holt er sich Beute: einen „⚡ +1 Zug“.',
+  'Die ganze Insel gehört mir! 👑', 'Sprung! Dein „⚡“ gehört mir!', 'Beute — ein „⚡ +1 Zug“ für mich!',
+  'Ich wittere Beute!', 'Du bist ein mutiges Tierchen!', 'Der Fürst der Insel gewinnt! 👑', 'Na gut… heute gehört die Insel dir.')
 
 # 7 · Eisige Arktis
 r('Eisbär Flocke', 'Schneeball', f'Nach deinem ersten Zug wirft er einen Schneeball: {LAVA}.',
@@ -74,8 +74,8 @@ r('Gürteltier Roll', 'Kugelrolle', 'Wird das Gürteltier kälter, rollt es sich
   'Ich bin wie ein Ball! 🥎', 'Kälter? Ich rolle — und ziehe noch mal!', 'Ich rolle direkt zum Ziel!', 'Du holst auf!', 'Zum Sieg gerollt!', 'In ein Loch gerollt…')
 r('Springmaus Hops', 'Gegenteil', 'Sie springt ans andere Ende: Sie nennt die Zahl, die deiner spiegelbildlich gegenüberliegt — wenn sie noch die gesuchte sein kann.',
   'Hops-hops! 🔁', 'Hops — ans andere Ende!', 'Noch ein Sprung, dann hab ich’s!', 'Du springst besser als ich!', 'Ein Sprung zum Sieg!', 'Zu weit gesprungen…')
-r('Kaktus Piks', 'Stacheln', 'Bist du „Warm“ oder näher, versteckt sich dein Zug in den Stacheln: Du siehst ihn nicht. Einmal pro Runde.',
-  'Eine Umarmung? 🌵', 'Autsch! Dein Zug steckt in meinen Stacheln!', 'Ich blühe — also ist es nah!', 'Stich dich nicht — du hast es fast!', 'Ein stacheliger Sieg! 🌵', 'Ich bin verwelkt…')
+r('Sandkatze Schatten', 'Hinter der Düne', 'Bist du „Warm“ oder näher, deckt sie deinen Zug mit Sand zu: Du siehst ihn nicht. Einmal pro Runde.',
+  'Miau… im Sand entdeckst du mich nicht 🏜️', 'Pst… dein Zug liegt unter dem Sand!', 'Hinter der Düne wittere ich Beute!', 'Hast du meine Spur gefunden?!', 'Schnurr! Die Wüste gehört mir!', 'Miau… die Spuren führten zu dir.')
 r('Kragenechse Rüsche', 'Schreck-Kragen', 'Mit ihrem ersten Zug spreizt sie den Kragen und erschreckt dich: Du setzt einen Zug aus.',
   'Schau, wie ich meinen Kragen aufspanne! 😱', 'Buh! Erschrocken? Setz einen Zug aus!', 'Mein Kragen zittert — nah dran!', 'Du hast keine Angst vor mir?!', 'Erschreckt und gewonnen!', 'Mein Kragen ist zugeklappt…')
 b('Der Sphinx-Pharao', 'Sandsturm', f'Nach deinem dritten Zug begräbt er die Spuren im Sand: {MEM}.',
@@ -102,10 +102,10 @@ r('Truthahn Fächer', 'Fächerschwanz', 'Sein zweiter Zug ist hinter seinem Schw
   'Bewundere meinen Schwanz! 🎴', 'Frrr! Der Zug ist hinter meinem Schwanz!', 'Mein Schwanz fächert sich — heiß!', 'Du schaust hinter meinen Schwanz?!', 'Ein schöner Sieg!', 'Mein Schwanz hängt…')
 r('Maus Emmentaler', 'Knabberei', f'Bist du „Sehr kalt“, knabbert sie heimlich: einen {K} für sie. Einmal pro Runde.',
   'Piep! Der Käse gehört mir! 🧀', 'Piep! Geknabbert — „⚡“ für mich!', 'Ich rieche Käse — ich bin nah dran!', 'Piep! Du bist an meinem Loch!', 'Piep! Der ganze Käse gehört mir!', 'Piep… der Käse ist weg.')
-b('Die Vogelscheuche', 'Krähe auf der Schulter', f'Bist du „Warm“ oder näher, bringt ihre Krähe ihr deinen {K}. Einmal pro Runde.',
-  'Strohwirbel', 'Wird sie kälter, dreht sie sich wie ein Wirbelwind: Beim nächsten Mal zieht sie zweimal hintereinander. Einmal pro Runde.',
-  'Ich bewache dieses Feld! 🌾', 'Krah! Die Krähe hat deinen „⚡“ geholt!', 'Wusch! Ein Strohwirbel!',
-  'Die Ernte ist fast meine!', 'Du hast keine Angst vor einer Vogelscheuche?!', 'Das Feld gehört mir! 🌾', 'Du hast alle meine Krähen verscheucht!')
+b('General Gans', 'Zwicken', 'Bist du „Warm“ oder näher, zwickt er dich und schnappt sich deinen „⚡ +1 Zug“. Einmal pro Runde.',
+  'Gänsemarsch', 'Wird er kälter, befiehlt er „Marsch!“: Beim nächsten Mal zieht er zweimal hintereinander. Einmal pro Runde.',
+  'Stillgestanden! Auf diesem Hof habe ich das Kommando! 👑', 'Schnatter! Gezwickt — dein „⚡“ gehört mir!', 'Im Gänsemarsch! Zwei Züge hintereinander!',
+  'Schnatter! Ziel in Sicht!', 'Soldat, du bist zu nah!', 'Sieg! Körner für alle! 👑', 'Rückzug… du gewinnst, schnatter.')
 
 # 10 · Wolkenstadt
 r('Papagei Pilot', 'Nachplappern', 'Bist du „Glühend“, plappert er dir nach und verplappert sich: Die Zahl ist größer oder kleiner als deine. Einmal pro Runde.',
@@ -116,20 +116,20 @@ r('Flamingo Fifi', 'Auf einem Bein', 'Beim fünften Zug der Runde stellt sich Fi
   'Ich bin die Eleganteste! 🦩', 'Ich stehe auf einem Bein… setze aus.', 'Oh, wie heiß!', 'Oh! Fast gefunden!', 'Ein eleganter Sieg!', 'Oh… Gleichgewicht verloren.')
 r('Jungadler Höhe', 'Adlerauge', 'Ab seinem zweiten Zug weiß er, ob die Zahl gerade oder ungerade ist. Dir verrät er es nicht.',
   'Von oben sehe ich alles! 🦅', 'Von hier oben weiß ich, ob sie gerade ist oder nicht!', 'Ziel in Sicht!', 'Du fliegst höher als ich!', 'Ein Adlersieg!', 'Eine Wolke war im Weg…')
-r('Wölkchen Puff', 'Nebelchen', 'Deinen dritten Zug versteckt das Wölkchen im Nebel: Du siehst ihn nicht.',
-  'Ich bin weich und flauschig ☁️', 'Puff! Dein Zug ist im Nebel!', 'Oh, gleich regne ich — heiß!', 'Du siehst durch Wolken?!', 'Ein wolkiger Sieg!', 'Ich bin davongeschwebt…')
-r('Ballon Brise', 'Abheben', 'Wird er wärmer, hebt er ab und zieht sofort noch einmal. Einmal pro Runde.',
-  'Wind, trag mich! 🎈', 'Wärmer! Ich hebe ab — und ziehe noch mal!', 'Höher und höher!', 'Oh, mir geht die Luft aus!', 'Hoch oben — gewonnen!', 'Pffft… Luft raus.')
+r('Mauersegler Blitz', 'Wirbelwind', 'Ein Wirbelwind trägt deinen dritten Zug davon: Du siehst ihn nicht.',
+  'Wusch! Ich bin schneller als der Wind! 💨', 'Wusch! Dein Zug ist weggeweht!', 'Ich fliege direkt zum Ziel!', 'Kannst du etwa auch fliegen?!', 'Wusch — ich gewinne!', 'Ich habe es nicht geschafft…')
+r('Albatros Brise', 'Rückenwind', 'Wird er wärmer, fängt er Rückenwind und zieht sofort noch einmal. Einmal pro Runde.',
+  'Ich überquere den ganzen Ozean, ohne mit den Flügeln zu schlagen 🌊', 'Rückenwind! Ich ziehe noch mal!', 'Der Wind trägt mich zur Antwort!', 'Sturm zieht auf… du bist nah!', 'Ich war zuerst da!', 'Flaute… du gewinnst.')
 r('Schwalbe Pfeil', 'Ein Brief', f'Wirst du kälter, bringt sie dir einen Brief mit einem {K}. Einmal pro Runde.',
   'Ich habe einen Brief für dich! ✉️', 'Sei nicht traurig — hier ist ein „⚡ +1 Zug“!', 'Ich fliege direkt zum Ziel!', 'Du bist schneller als eine Schwalbe!', 'Ich war zuerst da!', 'Der Brief kam zu spät…')
 r('Gleithörnchen Segler', 'Gleitflug', 'Wird das Gleithörnchen kälter, gleitet es davon: Dieser Zug ist vor dir versteckt.',
   'Ich fliege ohne Flügel! 🪂', 'Wusch — ich gleite unsichtbar!', 'Ich gleite genau aufs Ziel!', 'Du holst mich ein!', 'Sanfte Landung — gewonnen!', 'An einem Ast hängen geblieben…')
 r('Storch Post', 'Ein Paket', f'Nach deinem zweiten Zug bringt er ein Paket: einen {K} für dich.',
   'Post! Für wen ist das Paket? 📦', 'Ein Paket für dich — „⚡ +1 Zug“!', 'Die Adresse hab ich fast!', 'Du hast die Adresse selbst gefunden?!', 'Zugestellt — gewonnen!', 'Das Paket kam zurück…')
-b('Der Gewitterkönig', 'Donnerschlag', 'Wirst du wärmer, donnert er: Du setzt einen Zug aus. Einmal pro Runde.',
+b('Der Donnervogel', 'Donnerschlag', 'Wirst du wärmer, grollt der Donner: Du setzt einen Zug aus. Einmal pro Runde.',
   'Platzregen', 'Der vierte Zug der Runde verschwindet im Platzregen: Du siehst ihn nicht.',
-  'Der Himmel gehört mir! Fürchte den Donner! 🌩️', 'KAWUMM! Setz einen Zug aus!', 'Platzregen! Diesen Zug siehst du nicht!',
-  'Meine Blitze treffen genau!', 'Du hast keine Angst vor dem Gewitter?!', 'Das Gewitter siegt! 🌩️', 'Die Wolken reißen auf… du strahlst!')
+  'Der Himmel ist mein Reich! 👑', 'KAWUMM! Setz einen Zug aus!', 'Platzregen! Diesen Zug siehst du nicht!',
+  'Das Gewitter ist nah!', 'Du fliegst durch mein Gewitter!', 'Ein donnernder Sieg! 👑', 'Das Gewitter hat sich gelegt… du gewinnst.')
 
 # 11 · Blumengarten
 r('Biene Summ', 'Honig', f'Ist sie „Sehr heiß“ oder näher, legt sie Honig zurück: einen {K} für sich. Einmal pro Runde.',
@@ -184,8 +184,8 @@ r('Möwe Matrosin', 'Schreihals', 'Jedes Mal, wenn sie kälter wird, ruft sie: D
   'Matrosin an Deck! ⚓', 'Kreisch! Sie ist {k}!', 'Land! Land ist nah!', 'Kreisch! Du hast den Schatz gefunden?!', 'Die Matrosin ist eine Heldin!', 'Kreiiisch… über Bord.')
 r('Mops Freibeuter', 'Entern', f'Bist du „Sehr heiß“ oder näher, entert er dein Schiff und nimmt deinen {K}. Einmal pro Runde.',
   'Wuff! Alle Mann an Deck! 🏴‍☠️', 'Entern! Dein „⚡“ gehört mir!', 'Ich rieche einen Schatz!', 'Wuff! Du bist an meiner Truhe!', 'Die Beute gehört mir!', 'Ich ergebe mich, Kapitän…')
-r('Schatztruhe Perle', 'Schatz', f'Bist du „Glühend“, öffnet sie sich: einen {K} für dich. Einmal pro Runde.',
-  'Ich bin voller Schätze! 💎', 'Knaarz! Ein Schatz — „⚡ +1 Zug“ für dich!', 'Meine Perlen klimpern — nah dran!', 'Du hast meinen Schlüssel gefunden!', 'Der Schatz bleibt bei mir!', 'Du hast den Schatz gefunden!')
+r('Papagei Dublone', 'Piaster!', 'Bist du „Glühend“, krächzt er „Piaster!“ und wirft dir eine Münze zu: einen „⚡ +1 Zug“. Einmal pro Runde.',
+  'Piaster! Ahoi, Schiffsjunge! 🦜', 'Piaster! Fang einen „⚡ +1 Zug“!', 'Lora wittert einen Schatz!', 'Der Schiffsjunge hat den Schatz fast gefunden!', 'Die Dublonen gehören mir!', 'Die Dublonen… gehören dir.')
 r('Seestern Funkel', 'Leitstern', 'Zu Beginn der Runde verrät er dir, ob die Zahl gerade oder ungerade ist.',
   'Ich zeige dir den Weg! ⭐', 'Der Leitstern sagt: Die Zahl ist {k}!', 'Genau auf Kurs!', 'Du segelst nach den Sternen!', 'Ein strahlender Sieg!', 'Mein Stern ist erloschen…')
 r('Ratte Pfiff', 'Trillerpfeife', 'Mit ihrem dritten Zug pfeift sie: Du erstarrst und setzt einen Zug aus.',
@@ -206,8 +206,8 @@ b('Kapitän Tiger', 'Entern!', f'Bist du „Glühend“, nimmt er sich deinen {K
 # 14 · Halloweendorf
 r('Gespenst Laterne', 'Durch Wände', 'Ist das Gespenst „Sehr heiß“ oder näher, schwebt es durch die Wand: Diesen Zug siehst du nicht. Einmal pro Runde.',
   'Buh! Keine Angst, ich bin lieb 👻', 'Huuuh! Dieser Zug geht durch die Wand!', 'Meine Laterne leuchtet heller — nah dran!', 'Du kannst mich sehen?!', 'Huuuh! Gewonnen!', 'Ich verblasse…')
-r('Kürbis Grinser', 'Kürbislaterne', 'Nach deinem zweiten Zug leuchtet er auf: Die Zahl ist größer oder kleiner als deine.',
-  'Hihi! Ich bin ein leuchtender Kürbis! 🎃', 'Ich leuchte: {k}!', 'Meine Kerze brennt heller!', 'Fast hättest du meine Kerze ausgepustet!', 'Ein Kürbissieg!', 'Meine Kerze ist aus…')
+r('Wasserspeier Zeiger', 'Steinfinger', 'Nach deinem zweiten Zug zeigt er mit seinem Steinfinger: Die Zahl ist größer oder kleiner als deine.',
+  'Keine Angst — ich bin aus Stein, aber lieb 🗿', 'Mein Finger zeigt: Sie ist {k}!', 'Ich spüre den Weg, wie Stein den Regen spürt!', 'Du bist auf dem richtigen Weg!', 'Stein ist stark — der Sieg gehört mir!', 'Ich bin vor Staunen versteinert…')
 r('Katze Besen', 'Besenflug', 'Ist sie „Glühend“, fliegt sie auf ihrem Besen davon und zieht sofort noch einmal. Einmal pro Runde.',
   'Miau! Ich kann zaubern 🧹', 'Miau! Auf den Besen — noch ein Zug!', 'Der Zauber wirkt!', 'Miau! Du kannst auch zaubern?!', 'Ein magischer Sieg!', 'Mein Besen ist kaputt…')
 r('Mumie Binde', 'Binden', 'Nach deinem dritten Zug wickelt sie dich in Binden: Du setzt einen Zug aus.',
@@ -220,8 +220,8 @@ r('Rabe Krächz', 'Krah!', f'Wirst du kälter, krächzt er dir ins Ohr: {LAVA}. 
   'Krah! Ich bin der König der Nacht! 😵', 'KRAH! Ein wilder Wurf!', 'Krah! Nah dran!', 'Krah-krah! Fast gefunden!', 'Krah — gewonnen!', 'Krah… ich fliege weg.')
 r('Wolfswelpe Heuler', 'Vollmond', 'Beim sechsten Zug der Runde geht der Mond auf: Beim nächsten Mal zieht er zweimal hintereinander.',
   'Auuu! Gleich kommt der Mond! 🌕', 'Vollmond! Auuu! Zwei Züge!', 'Meine Nase riecht das Ziel!', 'Du heulst besser als ich!', 'Auuu! Gewonnen!', 'Der Mond hat sich versteckt…')
-r('Kessel Blubber', 'Übergekocht', 'Wird er wärmer, brodelt der Kessel über und bespritzt dich: Du setzt einen Zug aus. Einmal pro Runde.',
-  'Blubb-blubb! Ich braue einen Trank! 🫧', 'Blubb-blubb-blubb! Platsch — setz aus!', 'Der Trank ist fast fertig!', 'Hast du mein Rezept gelesen?!', 'Der Siegestrank ist fertig!', 'Der Trank ist angebrannt…')
+r('Goblin Wusel', 'Beinchen stellen', 'Wird er wärmer, stellt er dir ein Beinchen: Du setzt einen Zug aus. Einmal pro Runde.',
+  'Hihi! Wusch — und schon bin ich da! 👀', 'Hoppla! Beinchen gestellt — setz einen Zug aus!', 'Hihi, ich bin fast da!', 'Oh, du hast mich entdeckt!', 'Hihi! Ausgetrickst!', 'Wusch… und weg bin ich. Du gewinnst.')
 b('Graf Fangzahn', 'Fledermausschwarm', f'Ist er „Glühend“, lässt er die Fledermäuse los: {FOG}. Einmal pro Runde.',
   'Biss', f'Wirst du wärmer, beißt er in deinen {K}: Er ist weg. Einmal pro Runde.',
   'Willkommen in meinem Schloss… 🦇', 'Fliegt, meine Fledermäuse!', 'Happs! Dein „⚡“ ist weg!',
@@ -242,8 +242,8 @@ r('Greif Gold', 'Krallen', f'Wird er wärmer, trägt er deinen {K} in seinen Kra
   'Ich bin ein Greif — stark und schnell! 🦅', 'Wärmer! Dein „⚡“ ist in meinen Krallen!', 'Meine Flügel tragen mich zum Ziel!', 'Du bist mutiger als ein Löwe!', 'Ein Greifensieg!', 'Ich fliege in die Berge…')
 r('Beagle Musketier', 'Ausfall', f'Ist er „Sehr heiß“ oder näher, macht er einen Ausfall: Dein {K} ist weg. Einmal pro Runde.',
   'Einer für alle! 🤺', 'Treffer! Dein „⚡“ ist weg!', 'Mein Degen spürt das Ziel!', 'En garde!', 'Für den König — gewonnen!', 'Touché… du gewinnst.')
-r('Der Schach-Springer', 'Weiß beginnt', 'Er zieht immer zuerst und verrät dir mit seinem zweiten Zug, ob die Zahl gerade oder ungerade ist.',
-  'Schach! Ich springe um die Ecke ♞', 'Springerzug: Die Zahl ist {k}!', 'Schach — heiß!', 'Du spielst wie ein Großmeister!', 'Schachmatt! Gewonnen!', 'Ich gebe auf…')
+r('Dachsritter Tapfer', 'Der Ritter beginnt', 'Er zieht immer zuerst und verrät dir mit seinem zweiten Zug ehrlich, ob die Zahl gerade oder ungerade ist.',
+  'Ein Ritter zieht immer zuerst! 🛡️', 'Ritterwort: Die Zahl ist {k}!', 'Vorwärts, zum Sieg!', 'Ein würdiger Gegner!', 'Sieg dem Ritter!', 'Ich senke meinen Schild — du gewinnst.')
 r('Troll Moos', 'Brückenzoll', f'Nach deinem zweiten Zug verlangt er Brückenzoll: Dein {K} gehört ihm.',
   'Du willst über meine Brücke? Zahl! 🌉', 'Brückenzoll! Der „⚡“ gehört mir!', 'Der Troll riecht den Sieg!', 'Du bist schlauer als ein Troll!', 'Die Brücke gehört mir!', 'Geh nur… du hast gewonnen.')
 b('Der Löwenkönig', 'Königsgebrüll', 'Bist du „Glühend“, brüllt er so laut, dass du bis zum Rundenende nur die letzten zwei Züge siehst. Einmal pro Runde.',

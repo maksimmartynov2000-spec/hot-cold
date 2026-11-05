@@ -1,0 +1,14 @@
+Досъёмка замен: один лист Gemini 3×2 (как promptsR.txt, тот же образец стиля).
+Клетки → портреты: 1 → adv-286 (робокраб), 2 → adv-223 (протей), 3 → adv-45 (Фея Звездопад, мир 5),
+4 → adv-48 (Богомол Комета, мир 5), 5 → adv-49 (Звездоед Обжорка, мир 5), 6 — запасной протей.
+Нарезка: cutsheet.py лист.jpg cut W5a 3 2; клетки без сияния (боссов нет), webp 192×192, качество 88.
+Герои мира 5 — из первых 50: имена и тексты в js/i18n.js (names, cast), правила — ADV_RULES в js/adventure.js.
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 6 cute character icons for a kids' mobile game, a perfectly even grid of 3 columns and 2 rows, pure white background, landscape 3:2 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Each character is shown whole (or from the chest up if large), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a cute ROBOT crab built from shiny silver-and-blue metal plates with visible rivets and bolts, round glowing LED eyes on little metal stalks, two big mechanical metal claws with hinges, one claw raised — clearly a machine, not a real animal
+Row 1, column 2: an olm (proteus), a very long, thin, snake-like cave salamander with pale pinkish-white skin, four tiny thin legs set far apart, a narrow head with a flat snout, small pink feathery gills on the sides of the head, tiny dot eyes, smiling — not an axolotl: much longer and thinner, no big round head
+Row 1, column 3: a tiny space fairy with glowing translucent wings and a silver dress sprinkled with stars, waving a star-tipped wand that scatters little shooting stars, smiling
+Row 2, column 1: a cute green praying mantis wearing a small round glass space helmet, big friendly eyes, front legs raised, a short glowing comet trail behind it
+Row 2, column 2: a round fluffy star-eater creature with dark violet fur sprinkled with tiny stars like a galaxy, two tiny horns, a big happy open mouth swallowing a small glowing star — cute and friendly, not scary
+Row 2, column 3: the same olm as in row 1, column 2, in a different pose, curled into a gentle S-shape, smiling

@@ -1,5 +1,5 @@
-WORLDS = ['Swamp', 'Music Valley', 'Mountain Peaks', 'Robot Factory', 'Land of Myths',
-          'Autumn Forest', 'Magic Kitchen', 'Atlantis', 'Dreamland', 'Dwarf Forge']
+WORLDS = ['Swamp', 'Faraway Tsardom', 'Mountain Peaks', 'Robot Factory', 'Land of Myths',
+          'Autumn Forest', 'Valley of the Pyramids', 'Atlantis', 'Dreamland', 'Dwarf Forge']
 H = []
 def r(n, t, d, hi, rule, luck, worry, win, lose):
     H.append(dict(n=n, t=t, d=d, hi=hi, rule=rule, luck=luck, worry=worry, win=win, lose=lose))
@@ -13,8 +13,8 @@ r('Reedy the Muskrat', 'Whispering Reeds', 'After your first move the reeds whis
   'I live in the reeds! 🌾', 'Shhh… The number is {k}!', 'The reeds rustle — I’m close!', 'Oh, you’ve almost found it!', 'A reedy win!', 'I’ll hide in the reeds…')
 r('Boomer the Bittern', 'Swamp Horn', 'On the sixth move of the round she booms across the swamp — you jump and skip a turn.',
   'My “boom” fills the whole swamp! 📯', 'BOO-OOM! Skip a turn!', 'Boom — I’m close!', 'Oh, you weren’t scared?!', 'A booming win!', 'I lost my voice…')
-r('Snappy the Flytrap', 'Snap!', f'If you are “Cold” or farther — snap! — she catches your {K} and keeps it. Once per round.',
-  'I catch flies, not kids! 🪤', 'Snap! The “⚡” is mine!', 'I’m about to snap the goal!', 'Oh, you’re quicker than me!', 'Snap — a win!', 'I missed…')
+r('Slick the Mink', 'Nimble Paws', 'If you are “Cold” or farther, she nimbly snatches your “⚡ +1 move” for herself. Once per round.',
+  'Hee-hee, I’m the nimblest in the swamp! 🦦', 'Snatch! Your “⚡” is mine now!', 'Hee-hee, almost got it!', 'You’re catching up with me!', 'Nimble! I win!', 'It slipped away…')
 r('Wiggle the Tadpole', 'Wiggly Gift', f'When you get warmer, he wiggles over and gives you a {K}. Once per round.',
   'Soon I’ll be a frog! 🐸', 'Wiggle! Have a “⚡ +1 move”!', 'Swimming to the goal!', 'You swim faster!', 'A wiggly win!', 'Swimming away…')
 r('Skimmer the Water Strider', 'Ripples', 'When you get warmer, she skims across the water and the ripples tell you: the number is more or less than yours. Once per round.',
@@ -23,36 +23,37 @@ r('Splash the Nutria', 'Splash!', f'With her third move she belly-flops into the
   'I love diving! 🦫', 'Splash! Your “⚡” went out!', 'Paddling straight to the goal!', 'You swim just as well!', 'A wet win!', 'I’ll go dry off…')
 r('Tangle the Swamp Sprite', 'Swamp Spell', f'When you are “Warm” or closer, she muddles your head: {LAVA}. Once per round.',
   'I’m a kind swamp sprite! 🍃', 'A spell! A wild throw!', 'The mud whispers — close!', 'Oh, you can’t be tricked!', 'A swampy win!', 'Back into the mud…')
-r('Mossy the Marimo', 'Mossy Gift', f'On the third move of the round she rolls over and gives a {K} to you and to herself.',
-  'I’m soft as moss! 🟢', 'Rolled over — a “⚡ +1 move” for everyone!', 'Rolling to the goal!', 'You roll faster!', 'A mossy win!', 'I’ll roll to the bottom…')
+r('Dam the Beaver', 'The Dam', 'On the third move of the round he finishes his dam and gives a “⚡ +1 move” each to you and to himself.',
+  'I build the best dams in the swamp! 🦫', 'The dam is done — a “⚡ +1 move” for each of us!', 'Building my way to the answer!', 'You swam across my dam!', 'A solid victory!', 'The dam broke…')
 r('Snouty the Desman', 'Keen Nose', 'When she gets warmer, she sniffs with her long snout and tells you whether the number is even or odd. Once per round.',
   'My nose smells everything! 👃', 'Sniff-sniff! The number is {k}!', 'I smell the goal!', 'Your nose is as good as mine!', 'My nose was right!', 'My nose is stuffy…')
 b('The Water King', 'Quagmire', 'When you get colder, the quagmire holds you: you freeze and skip a turn. Once per round.',
   'Water Lily', f'After your first move he picks a water lily: a {K} for himself.',
   'I’m the king of the whole swamp! 👑', 'Glug-glug! Freeze!', 'A lily — a “⚡” for me!', 'The swamp tells me — close!', 'Oh, you reached my palace!', 'A kingly win!', 'Back to the bottom…')
 
-# 27 · Music Valley
-r('Trill the Nightingale', 'Trill Hint', 'When you get colder, he sings a trill and tells you whether the number is even or odd. Once per round.',
-  'Listen to my song! 🎶', 'Tweet-tweet! The number is {k}!', 'I sing louder — close!', 'You sing just as well!', 'A winning trill!', 'I lost my voice…')
-r('Keys the Grand Piano', 'Chord', 'When he gets warmer, he plays a chord and tells you which half the number is in. Once per round.',
-  'I have eighty-eight keys! 🎹', 'Pam-pam! The number is {k}!', 'It sounds closer and closer!', 'You play right on the beat!', 'Applause!', 'My lid is closed…')
-r('Strum the Guitar', 'Strumming', f'When she is “Warm” or closer, she strums and takes a {K} for herself. Once per round.',
-  'Strum-strum, let’s play! 🎸', 'Twang! A “⚡” for me!', 'My strings ring — close!', 'Oh, you hit the right note!', 'A guitar win!', 'A string snapped…')
-r('Jazzy the Saxophone', 'Jazz Solo', 'When he is “Burning”, he plays a solo: his next move is two in a row. Once per round.',
-  'A little jazz? 🎷', 'Solo! Two moves in a row!', 'Doo-doo-doo — close!', 'You improvise so well!', 'A jazzy win!', 'A wrong note…')
-r('The Cha-Cha Maracas', 'Cha-Cha-Cha', 'Every second move of theirs is lost in the rattle: you can’t see it.',
-  'Cha-cha-cha, let’s dance! 🕺', 'Cha-cha! You can’t hear that move!', 'Shaking to the goal!', 'Oh, you dance better!', 'A dancing win!', 'We’re tired…')
-r('Chime the Harp', 'Ringing Strings', f'When you are “Very hot” or closer, she rings her strings and gives you a {K}. Once per round.',
-  'My strings sing! ✨', 'Ding-ding! A “⚡ +1 move” for you!', 'Ringing closer and closer!', 'Oh, you’re almost there!', 'A ringing win!', 'My strings went quiet…')
-r('Sol the Music Note', 'Clear Note', 'With her third move she rings out and tells you: the number is more or less than hers.',
-  'Do, re, mi, fa, SOL! 🎵', 'Sooo-ol! It’s {k}!', 'I hit the note!', 'You sing clearly too!', 'A note-perfect win!', 'I sang off-key…')
-r('Squeezy the Accordion', 'Open Bellows', f'You switch on your {K} — he stretches his bellows: his next move is two in a row. Once per round.',
-  'I’ll stretch my bellows — let’s sing! 🪗', 'Hey-ho! Two moves in a row!', 'Playing closer and closer!', 'You sing along on the beat!', 'A dancing tune win!', 'My bellows are empty…')
-r('Echo the Lyrebird', 'Echo', 'After your first move he echoes it and learns whether the number is more or less than yours. He won’t tell you.',
-  'I can copy any sound! 🐦', 'Echo-echo… I know!', 'The echo tells me — close!', 'Oh, you mimicked me!', 'An echo of victory!', 'The echo faded…')
-b('Maestro Treble Clef', 'Pause', 'On the fifth move of the round he waves his baton: pause! You freeze and skip a turn.',
-  'Crescendo', 'When you get warmer, the orchestra plays louder: his next move is two in a row. Once per round.',
-  'Orchestra, let’s begin! 👑', 'Pause! Freeze!', 'Crescendo! Two moves in a row!', 'The finale is near!', 'Oh, you’re leading the tune!', 'Bravo, maestro!', 'The concert is over…')
+# 27 · Faraway Tsardom
+r('Melody the Sirin', 'Prophetic Song', 'When you get colder, she sings a prophetic song and tells you whether the number is even or odd. Once per round.',
+  'Listen to my song, traveler 🎶', 'I sing, I sing: the number is {k}!', 'My song leads me to the answer!', 'Can you hear my song?', 'A song of victory!', 'The song is over…')
+r('The Little Humpbacked Horse', 'Wise Whisper', 'When he gets warmer, he whispers advice in your ear: which half the number is in. Once per round.',
+  'Don’t be sad, I’ll help you! 🐴', 'Here’s my advice: {k}!', 'Galloping straight to the answer!', 'You’re catching up with me!', 'Neigh! I win!', 'Neigh… you win!')
+r('Mossy the Leshy', 'Forest Treasure', 'When he is “Warm” or closer, he finds treasure in the forest: a “⚡ +1 move” for himself. Once per round.',
+  'Hello-o! Don’t get lost in my forest! 🌲', 'Forest treasure — a “⚡ +1 move” for me!', 'The forest rustles — very hot!', 'You found my secret path!', 'Hello! The forest wins!', 'I got lost…')
+r('Zmey Gorynych', 'Three Heads', 'When he is “Burning”, his three heads rush each other: his next move is two in a row. Once per round.',
+  'Hi! Hi! Hi! That’s all three of us 🐉', 'Three heads in a hurry — two moves in a row!', 'Three heads smell the answer!', 'The heads are arguing — you’re close!', 'A triple victory!', 'All three heads are sad…')
+r('Rustle the Domovoi', 'Behind the Stove', 'Every second move of his hides behind the stove: you can’t see it.',
+  'Rustle-rustle… I’m here, behind the stove 🏠', 'Rustle-rustle… that move is behind the stove!', 'Rustle-rustle, I’m close!', 'Did you peek behind the stove?!', 'Rustle-rustle — I win!', 'Rustle… I’ll hide further away.')
+r('Blaze the Firebird', 'Firebird Feather', 'When you are “Very hot” or closer, she drops a glowing feather: a “⚡ +1 move” for you. Once per round.',
+  'My feather shines brighter than the sun! 🔥', 'Catch the feather — a “⚡ +1 move”!', 'Glowing right by the answer!', 'You almost caught the Firebird!', 'A glowing victory!', 'Flying away beyond thrice-nine lands…')
+r('Finist the Falcon', 'Sharp Eye', 'With his third move he looks down from above and tells you: the number is more or less than his.',
+  'I see everything from up high! 🦅', 'From up here I see: it’s {k}!', 'A clear eye — the right path!', 'Your eyes are sharper than mine!', 'Victory from above!', 'Flying away… you win.')
+r('Baba Yaga', 'The Mortar', 'You switch on your “⚡ +1 move” — Yaga climbs into her mortar: her next move is two in a row. Once per round.',
+  'Welcome, guest! Don’t be scared — I’m kind today 🧹', 'Fly, mortar! Two moves in a row!', 'I smell it — the answer is near!', 'My, what a speedy guest!', 'Heh-heh! Granny wins!', 'Well, good youth, you win!')
+r('The Frog Princess', 'Enchantment', 'After your first move she casts a spell and learns: the number is more or less than yours. She won’t tell you.',
+  'Ribbit! I’m an enchanted princess 🐸', 'Ribbit! My spell revealed the secret!', 'Ribbit! The magic works!', 'Did you break my spell?!', 'Ribbit! A royal victory!', 'Ribbit… the spell is broken.')
+b('Koschei the Deathless', 'Icy Stare', 'On the fifth move of the round he gives you an icy stare: you freeze and skip a turn.',
+  'Deathless Speed', 'When you get warmer, he hurries: his next move is two in a row. Once per round.',
+  'I am Koschei the Deathless — no one can beat me! 👑', 'Freeze! You skip a turn!', 'Ha! Two moves in a row!',
+  'My needle is well hidden!', 'Did you really find my needle?!', 'A deathless victory! 👑', 'You found my needle… you win.')
 
 # 28 · Mountain Peaks (the whole world has minus numbers)
 r('Shaggy the Baby Yak', 'Warm Fur', 'After your first move he warms you with his fur and skips his turn.',
@@ -61,18 +62,18 @@ r('Plumpy the Marmot', 'Hibernation', 'When he is “Very hot” or closer, he f
   'I love sleeping! 😴', 'Zzz… Skipping a turn…', 'Oh, I’m awake — close!', 'You won’t let me sleep!', 'I woke up a winner!', 'Back to sleep…')
 r('Coil the Bighorn Lamb', 'Headbutt', 'On the second move of the round he headbutts: you freeze and skip a turn.',
   'Look at my horns! 🐏', 'Bonk! Freeze!', 'Leaping over rocks to the goal!', 'Oh, you’re as stubborn as me!', 'A horned win!', 'I bumped into a rock…')
-r('Snowflake the Edelweiss', 'Mountain Flower', 'On the fourth move of the round he blooms and tells you which half the number is in.',
-  'I grow at the very top! ❄️', 'I bloomed! The number is {k}!', 'Reaching for the sun — close!', 'You climbed so high!', 'A blooming win!', 'I wilted…')
+r('Haystack the Pika', 'Mountain Whistle', 'On the fourth move of the round she whistles a hint: which half the number is in.',
+  'Eep-eep! I’m drying hay for the winter 🌾', 'Eep-eep! Hint: {k}!', 'Eep! Very hot!', 'You’re at my haystack!', 'Eep-eep — I win!', 'Eep… you win.')
 r('Barrel the St. Bernard', 'Rescuer', f'On the fourth move of the round he rushes to help: he gives you a {K}.',
   'I rescue anyone who gets lost! 🛟', 'Woof! Have a “⚡ +1 move”!', 'Sniffing — the goal is close!', 'You found the way yourself!', 'A rescue win!', 'I’ll go rescue others…')
 r('Puffball the Chinchilla', 'Fluffy Tail', f'When she is “Warm” or closer, she swishes her fluffy tail and puts out your {K}. Once per round.',
   'I’m the fluffiest! 🐭', 'Whoosh! Your “⚡” went out!', 'Fluff-fluff — close!', 'Oh, you’ve almost found it!', 'A fluffy win!', 'I’ll go roll in the dust…')
 r('Sooty the Alpine Chough', 'Shiny Thing', f'With her first move she snatches your shiny {K} for herself.',
   'I love everything shiny! 💍', 'Shiny! The “⚡” is mine!', 'I see the goal shining!', 'Oh, you have sharp eyes!', 'A shiny win!', 'I’ll fly to a cliff…')
-r('Rumble the Snowball', 'Avalanche', f'When he is “Very hot” or closer, he rolls into an avalanche: {LAVA}. Once per round.',
-  'I’m small, but I can become an avalanche! ⛄', 'Avalanche! A wild throw!', 'Rolling straight to the goal!', 'Oh, I’m about to melt!', 'A snowy win!', 'I melted…')
-r('Lift the Cable Car', 'Lookout Ride', 'When she is “Very hot” or closer, she rides higher and tells you from above whether the number is even or odd. Once per round.',
-  'I’ll take you to the very top! 🚡', 'From up here: the number is {k}!', 'Arriving at the goal!', 'You go up faster!', 'Summit reached!', 'Stuck on the cable…')
+r('Climber the Ibex', 'Rockfall', 'When he is “Very hot” or closer, he knocks down rocks: your next move is made for you — a wild throw. Once per round.',
+  'Meh-eh! I jump on the steepest cliffs! 🐐', 'Meh-eh! Rockfall — your move went flying!', 'Meh-eh! Almost at the top!', 'Are you climbing my cliff?!', 'Meh-eh! The summit is mine!', 'I slipped… meh-eh.')
+r('Keen-Eye the Bearded Vulture', 'View from the Summit', 'When he is “Very hot” or closer, he looks down from the summit and tells you whether the number is even or odd. Once per round.',
+  'From up here everything is crystal clear! 🦅', 'From the summit I see: the number is {k}!', 'Circling over the answer!', 'You’ve climbed high!', 'Victory from above!', 'Flying off above the clouds…')
 b('The Snow Leopard King', 'Blizzard', 'When you get warmer, he whips up a blizzard: you can’t see your own moves for the rest of the round. Once per round.',
   'View from the Top', 'When he is “Warm” or closer, he looks down from the summit and learns whether the number is more or less than his. He won’t tell you. Once per round.',
   'The mountains are my kingdom! 👑', 'Blizzard! You can’t see a thing!', 'I can see everything from the top!', 'Sneaking up on the goal!', 'Oh, you’re as nimble as a leopard!', 'A royal leap!', 'Back to the mountains…')
@@ -80,18 +81,18 @@ b('The Snow Leopard King', 'Blizzard', 'When you get warmer, he whips up a blizz
 # 29 · Robot Factory
 r('Bolt the Robot Dog', 'Sniff Sensor', 'On the second move of the round he turns on his sensor and learns whether the number is more or less than that one. He won’t tell you.',
   'Woof-beep! I’m a robot dog! 🐕', 'Beep-beep! My sensor got it!', 'The signal is getting stronger!', 'Error! You’re too close!', 'Victory loaded!', 'My battery died…')
-r('Whirr the Robot Vacuum', 'Suction', f'On the second move of the round he sucks up your {K}.',
-  'I’ll clean up every crumb! 🧹', 'Whoosh! Your “⚡” is in my bag!', 'Whirring to the goal!', 'Oh, you work cleaner!', 'A clean win!', 'My bag is full…')
+r('Sprocket the Robo-Cat', 'Short Circuit', 'On the second move of the round he sparks: your “⚡ +1 move” burns out.',
+  'Meow-beep! I’m the newest cat model 🤖', 'Beep-bzzz! Your “⚡” burned out!', 'Meow-beep! Target is close!', 'Beep! You’re too close!', 'Meow-beep! I win!', 'Beep… overheated.')
 r('Buzz the Drone', 'Flyover', 'On the fourth move of the round he flies over the field and tells you: the number is more or less than that one.',
   'I see everything from above! 🚁', 'Bzzz! It’s {k}!', 'Coming in to land!', 'You fly just as well!', 'Landing — a win!', 'My propeller is tired…')
-r('Sticky the Magnet', 'Attraction', f'After your first move he pulls your {K} over to himself.',
-  'Everything sticks to me! 🧲', 'Clink! The “⚡” stuck to me!', 'I’m drawn to the goal!', 'Oh, you’re magnetic too!', 'An attractive win!', 'I lost my magnetism…')
-r('Zap the Battery', 'Fully Charged', f'At the start of the round she charges up: a {K} for herself.',
-  'Charged to one hundred percent! 🔋', 'Zap! Charged — a “⚡” for me!', 'The charge is rising — close!', 'Oh, you’re fully charged too!', 'A charged-up win!', 'I ran flat…')
-r('Grabby the Robot Arm', 'Grab', 'After your second move she grabs you: you freeze and skip a turn.',
-  'Hi! High five! 🦾', 'Grab! Freeze!', 'Reaching for the goal!', 'Oh, you slip right out!', 'An iron grip!', 'My joints are stuck…')
-r('Printy the 3D Printer', 'Print', 'With his third move he prints himself a hint: whether the number is even or odd. He won’t tell you.',
-  'I can print anything! 🖨️', 'Brrr-brrr… I know if it’s even!', 'Printing the answer!', 'Oh, I’m running out of paper!', 'I printed a win!', 'Out of ink…')
+r('Grabby the Robo-Magpie', 'Grabby', 'After your first move she snatches your “⚡ +1 move” — it’s shiny, after all!',
+  'Chatter! Everything shiny is mine! ✨', 'Chatter! Your “⚡” goes to my nest!', 'Chatter! The answer is shining!', 'Don’t touch my nest!', 'Chatter! Victory shines!', 'Chatter… you win.')
+r('Charge the Android', 'Fully Charged', 'At the start of the round he charges up: a “⚡ +1 move” for himself.',
+  'Charge 100%. Starting the game 🔋', 'Charge 100%! A “⚡ +1 move” for me!', 'Calculation correct!', 'Error: opponent nearby!', 'Task complete!', 'Battery empty…')
+r('Pincer the Robo-Crab', 'Grab', 'After your second move he grabs you with his claw: you freeze and skip a turn.',
+  'Click-click! My claws are made of steel 🦀', 'Click! Grabbed — you skip a turn!', 'Click! Target locked!', 'You’re slipping away!', 'Click-click! I win!', 'My claws let go…')
+r('Lens the Robo-Bee', 'Scanner', 'With her third move she scans the field and learns whether the number is even or odd. She won’t tell you.',
+  'Bzzz-beep! Scanning! 🐝', 'Beep! Scan complete!', 'Bzz-beep! Target close!', 'Interference! You’re close!', 'Bzzz! I win!', 'My scanner broke…')
 r('Clank the Tin Can Robot', 'Clank Swap', 'When she gets warmer — clank! — she swaps “⚡ +1 move” with you: yours go to her, hers go to you. Once per round.',
   'Clank-clank, I’m a robot from a can! 🥫', 'Clank! Let’s swap “⚡”!', 'Rattling to the goal!', 'Oh, you’re louder than me!', 'A tin-can win!', 'I got dented…')
 r('Wheely the Unicycle Bot', 'Speed Up', 'On the third move of the round he speeds up on his wheel: his next move is two in a row.',
@@ -128,16 +129,16 @@ r('Cheeky the Chipmunk', 'Sharing Nuts', f'After your third move he shares his s
   'My cheeks are full of nuts! 🐿️', 'Sharing! A “⚡ +1 move” for everyone!', 'Found a nut — close!', 'Oh, you gather faster!', 'A nutty win!', 'I’ll go refill my stash…')
 r('Knocky the Woodpecker', 'Knock-Knock', 'On the second move of the round he knocks on a trunk and tells you which half the number is in.',
   'Knock-knock! Who’s there? 🪵', 'Knock-knock! The number is {k}!', 'Knocking closer and closer!', 'Oh, you hear every knock!', 'A knockout win!', 'My beak is tired…')
-r('Crimson the Maple Leaf', 'Falling Leaf', 'When he gets warmer, he falls and tells you: the number is more or less than his. Once per round.',
-  'I’m the reddest in the forest! 🍁', 'Rustle! It’s {k}!', 'The wind carries me to the goal!', 'Oh, you spin faster!', 'A leaf-fall win!', 'I’ll fly away with the wind…')
+r('Maple the Weasel', 'Rustling Leaves', 'When she gets warmer, she rustles the leaves and tells you: the number is more or less than hers. Once per round.',
+  'Rustle-rustle! I’m playing in the leaves 🍁', 'Rustle-rustle! It’s {k}!', 'The leaves whisper: very hot!', 'You found me in the leaves!', 'Rustle-rustle — I win!', 'The leaves blew away…')
 r('Silky the Pine Marten', 'Nimble Paws', f'On the third move of the round she nimbly snatches your {K} for herself.',
   'Look at my fur coat! 🧣', 'Snatch! The “⚡” is mine!', 'Sneaking up on the goal!', 'Oh, you’re nimble!', 'A furry-pawed win!', 'I’ll run up a tree…')
 r('Snuffle the Boar Piglet', 'Digging', 'With his third move he burrows into the leaves and skips his turn.',
   'Oink! I’ll find acorns under the leaves! 🐗', 'Digging… I’ll skip a turn.', 'Oink! I smell the goal!', 'Oh, you dig faster!', 'An oinking win!', 'I’ll burrow into the leaves…')
 r('Chatter the Jay', 'Chattering', 'She chatters nonstop — you can’t see your second move.',
   'Krr-krr! I’ll tell the whole forest! 🪶', 'Krr-krr! Where did your move go?', 'Krr — close!', 'Oh, you don’t get distracted!', 'A chattering win!', 'I’ll go chatter in another forest…')
-r('Shiny the Chestnut', 'Rolling Out', 'If you are “Cold” or farther, he rolls out of his spiky shell and tells you which half the number is in. Once per round.',
-  'I’m as shiny as polish! 🌰', 'Bump! The number is {k}!', 'Rolling to the goal!', 'Oh, you found me!', 'A chestnut win!', 'I’ll hide in my spikes…')
+r('Grumble the Capercaillie', 'Grumpy Advice', 'If you are “Cold” or farther, he grumbles and tells you which half the number is in. Once per round.',
+  'Grumble-grumble… well, hello 🍂', 'Grumble… fine, here’s a hint: {k}.', 'Grumble! I’m close!', 'Grumble… you sneaked up!', 'Grumble — I win!', 'Grumble… oh well.')
 r('Whiff the Skunk', 'Phew!', 'With his third move — phew! You hold your nose and skip a turn.',
   'I’m cute — just don’t scare me! 🦨', 'Phew! Skip a turn!', 'Oh, close!', 'Oh, don’t scare me!', 'A fragrant win!', 'Running away…')
 r('Dangle the Opossum', 'Playing Dead', 'When he is “Burning”, he pretends to be asleep and skips his turn. Once per round.',
@@ -146,28 +147,29 @@ b('The Moose King', 'Trumpet Call', 'On the third move of the round he trumpets 
   'Forest Wisdom', 'When he is “Warm” or closer, he listens to the forest and learns which half the number is in. He won’t tell you. Once per round.',
   'I’m the king of the autumn forest! 👑', 'Toot-toooo! Freeze!', 'The forest told me — I know the half!', 'The forest whispers — close!', 'Oh, you know the forest better than me!', 'A win under falling leaves!', 'Into the thicket…')
 
-# 32 · Magic Kitchen
-r('Steamy the Teapot', 'Whistle', 'When he is “Very hot” or closer, he whistles and tells you which half the number is in. Once per round.',
-  'Fancy some tea? 🫖', 'Wheee! The number is {k}!', 'I’m boiling — close!', 'Oh, you’re hotter than me!', 'A boiling win!', 'I cooled down…')
-r('Sizzle the Frying Pan', 'Sizzling', f'When you are “Very hot” or closer, she sizzles and spatters: {LAVA}. Once per round.',
-  'I’ll fry you an egg! 🍳', 'Sizzle-sizzle! A wild throw!', 'Heating up — close!', 'Oh, hot-hot-hot!', 'A sizzling win!', 'I got burnt…')
-r('Butter the Pancake', 'First Pancake', f'The first pancake is yours: with his first move he gives you a {K}.',
-  'My first pancake is a perfect one! 🥞', 'Have a “⚡ +1 move” — with butter!', 'Getting golden — close!', 'Oh, you bake faster!', 'A buttery win!', 'I came out lumpy…')
-r('Whippy the Whisk', 'Whip It All!', 'Every fourth move of the round he tries to whip everything up: he swaps “⚡ +1 move” with you — yours go to him, his go to you. Once per round.',
-  'I’ll whip it all into foam! 🥄', 'Whisk-whisk! Let’s swap “⚡”!', 'Whisking — close!', 'Oh, everything works for you!', 'A fluffy win!', 'The foam fell flat…')
-r('Toasty the Toaster', 'Toast Is Ready', 'On the fifth move of the round a slice of toast pops up and tells you: the number is more or less than that one.',
-  'Ding! The toast is ready! 🍞', 'Ding! It’s {k}!', 'Toasting — close!', 'Oh, you’re as hot as toast!', 'A crunchy win!', 'I got burnt…')
-r('Pinch the Salt Shaker', 'Spilled', f'After your third move she spills salt and loses her own {K}.',
-  'A pinch of salt makes it tasty! 🧂', 'Oops, I spilled my “⚡”!', 'Salty — close!', 'Oh, you didn’t add too much salt!', 'A salty win!', 'I spilled everywhere…')
-r('Yolky the Egg', 'In the Shell', 'With his first move he hides in his shell: you can’t see that move.',
-  'Tap-tap, I’m an egg! 🥚', 'Hidden in my shell!', 'I’m about to hatch — close!', 'Oh, don’t crack me!', 'A hard-boiled win!', 'I cracked…')
-r('Curly the Broccoli', 'Growing', f'On the sixth move of the round he grows a bit: a {K} for himself.',
-  'Eat your veggies and you’ll be strong! 🥦', 'I grew — a “⚡” for me!', 'Reaching for the goal!', 'Oh, you’re strong — do you eat veggies?', 'A healthy win!', 'I turned yellow…')
-r('Dumpy the Dumpling', 'Pinching', 'When you get colder, he pinches his edges and learns whether the number is even or odd. He won’t tell you. Once per round.',
-  'I have the tastiest filling! 🥟', 'Pinched — I know if it’s even!', 'Boiling — close!', 'Oh, you found me!', 'A piping-hot win!', 'I got overcooked…')
-b('The Stove Queen', 'Oven Heat', f'On the second move of the round she breathes out heat: {LAVA}.',
-  'Little Pie', f'When she is “Burning”, she bakes a little pie: a {K} for herself. Once per round.',
-  'Sit down, have some pies! 👑', 'Heat! A wild throw!', 'A pie — a “⚡” for me!', 'The pies are almost ready!', 'Oh, you bake better than me!', 'A golden-brown win!', 'The fire went out…')
+# 32 · Valley of the Pyramids
+r('Papyrus the Ibis', 'Papyrus', 'When he is “Very hot” or closer, he checks his papyrus and tells you which half the number is in. Once per round.',
+  'I write everything down on papyrus 📜', 'The papyrus says: {k}.', 'The hieroglyphs lead to the answer!', 'Are you reading my papyri?!', 'Noted: victory!', 'Noted: you win.')
+r('Roller the Scarab', 'Rolling Ball', 'When you are “Very hot” or closer, he rolls his ball at you: your next move is made for you — a wild throw. Once per round.',
+  'I roll the sun across the sky! ☀️', 'Off it rolls! Your move goes anywhere!', 'Rolling straight to the answer!', 'Are you taking my ball?!', 'I rolled to victory!', 'My ball rolled away…')
+r('Bastet the Cat', 'Blessing', 'With her first move she blesses you: a “⚡ +1 move” for you.',
+  'Purr… I’m the guardian of the home 🐈‍⬛', 'I bless you — a “⚡ +1 move”!', 'Purr! Luck is with me!', 'Purr… you’re clever!', 'Purr-purr — I win!', 'Purr… you win.')
+r('Anubis the Jackal Pup', 'The Scales', 'On the fourth move of the round he weighs everything on his scales: he swaps “⚡ +1 move” with you — yours go to him, his go to you.',
+  'Awoo! I guard the pyramids 🐺', 'The scales tipped — we swap “⚡”!', 'Awoo! I smell the answer!', 'You sneaked into the pyramid!', 'Awoo! I win!', 'The scales didn’t favor me…')
+r('Horus the Falcon', 'Eye of Horus', 'On the fifth move of the round he looks with the Eye of Horus and tells you: the number is more or less than that one.',
+  'My eye sees everything! 🦅', 'The Eye of Horus sees: it’s {k}!', 'The Eye is never wrong!', 'You’re as sharp-eyed as a falcon!', 'Victory under the sun!', 'The Eye has closed…')
+r('Taweret the Hippo', 'Butterfingers', 'After your third move she flops into the Nile and loses her own “⚡ +1 move”.',
+  'Splash! I’m the giant of the river 🦛', 'Splash! I dropped my “⚡” in the water!', 'Splash-splash, very hot!', 'Are you swimming towards me?!', 'Splash! I win!', 'Splash… you win.')
+r('Sobek the Little Crocodile', 'Underwater', 'With his first move he dives: you can’t see that move.',
+  'Blub… I’m here, in the Nile 🐊', 'Blub! My first move is underwater!', 'Swimming up to the answer!', 'Can you see me underwater?!', 'Snap! I win!', 'Swimming away…')
+r('Snatch the Mongoose', 'Quick Grab', 'On the sixth move of the round he grabs some prey: a “⚡ +1 move” for himself.',
+  'I’m quick and brave! 🦡', 'Grab! A “⚡ +1 move” for me!', 'I smell prey!', 'Are you faster than me?!', 'Grab — I win!', 'It got away…')
+r('Bennu the Heron', 'Sun Sign', 'When you get colder, she looks at the sun and learns whether the number is even or odd. She won’t tell you. Once per round.',
+  'I greet every sunrise 🌅', 'The sun revealed the secret to me!', 'The sun shows the way!', 'You’re following the sun!', 'A sunrise victory!', 'The sun has set…')
+b('Ra the Sun King', 'Sunstroke', 'On the second move of the round he blazes with sunlight: your next move is made for you — a wild throw.',
+  'Radiance', 'When he is “Burning”, he shines even brighter: a “⚡ +1 move” for himself. Once per round.',
+  'I am the sun above the pyramids! 👑', 'Scorching sun! Your move goes anywhere!', 'Radiance! A “⚡ +1 move” for me!',
+  'The sun is at its height!', 'You’re not afraid of the heat?!', 'A sunny victory! 👑', 'The sun is setting… you win.')
 
 # 33 · Atlantis (the whole world has minus numbers)
 r('Whistle the Dolphin', 'Whistle Hint', 'After your third move he whistles and tells you: the number is more or less than yours.',
@@ -195,20 +197,20 @@ b('King Neptune', 'Deep Sea', 'When you get warmer, he covers you with a wave: y
 # 34 · Dreamland
 r('Sweetdream the Baku', 'Dream Eater', 'After your fourth move he eats a dream: you only see the last two moves.',
   'I only eat bad dreams! 🐘', 'Gulp! What came before?', 'I smell a sweet win!', 'Oh, you’re not asleep?!', 'A sweet win!', 'I’ll go take a nap…')
-r('Cushy the Pillow', 'Soft Pillow', 'On the sixth move of the round she falls asleep herself — she skips her turn.',
-  'Give me a hug! 🛏️', 'Yawn… skipping a turn.', 'Oh, I’m not sleepy — close!', 'Oh, you’re wide awake!', 'A soft win!', 'Sleeping…')
-r('Glow the Night-Light', 'Night Light', 'On the third move of the round he shines in the dark and sees which half the number is in. He won’t tell you.',
-  'Don’t be afraid of the dark — I’m here! 🌙', 'I lit it up — I know the half!', 'My light gets closer to the goal!', 'Oh, can you see in the dark?', 'A bright win!', 'I switched off…')
+r('Bobber the Sea Otter', 'Asleep on the Waves', 'On the sixth move of the round he falls asleep on the waves and skips his turn.',
+  'I sleep on my back holding a pebble 🦦', 'Zzz… rocking on the waves… skipping a turn.', 'The waves carry me to the answer!', 'You’re waking me up!', 'I won — time for bed!', 'I overslept…')
+r('Moony the Luna Moth', 'Moonlight', 'On the third move of the round he flies to the moon and learns which half the number is in. He won’t tell you.',
+  'I fly towards the moonlight 🌙', 'The moonlight showed me everything…', 'The light guides me!', 'Are you flying to my light?!', 'A moonlit victory!', 'The light went out…')
 r('Drowsy the Dormouse', 'Yawning', 'After your first move he yawns so sweetly that you doze off and skip a turn.',
   'Yaaawn… 🥱', 'Yaaawn… Sleep, skip a turn!', 'I see the goal in my dreams!', 'Oh, you’re not yawning!', 'A sleepy win!', 'Back to my dream…')
 r('Ole the Dream Keeper', 'Magic Umbrella', 'When you are “Very hot” or closer, he opens his dream umbrella over you: you can’t see your own moves for the rest of the round. Once per round.',
   'I’ll open my umbrella — you’ll dream a fairy tale! ☂️', 'Sweet dreams! Where are your moves?', 'The tale is almost over — close!', 'Oh, you’re not asleep!', 'A fairy-tale win!', 'My umbrella folded…')
 r('Flutter the Bat', 'Night Echo', 'When she is “Very hot” or closer, she listens to the echo and learns which half the number is in. She won’t tell you. Once per round.',
   'At night I hear everything! 🦇', 'Squeak! I know the half!', 'I hear the goal!', 'Oh, you fly so quietly!', 'A nighttime win!', 'I’ll hang upside down and sleep…')
-r('Webby the Dreamcatcher', 'Catching Dreams', f'After your third move he catches your {K} in his web.',
-  'I catch bad dreams! 🕸️', 'Caught the “⚡”! Now it’s mine!', 'The dream is almost caught!', 'Oh, you slipped through!', 'A caught win!', 'My web broke…')
-r('Shuffle the Slipper', 'Warm Slippers', 'If you are “Cold” or farther, he warms your feet: you move again right away. Once per round.',
-  'Shuffle-shuffle, I’m a slipper! 🥿', 'Shuffle! Have another go!', 'Shuffling to the goal!', 'Oh, you shuffle faster!', 'A slipper win!', 'Lost under the bed…')
+r('Nightlight the Tarsier', 'Dream Catcher', 'After your third move he catches your “⚡ +1 move” along with your dream.',
+  'My eyes are bigger than the moon! 👀', 'Hop! I caught your “⚡” and your dream!', 'I see the answer in the dark!', 'Aren’t you asleep?!', 'Victory — sweet dreams!', 'I woke up… you win.')
+r('Sleepwalker the Penguin Chick', 'Sleepwalking', 'If you are “Cold” or farther, he wanders in his sleep and lets you go: you move again right away. Once per round.',
+  'Zzz… I walk in my sleep 🐧', 'Zzz… have another move…', 'Zzz… I’m close…', 'Oh, you woke me up!', 'I won… in my sleep!', 'I woke up a loser…')
 r('Bayun the Storyteller Cat', 'Lullaby', f'On the fourth move of the round he purrs a lullaby: {LAVA}.',
   'Let me tell you a story… 🐈', 'Purr… A sleepy wild throw!', 'The story is ending — close!', 'Oh, you won’t fall asleep!', 'A purring win!', 'I’ll go nap by the stove…')
 b('The Moon Queen', 'Night', 'With her first move she calls the night: you can’t see her moves for the rest of the round.',
@@ -218,22 +220,22 @@ b('The Moon Queen', 'Night', 'With her first move she calls the night: you can�
 # 35 · Dwarf Forge
 r('Hammer the Little Dwarf', 'Hammer Bang', 'With his second move he strikes with his hammer — bang! — you skip a turn.',
   'Tap-tap, I’m forging! 🔨', 'Bang! Skip a turn!', 'Almost forged!', 'Oh, you forge faster!', 'A forged win!', 'My hammer broke…')
-r('Blaze the Torch', 'Out!', 'When you get colder, the torch goes out: you can’t see your own moves for the rest of the round. Once per round.',
-  'I’ll light the way into the mine! 🔥', 'Pff! It’s dark — where are your moves?', 'Flaring up — close!', 'Oh, you’re brighter than me!', 'A blazing win!', 'I’m burning out…')
-r('Clang the Anvil', 'Clang', 'On the third move of the round she rings out and learns whether the number is more or less than that one. She won’t tell you.',
-  'Clang-clang, they hammer on me! ⚒️', 'Clang! I know!', 'Ringing louder and louder!', 'Oh, you’re tougher than iron!', 'An iron win!', 'I cooled down…')
-r('Rattle the Mine Cart', 'Off I Go!', f'With her third move she carts your {K} away for herself.',
-  'I’m carrying gems! 🛒', 'Clickety-clack — the “⚡” is mine!', 'Riding straight to the goal!', 'Oh, you’re overtaking me!', 'A breezy win!', 'I came off the rails…')
-r('The Huff-Puff Bellows', 'Smoke', 'When you are “Very hot” or closer, they blow up smoke: you can’t see their moves for the rest of the round. Once per round.',
-  'Huff-puff, let’s fan the fire! 💨', 'Puff! All smoke!', 'Puffing to the goal!', 'Oh, you’re hotter than fire!', 'A huffing win!', 'We’re out of air…')
-r('Glint the Gold Nugget', 'Golden Glint', 'On the fourth move of the round he glints and learns whether the number is even or odd. He won’t tell you.',
-  'I’m pure gold! 🪙', 'Glint — I know if it’s even!', 'Shining brighter and brighter!', 'Oh, you struck gold!', 'A nugget win!', 'I lost my shine…')
-r('Lucky the Horseshoe', 'For Luck', f'After your second move she brings herself luck: a {K} for her.',
-  'I bring good luck! 🍀', 'For luck — a “⚡” for me!', 'Luck is near!', 'Oh, you’re lucky too!', 'The horseshoe came through!', 'My luck ran out…')
-r('Valor the Viking Helmet', 'Battle Cry', 'When he is “Burning”, he lets out a battle cry: you freeze and skip a turn. Once per round.',
-  'I’m as tough as a rock! ⛑️', 'Oh-ho-ho! Freeze!', 'Into battle — the goal is close!', 'Oh, you’re brave!', 'A Viking win!', 'I got dented…')
-r('Bong the Bell', 'Bong!', f'With his first move he rings — bong! — {LAVA}.',
-  'Bong-bong, I’m ringing! 🔔', 'BONG! A wild throw!', 'Ringing in the win!', 'Oh, you ring louder than me!', 'A bell-ringing win!', 'I went quiet…')
+r('Flare the Fire Spirit', 'Burnt Out', 'When you get colder, he goes out and it gets dark: you can’t see your own moves for the rest of the round. Once per round.',
+  'Fwoosh! I’m the living fire of the forge! 🔥', 'Pff! It’s dark — you can’t see your own moves!', 'I’m flaring up — very hot!', 'You’re fanning my fire!', 'Flames of victory!', 'I’ve gone out…')
+r('Clang the Dwarf Smith', 'Ringing Anvil', 'On the third move of the round she strikes the anvil and learns from the ring: the number is more or less than that one. She won’t tell you.',
+  'Clang! I’m the best smith under the mountain ⚒️', 'Clang! The ring told me everything!', 'Strike while the iron is hot!', 'You hammer louder than me!', 'Clang! Victory is forged!', 'My hammer slipped…')
+r('Hauler the Mole Miner', 'Off It Goes!', 'With his third move he carts your “⚡ +1 move” away.',
+  'I dig deeper than anyone! ⛏️', 'Off it goes! Your “⚡” is in my cart!', 'The vein is near!', 'You’re digging right beside me!', 'I mined a victory!', 'Cave-in… you win.')
+r('Puff the Troll', 'Forge Smoke', 'When you are “Very hot” or closer, he puffs out smoke: you can’t see his moves for the rest of the round. Once per round.',
+  'Puff-puff! I keep the furnace going 💨', 'Puff! Smoke — you can’t see my moves!', 'Puff-puff, very hot!', 'Can you see through the smoke?!', 'Puff! I win!', 'The smoke cleared…')
+r('Nugget the Kobold', 'Nose for Gold', 'On the fourth move of the round he sniffs out the gold and learns whether the number is even or odd. He won’t tell you.',
+  'Hee-hee! I know where the gold is hidden 🪙', 'Hee-hee! My nose figured it out!', 'The gold is near!', 'Are you looking for my gold?!', 'Hee-hee! A golden victory!', 'The gold slipped away…')
+r('Lucky the Prospector Dwarf', 'Prospector’s Luck', 'After your second move he pans out a nugget: a “⚡ +1 move” for himself.',
+  'Ha! Today is my lucky day! ✨', 'A nugget! A “⚡ +1 move” for me!', 'I smell a golden vein!', 'You’re panning right next to me!', 'Ha! What luck!', 'Nothing but rocks…')
+r('Axe the Dwarf Warrior', 'Battle Cry', 'When he is “Burning”, he lets out a battle cry: you freeze and skip a turn. Once per round.',
+  'Ha! I’m the bravest dwarf under the mountain! ⚔️', 'AAARGH! Freeze — you skip a turn!', 'Victory is near!', 'You’re a brave warrior!', 'Hooray! I win!', 'Retreating… you win.')
+r('Bruno the Blacksmith Bear', 'Hammer Strike', 'With his first move he strikes with his hammer: bong! — your next move is made for you — a wild throw.',
+  'Bong-bong! I forge horseshoes and swords 🔨', 'BONG! Your move went flying!', 'Strike while it’s hot!', 'You hammer as well as I do!', 'Bong! I win!', 'The hammer is heavy… you win.')
 b('The Dwarf King', 'Dungeon', 'With his second move he leads you into the dungeon: you only see the last two moves.',
   'Treasury', f'On the second move of the round he carries your {K} off to his treasury.',
   'Welcome to my forge! 👑', 'The dungeon! What came before?', 'To the treasury — the “⚡” is mine!', 'The treasure is almost found!', 'Oh, you found my gold vein!', 'A dwarf king win!', 'Deep into the mountain…')

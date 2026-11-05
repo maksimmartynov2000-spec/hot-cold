@@ -7680,7 +7680,7 @@ async function testAdvRules(browser) {
   r.moon = await page.evaluate(() => { advTest(43, 100); play(1, 1); play(0, 1); play(1, 2); return history.filter(h => h.p === 1).map(h => hiddenRow(1, h)).join(); });
   check('Лунный зайка: каждый второй его ход спрятан', r.moon === 'false,true', r.moon);
   r.meteor = await page.evaluate(() => { advTest(44, 100); play(0, 1); play(1, 1); play(0, 1); return { next: D.cur, lava: D.autoLava[D.cur] }; });
-  check('Метеорит: третий ход — следующий делается сам', r.meteor.lava === true, JSON.stringify(r.meteor));
+  check('Фея Звездопад: третий ход — следующий делается сам', r.meteor.lava === true, JSON.stringify(r.meteor));
   r.whale = await page.evaluate(() => { advTest(45, 100); advRoundStart(); return [D.know[0].half, D.know[1].half].join(); });
   check('Кит: оба знают половину', r.whale === 'low,low', r.whale);
   r.eyes = await page.evaluate(() => { advTest(46, 100); advRoundStart(); return [D.know[1].parity === undefined ? '-' : D.know[1].parity, D.know[1].half, D.know[0].half || '-'].join(); });
@@ -7852,8 +7852,8 @@ async function testAdvWorlds(browser) {
     gate.locked && gate.text === '🔒 Нужно 20 ⭐ в мире «Космос» — сейчас 19' && gate.shown === gate.text && gate.cur === '4' &&
     gate.btn === gate.text && gate.dis, JSON.stringify(gate));
   check('20 ⭐ — мир 6 открыт; начатый мир не закрывается', gate.open && gate.started, JSON.stringify(gate));
-  check('мир 7 ждёт 20 ⭐ в Сладком королевстве; без босса — «Откроется после мира»', gate.w7locked &&
-    /Сладкое королевство/.test(gate.w7) && /сейчас 10/.test(gate.w7) && gate.boss === '🔒 Откроется после мира «Космос»', JSON.stringify(gate));
+  check('мир 7 ждёт 20 ⭐ на Острове лемуров; без босса — «Откроется после мира»', gate.w7locked &&
+    /Остров лемуров/.test(gate.w7) && /сейчас 10/.test(gate.w7) && gate.boss === '🔒 Откроется после мира «Космос»', JSON.stringify(gate));
 
   // Итог боя с боссом Космоса без нужных звёзд: «Дальше» нет, сказано, чего не хватает
   const after = await page.evaluate(() => {
@@ -7891,8 +7891,8 @@ async function testAdvWorlds(browser) {
   });
   check('карта: все миры строками, раскрыт только текущий (Пустыня), в нём следующий — 74-й', map.worlds === data.worlds && map.shown === '7' &&
     map.tiles === 10 && map.next === '73' && map.head === 'true', JSON.stringify(map));
-  check('нажатие на мир раскрывает и сворачивает его', map.two === 20 && map.back === 10 && map.badge === '🍬' &&
-    map.name === 'Сладкое королевство', JSON.stringify(map));
+  check('нажатие на мир раскрывает и сворачивает его', map.two === 20 && map.back === 10 && map.badge === '🚧' &&
+    map.name === 'Остров лемуров', JSON.stringify(map));
   check('у закрытых миров — что их откроет; внизу — сколько миров ещё впереди', map.gates === data.worlds - 8 &&
     map.soon === '🌍 Ещё ' + (50 - data.worlds) + ' миров — скоро',
     JSON.stringify(map));
@@ -7909,7 +7909,8 @@ async function testAdvWorlds(browser) {
     return r;
   }));
   const RANGES = ['1..50', '-50..50', '1..150', '1..200', '1..300', '1..100', '1..150', '1..200', '1..300', '1..500',
-                  '1..100', '1..150', '-150..150', '1..300', '1..500', '1..150', '1..200', '1..300', '-200..200', '1..500'];
+                  '1..100', '1..150', '-150..150', '1..300', '1..500', '1..150', '1..200', '1..300', '-200..200', '1..500',
+                  '1..150', '1..200', '-150..150', '1..400', '1..500', '1..200', '1..300', '-150..150', '1..400', '1..500'];
   check('числа миров с шестого и бонус мира в наборе', bonus.length >= 10 &&
     bonus.map(b => b.min + '..' + b.max).join() === RANGES.slice(0, bonus.length).join() && bonus.every(b => b.has && b.field), JSON.stringify(bonus));
 
@@ -7953,29 +7954,29 @@ async function testAdvWorlds(browser) {
     out.first = D.cur;
     n = 50 + ADV_HEROES.findIndex(h => h.pick === 'tens'); advTest(n, 77); D.cur = 1; botMove(); stopBot();
     out.tens = history[0] && history[0].guess % 10;
-    // Сахарная Королева: теплеете — забирает ваш «⚡», четвёртым ходом раунда — «⚡» себе
+    // Владыка Фосса: теплеете — забирает ваш «⚡», четвёртым ходом раунда — «⚡» себе
     advTest(59, 25); play(0, 1); play(1, 1); const q1 = D.tokens.join(':'); play(0, 3); const q2 = D.tokens.join(':'); play(1, 1);
     out.queen = [q1, q2, D.tokens.join(':')].join(' ');
     quitToMenu();
     return out;
   });
-  check('Мишка Мармелад: вам «Холодно» — пропускаете ход, правило — карточкой', r.sticky.skip && /^F 🍬 Липучка/.test(r.sticky.fire),
+  check('Жук-жираф: вам «Холодно» — пропускаете ход, правило — карточкой', r.sticky.skip && /^F 🚧 Шлагбаум/.test(r.sticky.fire),
     JSON.stringify(r.sticky));
-  check('Кекс Вишенка: ему «Горячо» — дарит «⚡», раз за раунд', r.gift.gain === 1 && r.gift.once, JSON.stringify(r.gift));
-  check('Пряник: вам «Горячо» — его следующий ход двойной', r.double === true);
-  check('Бегемотик: после вашего первого хода — чётность словами', r.parity.know === 0 && /[Чч]исло чётное/.test(r.parity.fire), JSON.stringify(r.parity));
+  check('Лемур Кольцехвост: ему «Горячо» — дарит «⚡», раз за раунд', r.gift.gain === 1 && r.gift.once, JSON.stringify(r.gift));
+  check('Сифака: вам «Горячо» — его следующий ход двойной', r.double === true);
+  check('Черепаха: после вашего первого хода — чётность словами', r.parity.know === 0 && /[Чч]исло чётное/.test(r.parity.fire), JSON.stringify(r.parity));
   check('Нарвал: ему «Горячо» — больше или меньше его числа, и это правда', r.dir.ok && /(больше|меньше) /.test(r.dir.fire), JSON.stringify(r.dir));
   check('Стегозавр: взвели «⚡» — он лопнул: взвода нет, второй жетон цел', r.burn.before === '1:1' && r.burn.after === '0:1' &&
     !r.burn.armed && r.burn.fire, JSON.stringify(r.burn));
   check('Муравей: взвели «⚡» — он растерялся и пропускает ход, а ваш «⚡» работает', r.ant.armed && r.ant.skip, JSON.stringify(r.ant));
   check('Мопс: вам «Горячо» — ваш «⚡» уходит к нему', r.steal.before === '1:1' && r.steal.after === '0:2', JSON.stringify(r.steal));
-  check('Рожок, Скорпиончик, Кактус, Песец: память, шальной бросок, скрытый ход, туман', r.memory && r.lava && r.hide && r.fog,
+  check('Лягушка, Скорпиончик, Песчаная кошка, Песец: память, шальной бросок, скрытый ход, туман', r.memory && r.lava && r.hide && r.fog,
     JSON.stringify([r.memory, r.lava, r.hide, r.fog]));
-  check('Хомяк: на втором ходу — «⚡» себе; Колибри: первым ходом ходит ещё раз', r.stash === 1 && r.again === 1, JSON.stringify([r.stash, r.again]));
+  check('Мышиный лемур: на втором ходу — «⚡» себе; Колибри: первым ходом ходит ещё раз', r.stash === 1 && r.again === 1, JSON.stringify([r.stash, r.again]));
   check('Горностай: вам «Очень горячо» — заморозка', r.freeze === true);
-  check('Звезда: в начале раунда — чётность; Шахматный Конь ходит первым; Утка — по круглым', r.start === 0 && r.first === 1 && r.tens === 0,
+  check('Звезда: в начале раунда — чётность; Барсук ходит первым; Утка — по круглым', r.start === 0 && r.first === 1 && r.tens === 0,
     JSON.stringify([r.start, r.first, r.tens]));
-  check('Сахарная Королева: забирает ваш «⚡», четвёртым ходом раунда берёт себе', r.queen === '1:1 0:2 0:3', r.queen);
+  check('Владыка Фосса: забирает ваш «⚡», четвёртым ходом раунда берёт себе', r.queen === '1:1 0:2 0:3', r.queen);
 
   // Новые действия и манеры хода партии 2 — прямо на идущей партии
   const acts = await page.evaluate(() => {
@@ -8060,7 +8061,7 @@ async function testAdvWorlds(browser) {
     head: document.querySelector('#advMap .adv-world[data-w="5"] .aw-name').textContent,
     card: (openAdvCard(50), document.getElementById('acName').textContent) }));
   check('немецкий: подгружен только js/adv-de.js, мир 6 и герой — по-немецки', lazy.scripts.join() === 'js/adv-de.js' &&
-    lazy.head === 'Süßigkeitenreich' && lazy.card === 'Gummibär Wackel', JSON.stringify(lazy));
+    lazy.head === 'Lemureninsel' && lazy.card === 'Giraffenkäfer Stelze', JSON.stringify(lazy));
   await done(de);
 }
 

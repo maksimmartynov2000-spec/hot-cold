@@ -1,0 +1,175 @@
+ПОРТРЕТЫ: ЖИВЫЕ ГЕРОИ ВМЕСТО ВЕЩЕЙ — 6 листов, 106 героев
+
+Как сделать каждый лист (так же, как партии 2 и 3):
+1. Откройте Gemini, приложите ту же картинку-образец стиля (style-ref).
+2. Вставьте текст листа целиком — от «Match» до последней строки.
+3. Готовую картинку пришлите сюда. Если Gemini дал два варианта — присылайте оба. Нарежу и подключу сам.
+Лист 6 — маленький: 6 героев, 3 в ряд, 2 ряда.
+Если какой-то герой вышел плохо — скажите, кого переделать: дам подсказку на него одного.
+
+Кто есть кто (по рядам слева направо; 👑 — босс):
+Лист 1.
+  ряд 1: Жук-жираф Каланча (мир 6), Лемур Кольцехвост (мир 6), Ай-ай Полуночник (мир 6), Сифака Попрыгун (мир 6), Мышиный лемур Запасик (мир 6)
+  ряд 2: Черепаха Лучистая (мир 6), Геккон Листохвост (мир 6), Тенрек Засоня (мир 6), Лягушка Помидорка (мир 6), 👑 Владыка Фосса (мир 6)
+  ряд 3: Песчаная кошка Тень (мир 8), 👑 Гусь Генерал (мир 9), Стриж Мельк (мир 10), Альбатрос Парусник (мир 10), 👑 Громовая Птица (мир 10)
+  ряд 4: Попугай Пиастр (мир 13), Горгулья Указка (мир 14), Гоблин Шмыг (мир 14), Барсук Храбрец (мир 15), Гиббон Лиана (мир 19)
+Лист 2.
+  ряд 1: Дракончик Жарик (мир 17), Виверна Флюгер (мир 17), Дракончик Апчхи (мир 17), Дракон Ветрокрыл (мир 17), Дракончик Мираж (мир 17)
+  ряд 2: Дракончик Добряк (мир 17), Дракон Рокот (мир 17), Дракон Скряга (мир 17), Пернатый змей Перо (мир 17), 👑 Король Драконов (мир 17)
+  ряд 3: Пришелец Гуп (мир 20), Тихоходка Невесомка (мир 20), Марсианин Двоюн (мир 20), Космический слизень Лип (мир 20), Звёздный ёж Искрун (мир 20)
+  ряд 4: Мышь-космонавт Пилотка (мир 20), Пришелец Локатор (мир 20), Осьминог-телепат Мыслик (мир 20), Пёс-космонавт Ракета (мир 20), 👑 Большая Медведица (мир 20)
+Лист 3.
+  ряд 1: Тигрёнок Кольцо (мир 22), Хомяк Кувырок (мир 22), Звездорыл Копун (мир 23), Протей Белянка (мир 23), Кристальная ящерка Блеск (мир 23)
+  ряд 2: Пещерный сверчок Скрипун (мир 23), Мамонтёнок Шерстик (мир 24), Саблезуб Клык (мир 24), Шерстистый носорог Буран (мир 24), Пещерный медведь Берлога (мир 24)
+  ряд 3: Большерогий олень Рогач (мир 24), Пещерный лев Засада (мир 24), Глиптодонт Броня (мир 24), Ленивец Великан (мир 24), 👑 Царь Мамонтов (мир 24)
+  ряд 4: Кельпи Омут (мир 25), Утка-мандаринка Узорка (мир 25), Цилинь Мудрец (мир 25), Медуза Жгучка (мир 25), Райская птица Танцорка (мир 25)
+Лист 4.
+  ряд 1: Лори Нектарка (мир 25), Кальмар Мерцалка (мир 25), Норка Шустрячок (мир 26), Бобр Запруда (мир 26), Сирин Певунья (мир 27)
+  ряд 2: Конёк-Горбунок (мир 27), Леший Мохнач (мир 27), Змей Горыныч (мир 27), Домовёнок Шуршун (мир 27), Жар-птица Огнепёрка (мир 27)
+  ряд 3: Сокол Финист (мир 27), Баба-Яга (мир 27), Царевна-Лягушка (мир 27), 👑 Кощей Бессмертный (мир 27), Пищуха Сеносбор (мир 28)
+  ряд 4: Горный козёл Скалолаз (мир 28), Бородач Зоркий (мир 28), Робокот Винтик (мир 29), Робосорока Хапуга (мир 29), Андроид Заряд (мир 29)
+Лист 5.
+  ряд 1: Робокраб Клешня (мир 29), Робопчела Сканер (мир 29), Ласка Листопадка (мир 31), Глухарь Ворчун (мир 31), Ибис Писец (мир 32)
+  ряд 2: Скарабей Катун (мир 32), Кошка Бастет (мир 32), Шакалёнок Анубис (мир 32), Сокол Гор (мир 32), Бегемотик Таурт (мир 32)
+  ряд 3: Крокодильчик Себек (мир 32), Мангуст Хват (мир 32), Цапля Бенну (мир 32), 👑 Солнечный Ра (мир 32), Калан Дремуша (мир 34)
+  ряд 4: Мотылёк Ночница (мир 34), Долгопят Ночник (мир 34), Пингвинёнок Лунатик (мир 34), Дух огня Полыхай (мир 35), Гномиха Звонка (мир 35)
+Лист 6.
+  ряд 1: Крот Рудокоп (мир 35), Тролль Пыхтун (мир 35), Кобольд Самородок (мир 35)
+  ряд 2: Гном Старатель (мир 35), Гном Секира (мир 35), Медведь Молотобоец (мир 35)
+
+
+=============== ЛИСТ 1 из 6 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a giraffe weevil, a small red-and-black beetle with an extremely long neck, smiling
+Row 1, column 2: a ring-tailed lemur holding a ripe mango, its long black-and-white striped tail curled up behind it
+Row 1, column 3: an aye-aye lemur with huge round orange eyes, big bat-like ears and one long thin finger raised, a tiny crescent moon above it
+Row 1, column 4: a white sifaka lemur leaping sideways in a dancing pose with arms up, a chocolate-brown cap of fur on its head
+Row 1, column 5: a tiny mouse lemur with enormous eyes hugging its own plump furry tail
+Row 2, column 1: a radiated tortoise with a high dome shell patterned with bright yellow star-like rays, looking wise and kind
+Row 2, column 2: a leaf-tailed gecko whose flat tail looks exactly like a dry brown leaf, pretending to be a leaf with a sly smile
+Row 2, column 3: a sleepy streaked tenrec, a small spiky hedgehog-like animal with yellow and black stripes, yawning
+Row 2, column 4: a round tomato frog, bright red and puffed up like a ball, croaking happily
+Row 2, column 5: a sleek fossa, a slender cat-like animal with reddish-brown fur and a very long tail, wearing a small golden crown, slightly bigger and grander than the others
+Row 3, column 1: a sand cat, a small desert wild cat with sandy fur, very wide ears and big green eyes, peeking out from behind a dune
+Row 3, column 2: a bossy white farm goose with its chest puffed out, wearing a general's sash with medals and a small golden crown, slightly bigger and grander than the others
+Row 3, column 3: a sleek dark swift bird in fast flight with long sickle-shaped wings and motion streaks behind it
+Row 3, column 4: a white albatross gliding with very long wings spread wide, calm and proud
+Row 3, column 5: a majestic thunderbird, a huge eagle-like spirit bird with storm-blue feathers and small lightning sparks around its wings, wearing a small crown, slightly bigger and grander than the others
+Row 4, column 1: a red-and-blue macaw parrot wearing a tiny pirate bandana and holding a gold coin in its beak
+Row 4, column 2: a small friendly stone gargoyle with little bat wings, pointing the way with one finger and smiling
+Row 4, column 3: a mischievous little green goblin with big pointy ears and a cheeky grin, wearing a patched hood
+Row 4, column 4: a brave badger knight in shiny silver armor holding a small shield with a white stripe emblem
+Row 4, column 5: a white-handed gibbon swinging from a green vine on one very long arm, looking upward
+
+=============== ЛИСТ 2 из 6 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a small chubby black-and-red dragon blowing on a glowing ember held in its paws
+Row 1, column 2: a slim green wyvern with wings for arms, pointing with its arrow-shaped tail
+Row 1, column 3: a tiny orange baby dragon with a runny nose sneezing a puff of sparks
+Row 1, column 4: a sky-blue dragon flapping its large feathery wings hard
+Row 1, column 5: a shimmering see-through purple dragon that is half invisible, winking playfully
+Row 2, column 1: a round friendly golden dragon with a warm smile, holding out a helping paw
+Row 2, column 2: a stocky dark-green dragon with small horns roaring a loud but friendly roar
+Row 2, column 3: a little red dragon hugging a pile of gold coins with a greedy but cute grin
+Row 2, column 4: a feathered serpent, a long flying snake-like dragon covered in bright green and blue feathers
+Row 2, column 5: a mighty crimson dragon king with golden horns, a long flowing mane and a crown, slightly bigger and grander than the others
+Row 3, column 1: a cute little purple alien with one big eye and long wobbly antennae, waving hello
+Row 3, column 2: a cute chubby tardigrade (water bear) floating in space, waving its tiny paws
+Row 3, column 3: a small red Martian with two smiling heads and four little arms
+Row 3, column 4: a friendly glowing purple space slug with eye stalks, leaving a sparkly trail
+Row 3, column 5: a hedgehog-like alien whose spikes are glowing, crackling electric sparks
+Row 4, column 1: a little mouse astronaut in a white spacesuit with a star badge, giving a thumbs up
+Row 4, column 2: a round blue alien with a big satellite-dish antenna on its head, listening carefully
+Row 4, column 3: a pink alien octopus with a big glowing head and closed eyes, reading minds
+Row 4, column 4: an eager puppy in an orange spacesuit with a small rocket backpack
+Row 4, column 5: the Great Bear constellation as a big friendly bear made of glowing stars and deep-blue night sky, wearing a crown, slightly bigger and grander than the others
+
+=============== ЛИСТ 3 из 6 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a tiger cub in a circus collar jumping through a hoop
+Row 1, column 2: a hamster acrobat doing a somersault in a little circus vest
+Row 1, column 3: a star-nosed mole with a pink star-shaped nose, holding a glowing crystal
+Row 1, column 4: an olm, a pale pink cave salamander with feathery gills and tiny eyes, smiling
+Row 1, column 5: a small lizard whose back is covered with sparkling crystal spikes
+Row 2, column 1: a cave cricket with extremely long antennae and long legs, listening
+Row 2, column 2: a baby woolly mammoth with long shaggy brown fur and small curved tusks
+Row 2, column 3: a saber-toothed kitten with two long friendly fangs, grinning
+Row 2, column 4: a woolly rhinoceros calf with thick shaggy fur and a big horn, smiling kindly
+Row 2, column 5: a sleepy cave bear cub curled up and yawning
+Row 3, column 1: a giant deer (megaloceros) fawn with enormous wide antlers, trumpeting
+Row 3, column 2: a cave lion cub with a short pale mane, crouching in fresh snow as if hiding
+Row 3, column 3: a glyptodont, a giant armadillo-like animal with a dome shell made of hexagon plates
+Row 3, column 4: a giant ground sloth standing on its hind legs with arms open for a hug
+Row 3, column 5: a huge old woolly mammoth king with long white tusks, frost on its fur and a crown, slightly bigger and grander than the others
+Row 4, column 1: a kelpie, a magical water horse with a mane like flowing seaweed and waves
+Row 4, column 2: a mandarin duck with bright orange, blue and purple patterned feathers
+Row 4, column 3: a qilin, a gentle deer-dragon creature with rainbow scales, a single antler and a flowing mane
+Row 4, column 4: a rainbow jellyfish with a shimmering bell and long glowing tentacles, smiling
+Row 4, column 5: a bird of paradise with a dazzling fan of colorful plumes, dancing
+
+=============== ЛИСТ 4 из 6 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a rainbow lorikeet parrot with a blue head, green wings and an orange chest, sipping nectar
+Row 1, column 2: a firefly squid with tiny glowing blue lights all over its body, puffing a little cloud of ink
+Row 1, column 3: a sleek dark-brown mink with a cheeky smile, sneaking
+Row 1, column 4: a beaver holding a stick, standing by a small dam of twigs
+Row 1, column 5: Sirin, a magical bird from Russian fairy tales with a kind girl's face, colorful feathers and a small kokoshnik headdress, singing
+Row 2, column 1: the Little Humpbacked Horse from a Russian fairy tale, a small horse with a hump and very long ears
+Row 2, column 2: a friendly forest spirit (leshy) with a beard of moss, bark skin and small twig antlers
+Row 2, column 3: a cute three-headed green dragon from Russian fairy tales, each head with a different funny expression
+Row 2, column 4: a little house spirit (domovoi), a small shaggy bearded creature peeking out from behind a stove corner
+Row 2, column 5: the Firebird, a magical bird with glowing golden-orange feathers and a long flaming tail
+Row 3, column 1: a bright falcon with sharp eyes and a little red cape, from a Russian fairy tale
+Row 3, column 2: a funny, kind-looking Baba Yaga in a headscarf flying in a wooden mortar with a broom
+Row 3, column 3: a frog princess with a tiny golden crown, holding an arrow
+Row 3, column 4: Koschei the Deathless as a funny thin old king with a long beard, a black cape and a crown, slightly bigger and grander than the others
+Row 3, column 5: a pika, a small round mountain animal like a tiny rabbit, carrying a bundle of hay
+Row 4, column 1: an ibex with huge curved horns standing on a rock ledge
+Row 4, column 2: a bearded vulture with orange chest feathers and a black beard of feathers, looking far away
+Row 4, column 3: a cute robot cat with a shiny metal body and little sparks coming from its ears
+Row 4, column 4: a robot magpie with black-and-white metal feathers holding a shiny bolt in its beak
+Row 4, column 5: a friendly android boy with a glowing battery-level indicator on its chest
+
+=============== ЛИСТ 5 из 6 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a robot crab with two big shiny claws, one of them raised
+Row 1, column 2: a robot bee with scanner lenses for eyes and glowing wings
+Row 1, column 3: a weasel with a red autumn leaf on its head, peeking out
+Row 1, column 4: a capercaillie, a big dark forest grouse with a fanned tail and red eyebrows, grumbling
+Row 1, column 5: a sacred ibis bird with a long curved beak holding a papyrus scroll
+Row 2, column 1: a shiny blue-green scarab beetle rolling a ball
+Row 2, column 2: an elegant black Egyptian cat wearing a golden collar and a gold earring
+Row 2, column 3: a jackal pup with tall ears and a gold-and-blue Egyptian collar
+Row 2, column 4: a falcon with the Eye of Horus marking around its eye
+Row 2, column 5: a clumsy cheerful baby hippo with a lotus flower on its head
+Row 3, column 1: a little Nile crocodile peeking out of the water with only its eyes and snout above the surface
+Row 3, column 2: a mongoose standing upright and alert
+Row 3, column 3: a grey heron with a golden sun disc behind its head, the Egyptian Bennu bird
+Row 3, column 4: a falcon-headed sun king with a golden sun disc above his head and a pharaoh's headdress, slightly bigger and grander than the others
+Row 3, column 5: a sea otter floating on its back fast asleep, holding a small pebble
+Row 4, column 1: a pale green luna moth with long tail wings, glowing softly
+Row 4, column 2: a tarsier with enormous round eyes clinging to a branch, holding a glowing dream bubble
+Row 4, column 3: a sleepwalking penguin chick in pajamas with eyes closed and flippers forward
+Row 4, column 4: a small friendly fire spirit made of warm flames with a happy face
+Row 4, column 5: a dwarf blacksmith girl with braids, a leather apron and a small hammer
+
+=============== ЛИСТ 6 из 6 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 6 cute character icons for a kids' mobile game, a perfectly even grid of 3 columns and 2 rows, pure white background, landscape 3:2 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no grid lines, no borders.
+Row 1, column 1: a mole miner with a helmet lamp pushing a little cart of ore
+Row 1, column 2: a big friendly stone troll with mossy hair, puffing out a cloud of forge smoke
+Row 1, column 3: a kobold, a small friendly mine spirit with big ears and a glowing nose, holding a gold nugget
+Row 2, column 1: a prospector dwarf holding a gold pan with a big lucky grin
+Row 2, column 2: a dwarf warrior with a horned helmet and a small axe, shouting a battle cry
+Row 2, column 3: a strong brown bear blacksmith in a leather apron swinging a big hammer
