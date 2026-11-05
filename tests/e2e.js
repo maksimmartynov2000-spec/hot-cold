@@ -332,7 +332,8 @@ async function registerPlayer(p, name, pin) {
   await A.page.evaluate(() => quitToMenu());
   await A.page.waitForTimeout(900);
   check('в главном меню — «Открыть сундук»', await A.page.locator('#screenMode #odChest').isVisible());
-  await A.page.click('#odChest');
+  // Кнопка пульсирует — «стоять на месте» она не будет, жмём её функцией
+  await A.page.evaluate(() => openChest());
   await A.page.waitForTimeout(1200);
   const opened = (await db.query("select chest_at is not null as opened from online_days where username = 'Тимур'")).rows[0];
   check('сундук открыт через настоящую базу', opened && opened.opened === true &&
