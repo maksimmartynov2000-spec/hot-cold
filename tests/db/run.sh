@@ -33,6 +33,7 @@ node "$DIR/say_codes_from_js.js"
 node "$DIR/bots_from_js.js"
 node "$DIR/rewards_from_js.js"
 node "$DIR/pass_sets_from_js.js"
+node "$DIR/shop_from_js.js"
 chmod a+r "$DIR"/*.csv
 
 # Список «-f файл» для psql: все миграции с номером не меньше $1.
