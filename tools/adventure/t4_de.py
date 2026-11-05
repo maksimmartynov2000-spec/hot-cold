@@ -41,7 +41,7 @@ r('Basset Schnupper', 'Auf der Fährte', 'Bist du „Sehr kalt“, nimmt er die 
   'Meine Nase täuscht sich nie! 🔎', 'Schnüffel, schnüffel! Hinweis: Die Zahl ist {k}!', 'Die Spur führt direkt zur Antwort!', 'Du folgst meiner Spur!', 'Fall gelöst!', 'Die Spur ist kalt geworden…')
 r('Bulldogge Inspektor', 'Bericht', 'Mit seinem vierten Zug erstattet er dir Bericht: Die Zahl ist größer oder kleiner als seine.',
   'Inspektor im Dienst! 📋', 'Bericht: Die Zahl ist {k}!', 'Der Verdächtige ist fast gefasst!', 'Ermittelst du auf eigene Faust?!', 'Fall abgeschlossen!', 'Die Beweise passen nicht…')
-r('Elster Indiz', 'Glänzendes Indiz', 'Beim dritten Zug der Runde bringt sie ein Indiz: die letzte Ziffer der Zahl.',
+r('Elster Indiz', 'Glänzendes Indiz', 'Beim sechsten Zug der Runde bringt sie ein Indiz: die letzte Ziffer der Zahl.',
   'Alles, was glänzt, ist ein Indiz! 🔑', 'Ein Indiz gefunden: {k}!', 'Die Indizien führen zur Antwort!', 'Sammelst du auch Indizien?!', 'Das Indiz hat geholfen!', 'Ich habe das Indiz verloren…')
 r('Siamkatze Chiffre', 'Entschlüsseln', 'Nach deinem zweiten Zug entschlüsselt sie, ob die Zahl durch 3 teilbar ist. Dir verrät sie es nicht.',
   'Miau. Agentin meldet sich 🕶️', 'Nachricht entschlüsselt. Verrate ich nicht.', 'Ziel im Visier!', 'Du hast meinen Code geknackt?!', 'Mission erfüllt!', 'Meine Tarnung ist aufgeflogen…')
@@ -49,8 +49,8 @@ r('Taube Kurier', 'Depesche', 'Nach deinem dritten Zug bringt er eine Depesche: 
   'Gurr-gurr! Post für den Detektiv ✉️', 'Depesche: Die Zahl ist {k}!', 'Ich fliege direkt zum Ziel!', 'Du hast meinen Brief abgefangen?!', 'Brief zugestellt — ich gewinne!', 'Der Wind hat meinen Brief geholt…')
 r('Meerschweinchen Akte', 'Die Akte', 'Nach deinem vierten Zug findet sie die Akte: die Zehnerziffer der Zahl.',
   'In meiner Kartei steht alles! 🗂️', 'Akte gefunden: {k}!', 'Der Fall ist fast gelöst!', 'Liest du meine Akten?!', 'Fall archiviert — ich gewinne!', 'Die Akte ist verschwunden…')
-r('Koala Abdruck', 'Fingerabdrücke', 'Ist er „Warm“ oder näher, nimmt er Fingerabdrücke und verrät dir, ob die Zahl gerade oder ungerade ist. Einmal pro Runde.',
-  'Koalas haben Fingerabdrücke wie Menschen! 🖐️', 'Die Abdrücke sagen: Die Zahl ist {k}!', 'Die Abdrücke führen zur Antwort!', 'Du hast meine Fingerabdrücke gefunden?!', 'Die Spurensicherung bestätigt — ich gewinne!', 'Die Abdrücke sind verwischt…')
+r('Koala Abdruck', 'Fingerabdrücke', 'Ist er „Warm“ oder näher, nimmt er Fingerabdrücke und erfährt, ob die Zahl gerade oder ungerade ist. Dir verrät er es nicht. Einmal pro Runde.',
+  'Koalas haben Fingerabdrücke wie Menschen! 🖐️', 'Abdrücke genommen… ich weiß mehr.', 'Die Abdrücke führen zur Antwort!', 'Du hast meine Fingerabdrücke gefunden?!', 'Die Spurensicherung bestätigt — ich gewinne!', 'Die Abdrücke sind verwischt…')
 r('Star Tratsch', 'Tratsch', 'Beim fünften Zug der Runde verplappert er sich, in welcher Hälfte die Zahl liegt.',
   'Willst du Neuigkeiten? Ich habe Hunderte! 🗣️', 'Psst, nicht weitersagen! Die Zahl ist {k}!', 'Ich habe gehört, die Antwort ist ganz nah!', 'Lauschst du etwa?!', 'Alle reden über meinen Sieg!', 'Mir sind die Neuigkeiten ausgegangen…')
 r('Waschbär Dietrich', 'Flinke Pfoten', f'Nach deinem dritten Zug greift er in deine Tasche: Dein {K} gehört jetzt ihm.',
@@ -69,8 +69,8 @@ r('Fregattvogel Ballon', 'Roter Ballon', f'Bist du „Warm“ oder näher, bläs
   'Siehst du meinen roten Ballon? 🔴', 'Puff! Du siehst meine Züge nicht!', 'Ich schwebe über der Antwort!', 'Fliegst du mir hinterher?!', 'Ein Sieg mit weiten Flügeln!', 'Mein Ballon ist geplatzt…')
 r('Fink Darwin', 'Beobachtung', 'Mit seinem dritten Zug teilt er eine Beobachtung: ob die Zahl durch 3 teilbar ist.',
   'An meinem Schnabel haben Forscher die Evolution verstanden! 🔬', 'Beobachtung: Die Zahl ist {k}!', 'Die Hypothese stimmt!', 'Bist du auch Forscher?!', 'Ein wissenschaftlicher Sieg!', 'Das Experiment ist gescheitert…')
-r('Seelöwe Faulpelz', 'Faulheit', 'Bei jedem dritten seiner Züge ist er zu faul und setzt aus.',
-  'Gääähn… die Sonne ist so warm 😴', 'Zu faul… ich setze aus.', 'Sogar im Liegen bin ich nah!', 'Du hast mich geweckt!', 'Gewonnen, ohne aufzustehen!', 'Zurück zum Nickerchen…')
+r('Seelöwe Faulpelz', 'Ansteckendes Gähnen', 'Mit seinem vierten Zug gähnt er so ansteckend, dass du einnickst und einen Zug aussetzt.',
+  'Gääähn… die Sonne ist so warm 😴', 'Gääähn… Müde? Setz einen Zug aus!', 'Sogar im Liegen bin ich nah!', 'Du hast mich geweckt!', 'Gewonnen, ohne aufzustehen!', 'Zurück zum Nickerchen…')
 r('Flugfisch Gischt', 'Gischt', 'Der zweite Zug der Runde geht in der Gischt unter: Du siehst ihn nicht.',
   'Ich kann über die Wellen fliegen! 🌊', 'Platsch! Dieser Zug ist in der Gischt verschwunden!', 'Ich fliege direkt zur Antwort!', 'Kannst du auch fliegen?!', 'Ein fliegender Sieg!', 'Zurück ins Meer…')
 r('Kormoran Watschel', 'Ein Fisch für dich', f'Ist er „Sehr kalt“, teilt er einen Fisch mit dir: einen {K} für dich. Einmal pro Runde.',
@@ -101,7 +101,7 @@ r('Kanincheneule Guckmal', 'Aus dem Bau', 'Nach deinem zweiten Zug schaut sie au
   'Ich wohne in einem Erdbau, wie ein Ziesel! 🦉', 'Ich habe rausgeschaut — jetzt weiß ich mehr.', 'Aus meinem Bau sehe ich die Antwort!', 'Du hast in meinen Bau geguckt?!', 'Ein unterirdischer Sieg!', 'Ich verstecke mich wieder…')
 r('Krustenechse Perlchen', 'Biss', f'Mit seinem vierten Zug beißt er in deinen {K} — und weg ist er.',
   'Meine Haut sieht aus wie Perlen! 🦎', 'Schnapp! Dein „⚡“ ist weg!', 'Ich krieche zur Antwort!', 'Du bist ausgewichen?!', 'Perlchen gewinnt!', 'Ich krieche in den Schatten…')
-r('Gabelbock Hornfix', 'Vollgas', 'Nach deinem dritten Zug legt er zu: Beim nächsten Mal zieht er zweimal hintereinander.',
+r('Gabelbock Hornfix', 'Vollgas', 'Nach jedem dritten deiner Züge legt er zu: Beim nächsten Mal zieht er zweimal hintereinander.',
   'Ich bin der Schnellste der Prärie! 🦌', 'Vollgas! Zwei Züge hintereinander!', 'Ich rase zur Antwort!', 'Du holst auf?!', 'Ein gehörnter Sieg!', 'Zu müde zum Rennen…')
 b('Sheriff Bison', 'Hände hoch!', f'Du hast deinen {K} eingeschaltet — der Sheriff ruft „Hände hoch!“: Du setzt deinen nächsten Zug aus. Einmal pro Runde.',
   'Beschlagnahme', f'Beim sechsten Zug der Runde beschlagnahmt er deinen {K}.',
@@ -111,22 +111,22 @@ b('Sheriff Bison', 'Hände hoch!', f'Du hast deinen {K} eingeschaltet — der Sh
 # 40 · Land der Yokai
 r('Kappa Gurke', 'Gurke', f'Ist er „Sehr kalt“, knabbert er eine Gurke und nimmt sich einen {K}. Einmal pro Runde.',
   'Verschütte nicht das Wasser auf meinem Kopf! 🥒', 'Knack! Ein „⚡ +1 Zug“ für mich!', 'Die Gurke führt zur Antwort!', 'Hast du dich höflich verbeugt?!', 'Ein knackiger Sieg!', 'Das Wasser ist verschüttet…')
-r('Tengu Federwind', 'Federfächer', f'Ist er „Warm“ oder näher, wedelt er mit seinem Federfächer: {LAVA}. Einmal pro Runde.',
+r('Tengu Federwind', 'Federfächer', 'Bei jedem vierten seiner Züge wedelt er mit seinem Federfächer: Dein nächster Zug geschieht von selbst — ein wilder Wurf.',
   'Ich bin ein Berggeist mit Krähenflügeln! 🍃', 'Wusch! Dein Zug ist irgendwohin geflogen!', 'Der Wind trägt mich zur Antwort!', 'Hat es dich nicht weggeweht?!', 'Ein stürmischer Sieg!', 'Zurück in die Berge…')
 r('Nekomata Zweischwanz', 'Zwei Schwänze', 'Mit ihrem zweiten Zug schwingt sie beide Schwänze: Beim nächsten Mal zieht sie zweimal hintereinander.',
   'Miau! Zwei Schwänze sind besser als einer 🐈', 'Miau! Zwei Züge hintereinander!', 'Meine Laterne beleuchtet die Antwort!', 'Siehst du im Dunkeln?!', 'Ein Sieg mit zwei Schwänzen!', 'Meine Laterne ist ausgegangen…')
-r('Kamaitachi Windstoß', 'Windstoß', 'Deinen vierten Zug weht ein Windstoß davon: Du siehst ihn nicht.',
-  'Wusch! Ich bin ein Wind mit kleinen Krallen 🌀', 'Wusch! Dein Zug ist weggeweht!', 'Ich wirble direkt neben der Antwort!', 'Du hast dem Wind standgehalten?!', 'Ein Wirbelwind-Sieg!', 'Der Wind hat sich gelegt…')
-r('Kodama Wispel', 'Waldflüstern', 'Bist du „Warm“ oder näher, flüstert es dir zu, in welcher Hälfte die Zahl liegt. Einmal pro Runde.',
-  'Psst… ich wohne in einem alten Baum 🌳', 'Psst… die Zahl ist {k}…', 'Der Wald flüstert — die Antwort ist nah!', 'Hörst du den Wald?', 'Ein Waldsieg!', 'Ich verschwinde im Laub…')
-r('Amabie Glanz', 'Prophezeiung', 'Zu Beginn der Runde sagt sie voraus, ob die Zahl durch 5 teilbar ist.',
-  'Ich bringe gute Vorzeichen! ✨', 'Prophezeiung: Die Zahl ist {k}!', 'Meine Schuppen leuchten — die Antwort ist nah!', 'Glaubst du an Prophezeiungen?', 'Sie hat sich erfüllt — ich gewinne!', 'Die Prophezeiung hat sich nicht erfüllt…')
-r('Yuki-onna Schneeflocke', 'Eisiger Atem', 'Ist sie „Kalt“ oder weiter weg, haucht sie Frost: Du frierst ein und setzt einen Zug aus. Einmal pro Runde.',
-  'Ich tanze mit den Schneeflocken ❄️', 'Huuu… Einfrieren — setz einen Zug aus!', 'Der Schneesturm führt mich zur Antwort!', 'Ist dir nicht kalt?!', 'Ein verschneiter Sieg!', 'Ich bin geschmolzen…')
-r('Zashiki-warashi Glücksi', 'Glück im Haus', f'Beim dritten Zug der Runde bringt sie Glück: einen {K} für dich.',
-  'Hihi! Wo ich bin, ist das Glück! 🎎', 'Glück! Nimm einen „⚡ +1 Zug“!', 'Das Glück ist auf meiner Seite!', 'Du hast Glück!', 'Hihi, Glück gehabt!', 'Mein Glück ist zu dir gewandert…')
-r('Schneeaffe Onsen', 'Heiße Quelle', 'Bist du „Sehr kalt“, wärmt sie sich in der heißen Quelle und setzt ihren Zug aus. Einmal pro Runde.',
-  'Ah, eine heiße Quelle… ♨️', 'Ich wärme mich… ich setze aus.', 'Sogar im Wasser bin ich nah!', 'Willst du dich auch aufwärmen?!', 'Ein gemütlicher Sieg!', 'Das Wasser ist kalt geworden…')
+r('Kamaitachi Windstoß', 'Windstoß', 'Nach deinem zweiten Zug weht ein Windstoß deine Züge davon: Bis zum Rundenende siehst du deine eigenen Züge nicht.',
+  'Wusch! Ich bin ein Wind mit kleinen Krallen 🌀', 'Wusch! Deine Züge sind weggeweht!', 'Ich wirble direkt neben der Antwort!', 'Du hast dem Wind standgehalten?!', 'Ein Wirbelwind-Sieg!', 'Der Wind hat sich gelegt…')
+r('Kodama Wispel', 'Waldflüstern', 'Beim vierten Zug der Runde beginnt der Wald zu flüstern: Bis zum Rundenende siehst du nur die letzten zwei Züge.',
+  'Psst… ich wohne in einem alten Baum 🌳', 'Psst… Du merkst dir nur zwei Züge…', 'Der Wald flüstert — die Antwort ist nah!', 'Hörst du den Wald?', 'Ein Waldsieg!', 'Ich verschwinde im Laub…')
+r('Amabie Glanz', 'Prophezeiung', 'Zu Beginn der Runde hat sie eine Vision: ob die Zahl durch 5 teilbar ist. Dir verrät sie es nicht.',
+  'Ich bringe gute Vorzeichen! ✨', 'Ich hatte eine Vision… ich weiß mehr.', 'Meine Schuppen leuchten — die Antwort ist nah!', 'Glaubst du an Prophezeiungen?', 'Sie hat sich erfüllt — ich gewinne!', 'Die Prophezeiung hat sich nicht erfüllt…')
+r('Yuki-onna Schneeflocke', 'Schneesturm', 'Beim fünften Zug der Runde entfacht sie einen Schneesturm: Bis zum Rundenende siehst du ihre Züge nicht.',
+  'Ich tanze mit den Schneeflocken ❄️', 'Huuu… Schneesturm! Du siehst meine Züge nicht!', 'Der Schneesturm führt mich zur Antwort!', 'Ist dir nicht kalt?!', 'Ein verschneiter Sieg!', 'Ich bin geschmolzen…')
+r('Zashiki-warashi Glücksi', 'Das Glück zieht aus', 'Mit ihrem dritten Zug zieht sie aus — und nimmt das Glück mit: Dein „⚡ +1 Zug“ gehört jetzt ihr.',
+  'Hihi! Wo ich bin, ist das Glück! 🎎', 'Das Glück geht mit mir — dein „⚡“ gehört jetzt mir!', 'Das Glück ist auf meiner Seite!', 'Du hast Glück!', 'Hihi, Glück gehabt!', 'Mein Glück ist zu dir gewandert…')
+r('Schneeaffe Onsen', 'Dampf der Quelle', 'Beim zweiten Zug der Runde steigt Dampf aus der heißen Quelle: Bis zum Rundenende siehst du nur die letzten zwei Züge.',
+  'Ah, eine heiße Quelle… ♨️', 'Dampf! Du merkst dir nur zwei Züge!', 'Sogar im Wasser bin ich nah!', 'Willst du dich auch aufwärmen?!', 'Ein gemütlicher Sieg!', 'Das Wasser ist kalt geworden…')
 b('Der Oni-König', 'Trommel', f'Mit seinem dritten Zug schlägt er die Trommel: {MEM}.',
   'Oni-Kraft', f'Ist er „Kalt“ oder weiter weg, nimmt er sich deinen {K}. Einmal pro Runde.',
   'Keine Angst — ich bin ein lieber Oni! 👑', 'BUMM-BUMM! Du merkst dir nur zwei Züge!', 'Oni-Kraft — dein „⚡“ gehört mir!',
@@ -189,8 +189,8 @@ r('Pekari Grunzi', 'Ausgrabung', 'Mit seinem vierten Zug gräbt er einen Hinweis
   'Grunz! Ich grabe alte Geheimnisse aus! 🐗', 'Ausgegraben… jetzt weiß ich mehr.', 'Ich grabe zur Antwort!', 'Gräbst du auch hier?!', 'Grunz — ich gewinne!', 'Nichts gefunden…')
 r('Klammeraffe Fünfhand', 'Schwanzhand', f'Nach deinem zweiten Zug schnappt sie sich mit dem Schwanz deinen {K}: Jetzt gehört er ihr.',
   'Ich habe fünf Hände — eine davon ist mein Schwanz! 🐒', 'Mit dem Schwanz geschnappt! Dein „⚡“ gehört mir!', 'Ich komme an die Antwort ran!', 'Du bist flink!', 'Ein Sieg mit Schwung!', 'Mein Schwanz ist müde…')
-r('Basilisk Platschi', 'Lauf übers Wasser', 'Beim dritten Zug der Runde — ein Sprint übers Wasser: Wer gerade gezogen hat, zieht sofort noch einmal.',
-  'Ich kann übers Wasser laufen! 💧', 'Platsch-platsch-platsch! Noch ein Zug!', 'Ich renne direkt zur Antwort!', 'Kannst du auch übers Wasser laufen?!', 'Ein nasser Sieg!', 'Ich bin untergegangen…')
+r('Basilisk Platschi', 'Lauf übers Wasser', 'Ist er „Kalt“ oder weiter weg, sprintet er übers Wasser: Beim nächsten Mal zieht er zweimal hintereinander. Einmal pro Runde.',
+  'Ich kann übers Wasser laufen! 💧', 'Platsch-platsch-platsch! Zwei Züge hintereinander!', 'Ich renne direkt zur Antwort!', 'Kannst du auch übers Wasser laufen?!', 'Ein nasser Sieg!', 'Ich bin untergegangen…')
 r('Wickelbär Greifi', 'Nachteinbruch', f'Beim sechsten Zug der Runde bricht die Nacht herein: {FOG}.',
   'Ich gehe nachts aus! 🌙', 'Nacht! Du siehst meine Züge nicht!', 'Im Dunkeln sehe ich die Antwort!', 'Siehst du im Dunkeln?!', 'Ein nächtlicher Sieg!', 'Morgengrauen… ab ins Bett.')
 r('Ozelot Tupfen', 'Hinterhalt', 'Sein vierter Zug versteckt sich im Laub: Du siehst ihn nicht.',
@@ -209,20 +209,20 @@ r('Manul Grummel', 'Grimmiger Blick', f'Nach deinem vierten Zug schaut er so gri
   'Ich lächle nicht. Niemals 😾', 'Hmpf! Dein „⚡“ ist erloschen!', 'Grimmig, aber nah!', 'Du hast mich zum Lachen gebracht?!', 'Ein grimmiger Sieg!', 'Hmpf… na gut.')
 r('Saiga Schnuffel', 'Staubsturm', 'Ist er „Sehr kalt“, verschwindet sein Zug im Staub: Du siehst ihn nicht. Einmal pro Runde.',
   'Meine Nase filtert den Steppenstaub! 🏜️', 'Staub! Diesen Zug siehst du nicht!', 'Ich galoppiere zur Antwort!', 'Rennst du mit mir?!', 'Ein Steppensieg!', 'Im Staub verschwunden…')
-r('Przewalski-Pferd Falbi', 'Ausritt', 'Bist du „Warm“ oder näher, lässt sie dich aufsitzen: Du ziehst sofort noch einmal. Einmal pro Runde.',
-  'Ich bin das letzte Wildpferd der Erde! 🐴', 'Steig auf — zieh noch mal!', 'Ich galoppiere zur Antwort!', 'Du hältst dich im Sattel!', 'Ein Sieg im vollen Galopp!', 'In die Steppe galoppiert…')
+r('Przewalski-Pferd Falbi', 'Wilder Galopp', 'Nach deinem zweiten Zug fällt sie in Galopp: Beim nächsten Mal zieht sie zweimal hintereinander.',
+  'Ich bin das letzte Wildpferd der Erde! 🐴', 'Galopp! Zwei Züge hintereinander!', 'Ich galoppiere zur Antwort!', 'Du galoppierst so gut wie ich?!', 'Ein Sieg im vollen Galopp!', 'In die Steppe galoppiert…')
 r('Kulan Galopp', 'Wettrennen', 'Bei jedem vierten seiner Züge zieht er sofort noch einmal.',
   'Ich bin schneller als der Steppenwind! 🏇', 'Wettrennen! Ich ziehe noch mal!', 'Ich hole die Antwort ein!', 'Du galoppierst schneller?!', 'Ein rasanter Sieg!', 'Zu müde zum Galoppieren…')
 r('Trampeltier Karawane', 'Karawane', f'Beim sechsten Zug der Runde kommt die Karawane an: je einen {K} für dich und für ihn.',
   'Zwei Höcker — doppelter Vorrat! 🐫', 'Die Karawane ist da! Ein „⚡ +1 Zug“ für jeden!', 'Die Karawane zieht zur Antwort!', 'Du hast mich eingeholt!', 'Die Karawane gewinnt!', 'Die Karawane ist weitergezogen…')
-r('Ziesel Pfosten', 'Pfiff', 'Wird er kälter, pfeift er einen Hinweis: ob die Zahl gerade oder ungerade ist. Einmal pro Runde.',
-  'Ich mache Männchen und schaue in die Ferne! 🐿️', 'Pfiiit! Die Zahl ist {k}!', 'Ich sehe die Antwort in der Ferne!', 'Machst du auch Männchen?!', 'Pfiiit — ich gewinne!', 'Ich verstecke mich im Bau…')
-r('Trappe Wichtig', 'Wichtigtuerei', 'Bist du „Sehr heiß“ oder näher, plustert sie sich wichtig auf und setzt ihren Zug aus. Einmal pro Runde.',
-  'Ich bin der schwerste fliegende Vogel! 🦃', 'Aufgeplustert… ich setze aus.', 'Ich schreite wichtig zur Antwort!', 'Du bist wichtiger als ich?!', 'Ein wichtiger Sieg!', 'Meine Federn hängen…')
+r('Ziesel Pfosten', 'Ausguck', 'Wird er kälter, macht er Männchen, schaut in die Ferne und erfährt die Zehnerziffer der Zahl. Dir verrät er es nicht. Einmal pro Runde.',
+  'Ich mache Männchen und schaue in die Ferne! 🐿️', 'Pfiiit! Ich habe etwas entdeckt…', 'Ich sehe die Antwort in der Ferne!', 'Machst du auch Männchen?!', 'Pfiiit — ich gewinne!', 'Ich verstecke mich im Bau…')
+r('Trappe Wichtig', 'Wichtigtuerei', 'Nach deinem dritten Zug stolziert sie so wichtig an dir vorbei, dass du warten musst: Du setzt einen Zug aus.',
+  'Ich bin der schwerste fliegende Vogel! 🦃', 'Platz da! Setz einen Zug aus!', 'Ich schreite wichtig zur Antwort!', 'Du bist wichtiger als ich?!', 'Ein wichtiger Sieg!', 'Meine Federn hängen…')
 r('Tigeriltis Tupfi', 'Schwanz hoch', f'Mit ihrem zweiten Zug stellt sie den Schwanz auf: {MEM}.',
   'Ich bin so bunt wie ein Steppenteppich! 🦨', 'Schwanz hoch! Du merkst dir nur zwei Züge!', 'Ich flitze um die Antwort herum!', 'Ich habe dich nicht erschreckt?!', 'Ein gefleckter Sieg!', 'Zurück in meinen Bau…')
-r('Korsak Dämmer', 'Schlauer Tausch', 'Wirst du kälter, tauscht er mit dir die „⚡ +1 Zug“: Deine gehen an ihn, seine an dich. Einmal pro Runde.',
-  'Der Steppenfuchs ist der Schlauste! 🦊', 'Wir tauschen die „⚡“! Schlau, was?', 'Schlauheit führt zur Antwort!', 'Du bist schlauer als ich?!', 'Ein schlauer Sieg!', 'Ausgetrickst…')
+r('Korsak Dämmer', 'Dämmerung', 'Wird er wärmer, senkt sich die Dämmerung über die Steppe: Bis zum Rundenende siehst du deine eigenen Züge nicht. Einmal pro Runde.',
+  'Der Steppenfuchs ist der Schlauste! 🦊', 'Dämmerung! Du siehst deine eigenen Züge nicht!', 'Schlauheit führt zur Antwort!', 'Du bist schlauer als ich?!', 'Ein schlauer Sieg!', 'Ausgetrickst…')
 b('Der Adler-Khan', 'Sturzflug', f'Bist du „Kalt“ oder weiter weg, stößt er auf dich herab: {LAVA}. Einmal pro Runde.',
   'Blick von oben', 'Ist er „Glühend“, schaut er von oben herab und erfährt, ob die Zahl größer oder kleiner als seine ist. Dir verrät er es nicht. Einmal pro Runde.',
   'Ich bin der Khan dieser Steppe! 👑', 'Sturzflug! Dein Zug ist irgendwohin geflogen!', 'Von oben sehe ich mehr…',
@@ -233,20 +233,20 @@ r('Sleipnir Achtbein', 'Acht Beine', 'Ist er „Sehr kalt“, galoppiert er auf 
   'Ich habe acht Beine — fang mich! 🐎', 'Acht Beine! Zwei Züge hintereinander!', 'Ich galoppiere durch die Welten zur Antwort!', 'Reitest du mit mir?!', 'Ein achtbeiniger Sieg!', 'Meine Beine haben sich verheddert…')
 r('Rabe Hugin', 'Gedanke', 'Bist du „Warm“ oder näher, fliegt er um die Welt und erfährt, ob die Zahl größer oder kleiner als deine ist. Dir verrät er es nicht. Einmal pro Runde.',
   'Mein Name bedeutet Gedanke — Hugin! 🪶', 'Ich bin um die Welt geflogen… ich weiß mehr.', 'Gedanken führen zur Antwort!', 'Du denkst schnell!', 'Ein weiser Sieg!', 'Der Gedanke ist davongeflogen…')
-r('Eichhörnchen Ratatöskr', 'Neues von der Esche', 'Mit ihrem ersten Zug bringt sie Neuigkeiten: ob die Zahl gerade oder ungerade ist.',
-  'Ich renne den Weltenbaum rauf und runter! 📯', 'Neues von der Esche: Die Zahl ist {k}!', 'Ich renne zur Antwort!', 'Du rennst schneller?!', 'Ein Eichhörnchen-Sieg!', 'Ab in die Baumkrone…')
+r('Eichhörnchen Ratatöskr', 'Neues von der Esche', 'Mit ihrem zweiten Zug rennt sie die Esche hinauf und erfährt, ob die Zahl gerade oder ungerade ist. Dir verrät sie es nicht.',
+  'Ich renne den Weltenbaum rauf und runter! 📯', 'Neues von der Esche… ich weiß mehr.', 'Ich renne zur Antwort!', 'Du rennst schneller?!', 'Ein Eichhörnchen-Sieg!', 'Ab in die Baumkrone…')
 r('Wolfswelpe Fenrir', 'Kleine Zähne', f'Nach deinem ersten Zug knabbert er deinen {K} an — und weg ist er.',
   'Grrr! Ich werde mal groß! 🐺', 'Knack! Dein „⚡“ ist weg!', 'Ich rieche die Antwort!', 'Du hast keine Angst vor mir?!', 'Ein wölfischer Sieg!', 'Ich gehe zurück zu Mama…')
-r('Zicklein Donnerer', 'Donner', 'Beim zweiten Zug der Runde grollt der Donner: Du setzt einen Zug aus.',
+r('Zicklein Donnerer', 'Donner', 'Bei jedem dritten seiner Züge grollt der Donner: Du setzt einen Zug aus.',
   'Mäh! Ich ziehe den Donnerwagen! 🌩️', 'KA-WUMM! Setz einen Zug aus!', 'Der Donner führt mich zur Antwort!', 'Du hast keine Angst vor Donner?!', 'Ein donnernder Sieg!', 'Das Gewitter ist vorbei…')
 r('Frostriese Eiszapfen', 'Frost', 'Nach deinem zweiten Zug haucht er Frost: Du frierst ein und setzt einen Zug aus.',
   'Ich bin ein kleiner Frostriese! ❄️', 'Huuu! Einfrieren — setz einen Zug aus!', 'Das Eis führt zur Antwort!', 'Ist dir nicht kalt?!', 'Ein eisiger Sieg!', 'Ich schmelze…')
-r('Walküre Sigrun', 'Belohnung', f'Mit ihrem zweiten Zug belohnt sie deinen Mut: einen {K} für dich.',
-  'Ich wähle die Mutigsten! ⚔️', 'Für deinen Mut — ein „⚡ +1 Zug“!', 'Ich fliege zur Antwort!', 'Du bist ein tapferer Krieger!', 'Ruhm dem Sieg!', 'Ab nach Walhall…')
-r('Waldkatze Freya', 'Schnurren', f'Bist du „Warm“ oder näher, schnurrt sie: je einen {K} für dich und für sie. Einmal pro Runde.',
-  'Ich ziehe den Wagen der Göttin! 🐈', 'Schnurr! Ein „⚡ +1 Zug“ für jeden!', 'Ich schnurre direkt neben der Antwort!', 'Streichelst du mich?!', 'Ein schnurriger Sieg!', 'Ab in den Wald…')
-r('Bärenjunges Berserker', 'Raserei', 'Ist er „Sehr kalt“, gerät er in Raserei: Du setzt einen Zug aus. Einmal pro Runde.',
-  'Grrr! Ich bin furchterregend… fast! 🐻', 'GRRR! Setz einen Zug aus!', 'Die Raserei führt zur Antwort!', 'Du hattest keine Angst?!', 'Ein wilder Sieg!', 'Meine Wut ist verflogen…')
+r('Walküre Sigrun', 'Über den Wolken', 'Beim dritten Zug der Runde steigt sie über die Wolken: Bis zum Rundenende siehst du ihre Züge nicht.',
+  'Ich wähle die Mutigsten! ⚔️', 'Hinauf! Du siehst meine Züge nicht!', 'Ich fliege zur Antwort!', 'Du bist ein tapferer Krieger!', 'Ruhm dem Sieg!', 'Ab nach Walhall…')
+r('Waldkatze Freya', 'Schnurren', 'Nach deinem ersten Zug schnurrt sie so sanft, dass du schläfrig wirst: Bis zum Rundenende siehst du nur die letzten zwei Züge.',
+  'Ich ziehe den Wagen der Göttin! 🐈', 'Schnurr… Du merkst dir nur zwei Züge!', 'Ich schnurre direkt neben der Antwort!', 'Streichelst du mich?!', 'Ein schnurriger Sieg!', 'Ab in den Wald…')
+r('Bärenjunges Berserker', 'Raserei', 'Zu Beginn der Runde gerät er in Raserei und wirbelt eine Schneewolke auf: Bis zum Rundenende siehst du seine Züge nicht.',
+  'Grrr! Ich bin furchterregend… fast! 🐻', 'GRRR! Du siehst meine Züge nicht!', 'Die Raserei führt zur Antwort!', 'Du hattest keine Angst?!', 'Ein wilder Sieg!', 'Meine Wut ist verflogen…')
 b('Jörmungandr die Weltenschlange', 'Sturm', f'Mit seinem vierten Zug entfacht er einen Sturm: {LAVA}.',
   'Meeresnebel', f'Bist du „Sehr kalt“, steigt Nebel über dem Meer auf: {FOG}. Einmal pro Runde.',
   'Ich schlinge meinen Schwanz um die ganze Welt! 👑', 'Sturm! Dein Zug ist irgendwohin geflogen!', 'Nebel! Du siehst meine Züge nicht!',

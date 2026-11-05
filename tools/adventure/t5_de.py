@@ -76,8 +76,8 @@ r('Pixie Schabernack', 'Streich', 'Beim dritten Zug der Runde spielt sie einen S
   'Hihi! Ich liebe Streiche! 🔀', 'Streich! Wir haben die „⚡“ getauscht!', 'Ich treibe Schabernack neben der Antwort!', 'Du hast mich erwischt?!', 'Ein schelmischer Sieg!', 'Ich schwirre davon…')
 r('Kaninchen Abrakadabra', 'Abrakadabra', 'Beim zweiten Zug der Runde — Abrakadabra: Wer gerade gezogen hat, zieht sofort noch einmal.',
   'Abrakadabra! Da bin ich! 🎩', 'Abrakadabra! Noch ein Zug!', 'Der Trick hat fast geklappt!', 'Du hast meinen Trick durchschaut?!', 'Ein Zaubersieg!', 'Puff — weg…')
-r('Igel Salbei', 'Kräutertee', f'Ist er „Glühend“, kocht er Kräutertee: einen {K} für dich. Einmal pro Runde.',
-  'Ich sammle Zauberkräuter! 🍵', 'Der Tee ist fertig! Nimm einen „⚡ +1 Zug“!', 'Die Kräuter führen zur Antwort!', 'Kennst du dich mit Kräutern aus?!', 'Ein heilsamer Sieg!', 'Der Tee ist kalt geworden…')
+r('Igel Salbei', 'Kräutertee', 'Nach jedem zweiten deiner Züge trinkt er Kräutertee: einen „⚡ +1 Zug“ für sich.',
+  'Ich sammle Zauberkräuter! 🍵', 'Teezeit! Ein „⚡ +1 Zug“ für mich!', 'Die Kräuter führen zur Antwort!', 'Kennst du dich mit Kräutern aus?!', 'Ein heilsamer Sieg!', 'Der Tee ist kalt geworden…')
 b('Erzmagier Graubart', 'Verzauberung', f'Bist du „Kalt“ oder weiter weg, verzaubert er dich: {BLIND}. Einmal pro Runde.',
   'Sternenwissen', 'Mit seinem ersten Zug liest er in den Sternen und erfährt, ob die Zahl durch 3 teilbar ist. Dir verrät er es nicht.',
   'Willkommen in der Zauberschule! 👑', 'Verzaubert! Du siehst deine eigenen Züge nicht!', 'Die Sterne haben mir mehr verraten…',
@@ -96,11 +96,11 @@ r('Honigdachs Furchtlos', 'Furchtlos', f'Ist er „Sehr kalt“, nimmt er dir fu
   'Ich habe vor nichts Angst! 🦡', 'Keine Angst! Dein „⚡“ gehört mir!', 'Ich stürme direkt zur Antwort!', 'Bist du auch furchtlos?!', 'Ein furchtloser Sieg!', 'Na gut… diesmal hast du gewonnen.')
 r('Schützenfisch Volltreffer', 'Präziser Strahl', f'Beim vierten Zug der Runde schießt sie deinen {K} mit einem Wasserstrahl ab.',
   'Ich treffe eine Fliege im Flug — mit Wasser! 🎯', 'Pssst! Dein „⚡“ ist abgeschossen!', 'Ich ziele auf die Antwort!', 'Du bist meinem Strahl ausgewichen?!', 'Ein Sieg wie ein Meisterschuss!', 'Daneben…')
-r('Schnabeltier Sensor', 'Elektrosinn', 'Bist du „Kalt“ oder weiter weg, spürt er elektrische Signale und erfährt, ob die Zahl größer oder kleiner als deine ist. Dir verrät er es nicht. Einmal pro Runde.',
-  'Mein Schnabel spürt Strom! 📡', 'Der Sensor hat angeschlagen… ich weiß mehr.', 'Der Sensor piept — nah!', 'Störst du meinen Sensor?!', 'Ein sensationeller Sieg!', 'Mein Sensor ist kaputt…')
-r('Spitzmaus Turbo', 'Turbo', 'Beim sechsten Zug der Runde zündet der Turbo: Wer gerade gezogen hat, zieht sofort noch einmal.',
-  'Mein Herz schlägt tausendmal pro Minute! 🏎️', 'Turbo! Noch ein Zug!', 'Ich düse zur Antwort!', 'Kommst du mit?!', 'Ein Turbo-Sieg!', 'Der Tank ist leer…')
-r('Leierschwanz Sirene', 'Sirene', f'Wird er kälter, ahmt er eine Sirene nach: {LAVA}. Einmal pro Runde.',
+r('Schnabeltier Sensor', 'Tauchgang', 'Ist er „Kalt“ oder weiter weg, taucht er ab und sucht mit seinem Sensorschnabel: Bis zum Rundenende siehst du seine Züge nicht. Einmal pro Runde.',
+  'Mein Schnabel spürt Strom! 📡', 'Blubb! Du siehst meine Züge nicht!', 'Der Sensor piept — nah!', 'Störst du meinen Sensor?!', 'Ein sensationeller Sieg!', 'Mein Sensor ist kaputt…')
+r('Spitzmaus Turbo', 'Turbo', 'Nach jedem zweiten deiner Züge zündet ihr Turbo: Beim nächsten Mal zieht sie zweimal hintereinander.',
+  'Mein Herz schlägt tausendmal pro Minute! 🏎️', 'Turbo! Zwei Züge hintereinander!', 'Ich düse zur Antwort!', 'Kommst du mit?!', 'Ein Turbo-Sieg!', 'Der Tank ist leer…')
+r('Leierschwanz Sirene', 'Sirene', 'Bei jedem dritten seiner Züge ahmt er eine Sirene nach: Dein nächster Zug geschieht von selbst — ein wilder Wurf.',
   'Ich kann jedes Geräusch nachmachen! 🎙️', 'Tatü-tata! Dein Zug ist irgendwohin geflogen!', 'Ich singe zur Antwort!', 'Du hast mich übertönt?!', 'Ein nachgemachter Sieg — aber echt!', 'Meine Stimme ist weg…')
 b('Doktor Chaos', 'Chaosstrahl', f'Du hast deinen {K} eingeschaltet — das Chaos mischt mit: {LAVA}. Einmal pro Runde.',
   'Blendstrahler', f'Beim fünften Zug der Runde schaltet er seinen Blendstrahler ein: {BLIND}.',
@@ -108,22 +108,22 @@ b('Doktor Chaos', 'Chaosstrahl', f'Du hast deinen {K} eingeschaltet — das Chao
   'Mein Plan geht auf!', 'Du hast meinen Plan durchkreuzt?!', 'Das Chaos gewinnt! 👑', 'Ich ergebe mich, Held…')
 
 # 50 · Thron der Zeit
-r('Dodo Stolper', 'Stolperer', 'Bist du „Glühend“, stolpert er vor Überraschung und setzt seinen Zug aus. Einmal pro Runde.',
-  'Ich bin ein Dodo, kein Dinosaurier! 🦤', 'Hoppla! Gestolpert — ich setze aus.', 'Ich stapfe zur Antwort!', 'Du holst auf?!', 'Ein Dodo-Sieg!', 'Ich bin gestolpert…')
-r('Moa Langbein', 'Weitblick', 'Mit ihrem vierten Zug schaut sie über die Bäume und erfährt, in welcher Hälfte die Zahl liegt. Dir verrät sie es nicht.',
+r('Dodo Stolper', 'Stolperer', 'Nach deinem zweiten Zug stolpert er und rempelt dich an: Du setzt einen Zug aus.',
+  'Ich bin ein Dodo, kein Dinosaurier! 🦤', 'Hoppla! Angerempelt — setz einen Zug aus!', 'Ich stapfe zur Antwort!', 'Du holst auf?!', 'Ein Dodo-Sieg!', 'Ich bin gestolpert…')
+r('Moa Langbein', 'Weitblick', 'Beim zweiten Zug der Runde schaut sie über die Bäume und erfährt die Zehnerziffer der Zahl. Dir verrät sie es nicht.',
   'Ich bin größer als jede Giraffe! 🔭', 'Ich sehe weit… ich weiß mehr.', 'Ich stakse zur Antwort!', 'Du bist aber groß!', 'Ein großer Sieg!', 'Meine Beine sind müde…')
-r('Beutelwolf Tasman', 'Verschwinden', 'Bist du „Sehr kalt“, verschwindet er zusammen mit deinem Zug: Du siehst ihn nicht. Einmal pro Runde.',
-  'Mich hat schon lange keiner mehr gesehen! 🐺', 'Verschwunden! Du siehst deinen Zug nicht!', 'Ich schleiche mich zur Antwort!', 'Siehst du mich?!', 'Ein gestreifter Sieg!', 'Ich verschwinde wieder…')
-r('Trilobit Kambrium', 'Uraltes Tempo', 'Bei jedem zweiten seiner Züge ist er zu langsam und setzt aus.',
-  'Ich bin fünfhundert Millionen Jahre alt! 🪲', 'Zu langsam… ich setze aus.', 'Seit Urzeiten krabble ich zur Antwort!', 'Du bist schneller als die Urzeit!', 'Ein urzeitlicher Sieg!', 'Zeit, ein Fossil zu werden…')
-r('Stellersche Seekuh Riesin', 'Seetang', f'Mit ihrem zweiten Zug teilt sie Seetang mit dir: einen {K} für dich.',
-  'Ich bin riesig und sehr lieb! 🐄', 'Nimm Seetang — und einen „⚡ +1 Zug“!', 'Ich schwimme zur Antwort!', 'Du schwimmst neben mir!', 'Ein lieber Sieg!', 'Ich schwimme ins kalte Meer…')
-r('Riesenalk Frack', 'Verbeugung', 'Nach deinem zweiten Zug verbeugt sie sich höflich und verrät dir die letzte Ziffer der Zahl.',
-  'Ich trage mein Leben lang einen Frack! 🐧', 'Mit einer Verbeugung: {k}!', 'Ich gehe im Frack zur Antwort!', 'Du bist genauso höflich?!', 'Ein eleganter Sieg!', 'Ich empfehle mich…')
+r('Beutelwolf Tasman', 'Verschwinden', 'Nach deinem dritten Zug verschwindet er — und nimmt deine Züge mit: Bis zum Rundenende siehst du deine eigenen Züge nicht.',
+  'Mich hat schon lange keiner mehr gesehen! 🐺', 'Verschwunden! Du siehst deine eigenen Züge nicht!', 'Ich schleiche mich zur Antwort!', 'Siehst du mich?!', 'Ein gestreifter Sieg!', 'Ich verschwinde wieder…')
+r('Trilobit Kambrium', 'Uralter Schlamm', 'Mit seinem zweiten Zug gräbt er sich in uralten Schlamm ein: Bis zum Rundenende siehst du seine Züge nicht.',
+  'Ich bin fünfhundert Millionen Jahre alt! 🪲', 'Eingegraben! Du siehst meine Züge nicht!', 'Seit Urzeiten krabble ich zur Antwort!', 'Du bist schneller als die Urzeit!', 'Ein urzeitlicher Sieg!', 'Zeit, ein Fossil zu werden…')
+r('Stellersche Seekuh Riesin', 'Seetangwald', 'Mit ihrem ersten Zug wirbelt sie den Seetangwald auf: Bis zum Rundenende siehst du nur die letzten zwei Züge.',
+  'Ich bin riesig und sehr lieb! 🐄', 'Aufgewirbelt! Du merkst dir nur zwei Züge!', 'Ich schwimme zur Antwort!', 'Du schwimmst neben mir!', 'Ein lieber Sieg!', 'Ich schwimme ins kalte Meer…')
+r('Riesenalk Frack', 'Verbeugung', 'Nach deinem zweiten Zug verbeugt sie sich höflich — und erfährt, ob die Zahl gerade oder ungerade ist. Dir verrät sie es nicht.',
+  'Ich trage mein Leben lang einen Frack! 🐧', 'Mit einer Verbeugung… ich weiß mehr.', 'Ich gehe im Frack zur Antwort!', 'Du bist genauso höflich?!', 'Ein eleganter Sieg!', 'Ich empfehle mich…')
 r('Haastadler Spannweite', 'Flügelschatten', 'Mit seinem dritten Zug bedeckt er dich mit dem Schatten seiner Flügel: Du frierst ein und setzt einen Zug aus.',
   'Meine Flügel sind breiter als ein Auto! 🦅', 'Schatten! Einfrieren — setz einen Zug aus!', 'Ich fliege zur Antwort!', 'Du hast keine Angst vor dem Schatten?!', 'Ein Sieg mit Spannweite!', 'Ich fliege in die Vergangenheit…')
-r('Quagga Halbzebra', 'Halbe-halbe', 'Zu Beginn der Runde verrät sie dir, in welcher Hälfte die Zahl liegt.',
-  'Ich bin ein halbes Zebra! 🦓', 'Halbe-halbe: Die Zahl ist {k}!', 'Ich galoppiere zur Antwort!', 'Du hast deine Hälfte gefunden!', 'Ein halbgestreifter Sieg!', 'Ich galoppiere in die Vergangenheit…')
+r('Quagga Halbzebra', 'Flimmernde Streifen', 'Zu Beginn der Runde blenden dich ihre Streifen: Bis zum Rundenende siehst du deine eigenen Züge nicht.',
+  'Ich bin ein halbes Zebra! 🦓', 'Streifen! Du siehst deine eigenen Züge nicht!', 'Ich galoppiere zur Antwort!', 'Siehst du durch meine Streifen?!', 'Ein halbgestreifter Sieg!', 'Ich galoppiere in die Vergangenheit…')
 r('Ammonit Jura', 'Zeitspirale', f'Nach deinem zweiten Zug dreht er die Zeit zur Spirale: {MEM}.',
   'Ich wohne in einem Spiralhaus! 🐚', 'Spirale! Du merkst dir nur zwei Züge!', 'Die Spirale führt zur Antwort!', 'Du bist aus der Spirale entkommen?!', 'Ein spiraliger Sieg!', 'Mein Haus ist leer…')
 b('Gebieter Chronos', 'Zeitstillstand', 'Zu Beginn der Runde hält er die Zeit an: Du frierst ein und setzt einen Zug aus.',

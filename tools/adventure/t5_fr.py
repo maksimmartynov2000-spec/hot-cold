@@ -75,8 +75,8 @@ r('Pixie Malice', 'Farce', 'Au troisième coup de la manche, elle fait une farce
   'Hi-hi ! J’adore les farces ! 🔀', 'Farce ! On a échangé les « ⚡ » !', 'Je fais des farces tout près de la réponse !', 'Tu m’as attrapée ?!', 'Une victoire malicieuse !', 'Je m’envole…')
 r('Lapin Abracadabra', 'Abracadabra', 'Au deuxième coup de la manche — abracadabra : celui qui vient de jouer rejoue.',
   'Abracadabra ! Me voilà ! 🎩', 'Abracadabra ! Encore un coup !', 'Le tour a presque marché !', 'Tu as compris mon tour ?!', 'Une victoire magique !', 'Pouf — disparu…')
-r('Hérisson Sauge', 'Tisane', f'Quand il est « Brûlant », il prépare une tisane : un {K} pour toi. Une fois par manche.',
-  'Je cueille des herbes magiques ! 🍵', 'La tisane est prête ! Prends un « ⚡ +1 coup » !', 'Les herbes mènent à la réponse !', 'Tu connais les herbes ?!', 'Une victoire qui fait du bien !', 'La tisane a refroidi…')
+r('Hérisson Sauge', 'Tisane', 'Un coup sur deux des tiens, il boit sa tisane : un « ⚡ +1 coup » pour lui.',
+  'Je cueille des herbes magiques ! 🍵', 'C’est l’heure de la tisane ! Un « ⚡ +1 coup » pour moi !', 'Les herbes mènent à la réponse !', 'Tu connais les herbes ?!', 'Une victoire qui fait du bien !', 'La tisane a refroidi…')
 b('L’Archimage Barbe-Grise', 'Envoûtement', f'Si tu es « Froid » ou plus loin, il te jette un sort : {BLIND}. Une fois par manche.',
   'Savoir des étoiles', 'À son premier coup, il lit dans les étoiles et apprend si le nombre est divisible par 3. Il ne te le dit pas.',
   'Bienvenue à l’École de magie ! 👑', 'Envoûté ! Tu ne vois plus tes coups !', 'Les étoiles m’en ont dit plus…',
@@ -95,11 +95,11 @@ r('Ratel Intrépide', 'Sans peur', f'Quand il est « Très froid », il te prend
   'Je n’ai peur de rien ! 🦡', 'Sans peur ! Ton « ⚡ » est à moi !', 'Je fonce droit sur la réponse !', 'Tu n’as peur de rien non plus ?!', 'Une victoire intrépide !', 'Bon… cette fois, tu as gagné.')
 r('Poisson-archer Sniper', 'Jet précis', f'Au quatrième coup de la manche, elle abat ton {K} d’un jet d’eau.',
   'J’abats une mouche en plein vol avec de l’eau ! 🎯', 'Pssht ! Ton « ⚡ » est abattu !', 'Je vise la réponse !', 'Tu as esquivé mon jet ?!', 'Une victoire de tireuse d’élite !', 'Raté…')
-r('Ornithorynque Capteur', 'Électrosens', 'Si tu es « Froid » ou plus loin, il capte l’électricité et apprend : le nombre est plus grand ou plus petit que le tien. Il ne te le dit pas. Une fois par manche.',
-  'Mon bec capte l’électricité ! 📡', 'Le radar a capté… j’en sais plus.', 'Le radar bipe — c’est tout près !', 'Tu brouilles mon radar ?!', 'Une victoire sensationnelle !', 'Mon radar est cassé…')
-r('Musaraigne Turbo', 'Turbo', 'Au sixième coup de la manche, le turbo s’enclenche : celui qui vient de jouer rejoue.',
-  'Mon cœur bat mille fois par minute ! 🏎️', 'Turbo ! Encore un coup !', 'Je fonce vers la réponse !', 'Tu arrives à me suivre ?!', 'Une victoire turbo !', 'Panne d’essence…')
-r('Oiseau-lyre Sirène', 'Sirène', f'Quand il refroidit, il imite une sirène : {LAVA}. Une fois par manche.',
+r('Ornithorynque Capteur', 'Plongée', 'Quand il est « Froid » ou plus loin, il plonge et cherche avec son bec-capteur : jusqu’à la fin de la manche, tu ne vois plus ses coups. Une fois par manche.',
+  'Mon bec capte l’électricité ! 📡', 'Plouf ! Tu ne vois plus mes coups !', 'Le radar bipe — c’est tout près !', 'Tu brouilles mon radar ?!', 'Une victoire sensationnelle !', 'Mon radar est cassé…')
+r('Musaraigne Turbo', 'Turbo', 'Un coup sur deux des tiens, le turbo s’enclenche : au tour suivant, elle joue deux fois de suite.',
+  'Mon cœur bat mille fois par minute ! 🏎️', 'Turbo ! Deux coups de suite !', 'Je fonce vers la réponse !', 'Tu arrives à me suivre ?!', 'Une victoire turbo !', 'Panne d’essence…')
+r('Oiseau-lyre Sirène', 'Sirène', 'Un coup sur trois des siens, il imite une sirène : ton coup suivant se joue tout seul — un lancer fou.',
   'Je sais imiter n’importe quel son ! 🎙️', 'Pin-pon, pin-pon ! Ton coup est parti n’importe où !', 'Je chante vers la réponse !', 'Tu chantes mieux que moi ?!', 'Une imitation de victoire !', 'J’ai perdu ma voix…')
 b('Docteur Chaos', 'Rayon du chaos', f'Tu as activé ton {K} — le Chaos s’en mêle : {LAVA}. Une fois par manche.',
   'Éblouisseur', f'Au cinquième coup de la manche, il allume son éblouisseur : {BLIND}.',
@@ -107,22 +107,22 @@ b('Docteur Chaos', 'Rayon du chaos', f'Tu as activé ton {K} — le Chaos s’en
   'Mon plan va marcher !', 'Tu as déjoué mon plan ?!', 'Le chaos gagne ! 👑', 'Je me rends, héros…')
 
 # 50 · Trône du Temps
-r('Dodo Trébuche', 'Trébuchement', 'Quand tu es « Brûlant », il trébuche de surprise et passe son tour. Une fois par manche.',
-  'Je suis un dodo, pas un dinosaure ! 🦤', 'Oups ! J’ai trébuché — je passe mon tour.', 'Je trotte vers la réponse !', 'Tu me rattrapes ?!', 'Une victoire de dodo !', 'J’ai trébuché…')
-r('Moa Échasses', 'Voir loin', 'À son quatrième coup, elle regarde par-dessus les arbres et apprend dans quelle moitié est le nombre. Elle ne te le dit pas.',
+r('Dodo Trébuche', 'Trébuchement', 'Après ton deuxième coup, il trébuche et te bouscule : tu passes ton tour.',
+  'Je suis un dodo, pas un dinosaure ! 🦤', 'Oups ! Je t’ai bousculé — passe ton tour !', 'Je trotte vers la réponse !', 'Tu me rattrapes ?!', 'Une victoire de dodo !', 'J’ai trébuché…')
+r('Moa Échasses', 'Voir loin', 'Au deuxième coup de la manche, elle regarde par-dessus les arbres et apprend le chiffre des dizaines. Elle ne te le dit pas.',
   'Je suis plus grande qu’une girafe ! 🔭', 'Je vois loin… j’en sais plus.', 'J’avance à grands pas vers la réponse !', 'Tu es grand, toi aussi !', 'Une victoire de géante !', 'Mes jambes sont fatiguées…')
-r('Thylacine Tasman', 'Disparition', 'Si tu es « Très froid », il disparaît avec ton coup : tu ne le vois pas. Une fois par manche.',
-  'Personne ne m’a vu depuis longtemps ! 🐺', 'Disparu ! Tu ne vois pas ton coup !', 'Je me faufile vers la réponse !', 'Tu me vois ?!', 'Une victoire rayée !', 'Je disparais encore…')
-r('Trilobite Cambrien', 'Pas ancien', 'Un coup sur deux des siens, il est trop lent et passe.',
-  'J’ai cinq cents millions d’années ! 🪲', 'Trop lent… je passe mon tour.', 'Je rampe vers la réponse depuis des siècles !', 'Tu es plus rapide que les temps anciens !', 'Une victoire ancienne !', 'Je vais devenir un fossile…')
-r('Rhytine de Steller Varech', 'Algues', f'À son deuxième coup, elle partage des algues : un {K} pour toi.',
-  'Je suis énorme et très gentille ! 🐄', 'Prends des algues — et un « ⚡ +1 coup » !', 'Je nage vers la réponse !', 'Tu nages à côté de moi !', 'Une victoire gentille !', 'Je repars dans la mer froide…')
-r('Grand Pingouin Queue-de-pie', 'Révérence', 'Après ton deuxième coup, elle fait une révérence polie et te dit le dernier chiffre du nombre.',
-  'Je porte une queue-de-pie toute ma vie ! 🐧', 'Avec une révérence : {k} !', 'Je marche vers la réponse en queue-de-pie !', 'Tu es aussi poli que moi ?!', 'Une victoire élégante !', 'Je prends congé…')
+r('Thylacine Tasman', 'Disparition', 'Après ton troisième coup, il disparaît — et emporte tes coups : jusqu’à la fin de la manche, tu ne vois plus tes propres coups.',
+  'Personne ne m’a vu depuis longtemps ! 🐺', 'Disparu ! Tu ne vois plus tes coups !', 'Je me faufile vers la réponse !', 'Tu me vois ?!', 'Une victoire rayée !', 'Je disparais encore…')
+r('Trilobite Cambrien', 'Vase ancienne', 'À son deuxième coup, il s’enfouit dans la vase ancienne : jusqu’à la fin de la manche, tu ne vois plus ses coups.',
+  'J’ai cinq cents millions d’années ! 🪲', 'Enfoui ! Tu ne vois plus mes coups !', 'Je rampe vers la réponse depuis des siècles !', 'Tu es plus rapide que les temps anciens !', 'Une victoire ancienne !', 'Je vais devenir un fossile…')
+r('Rhytine de Steller Varech', 'Forêt de varech', 'À son premier coup, elle remue la forêt de varech : jusqu’à la fin de la manche, tu ne vois que les deux derniers coups.',
+  'Je suis énorme et très gentille ! 🐄', 'Tout est remué ! Tu ne te souviens que de deux coups !', 'Je nage vers la réponse !', 'Tu nages à côté de moi !', 'Une victoire gentille !', 'Je repars dans la mer froide…')
+r('Grand Pingouin Queue-de-pie', 'Révérence', 'Après ton deuxième coup, elle fait une révérence polie — et apprend si le nombre est pair ou impair. Elle ne te le dit pas.',
+  'Je porte une queue-de-pie toute ma vie ! 🐧', 'Avec une révérence… j’en sais plus.', 'Je marche vers la réponse en queue-de-pie !', 'Tu es aussi poli que moi ?!', 'Une victoire élégante !', 'Je prends congé…')
 r('Aigle de Haast Envergure', 'Ombre des ailes', 'À son troisième coup, il te couvre de l’ombre de ses ailes : tu gèles et tu passes ton tour.',
   'Mes ailes sont plus larges qu’une voiture ! 🦅', 'L’ombre ! Gèle — passe ton tour !', 'Je vole vers la réponse !', 'L’ombre ne te fait pas peur ?!', 'Une victoire à grande envergure !', 'Je m’envole vers le passé…')
-r('Quagga Demi-Zèbre', 'À mi-chemin', 'Au début de la manche, elle te dit dans quelle moitié est le nombre.',
-  'Je suis un demi-zèbre ! 🦓', 'À mi-chemin : {k} !', 'Je galope vers la réponse !', 'Tu as trouvé ta moitié !', 'Une victoire rayée !', 'Je galope vers le passé…')
+r('Quagga Demi-Zèbre', 'Rayures éblouissantes', 'Au début de la manche, ses rayures t’éblouissent : jusqu’à la fin de la manche, tu ne vois plus tes propres coups.',
+  'Je suis un demi-zèbre ! 🦓', 'Des rayures ! Tu ne vois plus tes coups !', 'Je galope vers la réponse !', 'Tu vois à travers mes rayures ?!', 'Une victoire rayée !', 'Je galope vers le passé…')
 r('Ammonite Jurassique', 'Spirale du temps', f'Après ton deuxième coup, il enroule le temps en spirale : {MEM}.',
   'J’habite une coquille en spirale ! 🐚', 'Spirale ! Tu ne te souviens que de deux coups !', 'La spirale mène à la réponse !', 'Tu es sorti de la spirale ?!', 'Une victoire en spirale !', 'Ma coquille est vide…')
 b('Le Seigneur Chronos', 'Temps arrêté', 'Au début de la manche, il arrête le temps : tu gèles et tu passes ton tour.',

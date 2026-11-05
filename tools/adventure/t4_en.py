@@ -37,7 +37,7 @@ r('Sniffer the Basset Hound', 'On the Trail', 'If you are “Very cold”, he pi
   'My nose never lets me down! 🔎', 'Sniff, sniff! Hint: the number is {k}!', 'The trail leads straight to the answer!', 'You’re following my trail!', 'Case closed!', 'The trail went cold…')
 r('Inspector Bulldog', 'Report', 'With his fourth move he reports to you: the number is more or less than his.',
   'Inspector on duty! 📋', 'Reporting: the number is {k}!', 'The suspect is almost caught!', 'Running your own investigation?!', 'Case closed!', 'The evidence didn’t add up…')
-r('Clue the Magpie', 'Shiny Clue', 'On the third move of the round she brings a clue: the last digit of the number.',
+r('Clue the Magpie', 'Shiny Clue', 'On the sixth move of the round she brings a clue: the last digit of the number.',
   'Everything shiny is a clue! 🔑', 'Found a clue: {k}!', 'The clues lead to the answer!', 'Collecting clues too?!', 'The clue worked!', 'I lost the clue…')
 r('Cipher the Siamese Cat', 'Decoding', 'After your second move she decodes whether the number is divisible by 3. She won’t tell you.',
   'Meow. Agent reporting 🕶️', 'Message decoded. Not telling you.', 'Target in sight!', 'You cracked my code?!', 'Mission accomplished!', 'My cover is blown…')
@@ -45,8 +45,8 @@ r('Courier the Pigeon', 'Dispatch', 'After your third move he delivers a dispatc
   'Coo-coo! Mail for the detective ✉️', 'Dispatch: the number is {k}!', 'Flying straight to the target!', 'You intercepted my letter?!', 'Letter delivered — I win!', 'The wind took my letter…')
 r('Files the Guinea Pig', 'Case File', 'After your fourth move she finds the case file: the tens digit.',
   'My filing cabinet has everything! 🗂️', 'Found the file: {k}!', 'The case is almost solved!', 'Are you reading my files?!', 'Case archived — I win!', 'The file went missing…')
-r('Prints the Koala', 'Fingerprints', 'When he is “Warm” or closer, he dusts for prints and tells you whether the number is even or odd. Once per round.',
-  'Koalas have fingerprints just like people! 🖐️', 'The prints say: the number is {k}!', 'The prints lead to the answer!', 'You found my fingerprints?!', 'Forensics confirm — I win!', 'The prints smudged…')
+r('Prints the Koala', 'Fingerprints', 'When he is “Warm” or closer, he dusts for prints and learns whether the number is even or odd. He won’t tell you. Once per round.',
+  'Koalas have fingerprints just like people! 🖐️', 'Prints taken… I know more.', 'The prints lead to the answer!', 'You found my fingerprints?!', 'Forensics confirm — I win!', 'The prints smudged…')
 r('Gossip the Starling', 'Gossip', 'On the fifth move of the round he lets slip which half the number is in.',
   'Want some news? I’ve got hundreds! 🗣️', 'Shhh, don’t tell! The number is {k}!', 'I heard the answer is very close!', 'Are you eavesdropping?!', 'Everyone’s talking about my win!', 'I’m out of news…')
 r('Lockpick the Raccoon', 'Quick Paws', f'After your third move he picks your pocket: your {K} is his now.',
@@ -65,8 +65,8 @@ r('Balloon the Frigatebird', 'Red Balloon', 'When you are “Warm” or closer, 
   'See my red balloon? 🔴', 'Puff! You can’t see my moves!', 'Soaring over the answer!', 'Are you flying after me?!', 'A wide-winged win!', 'My balloon popped…')
 r('Darwin the Finch', 'Observation', 'With his third move he shares an observation: whether the number is divisible by 3.',
   'Scientists understood evolution by looking at my beak! 🔬', 'Observation: the number is {k}!', 'The hypothesis checks out!', 'Are you a researcher too?!', 'A scientific win!', 'The experiment failed…')
-r('Lazybones the Sea Lion', 'Laziness', 'Every third move of his he’s too lazy and skips it.',
-  'Yaaawn… the sun is so warm 😴', 'Too lazy… skipping a turn.', 'Even lying down I’m close!', 'You woke me up!', 'I won without getting up!', 'Back to my nap…')
+r('Lazybones the Sea Lion', 'Contagious Yawn', 'With his fourth move he yawns so contagiously that you doze off and skip a turn.',
+  'Yaaawn… the sun is so warm 😴', 'Yaaawn… Sleepy? Skip a turn!', 'Even lying down I’m close!', 'You woke me up!', 'I won without getting up!', 'Back to my nap…')
 r('Skipper the Flying Fish', 'Spray', 'The second move of the round drowns in spray: you can’t see it.',
   'I can fly over the waves! 🌊', 'Splash! This move is lost in the spray!', 'Flying straight to the answer!', 'Can you fly too?!', 'A flying win!', 'Back into the sea…')
 r('Waddle the Cormorant', 'A Fish for a Friend', f'When he is “Very cold”, he shares a fish with you: a {K} for you. Once per round.',
@@ -97,7 +97,7 @@ r('Peeky the Burrowing Owl', 'Out of the Burrow', 'After your second move she pe
   'I live in a burrow, like a gopher! 🦉', 'I peeked out — now I know more.', 'I can see the answer from my burrow!', 'You peeked into my burrow?!', 'An underground win!', 'Hiding back inside…')
 r('Beady the Gila Monster', 'Bite', f'With his fourth move he bites your {K} — and it’s gone.',
   'My skin looks like beads! 🦎', 'Chomp! Your “⚡” is gone!', 'Crawling to the answer!', 'You dodged?!', 'Beady wins!', 'Crawling into the shade…')
-r('Forky the Pronghorn', 'Speeding Up', 'After your third move he speeds up: his next move is two in a row.',
+r('Forky the Pronghorn', 'Speeding Up', 'After every third move of yours he speeds up: his next move is two in a row.',
   'I’m the fastest on the prairie! 🦌', 'Speeding up! Two moves in a row!', 'Racing to the answer!', 'You’re catching up?!', 'A horned win!', 'Too tired to run…')
 b('Sheriff Bison', 'Hands Up!', f'You switched on your {K} — the sheriff shouts “Hands up!”: you skip your next turn. Once per round.',
   'Confiscation', f'On the sixth move of the round he confiscates your {K}.',
@@ -107,22 +107,22 @@ b('Sheriff Bison', 'Hands Up!', f'You switched on your {K} — the sheriff shout
 # 40 · Land of Yokai
 r('Cucumber the Kappa', 'Cucumber', f'When he is “Very cold”, he crunches a cucumber and takes a {K} for himself. Once per round.',
   'Don’t spill the water on my head! 🥒', 'Crunch! A “⚡ +1 move” for me!', 'The cucumber leads to the answer!', 'Did you bow politely?!', 'A crunchy win!', 'The water spilled…')
-r('Featherfan the Tengu', 'Feather Fan', f'When he is “Warm” or closer, he waves his feather fan: {LAVA}. Once per round.',
+r('Featherfan the Tengu', 'Feather Fan', 'With every fourth move of his he waves his feather fan: your next move is made for you: a wild throw.',
   'I’m a mountain spirit with crow wings! 🍃', 'Whoosh! Your move flew anywhere!', 'The wind carries me to the answer!', 'Didn’t you get blown away?!', 'A windy win!', 'Flying back to the mountains…')
 r('Twotails the Nekomata', 'Two Tails', 'With her second move she swishes both tails: her next move is two in a row.',
   'Meow! Two tails are better than one 🐈', 'Meow! Two moves in a row!', 'My lantern lights up the answer!', 'Can you see in the dark?!', 'A purr-fect win!', 'My lantern went out…')
-r('Gust the Kamaitachi', 'Gust of Wind', 'Your fourth move is blown away by a gust: you can’t see it.',
-  'Whoosh! I’m a wind with little claws 🌀', 'Whoosh! Your move blew away!', 'Spinning right by the answer!', 'You stood firm in the wind?!', 'A whirlwind win!', 'The wind died down…')
-r('Murmur the Kodama', 'Forest Whisper', 'When you are “Warm” or closer, it whispers to you which half the number is in. Once per round.',
-  'Shhh… I live in an old tree 🌳', 'Shhh… the number is {k}…', 'The forest whispers — the answer is near!', 'Can you hear the forest?', 'A forest win!', 'Fading into the leaves…')
-r('Shine the Amabie', 'Prophecy', 'At the start of the round she foretells whether the number is divisible by 5.',
-  'I bring good fortunes! ✨', 'Prophecy: the number is {k}!', 'My scales shine — the answer is near!', 'Do you believe in prophecies?', 'It came true — I win!', 'The prophecy didn’t come true…')
-r('Snowflake the Yuki-onna', 'Icy Breath', 'When she is “Cold” or farther, she breathes frost: you freeze and skip a turn. Once per round.',
-  'I dance with the snowflakes ❄️', 'Whoo… Freeze — skip a turn!', 'The blizzard leads me to the answer!', 'Aren’t you cold?!', 'A snowy win!', 'I melted…')
-r('Fortune the Zashiki-warashi', 'Luck at Home', f'On the third move of the round she brings luck: a {K} for you.',
-  'Hee-hee! Wherever I am, there’s luck! 🎎', 'Luck! Have a “⚡ +1 move”!', 'Luck is on my side!', 'You’re lucky!', 'Hee-hee, lucky me!', 'My luck went to you…')
-r('Onsen the Snow Monkey', 'Hot Spring', 'If you are “Very cold”, she warms up in the hot spring and skips her turn. Once per round.',
-  'Ahh, a hot spring… ♨️', 'Warming up… skipping a turn.', 'Even in the water I’m close!', 'Want to warm up too?!', 'A cozy win!', 'The water got cold…')
+r('Gust the Kamaitachi', 'Gust of Wind', 'After your second move a gust blows your moves away: you can’t see your own moves for the rest of the round.',
+  'Whoosh! I’m a wind with little claws 🌀', 'Whoosh! Your moves blew away!', 'Spinning right by the answer!', 'You stood firm in the wind?!', 'A whirlwind win!', 'The wind died down…')
+r('Murmur the Kodama', 'Forest Whisper', 'On the fourth move of the round the forest starts whispering: for the rest of the round you only see the last two moves.',
+  'Shhh… I live in an old tree 🌳', 'Shhh… You only remember two moves…', 'The forest whispers — the answer is near!', 'Can you hear the forest?', 'A forest win!', 'Fading into the leaves…')
+r('Shine the Amabie', 'Prophecy', 'At the start of the round she has a prophetic vision: whether the number is divisible by 5. She won’t tell you.',
+  'I bring good fortunes! ✨', 'I saw a prophecy… I know more.', 'My scales shine — the answer is near!', 'Do you believe in prophecies?', 'It came true — I win!', 'The prophecy didn’t come true…')
+r('Snowflake the Yuki-onna', 'Blizzard', 'On the fifth move of the round she raises a blizzard: you can’t see her moves for the rest of the round.',
+  'I dance with the snowflakes ❄️', 'Whoo… Blizzard! You can’t see my moves!', 'The blizzard leads me to the answer!', 'Aren’t you cold?!', 'A snowy win!', 'I melted…')
+r('Fortune the Zashiki-warashi', 'Luck Moves Out', 'With her third move she moves out — and takes the luck with her: your “⚡ +1 move” is hers now.',
+  'Hee-hee! Wherever I am, there’s luck! 🎎', 'The luck leaves with me — your “⚡” is mine now!', 'Luck is on my side!', 'You’re lucky!', 'Hee-hee, lucky me!', 'My luck went to you…')
+r('Onsen the Snow Monkey', 'Hot Spring Steam', 'On the second move of the round steam rises from the hot spring: for the rest of the round you only see the last two moves.',
+  'Ahh, a hot spring… ♨️', 'Steam! You only remember two moves!', 'Even in the water I’m close!', 'Want to warm up too?!', 'A cozy win!', 'The water got cold…')
 b('The Oni King', 'Drum', 'With his third move he beats his drum: for the rest of the round you only see the last two moves.',
   'Oni Strength', f'When he is “Cold” or farther, he takes your {K}. Once per round.',
   'Don’t be afraid — I’m a kind oni! 👑', 'BOOM-BOOM! You only remember two moves!', 'Oni strength — your “⚡” is mine!',
@@ -185,8 +185,8 @@ r('Rooter the Peccary', 'Excavation', 'With his fourth move he digs up a clue an
   'Oink! Digging up ancient secrets! 🐗', 'Dug it up… now I know more.', 'Digging to the answer!', 'Digging nearby?!', 'Oink — I win!', 'Found nothing…')
 r('Fivehands the Spider Monkey', 'Tail Hand', f'After your second move she grabs your {K} with her tail: it’s hers now.',
   'I have five hands — one is my tail! 🐒', 'Grabbed it with my tail! Your “⚡” is mine!', 'I can reach the answer!', 'You’re nimble!', 'A tail-ented win!', 'My tail is tired…')
-r('Splashdash the Basilisk Lizard', 'Run on Water', 'On the third move of the round — a dash across the water: whoever just moved moves again.',
-  'I can run on water! 💧', 'Splash-splash-splash! Another move!', 'Running straight to the answer!', 'Can you run on water too?!', 'A wet win!', 'I sank…')
+r('Splashdash the Basilisk Lizard', 'Run on Water', 'When he is “Cold” or farther, he dashes across the water: his next move is two in a row. Once per round.',
+  'I can run on water! 💧', 'Splash-splash-splash! Two moves in a row!', 'Running straight to the answer!', 'Can you run on water too?!', 'A wet win!', 'I sank…')
 r('Grip the Kinkajou', 'Nightfall', 'On the sixth move of the round night falls: you can’t see his moves for the rest of the round.',
   'I go out at night! 🌙', 'Night! You can’t see my moves!', 'In the dark I can see the answer!', 'Can you see in the dark?!', 'A night-time win!', 'Dawn… off to sleep.')
 r('Spots the Ocelot', 'Ambush', 'His fourth move hides in the leaves: you can’t see it.',
@@ -205,20 +205,20 @@ r('Grumpy the Pallas Cat', 'Grumpy Look', f'After your fourth move he frowns so 
   'I don’t smile. Ever 😾', 'Hmph! Your “⚡” went out!', 'Grumpy, but close!', 'Did you make me laugh?!', 'A grumpy win!', 'Hmph… fine.')
 r('Snoot the Saiga', 'Dust Storm', 'When he is “Very cold”, his move is lost in the dust: you can’t see it. Once per round.',
   'My nose filters the steppe dust! 🏜️', 'Dust! You can’t see this move!', 'Galloping to the answer!', 'Running with me?!', 'A steppe win!', 'Gone into the dust…')
-r('Dun the Przewalski Horse', 'A Ride', 'When you are “Warm” or closer, she gives you a ride: you move again right away. Once per round.',
-  'I’m the last wild horse on Earth! 🐴', 'Hop on — move again!', 'Galloping to the answer!', 'You stay in the saddle!', 'A win at full gallop!', 'Galloped off into the steppe…')
+r('Dun the Przewalski Horse', 'Gallop', 'After your second move she breaks into a gallop: her next move is two in a row.',
+  'I’m the last wild horse on Earth! 🐴', 'Gallop! Two moves in a row!', 'Galloping to the answer!', 'You gallop as well as I do?!', 'A win at full gallop!', 'Galloped off into the steppe…')
 r('Gallop the Kulan', 'Race', 'Every fourth move of his he moves again right away.',
   'I’m faster than the steppe wind! 🏇', 'Racing! I move again!', 'Catching up with the answer!', 'You gallop faster?!', 'A speedy win!', 'Too tired to gallop…')
 r('Caravan the Bactrian Camel', 'Caravan', f'On the sixth move of the round the caravan arrives: a {K} for you and for him.',
   'Two humps — double supplies! 🐫', 'The caravan is here! A “⚡ +1 move” for each of us!', 'The caravan heads to the answer!', 'You caught up with me!', 'The caravan wins!', 'The caravan has gone…')
-r('Pillar the Ground Squirrel', 'Whistle', 'When he gets colder, he whistles a hint: whether the number is even or odd. Once per round.',
-  'I stand up straight and look far away! 🐿️', 'Wheet! The number is {k}!', 'I see the answer in the distance!', 'Standing up straight too?!', 'Wheet — I win!', 'Hiding in my burrow…')
-r('Pompous the Bustard', 'Self-Importance', 'When you are “Very hot” or closer, she fluffs up her feathers importantly and skips her turn. Once per round.',
-  'I’m the heaviest flying bird! 🦃', 'Fluffed up… skipping a turn.', 'Striding importantly to the answer!', 'You’re more important than me?!', 'An important win!', 'My feathers drooped…')
+r('Pillar the Ground Squirrel', 'Lookout', 'When he gets colder, he stands up straight, looks far across the steppe and learns the tens digit. He won’t tell you. Once per round.',
+  'I stand up straight and look far away! 🐿️', 'Wheet! I spotted something…', 'I see the answer in the distance!', 'Standing up straight too?!', 'Wheet — I win!', 'Hiding in my burrow…')
+r('Pompous the Bustard', 'Self-Importance', 'After your third move she struts past so importantly that you have to wait: you skip a turn.',
+  'I’m the heaviest flying bird! 🦃', 'Make way! Skip a turn!', 'Striding importantly to the answer!', 'You’re more important than me?!', 'An important win!', 'My feathers drooped…')
 r('Speckles the Marbled Polecat', 'Tail Up', 'With her second move she raises her tail: for the rest of the round you only see the last two moves.',
   'I’m as colorful as a steppe carpet! 🦨', 'Tail up! You only remember two moves!', 'Darting around the answer!', 'You weren’t scared of me?!', 'A speckled win!', 'Running back to my burrow…')
-r('Dusk the Corsac Fox', 'Sly Swap', 'When you get colder, he swaps “⚡ +1 move” with you: yours go to him, his go to you. Once per round.',
-  'The steppe fox is the slyest! 🦊', 'We swap “⚡”! Sly, huh?', 'Slyness leads to the answer!', 'You’re slyer than me?!', 'A sly win!', 'Outfoxed…')
+r('Dusk the Corsac Fox', 'Dusk', 'When he gets warmer, dusk falls over the steppe: you can’t see your own moves for the rest of the round. Once per round.',
+  'The steppe fox is the slyest! 🦊', 'Dusk! You can’t see your own moves!', 'Slyness leads to the answer!', 'You’re slyer than me?!', 'A sly win!', 'Outfoxed…')
 b('The Eagle Khan', 'Dive', f'If you are “Cold” or farther, he dives at you: {LAVA}. Once per round.',
   'View from Above', 'When he is “Burning”, he looks down from above and learns: the number is more or less than his. He won’t tell you. Once per round.',
   'I’m the khan of this steppe! 👑', 'Dive! Your move flew anywhere!', 'From above I see more…',
@@ -229,20 +229,20 @@ r('Sleipnir the Eight-Legged Foal', 'Eight Legs', 'When he is “Very cold”, h
   'I have eight legs — catch me! 🐎', 'Eight legs! Two moves in a row!', 'Galloping across the worlds to the answer!', 'Are you riding with me?!', 'An eight-legged win!', 'My legs got tangled…')
 r('Huginn the Raven', 'Thought', 'When you are “Warm” or closer, he flies around the world and learns: the number is more or less than yours. He won’t tell you. Once per round.',
   'My name means Thought — Huginn! 🪶', 'I flew around the world… I know more.', 'Thoughts lead to the answer!', 'You think fast!', 'A wise win!', 'The thought flew away…')
-r('Ratatoskr the Squirrel', 'News from the Ash Tree', 'With her first move she brings news: whether the number is even or odd.',
-  'I run up and down the World Tree! 📯', 'News from the Ash: the number is {k}!', 'Running to the answer!', 'You run faster?!', 'A squirrel’s win!', 'Off to the treetop…')
+r('Ratatoskr the Squirrel', 'News from the Ash Tree', 'With her second move she runs up the Ash Tree to the eagle and learns whether the number is even or odd. She won’t tell you.',
+  'I run up and down the World Tree! 📯', 'News from the Ash… I know more.', 'Running to the answer!', 'You run faster?!', 'A squirrel’s win!', 'Off to the treetop…')
 r('Fenrir the Wolf Pup', 'Little Teeth', f'After your first move he gnaws your {K} — and it’s gone.',
   'Grrr! I’ll grow up big! 🐺', 'Crunch! Your “⚡” is gone!', 'I can smell the answer!', 'You’re not scared of me?!', 'A wolfish win!', 'Going back to mom…')
-r('Rumbler the Goat Kid', 'Thunder', 'On the second move of the round thunder rumbles: you skip a turn.',
+r('Rumbler the Goat Kid', 'Thunder', 'With every third move of his thunder rumbles: you skip a turn.',
   'Maa! I pull the chariot of thunder! 🌩️', 'KA-BOOM! Skip a turn!', 'The thunder leads me to the answer!', 'You’re not afraid of thunder?!', 'A thundering win!', 'The storm has passed…')
 r('Icicle the Frost Giant', 'Frost', 'After your second move he breathes frost: you freeze and skip a turn.',
   'I’m a little frost giant! ❄️', 'Hooo! Freeze — skip a turn!', 'The ice leads to the answer!', 'Aren’t you cold?!', 'An icy win!', 'I’m melting…')
-r('Sigrun the Valkyrie', 'Reward', f'With her second move she rewards your courage: a {K} for you.',
-  'I choose the bravest! ⚔️', 'For courage — a “⚡ +1 move”!', 'Flying to the answer!', 'You’re a brave warrior!', 'Glory to the victory!', 'Off to Valhalla…')
-r('Freya the Forest Cat', 'Purring', f'When you are “Warm” or closer, she purrs: a {K} for you and for herself. Once per round.',
-  'I pull the goddess’s chariot! 🐈', 'Purr! A “⚡ +1 move” for each of us!', 'Purring right by the answer!', 'Are you petting me?!', 'A purr-fect win!', 'Off into the forest…')
-r('Berserk the Bear Cub', 'Fury', 'When he is “Very cold”, he flies into a fury: you skip a turn. Once per round.',
-  'Grrr! I’m scary… almost! 🐻', 'GRRR! Skip a turn!', 'Fury leads to the answer!', 'You weren’t scared?!', 'A furious win!', 'My fury’s gone…')
+r('Sigrun the Valkyrie', 'Above the Clouds', 'On the third move of the round she soars above the clouds: you can’t see her moves for the rest of the round.',
+  'I choose the bravest! ⚔️', 'Up and away! You can’t see my moves!', 'Flying to the answer!', 'You’re a brave warrior!', 'Glory to the victory!', 'Off to Valhalla…')
+r('Freya the Forest Cat', 'Purring', 'After your first move she purrs so sweetly that you get drowsy: for the rest of the round you only see the last two moves.',
+  'I pull the goddess’s chariot! 🐈', 'Purr… You only remember two moves!', 'Purring right by the answer!', 'Are you petting me?!', 'A purr-fect win!', 'Off into the forest…')
+r('Berserk the Bear Cub', 'Fury', 'At the start of the round he flies into a fury and kicks up a cloud of snow: you can’t see his moves for the rest of the round.',
+  'Grrr! I’m scary… almost! 🐻', 'GRRR! You can’t see my moves!', 'Fury leads to the answer!', 'You weren’t scared?!', 'A furious win!', 'My fury’s gone…')
 b('Jörmungandr the World Serpent', 'Storm', f'With his fourth move he stirs up a storm: {LAVA}.',
   'Sea Fog', 'If you are “Very cold”, a fog rises over the sea: you can’t see his moves for the rest of the round. Once per round.',
   'I wrap my tail around the whole world! 👑', 'Storm! Your move flew anywhere!', 'Fog! You can’t see my moves!',

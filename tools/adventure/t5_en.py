@@ -72,8 +72,8 @@ r('Mischief the Pixie', 'Prank', 'On the third move of the round she plays a pra
   'Hee-hee! I love pranks! 🔀', 'Prank! We swapped “⚡”!', 'Pranking right by the answer!', 'You caught me?!', 'A mischievous win!', 'Fluttered away…')
 r('Abracadabra the Rabbit', 'Abracadabra', 'On the second move of the round — abracadabra: whoever just moved moves again.',
   'Abracadabra! Here I am! 🎩', 'Abracadabra! Another move!', 'The trick almost worked!', 'You figured out my trick?!', 'A magic win!', 'Poof — gone…')
-r('Herbie the Hedgehog', 'Herbal Tea', f'When he is “Burning”, he brews herbal tea: a {K} for you. Once per round.',
-  'I gather magic herbs! 🍵', 'Tea’s ready! Have a “⚡ +1 move”!', 'The herbs lead to the answer!', 'You know your herbs?!', 'A healing win!', 'The tea went cold…')
+r('Herbie the Hedgehog', 'Herbal Tea', 'After every second move of yours he sips his herbal tea: a “⚡ +1 move” for him.',
+  'I gather magic herbs! 🍵', 'Tea time! A “⚡ +1 move” for me!', 'The herbs lead to the answer!', 'You know your herbs?!', 'A healing win!', 'The tea went cold…')
 b('Archmage Greybeard', 'Enchantment', 'If you are “Cold” or farther, he casts a spell: you can’t see your own moves for the rest of the round. Once per round.',
   'Star Knowledge', 'With his first move he reads the stars and learns whether the number is divisible by 3. He won’t tell you.',
   'Welcome to the School of Magic! 👑', 'Enchanted! You can’t see your own moves!', 'The stars told me more…',
@@ -92,11 +92,11 @@ r('Fearless the Honey Badger', 'Fearless', f'When he is “Very cold”, he fear
   'I’m not afraid of anything! 🦡', 'No fear! Your “⚡” is mine!', 'Charging straight to the answer!', 'Are you fearless too?!', 'A fearless win!', 'Fine… you win this time.')
 r('Sniper the Archerfish', 'Precise Jet', f'On the fourth move of the round she shoots down your {K} with a jet of water.',
   'I can hit a fly in mid-air with water! 🎯', 'Pssht! Your “⚡” is shot down!', 'Aiming at the answer!', 'You dodged my jet?!', 'A sharpshooter’s win!', 'Missed…')
-r('Sensor the Platypus', 'Electrosense', 'If you are “Cold” or farther, he senses electricity and learns: the number is more or less than yours. He won’t tell you. Once per round.',
-  'My bill senses electricity! 📡', 'Sensor triggered… I know more.', 'The sensor beeps — close!', 'Are you jamming my sensor?!', 'A sensational win!', 'My sensor broke…')
-r('Turbo the Shrew', 'Turbo', 'On the sixth move of the round turbo kicks in: whoever just moved moves again.',
-  'My heart beats a thousand times a minute! 🏎️', 'Turbo! Another move!', 'Racing to the answer!', 'Can you keep up with me?!', 'A turbo win!', 'Out of fuel…')
-r('Siren the Lyrebird', 'Siren', f'When he gets colder, he imitates a siren: {LAVA}. Once per round.',
+r('Sensor the Platypus', 'Dive', 'When he is “Cold” or farther, he dives and searches with his sensor bill: you can’t see his moves for the rest of the round. Once per round.',
+  'My bill senses electricity! 📡', 'Splash! You can’t see my moves!', 'The sensor beeps — close!', 'Are you jamming my sensor?!', 'A sensational win!', 'My sensor broke…')
+r('Turbo the Shrew', 'Turbo', 'After every second move of yours, turbo kicks in: her next move is two in a row.',
+  'My heart beats a thousand times a minute! 🏎️', 'Turbo! Two moves in a row!', 'Racing to the answer!', 'Can you keep up with me?!', 'A turbo win!', 'Out of fuel…')
+r('Siren the Lyrebird', 'Siren', 'With every third move of his he imitates a siren: your next move is made for you: a wild throw.',
   'I can copy any sound! 🎙️', 'Wee-oo-wee-oo! Your move flew anywhere!', 'Singing to the answer!', 'You out-sang me?!', 'An imitation of victory!', 'Lost my voice…')
 b('Doctor Chaos', 'Chaos Ray', f'You switched on your {K} — Chaos steps in: {LAVA}. Once per round.',
   'Dazzler', 'On the fifth move of the round he turns on his dazzler: you can’t see your own moves for the rest of the round.',
@@ -104,22 +104,22 @@ b('Doctor Chaos', 'Chaos Ray', f'You switched on your {K} — Chaos steps in: {L
   'My plan will work!', 'You foiled my plan?!', 'Chaos wins! 👑', 'I surrender, hero…')
 
 # 50 · Throne of Time
-r('Stumble the Dodo', 'Stumble', 'When you are “Burning”, he stumbles in surprise and skips his turn. Once per round.',
-  'I’m a dodo, not a dinosaur! 🦤', 'Oops! Tripped — skipping a turn.', 'Stomping to the answer!', 'You’re catching up?!', 'A dodo win!', 'Tripped up…')
-r('Stilts the Moa', 'Seeing Far', 'With her fourth move she looks over the trees and learns which half the number is in. She won’t tell you.',
+r('Stumble the Dodo', 'Stumble', 'After your second move he stumbles and bumps into you: you skip a turn.',
+  'I’m a dodo, not a dinosaur! 🦤', 'Oops! Bumped into you — skip a turn!', 'Stomping to the answer!', 'You’re catching up?!', 'A dodo win!', 'Tripped up…')
+r('Stilts the Moa', 'Seeing Far', 'On the second move of the round she looks over the trees and learns the tens digit. She won’t tell you.',
   'I’m taller than any giraffe! 🔭', 'I see far… I know more.', 'Striding to the answer!', 'You’re tall!', 'A towering win!', 'My legs are tired…')
-r('Tasman the Thylacine', 'Vanishing', 'If you are “Very cold”, he vanishes together with your move: you can’t see it. Once per round.',
-  'Nobody has seen me for ages! 🐺', 'Vanished! You can’t see your move!', 'Sneaking up on the answer!', 'Can you see me?!', 'A striped win!', 'Vanishing again…')
-r('Cambrian the Trilobite', 'Ancient Pace', 'Every second move of his he’s too slow and skips it.',
-  'I’m five hundred million years old! 🪲', 'Too slow… skipping a turn.', 'Crawling to the answer for ages!', 'You’re faster than ancient times!', 'An ancient win!', 'Time to become a fossil…')
-r('Kelp the Sea Cow', 'Seaweed', f'With her second move she shares some seaweed: a {K} for you.',
-  'I’m huge and very kind! 🐄', 'Have some seaweed — and a “⚡ +1 move”!', 'Swimming to the answer!', 'You’re swimming next to me!', 'A kind win!', 'Swimming off into the cold sea…')
-r('Tailcoat the Great Auk', 'A Bow', 'After your second move she bows politely and tells you: the last digit of the number.',
-  'I wear a tailcoat all my life! 🐧', 'With a bow: {k}!', 'Walking to the answer in my tailcoat!', 'You’re just as polite?!', 'An elegant win!', 'Taking my leave…')
+r('Tasman the Thylacine', 'Vanishing', 'After your third move he vanishes — and takes your moves with him: you can’t see your own moves for the rest of the round.',
+  'Nobody has seen me for ages! 🐺', 'Vanished! You can’t see your own moves!', 'Sneaking up on the answer!', 'Can you see me?!', 'A striped win!', 'Vanishing again…')
+r('Cambrian the Trilobite', 'Ancient Silt', 'With his second move he burrows into the ancient silt: you can’t see his moves for the rest of the round.',
+  'I’m five hundred million years old! 🪲', 'Burrowed in! You can’t see my moves!', 'Crawling to the answer for ages!', 'You’re faster than ancient times!', 'An ancient win!', 'Time to become a fossil…')
+r('Kelp the Sea Cow', 'Kelp Forest', 'With her first move she stirs up the kelp forest: for the rest of the round you only see the last two moves.',
+  'I’m huge and very kind! 🐄', 'All stirred up! You only remember two moves!', 'Swimming to the answer!', 'You’re swimming next to me!', 'A kind win!', 'Swimming off into the cold sea…')
+r('Tailcoat the Great Auk', 'A Bow', 'After your second move she bows politely — and learns whether the number is even or odd. She won’t tell you.',
+  'I wear a tailcoat all my life! 🐧', 'With a bow… I know more.', 'Walking to the answer in my tailcoat!', 'You’re just as polite?!', 'An elegant win!', 'Taking my leave…')
 r('Span the Haast’s Eagle', 'Shadow of Wings', 'With his third move he covers you with the shadow of his wings: you freeze and skip a turn.',
   'My wings are wider than a car! 🦅', 'Shadow! Freeze — skip a turn!', 'Flying to the answer!', 'You’re not afraid of the shadow?!', 'A wide-winged win!', 'Flying off into the past…')
-r('Halfstripe the Quagga', 'Halfway', 'At the start of the round she tells you which half the number is in.',
-  'I’m half a zebra! 🦓', 'Halfway: the number is {k}!', 'Galloping to the answer!', 'You found your half!', 'A striped win!', 'Galloped off into the past…')
+r('Halfstripe the Quagga', 'Dazzling Stripes', 'At the start of the round her stripes dazzle you: you can’t see your own moves for the rest of the round.',
+  'I’m half a zebra! 🦓', 'Stripes! You can’t see your own moves!', 'Galloping to the answer!', 'Can you see through my stripes?!', 'A striped win!', 'Galloped off into the past…')
 r('Jurassic the Ammonite', 'Spiral of Time', 'After your second move he twists time into a spiral: for the rest of the round you only see the last two moves.',
   'I live in a spiral shell! 🐚', 'Spiral! You only remember two moves!', 'The spiral leads to the answer!', 'You got out of the spiral?!', 'A spiral win!', 'My shell is empty…')
 b('Lord Chronos', 'Time Stop', 'At the start of the round he stops time: you freeze and skip a turn.',
