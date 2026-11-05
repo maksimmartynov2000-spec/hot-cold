@@ -133,7 +133,7 @@ function stubSupabase(opts) {
             const cur = (window.__advStars || '').padEnd(args.p_n + 1, '0');
             window.__advStars = mergeStars(cur, '0'.repeat(args.p_n) + args.p_stars);
             window.__adventure = Math.max(window.__adventure || 0, args.p_n + 1);
-            return { data: { done: window.__adventure, stars: window.__advStars }, error: null };
+            return { data: Object.assign({ done: window.__adventure, stars: window.__advStars }, window.__advPay || {}), error: null };
           }
           if (name === 'friend_adventure') {
             return { data: window.__friendAdv || { done: 0, stars: '', total: 0 }, error: null };
@@ -199,6 +199,23 @@ function stubSupabase(opts) {
             O.chest = { xp: 30, streak: O.streak, froze: false, surprise: window.__chestSurprise || null, streakReward: null };
             if (O.chest.surprise) O.owned.push(O.chest.surprise);
             return { data: O.chest, error: null };
+          }
+          // Магазин (миграция 061): кошелёк — window.__wallet {coins, gems, today, cap},
+          // купленное ложится в window.__online.owned. Не задан — база без 061
+          if ((name === 'my_wallet' || name === 'shop_buy') && !window.__wallet) {
+            return { data: null, error: { message: 'Could not find the function public.' + name } };
+          }
+          if (name === 'my_wallet') return { data: JSON.parse(JSON.stringify(window.__wallet)), error: null };
+          if (name === 'shop_buy') {
+            const W = window.__wallet, O = window.__online || { owned: [] };
+            (window.__bought = window.__bought || []).push(args.p_kind + ':' + args.p_code);
+            const it = SHOP_ITEMS.find(i => i.kind === args.p_kind && i.code === args.p_code);
+            if (!it) return { data: null, error: { message: 'no_such_item' } };
+            if (O.owned.some(o => o.kind === it.kind && o.code === it.code)) return { data: null, error: { message: 'already_owned' } };
+            if (W.coins < (it.coins || 0) || W.gems < (it.gems || 0)) return { data: null, error: { message: 'not_enough' } };
+            W.coins -= it.coins || 0; W.gems -= it.gems || 0;
+            O.owned.push({ kind: it.kind, code: it.code });
+            return { data: { coins: W.coins, gems: W.gems, kind: it.kind, code: it.code }, error: null };
           }
           // Таблица турнира (миграция 055): window.__cupTop
           if (name === 'cup_top') {
@@ -319,7 +336,8 @@ function stubSupabase(opts) {
           }
           if (name === 'send_phrase') {
             const M = window.__match;
-            if (['hi','luck','nice','wow','think','almost','again','gg','hot','cold','hurry'].indexOf(args.p_code) < 0) {
+            const ownPhrase = ((window.__online && window.__online.owned) || []).some(o => o.kind === 'phrase' && o.code === args.p_code);
+            if (['hi','luck','nice','wow','think','almost','again','gg','hot','cold','hurry'].indexOf(args.p_code) < 0 && !ownPhrase) {
               return { data: null, error: { message: 'bad_phrase' } };
             }
             M.chat = M.chat || [];

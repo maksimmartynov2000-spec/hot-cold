@@ -43,6 +43,7 @@ function passWhere(kind, code) {
   if (s) return P.whereStreak.replace('{n}', s.days);
   if (kind === 'frame' && code === 'tourney') return P.whereCup;
   if (kind === 'frame' && /^cup-\d\d$/.test(code)) return P.cup.whereCupM.replace('{m}', seasonMonth('2026-' + code.slice(4)));
+  if (typeof isShopItem === 'function' && isShopItem(kind, code)) return t().shop.where;
   return P.whereChest;
 }
 function passLevel() {
@@ -146,6 +147,8 @@ async function claimCup(n) {
     return setNote('rkNote', friendErrorText(e.message), true);
   }
   await loadOnlineInfo();
+  // Кристаллы за турнир (миграция 061) — в кошелёк; показывает их сундук
+  if (r && r.gems && typeof loadWallet === 'function') loadWallet();
   showCupChest(r);
 }
 function showCupChest(r) {
@@ -155,6 +158,8 @@ function showCupChest(r) {
     '<span><b>' + escapeHtml(C.frame) + '</b>' + escapeHtml(passRewardName('frame', r.frame)) + '</span></div>');
   if (r.surprise) items.push('<div class="ch-item">' + passRewardArt(r.surprise.kind, r.surprise.code) +
     '<span><b>' + escapeHtml(P.surprise) + '</b>' + escapeHtml(passRewardName(r.surprise.kind, r.surprise.code)) + '</span></div>');
+  if (r.gems) items.push('<div class="ch-item gold"><span class="pr-art pr-emoji">💎</span><span><b>' +
+    escapeHtml(t().shop.toastGems.replace('{n}', r.gems)) + '</b>' + escapeHtml(t().shop.gemsName) + '</span></div>');
   document.getElementById('chestTitle').textContent = r.goal === 3 ? C.chest : r.frame ? C.title : C.big;
   document.getElementById('chestBody').innerHTML = items.join('');
   document.getElementById('chestOk').textContent = P.ok;
@@ -251,8 +256,9 @@ function renderStylePicker() {
   const P = t().pass;
   // Рамки турнира — коллекция: видны полученные и та, что разыгрывается сейчас
   const cupNow = onlineInfo.weekend && onlineInfo.weekend.frame;
-  const frames = [null].concat(PASS_FRAMES.filter(f => !(f === 'tourney' || /^cup-/.test(f)) || passOwns('frame', f) || f === cupNow));
-  const titles = [null].concat(PASS_TITLES);
+  const frames = [null].concat(PASS_FRAMES.filter(f => !(f === 'tourney' || /^cup-/.test(f)) || passOwns('frame', f) || f === cupNow))
+    .concat(shopOwnedCodes('frame'));
+  const titles = [null].concat(PASS_TITLES).concat(shopOwnedCodes('title'));
   const chip = (cls, sel, locked, html, fn) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -267,6 +273,7 @@ function renderStylePicker() {
     '<span class="pr-art pr-frame" data-frame="' + (f || leagueFrame()) + '"></span><small>' + escapeHtml(f ? P.frames[f] : P.frameLeague) + '</small>',
     () => chooseStyle('frame', f))));
   document.getElementById('tPfTitles').textContent = P.titleHead;
+  document.getElementById('pfShopLink').textContent = t().shop.more;
   document.getElementById('pfTitles').replaceChildren(...titles.map(x => chip('st-title', (onlineInfo.title || null) === x,
     x && !passOwns('title', x), escapeHtml(x ? P.titles[x] : P.titleNone), () => chooseStyle('title', x))));
 }
@@ -300,9 +307,9 @@ async function chooseStyle(kind, code) {
   }
 }
 
-// Фразы для чата: обычные и свои из наград
+// Фразы для чата: обычные, свои из наград и купленные в магазине
 function sayCodesFor() {
-  return SAY_CODES.concat(PASS_PHRASES.filter(c => passOwns('phrase', c)));
+  return SAY_CODES.concat(PASS_PHRASES.filter(c => passOwns('phrase', c))).concat(shopOwnedCodes('phrase'));
 }
 
 // ---------- таблица турнира (миграция 055) ----------

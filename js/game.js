@@ -503,6 +503,7 @@ function applyTranslations() {
   document.getElementById('tModeBot').textContent = L.tileBot;
   document.getElementById('tNavPlay').textContent = L.navPlay;
   document.getElementById('tNavFriends').textContent = L.navFriends;
+  document.getElementById('tNavShop').textContent = L.navShop;
   document.getElementById('tSoundLabel').textContent = L.run.sound;
   document.getElementById('tLblBot').textContent = L.lblBot;
   // У каждого экрана своё название — с тем же значком, что в меню
@@ -652,7 +653,11 @@ function showScreen(name) {
   document.getElementById('friendsBtn').classList.toggle('on', name === 'friends' || name === 'chat');
   updateAccountChip();
   // Вернулся в меню — задания могли продвинуться: партия или Испытание
-  if (name === 'mode') { renderModeInfo(); loadProgress(); loadLadder().then(renderModeInfo); loadOnlineInfo(); }
+  if (name === 'mode') {
+    renderModeInfo(); loadProgress(); loadLadder().then(renderModeInfo); loadOnlineInfo();
+    // Кошелёк — заранее: после партии всплывашка «+15 🪙» считает разницу с ним
+    if (typeof loadWallet === 'function') loadWallet();
+  }
   // Ушёл с доски — праздник звёзд и салют закрываются: они про только что сыгранную партию
   if (name !== 'game') {
     closeVizPanel();

@@ -601,6 +601,7 @@
      место — доске и полю ввода -->
 <nav class="tabbar" id="tabbar">
   <button class="tab" id="navPlay" onclick="navPlay()"><span class="tab-ic">🎮</span><span id="tNavPlay"></span></button>
+  <button class="tab" id="shopBtn" onclick="openShop()"><span class="tab-ic">🛍️</span><span id="tNavShop"></span></button>
   <button class="tab" id="friendsBtn" onclick="openFriendsEntry()"><span class="tab-ic">👥<span
     class="hdr-badge hidden" id="friendsBadge"></span></span><span id="tNavFriends"></span></button>
   <button class="tab" id="accountChip" onclick="openLogoutModal()"><span class="tab-ic"><span
@@ -666,6 +667,40 @@
     <div class="pl-list" id="passList"></div>
     <div class="pl-list" id="passStreak"></div>
     <button class="btn btn-block" style="margin-top:14px" id="passOk" onclick="closePassModal()"></button>
+  </div>
+</div>
+
+<!-- Магазин (миграция 061): монеты и кристаллы, товары по разделам -->
+<div class="modal-backdrop hidden" id="shopModal" onclick="if (event.target === this) closeShop()">
+  <div class="modal-card pass-card shop-card">
+    <div class="sh-top">
+      <div class="ps-title" id="shopTitle"></div>
+      <div class="sh-wallet" id="shopWallet"></div>
+    </div>
+    <div class="sh-note" id="shopNote"></div>
+    <div class="sh-tabs" id="shopTabs" role="group"></div>
+    <div class="sh-grid" id="shopGrid"></div>
+    <details class="fold sh-earn-box" id="shopEarnBox">
+      <summary class="fold-head" id="shopEarnHead"></summary>
+      <div class="fold-body">
+        <div class="sh-earn" id="shopEarn"></div>
+        <div class="sh-trophy" id="shopTrophy"></div>
+      </div>
+    </details>
+    <button class="btn btn-block" style="margin-top:14px" id="shopOk" onclick="closeShop()"></button>
+  </div>
+</div>
+
+<!-- Товар крупно: цена, купить или надеть -->
+<div class="modal-backdrop hidden" id="shopItemModal" onclick="if (event.target === this) closeShopItem()">
+  <div class="modal-card shop-item-card">
+    <div class="si-art" id="siArt"></div>
+    <div class="si-kind" id="siKind"></div>
+    <div class="si-name" id="siName"></div>
+    <div class="si-price" id="siPrice"></div>
+    <div class="si-note" id="siNote"></div>
+    <button class="btn btn-block" id="siBuy"></button>
+    <button class="btn-ghost btn-block si-back" id="siBack" onclick="closeShopItem()"></button>
   </div>
 </div>
 
@@ -763,6 +798,7 @@
           <div class="pf-label" id="tPfTitles"></div>
           <div class="st-row" id="pfTitles"></div>
           <div class="fr-note hidden" id="styleNote"></div>
+          <button class="btn-ghost btn-block st-shop" id="pfShopLink" onclick="openShop()"></button>
         </div>
       </details>
 
@@ -1047,6 +1083,7 @@
 <script src="js/adventure.js"></script>
 <script src="js/trial.js"></script>
 <script src="js/pass.js"></script>
+<script src="js/shop.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

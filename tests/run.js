@@ -7059,6 +7059,156 @@ async function testOnlinePass(browser) {
   await page.context().close();
 }
 
+// Магазин (миграция 061): вкладка, витрина, кошелёк, покупка, надеть купленное
+async function testShop(browser) {
+  console.log('\nМагазин: монеты, кристаллы, товары');
+  const fs = require('fs'), path = require('path');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(() => {
+    window.__online = { day: '2026-11-04', played: false, chestOpened: false, chest: null, streak: 0, bestStreak: 0, freezeLeft: true,
+      season: '2026-11', xp: 0, levelXp: 100, maxLevel: 30, seasonLeft: 86400 * 20, rewards: [], streakRewards: [],
+      owned: [], frame: null, title: null };
+    window.__wallet = { coins: 160, gems: 3, today: 40, cap: 300 };
+    tutSave({ done: [1, 2, 3], skipped: true, veteran: true });
+  });
+  await page.evaluate(() => loadOnlineInfo());
+  const tab = await page.evaluate(() => ({ text: document.getElementById('shopBtn').textContent,
+    order: [...document.querySelectorAll('#tabbar .tab')].map(b => b.id).join() }));
+  check('в нижнем меню — «Магазин» вторым', /Магазин/.test(tab.text) && tab.order === 'navPlay,shopBtn,friendsBtn,accountChip', JSON.stringify(tab));
+  await page.click('#shopBtn');
+  await page.waitForTimeout(400);
+  const shop = await page.evaluate(() => ({ shown: !document.getElementById('shopModal').classList.contains('hidden'),
+    wallet: [...document.querySelectorAll('#shopWallet .sw-chip')].map(c => c.textContent).join('|'),
+    note: document.getElementById('shopNote').textContent,
+    tabs: [...document.querySelectorAll('#shopTabs .sh-tab')].map(b => b.textContent).join('|'),
+    items: document.querySelectorAll('#shopGrid .sh-item').length, rare: document.querySelectorAll('#shopGrid .sh-item.rare').length,
+    first: document.querySelector('#shopGrid .sh-item').textContent, earn: document.querySelectorAll('#shopEarn .sh-earn-row').length,
+    trophy: document.getElementById('shopTrophy').textContent }));
+  check('витрина: кошелёк 🪙 160 и 💎 3, сколько сегодня из 300', shop.shown && shop.wallet === '🪙 160|💎 3' && /40 из 300/.test(shop.note), JSON.stringify(shop));
+  check('пять разделов, иконок 20, из них 10 редких за 💎', shop.tabs === 'Иконки|Рамки|Фоны|Титулы|Фразы' && shop.items === 20 && shop.rare === 10, JSON.stringify(shop));
+  check('у товара имя и цена', /Листовой зайчик/.test(shop.first) && /150 🪙/.test(shop.first), shop.first);
+  check('как копить — восемь строк, трофеи не продаются', shop.earn === 8 && /не продаются/.test(shop.trophy), JSON.stringify(shop));
+  // Покупка за монеты, затем надеть
+  await page.click('#shopGrid .sh-item[data-code="shop-01"]');
+  await page.waitForTimeout(200);
+  const card = await page.evaluate(() => ({ name: document.getElementById('siName').textContent, price: document.getElementById('siPrice').textContent,
+    btn: document.getElementById('siBuy').textContent, off: document.getElementById('siBuy').disabled,
+    kind: document.getElementById('siKind').textContent }));
+  check('карточка товара: имя, цена, «Купить за 150 🪙»', card.name === 'Листовой зайчик' && card.price === '150 🪙' &&
+    card.btn === 'Купить за 150 🪙' && !card.off && card.kind === 'Иконка', JSON.stringify(card));
+  await page.click('#siBuy');
+  await page.waitForTimeout(300);
+  const bought = await page.evaluate(() => ({ wallet: [...document.querySelectorAll('#shopWallet .sw-chip')].map(c => c.textContent).join('|'),
+    note: document.getElementById('siNote').textContent, btn: document.getElementById('siBuy').textContent,
+    own: document.querySelector('#shopGrid .sh-item[data-code="shop-01"]').className,
+    price: document.querySelector('#shopGrid .sh-item[data-code="shop-01"] .sh-price').textContent }));
+  check('куплено: 150 🪙 списано, «Куплено!», кнопка «Надеть»', bought.wallet === '🪙 10|💎 3' && /Куплено/.test(bought.note) &&
+    bought.btn === 'Надеть' && /\bown\b/.test(bought.own) && bought.price === 'Куплено', JSON.stringify(bought));
+  await page.click('#siBuy');
+  await page.waitForTimeout(300);
+  const worn = await page.evaluate(() => ({ me: myAvatar(), btn: document.getElementById('siBuy').textContent, off: document.getElementById('siBuy').disabled,
+    sent: window.__profile.calls.filter(c => c.name === 'set_avatar').map(c => c.args.p_avatar).join() }));
+  check('надел — иконка своя и ушла в базу, кнопка «Надето ✓»', worn.me === 'shop-01' && worn.sent === 'shop-01' && worn.btn === 'Надето ✓' && worn.off,
+    JSON.stringify(worn));
+  await page.evaluate(() => closeShopItem());
+  // Редкое за кристаллы — не хватает: сказано, сколько
+  await page.click('#shopGrid .sh-item[data-code="shop-11"]');
+  await page.waitForTimeout(200);
+  const rare = await page.evaluate(() => ({ note: document.getElementById('siNote').textContent, off: document.getElementById('siBuy').disabled,
+    kind: document.getElementById('siKind').textContent, price: document.getElementById('siPrice').textContent }));
+  check('редкое за 💎: не хватает 12 💎, кнопка выключена', /Не хватает 12 💎/.test(rare.note) && rare.off && /редкое/.test(rare.kind) && rare.price === '15 💎',
+    JSON.stringify(rare));
+  await page.evaluate(() => closeShopItem());
+  // Остальные разделы: рамка, фон, титул, фраза
+  await page.evaluate(async () => { window.__wallet.coins = 1000; window.__wallet.gems = 20; await loadWallet(); });
+  const kinds = await page.evaluate(async () => {
+    const out = {};
+    for (const [kind, code] of [['frame', 'leaf'], ['color', 'grad-mint'], ['title', 'thinker'], ['phrase', 'bingo'], ['frame', 'galaxy']]) {
+      shopKind = kind; renderShop();
+      out[kind + 'Count'] = document.querySelectorAll('#shopGrid .sh-item').length;
+      openShopItem(kind, code);
+      await shopBuy(kind, code);
+      out[code] = document.getElementById('siNote').textContent;
+      if (kind !== 'phrase') await shopWear(kind, code);
+      out[code + 'Btn'] = document.getElementById('siBuy').classList.contains('hidden') ? 'hidden' : document.getElementById('siBuy').textContent;
+      closeShopItem();
+    }
+    return out;
+  });
+  check('рамок 8, фонов 8, титулов 10, фраз 8', kinds.frameCount === 8 && kinds.colorCount === 8 && kinds.titleCount === 10 && kinds.phraseCount === 8,
+    JSON.stringify(kinds));
+  check('купил рамку, фон, титул и фразу; у фразы нет «Надеть»', ['leaf', 'grad-mint', 'thinker', 'bingo', 'galaxy'].every(c => /Куплено/.test(kinds[c])) &&
+    kinds.bingoBtn === 'hidden' && kinds.leafBtn === 'Надето ✓', JSON.stringify(kinds));
+  const wear = await page.evaluate(() => ({ frame: window.__online.frame, title: window.__online.title, color: myColor(),
+    say: sayCodesFor().includes('bingo'), wallet: JSON.stringify(window.__wallet) }));
+  check('надето: рамка «Галактика», титул, фон; фраза — в чате', wear.frame === 'galaxy' && wear.title === 'thinker' && wear.color === 'grad-mint' && wear.say,
+    JSON.stringify(wear));
+  await page.evaluate(() => closeShop());
+  // В профиле купленное — среди своего, и ссылка в магазин
+  await page.evaluate(() => { openLogoutModal(); });
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById('pfStyle').open = true; showAvatarPicker(true); });
+  const pf = await page.evaluate(() => ({ frames: [...document.querySelectorAll('#pfFrames .st-frame')].map(b => b.querySelector('.pr-frame').dataset.frame),
+    titles: [...document.querySelectorAll('#pfTitles .st-title')].map(b => b.textContent),
+    icon: !!document.querySelector('#avGrid .av-tile[data-icon="shop-01"]'), color: !!document.querySelector('#avGrid .av-color[data-color="grad-mint"]'),
+    shopColorsLocked: !!document.querySelector('#avGrid .av-color[data-color="grad-peach"]'),
+    links: [document.getElementById('pfShopLink').textContent, (document.querySelector('#avGrid .av-shop') || {}).textContent].join('|'),
+    frame: document.getElementById('pfAvatar').dataset.frame, title: document.getElementById('pfTitle').textContent }));
+  check('в профиле: купленные рамки и титул в выборе, иконка и фон в сетке; некупленного нет', pf.frames.includes('leaf') && pf.frames.includes('galaxy') &&
+    !pf.frames.includes('ocean') && pf.titles.includes('Мыслитель') && pf.icon && pf.color && !pf.shopColorsLocked, JSON.stringify(pf));
+  check('в профиле — рамка «Галактика» и титул, ссылки «Ещё — в магазине»', pf.frame === 'galaxy' && pf.title === 'Мыслитель' &&
+    pf.links === '🛍️ Ещё — в магазине|🛍️ Ещё — в магазине', JSON.stringify(pf));
+  await page.evaluate(() => closeLogoutModal());
+  // Монеты после игры: всплывашка, кристаллы турнира — в сундуке
+  await page.evaluate(() => { window.__advPay = { coins: 15, gems: 5 }; advReport(0, 3); });
+  await page.waitForTimeout(300);
+  const toast = await page.evaluate(() => { const el = document.getElementById('walletToast');
+    return { text: el && el.textContent, show: !!el && el.classList.contains('show'), wallet: shopWallet.coins + '/' + shopWallet.gems }; });
+  check('бой Приключения: всплывашка «+15 🪙 +5 💎», кошелёк вырос', toast.show && /\+15 🪙/.test(toast.text) && /\+5 💎/.test(toast.text), JSON.stringify(toast));
+  const cup = await page.evaluate(() => { showCupChest({ goal: 3, xp: 50, surprise: null, frame: null, gems: 1 });
+    const t = document.getElementById('chestBody').textContent; closeChest(); return t; });
+  check('сундук турнира: +1 💎', /\+1 💎/.test(cup) && /Кристаллы/.test(cup), cup);
+  // Без миграции 061 — «сейчас не отвечает», без входа — «войти»
+  const off = await page.evaluate(async () => { window.__wallet = null; await openShop();
+    const r = { note: document.getElementById('shopNote').textContent, items: document.querySelectorAll('#shopGrid .sh-item').length };
+    closeShop(); return r; });
+  check('без миграции витрина видна, сказано, что магазин не отвечает', /не отвечает/.test(off.note) && off.items > 0, JSON.stringify(off));
+  await page.context().close();
+  const guest = await newGame(browser, {});
+  const g = await guest.evaluate(async () => { await openShop(); openShopItem('icon', 'shop-02');
+    return { note: document.getElementById('shopNote').textContent, btn: document.getElementById('siBuy').textContent,
+      off: document.getElementById('siBuy').disabled, login: !!document.querySelector('#shopNote .btn') }; });
+  check('без входа: витрина видна, купить — после входа', /после входа/.test(g.note) && g.btn === 'Войти' && !g.off && g.login, JSON.stringify(g));
+  await guest.context().close();
+  // Тексты на всех языках, рисунки, рамки, фоны
+  const p2 = await newGame(browser, {});
+  const tr = await p2.evaluate(() => ['en', 'fr', 'de', 'ru'].map(l => {
+    const S = i18n[l].shop, P = i18n[l].pass;
+    const miss = SHOP_ITEMS.filter(it => !(it.kind === 'icon' ? S.icons[it.code] : it.kind === 'color' ? S.colors[it.code]
+      : it.kind === 'frame' ? P.frames[it.code] : it.kind === 'title' ? P.titles[it.code] : i18n[l].say[it.code]));
+    const keys = ['title', 'coinsName', 'gemsName', 'toastCoins', 'toastGems', 'worn', 'owned', 'guest', 'login', 'off', 'today', 'earnHead',
+      'trophy', 'rare', 'phraseHint', 'wornBtn', 'wear', 'buyFor', 'notEnough', 'back', 'notEnoughShort', 'bought', 'where', 'more'];
+    return l + ':' + (miss.length + keys.filter(k => !S[k]).length + SHOP_KINDS.filter(k => !S.tabs[k]).length +
+      (S.earn.length === 8 ? 0 : 1) + (i18n[l].navShop ? 0 : 1));
+  }).join());
+  check('магазин переведён на 4 языка: разделы, товары, подсказки', tr === 'en:0,fr:0,de:0,ru:0', tr);
+  const art = await p2.evaluate(() => {
+    const ring = document.createElement('span');
+    ring.className = 'sha-ring';
+    document.body.appendChild(ring);
+    const frames = shopCodes('frame').filter(c => { ring.dataset.frame = c; return !getComputedStyle(ring).getPropertyValue('--fr').trim(); });
+    ring.remove();
+    return { icons: shopCodes('icon').filter(c => !isNamedArt(c)), files: shopCodes('icon').map(iconFile),
+      colors: shopCodes('color').filter(c => !AVATAR_GRAD[c]), frames,
+      shiny: SHOP_ITEMS.filter(i => i.kind === 'color' && i.gems).every(i => isShinyBg(i.code)) };
+  });
+  const absent = art.files.filter(f => !fs.existsSync(path.join(__dirname, '..', f)));
+  check('у каждого товара есть вид: иконки рисунком, фоны, рамки; редкие фоны переливаются', !art.icons.length && !art.colors.length &&
+    !art.frames.length && art.shiny, JSON.stringify(art));
+  check('рисунки иконок магазина — в icons/', !absent.length, absent.join(' '));
+  await p2.context().close();
+}
+
 // Режим дня и турнир выходных (миграция 054)
 async function testDailyWeekend(browser) {
   console.log('\nОнлайн: режим дня и турнир выходных');
@@ -9216,6 +9366,7 @@ async function testKeyPage(browser) {
     await testTrialSurprises(browser);
     await testOnlinePass(browser);
     await testDailyWeekend(browser);
+    await testShop(browser);
     await testKidClarity(browser);
     await testOnlineAdvBonuses(browser);
     await testLocalAdvBonuses(browser);

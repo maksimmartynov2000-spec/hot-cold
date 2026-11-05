@@ -415,11 +415,11 @@ function renderAvatarGrid() {
   // Награды за лиги — только когда сервер знает лиги
   const rewardsOf = kind => ladderInfo ? LEAGUE_REWARDS.filter(r => r.kind === kind).map(r => r.value) : [];
   if (colorsSupported()) {
-    AVATAR_BG.concat(rewardsOf('color')).concat(onlineInfo ? PASS_COLORS : []).forEach(color => {
+    AVATAR_BG.concat(rewardsOf('color')).concat(onlineInfo ? PASS_COLORS : []).concat(shopOwnedCodes('color')).forEach(color => {
       const c = document.createElement('button');
       const locked = PASS_COLORS.indexOf(color) >= 0 ? !passOwns('color', color)
         : rewardLeague('color', color) > 0 && !rewardOpen('color', color);
-      c.className = 'av-color' + (color === bg ? ' sel' : '') + (locked ? ' locked' : '');
+      c.className = 'av-color' + (color === bg ? ' sel' : '') + (locked ? ' locked' : '') + (isShinyBg(color) ? ' shine' : '');
       c.dataset.color = color;
       c.style.background = avatarBgCss(color);
       c.setAttribute('aria-label', color);
@@ -438,7 +438,8 @@ function renderAvatarGrid() {
   // Иконки боссов Приключения — когда база о них знает (миграция 049)
   const advIcons = advServer ? ADV_PICK_BOSSES : [];
   const passIcons = onlineInfo ? PASS_ICONS : [];
-  ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons, ...advIcons, ...passIcons].forEach((icon, i) => {
+  const shopIcons = shopOwnedCodes('icon');
+  ['', ...AVATAR_CHOICES, ...rewardsOf('icon'), ...tutIcon, ...questIcons, ...advIcons, ...passIcons, ...shopIcons].forEach((icon, i) => {
     // Награды — отдельным блоком после обычных: их не выбирают, а заслуживают
     if (i === AVATAR_CHOICES.length + 1) {
       const sep = document.createElement('div');
@@ -460,6 +461,16 @@ function renderAvatarGrid() {
     b.onclick = () => chooseAvatar(icon);
     grid.appendChild(b);
   });
+  // Ещё иконки и фоны — в магазине (миграция 061): сразу под своими, до сотен
+  // портретов Приключения, иначе до ссылки не долистать
+  if (onlineInfo) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn-ghost av-shop';
+    b.textContent = t().shop.more;
+    b.onclick = () => openShop();
+    grid.appendChild(b);
+  }
   // Из Приключения: рисунки соперников, по мирам. Когда база их знает (миграция 052)
   if (progressInfo && progressInfo.stats && 'advGold' in progressInfo.stats) {
     const head = document.createElement('div');
@@ -489,7 +500,7 @@ function lockedNote(kind, value) {
 }
 
 async function chooseColor(color) {
-  if (PASS_COLORS.indexOf(color) >= 0 && !passOwns('color', color)) {
+  if ((PASS_COLORS.indexOf(color) >= 0 || isShopItem('color', color)) && !passOwns('color', color)) {
     return setNote('avNote', t().pass.locked.replace('{w}', passWhere('color', color)), true);
   }
   if (lockedNote('color', color)) return;
@@ -523,7 +534,7 @@ async function chooseAvatar(icon) {
   if (questIconDays(icon) && !questIconOpen(icon)) {
     return setNote('avNote', t().prog.streakLocked.replace('{n}', questIconDays(icon)), true);
   }
-  if (PASS_ICONS.indexOf(icon) >= 0 && !passOwns('icon', icon)) {
+  if ((PASS_ICONS.indexOf(icon) >= 0 || isShopItem('icon', icon)) && !passOwns('icon', icon)) {
     return setNote('avNote', t().pass.locked.replace('{w}', passWhere('icon', icon)), true);
   }
   // Иконка за босса — раньше иконок соперников: с шестого мира портрет босса
@@ -3078,7 +3089,13 @@ function applyMatchState(st) {
   if (st.matchOver && online.wasPlaying) online.justFinished = true;
   if (st.matchOver && !online.progressAsked) {
     online.progressAsked = true;
-    setTimeout(() => { if (runAuth()) { loadProgress(); loadOnlineInfo(); } }, 2500);
+    // И монеты за партию (миграция 061): «+15 🪙» — разница с кошельком до неё
+    setTimeout(() => {
+      if (!runAuth()) return;
+      loadProgress();
+      loadOnlineInfo();
+      if (typeof walletAfterGame === 'function') walletAfterGame();
+    }, 2500);
   }
   online.elo = st.elo;
   online.botSeat = (st.botSeat === null || st.botSeat === undefined) ? null : st.botSeat;

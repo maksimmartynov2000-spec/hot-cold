@@ -2823,3 +2823,108 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
 .aw-tags .art-span { vertical-align: middle; }
 .adv-card .ac-rule { flex-basis: 100%; padding: 8px 10px; border-radius: 12px; font-size: 13px; line-height: 1.4;
   background: color-mix(in srgb, var(--wc, #7c5cff) 10%, var(--surface)); }
+
+/* ================= Магазин (миграция 061) ================= */
+/* Рамки из магазина: пять за монеты, три редких за кристаллы — крутятся
+   быстрее и светятся ярче. Переменные — на любом элементе с рамкой: большой
+   кружок профиля (--fr, --fr-glow), маленькие кружки и значки (--fr-solid) */
+[data-frame="leaf"] { --fr: conic-gradient(from 0deg, #d9f99d, #4ade80, #166534, #86efac, #d9f99d, #22c55e, #14532d, #d9f99d); --fr-glow: rgba(74, 222, 128, 0.8); --fr-solid: #4ade80; }
+[data-frame="ocean"] { --fr: conic-gradient(from 0deg, #cffafe, #22d3ee, #1d4ed8, #67e8f9, #cffafe, #0ea5e9, #1e3a8a, #cffafe); --fr-glow: rgba(34, 211, 238, 0.8); --fr-solid: #22d3ee; }
+[data-frame="coral"] { --fr: conic-gradient(from 0deg, #ffe4e6, #fb7185, #f97316, #fecdd3, #ffe4e6, #f43f5e, #fdba74, #ffe4e6); --fr-glow: rgba(251, 113, 133, 0.8); --fr-solid: #fb7185; }
+[data-frame="ember"] { --fr: conic-gradient(from 0deg, #451a03, #ea580c, #fbbf24, #7c2d12, #451a03, #f97316, #fde68a, #451a03); --fr-glow: rgba(234, 88, 12, 0.85); --fr-solid: #ea580c; }
+[data-frame="night"] { --fr: conic-gradient(from 0deg, #0f172a, #334155, #e2e8f0, #1e293b, #0f172a, #64748b, #f8fafc, #0f172a); --fr-glow: rgba(148, 163, 184, 0.75); --fr-solid: #94a3b8; }
+[data-frame="galaxy"] { --fr: conic-gradient(from 0deg, #0b1026, #4338ca, #fde68a, #312e81, #0b1026, #7c3aed, #fef9c3, #1e1b4b, #0b1026); --fr-glow: rgba(129, 140, 248, 1); --fr-solid: #818cf8; }
+[data-frame="aurora"] { --fr: conic-gradient(from 0deg, #a7f3d0, #34d399, #22d3ee, #a78bfa, #f0abfc, #34d399, #67e8f9, #a7f3d0); --fr-glow: rgba(52, 211, 153, 1); --fr-solid: #34d399; }
+[data-frame="prism"] { --fr: conic-gradient(from 0deg, #ffffff, #fbcfe8, #ffffff, #bae6fd, #ffffff, #fef08a, #ffffff, #bbf7d0, #ffffff, #e9d5ff, #ffffff); --fr-glow: rgba(255, 255, 255, 0.95); --fr-solid: #f5d0fe; }
+.pf-avatar[data-frame="galaxy"]::before, .pf-avatar[data-frame="aurora"]::before, .pf-avatar[data-frame="prism"]::before,
+.sha-ring[data-frame="galaxy"]::before, .sha-ring[data-frame="aurora"]::before, .sha-ring[data-frame="prism"]::before { animation-duration: 3.5s; }
+
+/* Окно магазина: кошелёк сверху, разделы, витрина, как копить */
+.shop-card { max-width: 380px; }
+.sh-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sh-top .ps-title { text-align: left; min-width: 0; }
+.sh-wallet { display: flex; gap: 6px; flex: none; }
+.sw-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px;
+  background: rgb(var(--ink) / 0.08); font-size: 14px; font-weight: 800; white-space: nowrap; }
+.sw-chip b { font-weight: 900; color: var(--gold); }
+.sw-chip.gem b { color: #7dd3fc; }
+.sh-note { margin-top: 8px; font-size: 12px; color: var(--muted); text-align: left; line-height: 1.4; }
+.sh-note:empty { display: none; }
+.sh-note.warn { padding: 8px 10px; border-radius: 12px; background: rgb(var(--ink) / 0.06); color: var(--text); font-size: 13px; }
+.sh-note .btn { padding: 6px 12px; font-size: 13px; margin-left: 6px; vertical-align: middle; }
+.sh-tabs { display: flex; gap: 6px; margin: 10px -2px 10px; padding: 2px; overflow-x: auto; scrollbar-width: none; }
+.sh-tabs::-webkit-scrollbar { display: none; }
+.sh-tab { all: unset; flex: none; cursor: pointer; padding: 7px 12px; border-radius: 999px; background: var(--tile);
+  font-size: 13px; font-weight: 800; -webkit-tap-highlight-color: transparent; }
+.sh-tab.sel { background: var(--accent); color: #fff; }
+.sh-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.sh-grid.sh-title, .sh-grid.sh-phrase { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sh-item { all: unset; box-sizing: border-box; cursor: pointer; position: relative; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px 8px;
+  border-radius: 14px; background: var(--tile); -webkit-tap-highlight-color: transparent; }
+.sh-item:active { transform: scale(0.96); }
+.sh-item.rare { background: linear-gradient(160deg, rgba(125, 211, 252, 0.18), rgba(192, 132, 252, 0.18)), var(--tile);
+  box-shadow: inset 0 0 0 2px rgba(125, 211, 252, 0.45); }
+.sh-item.own { box-shadow: inset 0 0 0 2px #34d399; }
+.sh-item.worn { box-shadow: inset 0 0 0 2px var(--gold); }
+.sh-art { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 64px; }
+.sh-name { font-size: 12px; font-weight: 800; line-height: 1.2; text-align: center; min-height: 2.4em;
+  display: flex; align-items: center; overflow-wrap: anywhere; hyphens: auto; }
+.sh-grid.sh-title .sh-name, .sh-grid.sh-phrase .sh-name { display: none; }
+.sh-grid.sh-title .sh-art, .sh-grid.sh-phrase .sh-art { min-height: 52px; }
+.sh-price { font-size: 13px; font-weight: 900; color: var(--gold); white-space: nowrap; }
+.sh-item.rare .sh-price { color: #7dd3fc; }
+.sh-item.own .sh-price { color: #34d399; }
+.sh-item.worn .sh-price { color: var(--gold); }
+.sh-earn-box { margin-top: 12px; text-align: left; }
+.sh-earn { display: flex; flex-direction: column; gap: 6px; }
+.sh-earn-row { font-size: 13px; line-height: 1.35; padding: 6px 10px; border-radius: 10px; background: var(--tile); }
+.sh-trophy { margin-top: 8px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+@media (max-width: 359px) { .sh-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Картинка товара: иконка или цвет — кружком, рамка — вокруг своего кружка,
+   титул — табличкой, фраза — облачком чата */
+.sha-face { width: 58px; height: 58px; border-radius: 50%; box-sizing: border-box; border: 2px solid #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; color: #0f1430;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.22); }
+.sha-face.has-art { padding: 4px; }
+.sha-face .icon-art { border-radius: 50%; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)); }
+.sha-ring { position: relative; display: inline-flex; border-radius: 50%; box-shadow: 0 0 16px var(--fr-glow, transparent); }
+.sha-ring .sha-face { width: 44px; height: 44px; font-size: 20px; }
+.sha-ring::before { content: ''; position: absolute; inset: -7px; border-radius: 50%; padding: 5px; pointer-events: none;
+  background: var(--fr); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; animation: fr-spin 7s linear infinite; }
+.sha-title { padding: 6px 10px; border-radius: 10px; background: rgb(var(--ink) / 0.08); color: var(--gold);
+  font-size: 13px; font-weight: 900; letter-spacing: 0.02em; overflow-wrap: anywhere; }
+.sha-phrase { padding: 7px 10px; border-radius: 14px 14px 14px 4px; background: #fff; color: #1e1b4b;
+  font-size: 13px; font-weight: 800; line-height: 1.25; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2); overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .sha-ring::before { animation: none; } }
+
+/* Товар крупно */
+.shop-item-card { max-width: 300px; }
+.si-art { display: flex; align-items: center; justify-content: center; min-height: 124px; margin: 2px 0 10px; }
+.si-art .sha-face { width: 104px; height: 104px; font-size: 46px; }
+.si-art .sha-face.has-art { padding: 7px; }
+.si-art .sha-ring .sha-face { width: 86px; height: 86px; font-size: 38px; }
+.si-art .sha-ring::before { inset: -11px; padding: 7px; }
+.si-art .sha-ring { box-shadow: 0 0 28px var(--fr-glow, transparent); }
+.si-art .sha-title { font-size: 18px; padding: 10px 16px; }
+.si-art .sha-phrase { font-size: 18px; padding: 12px 16px; }
+.si-kind { font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.si-name { font-size: 20px; font-weight: 900; margin: 2px 0 4px; line-height: 1.2; }
+.si-price { font-size: 18px; font-weight: 900; color: var(--gold); margin-bottom: 8px; }
+.si-note { font-size: 13px; color: var(--muted); margin-bottom: 10px; line-height: 1.4; }
+.si-note:empty { display: none; }
+.si-note.warn { color: #fb923c; font-weight: 800; }
+.si-note.good { color: #34d399; font-weight: 800; }
+.si-back { margin-top: 8px; }
+
+/* «+15 🪙» после игры: сверху, на пару секунд, нажатиям не мешает */
+.wallet-toast { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top)); z-index: 70;
+  transform: translate(-50%, -16px); opacity: 0; pointer-events: none; white-space: nowrap;
+  padding: 9px 18px; border-radius: 999px; background: #1e1b4b; color: #fde68a; font-size: 17px; font-weight: 900;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 0 0 2px rgba(253, 230, 138, 0.35); transition: opacity 0.25s, transform 0.25s; }
+.wallet-toast.show { opacity: 1; transform: translate(-50%, 0); }
+/* Ссылка «Ещё — в магазине» под рамками и иконками профиля */
+.st-shop { margin-top: 4px; }
+.av-shop { grid-column: 1 / -1; margin-top: 6px; }

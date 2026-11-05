@@ -194,7 +194,7 @@ language sql immutable as $$
     -- Цвета фона кружка: три последних переливаются
     ('color', 'grad-mint', 100, 0), ('color', 'grad-peach', 100, 0), ('color', 'grad-sky', 100, 0),
     ('color', 'grad-violet', 100, 0), ('color', 'grad-sand', 100, 0),
-    ('color', 'grad-galaxy', 0, 10), ('color', 'grad-rainbow', 0, 10), ('color', 'grad-gold', 0, 10),
+    ('color', 'grad-galaxy', 0, 10), ('color', 'grad-rainbow', 0, 10), ('color', 'grad-sun', 0, 10),
     -- Титулы под именем
     ('title', 'thinker', 150, 0), ('title', 'explorer', 150, 0), ('title', 'lucky', 150, 0),
     ('title', 'strategist', 150, 0), ('title', 'speedy', 150, 0), ('title', 'calm', 150, 0),

@@ -24,7 +24,7 @@ const SHOP_ITEMS = [
   { kind: 'color', code: 'grad-mint', coins: 100 }, { kind: 'color', code: 'grad-peach', coins: 100 },
   { kind: 'color', code: 'grad-sky', coins: 100 }, { kind: 'color', code: 'grad-violet', coins: 100 },
   { kind: 'color', code: 'grad-sand', coins: 100 }, { kind: 'color', code: 'grad-galaxy', gems: 10 },
-  { kind: 'color', code: 'grad-rainbow', gems: 10 }, { kind: 'color', code: 'grad-gold', gems: 10 },
+  { kind: 'color', code: 'grad-rainbow', gems: 10 }, { kind: 'color', code: 'grad-sun', gems: 10 },
   { kind: 'title', code: 'thinker', coins: 150 }, { kind: 'title', code: 'explorer', coins: 150 },
   { kind: 'title', code: 'lucky', coins: 150 }, { kind: 'title', code: 'strategist', coins: 150 },
   { kind: 'title', code: 'speedy', coins: 150 }, { kind: 'title', code: 'calm', coins: 150 },
@@ -173,7 +173,7 @@ function renderShop() {
   // Что сверху: вход, нет сети, или как копить
   const note = document.getElementById('shopNote');
   note.className = 'sh-note' + (shopState === 'ok' ? '' : ' warn');
-  if (shopState === 'guest') note.innerHTML = escapeHtml(S.guest) + ' <button class="btn btn-small" type="button" onclick="closeShop(); openLogoutModal()">' + escapeHtml(S.login) + '</button>';
+  if (shopState === 'guest') note.innerHTML = escapeHtml(S.guest) + ' <button class="btn" type="button" onclick="closeShop(); openLogoutModal()">' + escapeHtml(S.login) + '</button>';
   else if (shopState === 'off') note.textContent = S.off;
   else note.textContent = shopWallet ? S.today.replace('{n}', shopWallet.today).replace('{m}', shopWallet.cap) : '';
   document.getElementById('shopEarnHead').textContent = S.earnHead;
@@ -200,13 +200,19 @@ function shopName(kind, code) {
   return (t().say[code] || code);
 }
 
+// Фон своего кружка: выбранный или тот, что считается из имени. Без входа — океан
+function shopBg() {
+  return runAuth() && typeof colorOf === 'function' ? colorOf(myName()) : 'grad-ocean';
+}
+
 // Картинка товара: иконка на своём фоне, рамка вокруг своего кружка, кружок
 // цвета, табличка титула, облачко фразы
 function shopArtHtml(kind, code) {
-  const bg = typeof myColor === 'function' ? myColor() : '';
+  const bg = shopBg();
   if (kind === 'icon') {
     const art = iconArt(code, 0);
-    return '<span class="sha-face' + (art ? ' has-art' : '') + '" style="background:' + avatarBgCss(bg) + '">' + (art || '🖼️') + '</span>';
+    return '<span class="sha-face' + (art ? ' has-art' : '') + (isShinyBg(bg) ? ' shine' : '') + '" style="background:' +
+      avatarBgCss(bg) + '">' + (art || '🖼️') + '</span>';
   }
   if (kind === 'color') {
     return '<span class="sha-face' + (isShinyBg(code) ? ' shine' : '') + '" style="background:' + avatarBgCss(code) + '"></span>';
@@ -214,8 +220,9 @@ function shopArtHtml(kind, code) {
   if (kind === 'frame') {
     const me = runAuth() && typeof myAvatar === 'function' ? myAvatar() : '';
     const art = me ? iconArt(me, 0) : '';
+    const face = art || escapeHtml(me || (runAuth() ? avatarLetter(myName()) : '🙂'));
     return '<span class="sha-ring" data-frame="' + code + '"><span class="sha-face' + (art ? ' has-art' : '') +
-      '" style="background:' + avatarBgCss(bg) + '">' + (art || escapeHtml(me || '🙂')) + '</span></span>';
+      (isShinyBg(bg) ? ' shine' : '') + '" style="background:' + avatarBgCss(bg) + '">' + face + '</span></span>';
   }
   if (kind === 'title') return '<span class="sha-title">' + escapeHtml(shopName(kind, code)) + '</span>';
   return '<span class="sha-phrase">' + escapeHtml(shopName(kind, code)) + '</span>';
