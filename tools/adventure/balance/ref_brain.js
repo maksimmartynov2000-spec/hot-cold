@@ -11,7 +11,6 @@ function refCandidates(moves, seat, flags, careless) {
   const bands = reviewBands(FEEDBACK_META);
   const cand = new Uint8Array(RANGE_MAX - RANGE_MIN + 1).fill(1);
   seen.forEach(m => narrow(cand, RANGE_MIN, bands, m.guess, m.labelIndex));
-  // Знание из бонусов (рентген, половина) бот тоже использует
   // Всё, что известно из бонусов и правил (чётность, половина, больше/меньше,
   // делимость, цифры) — общей проверкой игры. Делимость на 3 «средний игрок»
   // замечает через раз: её труднее посчитать в уме
