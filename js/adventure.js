@@ -21,7 +21,9 @@
 // Всего миров в замысле — 50; выходят партиями, готовые — в ADV_WORLDS.
 // С шестого мира — волны по пять миров (см. advLevel), у героев — правила-данные
 // (ADV_HEROES), тексты — отдельным файлом на язык (js/adv-<язык>.js).
-// frost — у всех соперников мира числа с минусом
+// frost — у всех соперников мира числа с минусом. rule — особое правило мира:
+// storm — бонусов вдвое больше, traps — ловушки в каждом бою (не только у
+// босса), first — каждый раунд первым ходит соперник
 const ADV_WORLD_MAX = 50;
 const ADV_WORLDS = [
   { key: 'forest', range: 20, color: '#2bd18f', boss: '🧙', bonus: 'shield' },
@@ -32,15 +34,15 @@ const ADV_WORLDS = [
   // Волна 2
   { key: 'candy', range: 50, color: '#ff6fb1', bonus: 'shield' },
   { key: 'arctic', range: 100, color: '#5aa9ff', bonus: 'freeze', frost: true },
-  { key: 'desert', range: 150, color: '#e0a23a', bonus: 'half' },
-  { key: 'farm', range: 200, color: '#6fc04a', bonus: 'xray' },
-  { key: 'sky', range: 300, color: '#8f9dff', bonus: 'lava' },
+  { key: 'desert', range: 150, color: '#e0a23a', bonus: 'compass' },
+  { key: 'farm', range: 200, color: '#6fc04a', bonus: 'div3' },
+  { key: 'sky', range: 300, color: '#8f9dff', bonus: 'half', rule: 'storm' },
   // Волна 3
-  { key: 'garden', range: 100, color: '#d66bff', bonus: 'shield' },
-  { key: 'dino', range: 150, color: '#a8b83a', bonus: 'freeze' },
-  { key: 'pirate', range: 200, color: '#e0574f', bonus: 'half' },
-  { key: 'spooky', range: 300, color: '#5b5bd6', bonus: 'xray' },
-  { key: 'castle', range: 500, color: '#e6b422', bonus: 'lava' }
+  { key: 'garden', range: 100, color: '#d66bff', bonus: 'div5' },
+  { key: 'dino', range: 150, color: '#a8b83a', bonus: 'xray' },
+  { key: 'pirate', range: 200, color: '#e0574f', bonus: 'thief', rule: 'first' },
+  { key: 'spooky', range: 300, color: '#5b5bd6', bonus: 'lava', rule: 'traps' },
+  { key: 'castle', range: 500, color: '#e6b422', bonus: 'mirror' }
 ];
 // Иконка за босса: у первых пяти миров — эмодзи, дальше — портрет самого
 // босса. Список — на все 50 миров. Копия — в базе (adventure_icons), сверяется тестом
@@ -728,11 +730,19 @@ function advCtx() {
     bonusIn: cand => { const b = D.bonuses.find(b => !b.taken && cand[b.value - RANGE_MIN] && !R.named(b.value)); return b ? b.value : null; },
     give: (p, k) => { D.tokens[p] = Math.min(9, D.tokens[p] + k); },
     take: (p, k) => { D.tokens[p] = Math.max(0, D.tokens[p] - k); },
-    skip: (p, freeze) => { D.skip[p] = true; if (freeze) D.frozen[p] = true; },
-    fog: p => { if (!D.fog[p]) { D.fog[p] = true; D.fogFrom[p] = 0; } },
-    blind: p => { if (!D.blind[p]) { D.blind[p] = true; D.blindFrom[p] = 0; } },
-    memory: p => { D.shortMemory[p] = true; },
-    lava: p => { D.autoLava[p] = true; },
+    // Помеха на игрока проходит через щит и зеркало: зеркало отправляет её
+    // сопернику, щит просто отбивает. Что именно сработало — помним до fire
+    guard: (p, go) => {
+      if (p !== 0) return go(p);
+      if (D.mirror && D.mirror[0]) { D.mirror[0] = false; round.guarded = 'mirrorRule'; return go(1); }
+      if (D.shield && D.shield[0]) { D.shield[0] = false; round.guarded = 'shieldRule'; return; }
+      go(0);
+    },
+    skip: (p, freeze) => R.guard(p, q => { D.skip[q] = true; if (freeze) D.frozen[q] = true; }),
+    fog: p => R.guard(p, q => { if (!D.fog[q]) { D.fog[q] = true; D.fogFrom[q] = 0; } }),
+    blind: p => R.guard(p, q => { if (!D.blind[q]) { D.blind[q] = true; D.blindFrom[q] = 0; } }),
+    memory: p => R.guard(p, q => { D.shortMemory[q] = true; }),
+    lava: p => R.guard(p, q => { D.autoLava[q] = true; }),
     again: () => { D.extraTurn = true; },
     hide: m => { m.ruleHidden = true; },
     dir: x => (secret > x ? 'gt' : 'lt'),
@@ -754,6 +764,9 @@ function advCtx() {
     // экрана, дальше — репликой в пузыре. В начале раунда — в очередь: экран
     // партии ещё не открыт
     fire: (kind, vars) => {
+      // Помеху отбил щит или отразило зеркало: вместо реплики правила —
+      // вспышка щита или зеркала с названием правила
+      if (round.guarded) return advGuarded(c, kind);
       const text = advLine(c.n, kind, vars);
       if (!text) return;
       round.firedNow = true;
@@ -764,6 +777,19 @@ function advCtx() {
     }
   };
   return R;
+}
+
+// Щит или зеркало встретили правило соперника. Вспышку покажет движок
+// (checkBonusFx): как у бонуса, только с названием правила
+function advGuarded(c, kind) {
+  const round = advRoundState();
+  if (!round || !round.guarded) return;
+  D.lastBonus = round.guarded;
+  D.lastBonusBy = 0;
+  // Тексты героев с шестого мира грузятся отдельно: пока их нет — имя героя
+  D.shieldedText = advFireTitle(c.n, kind || 'rule') || advName(c.n);
+  round.guarded = null;
+  round.firedNow = true;
 }
 
 // Реплика соперника: hi, rule, a1, a2, luck, worry, win, lose
@@ -797,8 +823,9 @@ function advRoundStart() {
   const R = advCtx();
   if (!R) return;
   R.round.queue = [];
-  if (R.rule.first) { D.starter = 1; D.cur = 1; }
+  if (R.rule.first || R.c.world.rule === 'first') { D.starter = 1; D.cur = 1; }
   if (R.rule.start) R.rule.start(R);
+  if (R.round.guarded) advGuarded(R.c, 'rule');
   const queue = R.round.queue;
   R.round.queue = null;
   // Экран партии откроется чуть позже: реплики — после него. В первом раунде
@@ -821,6 +848,7 @@ function advAfterMove(m) {
   if (!R || D.roundOver) return;
   R.round.firedNow = false;
   if (R.rule.after) R.rule.after(R, m);
+  if (R.round.guarded) advGuarded(R.c, 'rule');
   if (R.round.firedNow) return;
   // Без правила — реплика на удачный ход: свой или ваш, раз за раунд
   if (m.p === 1 && advVeryHot(R, m) && R.once('luck')) advSay('luck');
@@ -853,6 +881,12 @@ function advRoundEndLine() {
   if (!vsBot || !vsBot.adv) return;
   const botWon = D.roundWinner === 1;
   advSay(D.matchOver ? (botWon ? 'win' : 'lose') : (botWon ? 'luck' : 'worry'));
+}
+
+// Цифра загаданного в бою с боссом — с шестого мира, через мир: десятков или
+// последняя
+function advBossDigit(c) {
+  return c.boss && c.w >= 5 ? (c.w % 2 ? 'units' : 'tens') : null;
 }
 
 function advDiff() {
@@ -1080,7 +1114,10 @@ function renderAdventure(scroll) {
     head.onclick = () => advToggleWorld(w);
     // Имя сверху, счёт под ним: длинное имя не рвёт счёт на куски. У закрытого
     // мира счёта нет (там всегда 0) — что его откроет, сказано строкой ниже
-    head.innerHTML = '<span class="aw-title"><span class="aw-name">' + escapeHtml(advWorldName(w)) + '</span>' +
+    // Рядом с именем — бонус мира и значок правила: видно, чего ждать, ещё до боя
+    const rule = W.rule && A.worldRules[W.rule];
+    head.innerHTML = '<span class="aw-title"><span class="aw-top"><span class="aw-name">' + escapeHtml(advWorldName(w)) + '</span>' +
+      '<span class="aw-tags">' + bonusArtHtml(W.bonus, BONUS_ICON[W.bonus]) + (rule ? rule[0] : '') + '</span></span>' +
       (open ? '<span class="aw-count">' + A.progress.replace('{n}', beaten) +
         ' · <span class="aw-stars">⭐ ' + advWorldStars(w) + '/' + ADV_PER_WORLD * 3 + '</span></span>' : '') + '</span>' +
       '<span class="aw-reward' + (advWorldDone(w) ? ' got' : '') + '" title="' + escapeHtml(A.reward) + '">' +
@@ -1170,14 +1207,18 @@ function openAdvCard(n) {
   const range = (c.R.frost || c.world.frost) ? L.placeholderTpl.replace('{a}', formatNum(-half)).replace('{b}', formatNum(half))
     : L.placeholderTpl.replace('{a}', '1').replace('{b}', formatNum(c.world.range));
   const best = advStarAt(n);
-  const bk = c.world.bonus;
+  // Бонус мира, у босса с шестого мира — ещё цифра загаданного; ниже — правило мира
+  const bk = c.world.bonus, digit = advBossDigit(c), rule = c.world.rule && A.worldRules[c.world.rule];
+  const bonusOf = k => '<b>' + bonusArtHtml(k, BONUS_ICON[k]) + ' ' + escapeHtml(L.bonusNames[k]) + '</b>';
   document.getElementById('acFacts').innerHTML =
     '<span>' + escapeHtml(A.range) + ': <b>' + range + '</b></span>' +
     '<span>' + escapeHtml(A.wins) + ' <b>' + (c.boss ? 2 : 1) + '</b></span>' +
     '<span class="ac-best">' + escapeHtml(A.best) + ': <b class="s' + best + '">' + advStarRow(best) + '</b></span>' +
-    '<button type="button" class="ac-bonus" onclick="openBonusGuide(\'' + bk + '\')">' + escapeHtml(A.worldBonus) + ': <b>' +
-      bonusArtHtml(bk, BONUS_ICON[bk]) + ' ' + escapeHtml(L.bonusNames[bk]) + '</b>' +
-      (c.boss || c.R.bonus === 'magic' ? ' · ' + escapeHtml(A.traps) : '') + '</button>' +
+    '<button type="button" class="ac-bonus" onclick="openBonusGuide(\'' + bk + '\')">' + escapeHtml(A.worldBonus) + ': ' +
+      bonusOf(bk) + (digit ? ', ' + escapeHtml(A.bossBonus).replace('{b}', bonusOf(digit)) : '') +
+      (c.boss || c.R.bonus === 'magic' || c.world.rule === 'traps' ? ' · ' + escapeHtml(A.traps) : '') + '</button>' +
+    (rule ? '<span class="ac-rule">' + escapeHtml(A.ruleLabel) + ': <b>' + rule[0] + ' ' + escapeHtml(rule[1]) + '</b> — ' +
+      escapeHtml(rule[2]) + '</span>' : '') +
     '<span class="ac-gold">' + escapeHtml(advWorldGold(c.w) ? A.goldDone : A.cardGold.replace('{n}', advWorldThree(c.w))) + '</span>';
   const go = document.getElementById('acGo');
   // Закрыт: не обыгран прошлый соперник — или мир ждёт звёзд в прошлом мире
@@ -1219,15 +1260,19 @@ function startAdventure(n) {
   applyRangeToInputs();
   // Бонусы — у всех: бонус мира ложится всегда, ловушки — у босса и у
   // Осьминога Жонглёра (у него бонусов вдвое больше). У Ящера Рыцаря — втрое
-  // больше, и только полезные
+  // больше, и только полезные. С шестого мира у босса ещё и цифра загаданного
+  // (десятков или последняя — через мир), она тоже ложится всегда. Правило
+  // мира: «буря» — бонусов вдвое больше, «ловушки» — ловушки в каждом бою
   const magic = c.R.bonus === 'magic', knight = c.R.bonus === 'knight';
   const allGood = ['xray', 'half', 'shield', 'freeze'].filter(k => k !== c.world.bonus);
+  const digit = advBossDigit(c);
+  const mult = (magic ? 2 : knight ? 3 : 1) * (c.world.rule === 'storm' ? 2 : 1);
   bonusMode = true;
   bonusSet = {
-    first: true,
-    good: [c.world.bonus, 'extra', 'fog', 'blind'].concat(magic || knight ? allGood : []),
-    trap: (c.boss || magic) ? BONUS_TRAP : [],
-    count: magic ? 2 * autoBonusCountFor(rangeCount()) : knight ? 3 * autoBonusCountFor(rangeCount()) : 0
+    first: digit ? 2 : 1,
+    good: [c.world.bonus].concat(digit ? [digit] : [], ['extra', 'fog', 'blind'], magic || knight ? allGood : []),
+    trap: (c.boss || magic || c.world.rule === 'traps') ? BONUS_TRAP : [],
+    count: mult > 1 ? mult * autoBonusCountFor(rangeCount()) : 0
   };
   vsBot = { adv: c, diff: diff, bot: { key: c.icon, icon: c.icon, color: c.world.color, level: advLevel(c),
                            think: advThink(c), greet: 'luck', react: 'nice' } };
@@ -1239,7 +1284,7 @@ function startAdventure(n) {
   D.wins = [0, 0];
   D.round = 1;
   D.matchOver = false;
-  D.starter = c.R.first ? 1 : 0;
+  D.starter = (c.R.first || c.world.rule === 'first') ? 1 : 0;
   startRound();
   applyTranslations();
   showScreen('game');

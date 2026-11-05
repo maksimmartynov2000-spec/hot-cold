@@ -6416,8 +6416,8 @@ async function testBonusGuide(browser) {
       shown: !document.getElementById('bonusGuide').classList.contains('hidden'),
       heads: document.querySelectorAll('#bgList .bg-head').length,
       rows: [...document.querySelectorAll('#bgList .bg-row')].map(r => r.textContent.trim()) }));
-    check(lang + ': в списке 4 помощи, 3 ловушки и 5 бонусов Приключения, у каждой название и описание',
-      g.shown && g.heads === 3 && g.rows.length === 12 && g.rows.every(r => r.length > 25 && !/undefined/.test(r)),
+    check(lang + ': в списке 13 помощей, 3 ловушки и 3 бонуса только Приключения, у каждой название и описание',
+      g.shown && g.heads === 3 && g.rows.length === 19 && g.rows.every(r => r.length > 25 && !/undefined/.test(r)),
       JSON.stringify(g).slice(0, 300));
     await page.click('#bgOk');
     await page.waitForTimeout(100);
@@ -7262,8 +7262,9 @@ async function testOnlineAdvBonuses(browser) {
     while (n && n.classList.contains('bg-row')) { rows.push(n.querySelector('b').textContent); n = n.nextElementSibling; }
     return h.textContent + ': ' + rows.join(',');
   }));
-  check('список бонусов: Рентген, Половина, Щит, Заморозка — среди полезных', /Рентген,Половина,Щит,Заморозка/.test(guide[0]) &&
-    guide[2] === 'Только в Приключении: Шальной бросок', guide.join(' | '));
+  check('список бонусов: Рентген, Половина, Щит, Заморозка и новые — среди полезных',
+    /Рентген,Половина,Щит,Заморозка,Делится на 3\?,Делится на 5\?,Компас,Воришка,Зеркало$/.test(guide[0]) &&
+    guide[2] === 'Только в Приключении: Шальной бросок,Цифра десятков,Последняя цифра', guide.join(' | '));
   await page.context().close();
 }
 
@@ -7298,6 +7299,165 @@ async function testLocalAdvBonuses(browser) {
   const ft = await page.evaluate(() => document.getElementById('forcedText').textContent);
   check('и сказано — «Заморозка»', /Заморозка/.test(ft), ft);
   await page.context().close();
+}
+
+// Новые бонусы: делимость на 3 и 5, цифры у боссов, компас, воришка, зеркало.
+// И правила миров: буря бонусов, ловушки у всех, соперник первым
+async function testNewBonuses(browser) {
+  console.log('\nНовые бонусы и правила миров');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.click('#tModeDuel');
+  await page.waitForTimeout(150);
+  await page.selectOption('#rangeMax', '100');
+  await page.evaluate(() => { const b = document.getElementById('bonusSetup'); if (b && !b.checked) b.click(); });
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  const k = await page.evaluate(() => {
+    const out = {};
+    secret = 45;
+    D.know = [{}, {}];
+    applyBonus('div3', 0); applyBonus('div5', 0);
+    out.div = [D.know[0].div3, D.know[0].div5];
+    applyBonus('tens', 0); applyBonus('units', 0);
+    out.digits = [D.know[0].tens, D.know[0].units];
+    out.text = knowText(0).join(' · ');
+    renderAll();
+    out.chip = document.getElementById('peff0').textContent;
+    // 45 — единственное число от 1 до 100 с цифрами 4 и 5: бот это знает
+    const cand = botCandidates([], 0, { know: D.know[0] }, false);
+    out.cand = [...cand].map((c, i) => c ? i + RANGE_MIN : 0).filter(Boolean).join();
+    // Компас мерит от числа, на котором лежал, и сужает с двух сторон
+    applyBonus('compass', 1, 30); applyBonus('compass', 1, 60); applyBonus('compass', 1, 20);
+    out.compass = [D.know[1].gt, D.know[1].lt].join();
+    out.compassText = knowText(1).join(' · ');
+    // Не делится — тоже знание
+    secret = 44; D.know[1] = {};
+    applyBonus('div3', 1); applyBonus('div5', 1);
+    out.notDiv = knowText(1).join(' · ');
+    const c2 = botCandidates([], 1, { know: D.know[1] }, false);
+    out.botNotDiv = [...c2].every((c, i) => !c || ((i + RANGE_MIN) % 3 !== 0 && (i + RANGE_MIN) % 5 !== 0));
+    // Воришка: «⚡» соперника — себе; у соперника пусто — из запаса
+    D.tokens = [0, 2]; applyBonus('thief', 0); out.thief = D.tokens.join();
+    D.tokens = [0, 0]; applyBonus('thief', 0); out.thiefEmpty = D.tokens.join();
+    return out;
+  });
+  check('➗3 и ➗5: у 45 — делится на оба', k.div[0] === true && k.div[1] === true, JSON.stringify(k));
+  check('цифры босса: у 45 десятков 4, последняя 5', k.digits.join() === '4,5', JSON.stringify(k));
+  check('знание словами у своего имени', /делится на 3/.test(k.chip) && /делится на 5/.test(k.chip) &&
+    /цифра десятков 4/.test(k.chip) && /последняя цифра 5/.test(k.chip), k.chip);
+  check('бот с этим знанием ищет только 45', k.cand === '45', k.cand);
+  check('компас: больше 30, меньше 60 (20 ничего не добавил)', k.compass === '30,60' && /больше 30/.test(k.compassText) &&
+    /меньше 60/.test(k.compassText), JSON.stringify(k));
+  check('44 — «не делится на 3», «не делится на 5», бот их пропускает', /не делится на 3/.test(k.notDiv) &&
+    /не делится на 5/.test(k.notDiv) && k.botNotDiv, k.notDiv);
+  check('воришка: забрал «⚡» у соперника, у пустого — из запаса', k.thief === '1,1' && k.thiefEmpty === '1,0', JSON.stringify(k));
+
+  // Зеркало на доске: игрок 1 берёт зеркало, потом наступает на ловушку — она уходит игроку 2
+  await page.evaluate(() => {
+    secret = 40; D.cur = 0; D.skip = [false, false]; D.know = [{}, {}];
+    D.bonuses = [{ value: 70, type: 'mirror', taken: false }, { value: 20, type: 'skip', taken: false }];
+  });
+  const step = async g => { await page.fill('#guessInput', String(g)); await page.click('#tSubmitGuess'); await page.waitForTimeout(350);
+    await page.evaluate(() => { document.querySelectorAll('.curtain:not(.hidden), #curtain:not(.hidden)').forEach(c => c.click());
+      const bc = document.getElementById('bonusCard'); if (bc) bc.classList.add('hidden'); }); };
+  await step(70);
+  const m1 = await page.evaluate(() => ({ mirror: D.mirror[0], flags: document.getElementById('peff0').textContent }));
+  check('зеркало: у игрока 1, значок 🪞 у имени', m1.mirror && /🪞/.test(m1.flags), JSON.stringify(m1));
+  await step(50);
+  await step(20);
+  const m2 = await page.evaluate(() => ({ skip: D.skip.join(), mirror: D.mirror[0], last: D.lastBonus, cur: D.cur,
+    forced: forcedTurn(), line: document.getElementById('bonusLine').textContent }));
+  check('зеркало отразило «Пропуск хода» в соперника — пропускает он', m2.skip === 'false,true' && !m2.mirror &&
+    m2.last === 'mirrorUsed' && m2.cur === 1 && m2.forced === 'skip', JSON.stringify(m2));
+  check('и об этом сказано', /зеркало отразило ловушку «Пропуск хода»/.test(m2.line), m2.line);
+  await page.evaluate(() => quitToMenu());
+
+  // Приключение: правила миров и цифра у босса
+  const w = await page.evaluate(() => {
+    localStorage.setItem(advKey(), String(ADV_TOTAL)); localStorage.setItem(advStarsKey(), '3'.repeat(ADV_TOTAL)); BOT_SPEED = 1000;
+    const find = rule => ADV_WORLDS.findIndex(W => W.rule === rule);
+    const plain = w => [...Array(9).keys()].map(i => w * 10 + i).find(n => !advChar(n).R.bonus && !advChar(n).R.first);
+    const out = { worlds: ADV_WORLDS.slice(5).map(W => W.bonus + (W.rule ? ':' + W.rule : '')).join() };
+    let n = plain(find('storm'));
+    startAdventure(n); stopBot();
+    out.storm = { n: D.bonuses.length, auto: autoBonusCountFor(rangeCount()), traps: bonusSet.trap.length };
+    quitToMenu();
+    n = plain(find('traps'));
+    startAdventure(n); stopBot();
+    out.traps = { set: bonusSet.trap.length, on: D.bonuses.filter(b => BONUS_TRAP.includes(b.type)).length };
+    quitToMenu();
+    n = plain(find('first'));
+    startAdventure(n); stopBot();
+    out.first = { starter: D.starter, cur: D.cur };
+    D.round = 2; startRound(); stopBot();
+    out.first.cur2 = D.cur;
+    quitToMenu();
+    // Обычный мир без правила: первым ходит игрок
+    n = plain(ADV_WORLDS.findIndex((W, i) => i >= 5 && !W.rule));
+    startAdventure(n); stopBot();
+    out.plain = { cur: D.cur, traps: bonusSet.trap.length, n: D.bonuses.length, auto: autoBonusCountFor(rangeCount()) };
+    quitToMenu();
+    // Боссы с шестого мира: цифра лежит всегда, через мир — десятков или последняя
+    out.boss = [4, 5, 6].map(w => {
+      startAdventure(w * 10 + 9); stopBot();
+      const r = { w, digit: advBossDigit(vsBot.adv), lead: bonusSet.good.slice(0, bonusSet.first).join(),
+                  on: D.bonuses.some(b => b.type === 'tens' || b.type === 'units') };
+      quitToMenu();
+      return r;
+    });
+    // Карточка: правило мира и цифра босса
+    const sw = find('storm');
+    openAdventure(); openAdvCard(sw * 10 + 9);
+    out.card = document.getElementById('acFacts').textContent;
+    closeAdvCard();
+    advToggleWorld(sw);
+    out.tags = document.querySelector('#advMap .adv-world[data-w="' + sw + '"] .aw-tags').textContent;
+    out.name = document.querySelector('#advMap .adv-world[data-w="' + sw + '"] .aw-name').textContent;
+    return out;
+  });
+  check('бонусы миров 6–15 и правила', w.worlds.split(',').slice(0, 10).join() ===
+    'shield,freeze,compass,div3,half:storm,div5,xray,thief:first,lava:traps,mirror', w.worlds);
+  check('буря бонусов: бонусов вдвое больше', w.storm.n === 2 * w.storm.auto && w.storm.traps === 0, JSON.stringify(w.storm));
+  check('ловушки у всех: и у обычного соперника', w.traps.set === 3 && w.traps.on > 0, JSON.stringify(w.traps));
+  check('соперник первым — в каждом раунде', w.first.starter === 1 && w.first.cur === 1 && w.first.cur2 === 1, JSON.stringify(w.first));
+  check('мир без правила: первым — игрок, бонусов обычно, ловушек нет', w.plain.cur === 0 && w.plain.traps === 0 &&
+    w.plain.n === w.plain.auto, JSON.stringify(w.plain));
+  check('босс пятого мира — без цифры, шестого — последняя, седьмого — десятков', w.boss[0].digit === null &&
+    w.boss[1].digit === 'units' && w.boss[1].on && w.boss[1].lead === 'shield,units' &&
+    w.boss[2].digit === 'tens' && w.boss[2].on && w.boss[2].lead === 'freeze,tens', JSON.stringify(w.boss));
+  check('в карточке босса — цифра и правило мира', /у босса ещё 🔢 Последняя цифра|у босса ещё 🔟 Цифра десятков/.test(w.card) &&
+    /Правило мира: 🌪️ Буря бонусов — Бонусов вдвое больше/.test(w.card), w.card);
+  check('на карте у имени мира — значки бонуса и правила, имя без них', w.tags === '🌗🌪️' && !/🌪️/.test(w.name), JSON.stringify(w));
+
+  // Щит и зеркало встречают и помеху из правила соперника
+  const g = await page.evaluate(async () => {
+    await advLoadPack();
+    startAdventure(50); stopBot();
+    const R = advCtx();
+    const out = {};
+    D.shield[0] = true;
+    R.skip(0); R.fire('rule');
+    out.shield = { skip: D.skip[0], shield: D.shield[0], last: D.lastBonus, text: D.shieldedText };
+    renderAll();
+    out.line = document.getElementById('bonusLine').textContent;
+    D.mirror[0] = true;
+    R.fog(0); R.fire('rule');
+    out.mirror = { fog: D.fog.join(), mirror: D.mirror[0], last: D.lastBonus };
+    renderAll();
+    out.line2 = document.getElementById('bonusLine').textContent;
+    // Без щита и зеркала помеха работает как раньше
+    R.memory(0); R.fire('rule');
+    out.plain = D.shortMemory[0];
+    out.title = advFireTitle(50, 'rule');
+    quitToMenu();
+    return out;
+  });
+  check('щит отбил помеху правила — ход не пропущен, сказано, что именно', !g.shield.skip && !g.shield.shield &&
+    g.shield.last === 'shieldRule' && g.shield.text === g.title && g.line.includes('щит отбил «' + g.title + '»'), JSON.stringify(g));
+  check('зеркало отразило помеху правила в соперника', g.mirror.fog === 'false,true' && !g.mirror.mirror &&
+    g.mirror.last === 'mirrorRule' && /зеркало отразило/.test(g.line2), JSON.stringify(g));
+  check('без защиты помеха правила работает', g.plain === true, JSON.stringify(g));
+  await done(page);
 }
 
 // Полная проверка «что дёргается и куда не попасть»
@@ -8174,9 +8334,9 @@ async function testAudit(browser) {
   check('−1000…1000 и 2000 бонусов — на поле ровно 2000, все на разных числах, кроме загаданного',
     opts.includes('2000') && bon.min === -1000 && bon.max === 1000 && bon.n === 2000 && bon.uniq === 2000 && !bon.onSecret && bon.typed,
     JSON.stringify(bon));
-  // С другом — и четыре из Приключения: рентген, половина, щит, заморозка
-  check('«Бросок в лаву» убран: среди 2000 бонусов его нет, остальные виды есть (и 4 из Приключения)',
-    bon.kinds === 'blind,extra,fog,freeze,gift,half,memory,shield,skip,xray', bon.kinds);
+  // С другом — все полезные, и из Приключения тоже: рентген, половина, щит, заморозка, ➗3, ➗5, компас, воришка, зеркало
+  check('«Бросок в лаву» убран: среди 2000 бонусов его нет, остальные виды есть (и 9 из Приключения)',
+    bon.kinds === 'blind,compass,div3,div5,extra,fog,freeze,gift,half,memory,mirror,shield,skip,thief,xray', bon.kinds);
   await page.evaluate(() => quitToMenu());
   await done(page);
 
@@ -8995,6 +9155,7 @@ async function testKeyPage(browser) {
     await testKidClarity(browser);
     await testOnlineAdvBonuses(browser);
     await testLocalAdvBonuses(browser);
+    await testNewBonuses(browser);
     await testNoJumps(browser);
     await testTablet(browser);
     await testScreensEverywhere(browser);

@@ -1902,7 +1902,8 @@ function renderLessonResult() {
 
 // ---------- Карточки бонусов ----------
 const BONUS_ICON = { extra: '⚡', fog: '🙈', blind: '🌫️', rush: '⏳', lava: '💫', skip: '⏭', gift: '🎁', memory: '🧠', near: '❓',
-                     xray: '🩻', half: '🌗', shield: '🛡️', freeze: '🧊' };
+                     xray: '🩻', half: '🌗', shield: '🛡️', freeze: '🧊',
+                     div3: '3️⃣', div5: '5️⃣', compass: '🧭', thief: '🦝', mirror: '🪞', tens: '🔟', units: '🔢' };
 let bonusCardFor = null;
 function seenBonuses() {
   try { return JSON.parse(localStorage.getItem(SEEN_BONUS_KEY)) || []; } catch (e) { return []; }
@@ -1935,11 +1936,12 @@ function openBonusGuide(focus) {
   const group = (head, kinds) => '<div class="bg-head">' + head + '</div>' + kinds.map(k =>
     '<div class="bg-row' + (k === focus ? ' on' : '') + '"><span class="bg-ic">' + bonusArtHtml(k, BONUS_ICON[k]) + '</span>' +
     '<span class="bg-txt"><b>' + L.bonusNames[k] + '</b><span>' + L.tut.bcDesc[k] + '</span></span></div>').join('');
-  // Рентген, половина, щит и заморозка теперь и в онлайне (миграция 057);
-  // только в Приключении остался Шальной бросок
-  document.getElementById('bgList').innerHTML = group(L.bgGood, BONUS_ONLINE) +
+  // Полезные — те, что бывают в дуэлях (онлайн и с другом); только в
+  // Приключении — шальной бросок и цифры загаданного (у боссов)
+  const good = BONUS_ONLINE.concat(BONUS_GOOD.filter(k => BONUS_ONLINE.indexOf(k) < 0));
+  document.getElementById('bgList').innerHTML = group(L.bgGood, good) +
     group(L.bgBad, ['skip', 'gift', 'memory']) +
-    group(L.bgAdv, ['lava']);
+    group(L.bgAdv, ['lava'].concat(BONUS_BOSS));
   document.getElementById('bonusGuide').classList.remove('hidden');
 }
 function closeBonusGuide() {
@@ -3132,6 +3134,7 @@ function applyMatchState(st) {
   D.shield = (st.shield || [false, false]).slice();
   D.frozen = (st.frozen || [false, false]).slice();
   D.shieldedTrap = st.shieldTrap || null;
+  D.shieldedText = null;
   D.know = [{}, {}];
   if (st.know) {
     if (st.know.parity !== null && st.know.parity !== undefined) D.know[st.seat].parity = st.know.parity;

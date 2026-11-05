@@ -12,15 +12,13 @@ function refCandidates(moves, seat, flags, careless) {
   const cand = new Uint8Array(RANGE_MAX - RANGE_MIN + 1).fill(1);
   seen.forEach(m => narrow(cand, RANGE_MIN, bands, m.guess, m.labelIndex));
   // Знание из бонусов (рентген, половина) бот тоже использует
+  // Всё, что известно из бонусов и правил (чётность, половина, больше/меньше,
+  // делимость, цифры) — общей проверкой игры. Делимость на 3 «средний игрок»
+  // замечает через раз: её труднее посчитать в уме
   const k = flags.know;
-  if (k && (k.parity !== undefined || k.half)) {
-    const mid = halfMark();
-    for (let i = 0; i < cand.length; i++) {
-      const v = i + RANGE_MIN;
-      if (k.parity !== undefined && Math.abs(v) % 2 !== k.parity) cand[i] = 0;
-      if (k.half === 'low' && v > mid) cand[i] = 0;
-      if (k.half === 'high' && v <= mid) cand[i] = 0;
-    }
+  if (knowAny(k)) {
+    const kk = (k.div3 !== undefined && Math.random() < 0.5) ? Object.assign({}, k, { div3: undefined }) : k;
+    for (let i = 0; i < cand.length; i++) if (cand[i] && !knowAllows(kk, i + RANGE_MIN)) cand[i] = 0;
   }
   // Ответы честные, загаданное всегда среди возможных. На всякий случай
   if (!cand.includes(1)) cand.fill(1);

@@ -2818,3 +2818,8 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
 #advMap .adv-soon { grid-column: 1 / -1; }
 .adv-soon { margin: 4px 0 8px; padding: 12px; border-radius: 18px; text-align: center; font-weight: 800; color: var(--muted);
   border: 2px dashed rgb(var(--ink) / 0.15); }
+/* Бонус и правило мира: значки у имени на карте, строка в карточке */
+.aw-tags { margin-left: 8px; font-size: 15px; letter-spacing: 2px; white-space: nowrap; vertical-align: 1px; }
+.aw-tags .art-span { vertical-align: middle; }
+.adv-card .ac-rule { flex-basis: 100%; padding: 8px 10px; border-radius: 12px; font-size: 13px; line-height: 1.4;
+  background: color-mix(in srgb, var(--wc, #7c5cff) 10%, var(--surface)); }
