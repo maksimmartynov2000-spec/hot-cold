@@ -1325,6 +1325,11 @@ select.field option { background: var(--surface); color: var(--text); }
   grid-template-columns: repeat(2, 1fr);
   gap: 6px;
   margin: 0 0 10px;
+  /* Фраз бывает много (награды пути и магазин) — палитра прокручивается,
+     а не выталкивает поле вниз */
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 @media (min-width: 520px) {
   .say-pad { grid-template-columns: repeat(4, 1fr); }

@@ -118,7 +118,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 4. онлайн: победа 15 🪙, поражение 5, в режиме дня вдвое; партия платится один раз
+\echo === 4. онлайн: победа 15 🪙, поражение 5, в режиме дня вдвое, сдавшемуся 0; партия платится один раз
 do $$
 declare mid bigint; a0 int; b0 int;
 begin
@@ -143,6 +143,15 @@ begin
     raise exception 'ОШИБКА: режим дня % / %', (select coins from wallet where username = 'Лев') - a0,
       (select coins from wallet where username = 'Кира') - b0;
   end if;
+  -- Сдался — без монет, победителю — как за победу
+  insert into matches(p0, p1, status, ranked, ranked_mode, range_min, range_max) values ('Лев', 'Кира', 'active', true, 0, 1, 100)
+  returning id into mid;
+  update matches set forfeit_by = 1, match_over = true, status = 'finished' where id = mid;
+  if (select coins from wallet where username = 'Лев') <> a0 + 40 or (select coins from wallet where username = 'Кира') <> b0 + 35 then
+    raise exception 'ОШИБКА: сдача % / %', (select coins from wallet where username = 'Лев') - a0,
+      (select coins from wallet where username = 'Кира') - b0;
+  end if;
+  a0 := a0 + 15;
   -- С ботом: человеку — монеты, боту — ничего
   insert into matches(p0, p1, status, ranked, ranked_mode, range_min, range_max, bot_seat, bot_level)
   values ('Лев', (select username from bot_people order by username limit 1), 'active', true, 0, 1, 100, 1, 0.5)

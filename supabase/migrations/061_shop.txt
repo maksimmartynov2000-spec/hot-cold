@@ -4,7 +4,7 @@
 -- • Кошелёк: монеты и кристаллы. Отдельно — сколько кристаллов куплено за
 --   деньги (сейчас всегда 0: покупки за деньги нет, но место под неё есть).
 -- • Монеты — за любую игру: Приключение (5 🪙 за каждую новую звезду),
---   онлайн (победа 15, поражение 5, в режиме дня — вдвое), Испытание
+--   онлайн (победа 15, поражение 5, в режиме дня — вдвое; сдавшемуся — 0), Испытание
 --   (2 🪙 за раунд, до 20 за заход), задания дня (20 🪙 за каждое).
 --   За онлайн и Испытание — не больше 300 🪙 в день: накрутить нельзя.
 -- • Кристаллы: 2 💎 за первую победу над боссом мира, 3 💎 за мир, где у всех
@@ -358,7 +358,9 @@ begin
     perform season_xp(who, (10 + case when w = seat then 10 else 0 end) * k);
     insert into online_days(username, day, played) values (who, player_day(who), true)
     on conflict (username, day) do update set played = true;
-    perform wallet_earn(who, (case when w = seat then 15 else 5 end) * k, 'online', 'match:' || new.id);
+    -- Сдался или ушёл из партии — без монет: иначе их копили бы, бросая партии
+    perform wallet_earn(who, (case when w = seat then 15 when new.forfeit_by = seat then 0 else 5 end) * k,
+                        'online', 'match:' || new.id);
   end loop;
   return null;
 end;
