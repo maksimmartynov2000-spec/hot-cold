@@ -2840,7 +2840,11 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
 .sha-ring[data-frame="galaxy"]::before, .sha-ring[data-frame="aurora"]::before, .sha-ring[data-frame="prism"]::before { animation-duration: 3.5s; }
 
 /* Окно магазина: кошелёк сверху, разделы, витрина, как копить */
-.shop-card { max-width: 380px; }
+.shop-card { max-width: 380px; display: flex; flex-direction: column; overflow: hidden; padding-left: 14px; padding-right: 14px;
+  height: calc(100vh - 40px); height: calc(100dvh - 40px); max-height: 860px; }
+.sh-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  margin: 0 -14px; padding: 2px 14px 6px; }
+.sh-ok { flex: none; margin-top: 12px; }
 .sh-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sh-top .ps-title { text-align: left; min-width: 0; }
 .sh-wallet { display: flex; gap: 6px; flex: none; }
@@ -2852,10 +2856,10 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
 .sh-note:empty { display: none; }
 .sh-note.warn { padding: 8px 10px; border-radius: 12px; background: rgb(var(--ink) / 0.06); color: var(--text); font-size: 13px; }
 .sh-note .btn { padding: 6px 12px; font-size: 13px; margin-left: 6px; vertical-align: middle; }
-.sh-tabs { display: flex; gap: 6px; margin: 10px -2px 10px; padding: 2px; overflow-x: auto; scrollbar-width: none; }
+.sh-tabs { flex: none; display: flex; gap: 4px; margin: 10px -2px 8px; padding: 2px; overflow-x: auto; scrollbar-width: none; }
 .sh-tabs::-webkit-scrollbar { display: none; }
-.sh-tab { all: unset; flex: none; cursor: pointer; padding: 7px 12px; border-radius: 999px; background: var(--tile);
-  font-size: 13px; font-weight: 800; -webkit-tap-highlight-color: transparent; }
+.sh-tab { all: unset; flex: 1 0 auto; cursor: pointer; padding: 7px 6px; border-radius: 999px; background: var(--tile);
+  font-size: 12.5px; font-weight: 800; text-align: center; -webkit-tap-highlight-color: transparent; }
 .sh-tab.sel { background: var(--accent); color: #fff; }
 .sh-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .sh-grid.sh-title, .sh-grid.sh-phrase { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2913,6 +2917,8 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
 .si-kind { font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .si-name { font-size: 20px; font-weight: 900; margin: 2px 0 4px; line-height: 1.2; }
 .si-price { font-size: 18px; font-weight: 900; color: var(--gold); margin-bottom: 8px; }
+.si-price.gem { color: #7dd3fc; }
+.si-note .si-how { display: block; margin-top: 4px; font-weight: 700; color: var(--muted); }
 .si-note { font-size: 13px; color: var(--muted); margin-bottom: 10px; line-height: 1.4; }
 .si-note:empty { display: none; }
 .si-note.warn { color: #fb923c; font-weight: 800; }

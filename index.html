@@ -679,15 +679,19 @@
     </div>
     <div class="sh-note" id="shopNote"></div>
     <div class="sh-tabs" id="shopTabs" role="group"></div>
-    <div class="sh-grid" id="shopGrid"></div>
-    <details class="fold sh-earn-box" id="shopEarnBox">
-      <summary class="fold-head" id="shopEarnHead"></summary>
-      <div class="fold-body">
-        <div class="sh-earn" id="shopEarn"></div>
-        <div class="sh-trophy" id="shopTrophy"></div>
-      </div>
-    </details>
-    <button class="btn btn-block" style="margin-top:14px" id="shopOk" onclick="closeShop()"></button>
+    <!-- Прокручивается только витрина: шапка с кошельком, разделы и кнопка
+         стоят на месте, и окно не прыгает, когда раздел короче или длиннее -->
+    <div class="sh-scroll" id="shopScroll">
+      <div class="sh-grid" id="shopGrid"></div>
+      <details class="fold sh-earn-box" id="shopEarnBox">
+        <summary class="fold-head" id="shopEarnHead"></summary>
+        <div class="fold-body">
+          <div class="sh-earn" id="shopEarn"></div>
+          <div class="sh-trophy" id="shopTrophy"></div>
+        </div>
+      </details>
+    </div>
+    <button class="btn btn-block sh-ok" id="shopOk" onclick="closeShop()"></button>
   </div>
 </div>
 

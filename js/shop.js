@@ -151,7 +151,7 @@ function renderShop() {
     b.className = 'sh-tab' + (k === shopKind ? ' sel' : '');
     b.textContent = S.tabs[k];
     b.setAttribute('aria-pressed', k === shopKind ? 'true' : 'false');
-    b.onclick = () => { shopKind = k; renderShop(); };
+    b.onclick = () => { shopKind = k; renderShop(); document.getElementById('shopScroll').scrollTop = 0; };
     return b;
   }));
   // Товары раздела
@@ -179,7 +179,7 @@ function renderShop() {
   document.getElementById('shopEarnHead').textContent = S.earnHead;
   document.getElementById('shopEarn').innerHTML = S.earn.map(x => '<div class="sh-earn-row">' + escapeHtml(x) + '</div>').join('');
   document.getElementById('shopTrophy').textContent = S.trophy;
-  document.getElementById('shopOk').textContent = t().pass.ok;
+  document.getElementById('shopOk').textContent = S.close;
 }
 
 // Надето ли сейчас: иконка, фон, рамка, титул. Фраза не «надевается»
@@ -250,6 +250,7 @@ function renderShopItem() {
   document.getElementById('siKind').textContent = P.kinds[kind] + (it.gems ? ' · ' + S.rare : '');
   document.getElementById('siName').textContent = shopName(kind, code);
   document.getElementById('siPrice').textContent = own ? (worn ? S.worn : S.owned) : shopPriceText(it);
+  document.getElementById('siPrice').className = 'si-price' + (it.gems && !own ? ' gem' : '');
   const btn = document.getElementById('siBuy');
   const note = document.getElementById('siNote');
   note.className = 'si-note';
@@ -272,7 +273,9 @@ function renderShopItem() {
     if (have < need) {
       btn.disabled = true;
       note.className = 'si-note warn';
-      note.textContent = S.notEnough.replace('{p}', (need - have) + (it.gems ? ' 💎' : ' 🪙'));
+      // Сколько не хватает и за что дают: кристаллы — не за любую игру
+      note.innerHTML = escapeHtml(S.notEnough.replace('{p}', (need - have) + (it.gems ? ' 💎' : ' 🪙'))) +
+        '<span class="si-how">' + escapeHtml(it.gems ? S.gemsHow : S.coinsHow) + '</span>';
     }
     btn.onclick = () => shopBuy(kind, code);
   }

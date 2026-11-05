@@ -32,8 +32,22 @@ const AVATAR_GRAD = {
   'grad-sky': 'linear-gradient(135deg, #e0f2fe 0%, #7dd3fc 45%, #3b82f6 100%)',
   'grad-violet': 'linear-gradient(135deg, #f3e8ff 0%, #c4b5fd 45%, #8b5cf6 100%)',
   'grad-sand': 'linear-gradient(135deg, #fef9c3 0%, #fcd34d 45%, #d97706 100%)',
-  'grad-galaxy': 'radial-gradient(circle at 28% 30%, #fff 0 1.6%, transparent 2.6%), radial-gradient(circle at 70% 24%, #fff 0 1.2%, transparent 2.2%), ' +
-    'radial-gradient(circle at 62% 70%, #fff 0 1.4%, transparent 2.4%), linear-gradient(135deg, #312e81 0%, #7c3aed 40%, #db2777 70%, #0f172a 100%)',
+  // Галактика: звёзды разбросаны по диагонали — перелив сдвигает фон по ней,
+  // и несколько звёзд видно всегда
+  'grad-galaxy': [
+    'radial-gradient(circle at 14% 22%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 30% 12%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 26% 40%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 42% 30%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 40% 56%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 55% 44%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 60% 68%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 72% 54%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 76% 82%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 88% 70%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 20% 70%, #fff 0 1.4%, transparent 2.4%)',
+    'radial-gradient(circle at 80% 26%, #fff 0 1.4%, transparent 2.4%)',
+    'linear-gradient(135deg, #312e81 0%, #7c3aed 40%, #db2777 70%, #0f172a 100%)'].join(', '),
   'grad-rainbow': 'linear-gradient(135deg, #ff6b6b 0%, #ffd166 25%, #6ee7b7 50%, #60a5fa 75%, #c084fc 100%)',
   'grad-sun': 'radial-gradient(circle at 50% 42%, #fffbe6 0%, #fde047 30%, #f59e0b 62%, #ea580c 100%)'
 };

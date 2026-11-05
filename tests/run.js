@@ -7187,7 +7187,8 @@ async function testShop(browser) {
     const miss = SHOP_ITEMS.filter(it => !(it.kind === 'icon' ? S.icons[it.code] : it.kind === 'color' ? S.colors[it.code]
       : it.kind === 'frame' ? P.frames[it.code] : it.kind === 'title' ? P.titles[it.code] : i18n[l].say[it.code]));
     const keys = ['title', 'coinsName', 'gemsName', 'toastCoins', 'toastGems', 'worn', 'owned', 'guest', 'login', 'off', 'today', 'earnHead',
-      'trophy', 'rare', 'phraseHint', 'wornBtn', 'wear', 'buyFor', 'notEnough', 'back', 'notEnoughShort', 'bought', 'where', 'more'];
+      'trophy', 'rare', 'phraseHint', 'wornBtn', 'wear', 'buyFor', 'notEnough', 'back', 'notEnoughShort', 'bought', 'where', 'more',
+      'close', 'coinsHow', 'gemsHow'];
     return l + ':' + (miss.length + keys.filter(k => !S[k]).length + SHOP_KINDS.filter(k => !S.tabs[k]).length +
       (S.earn.length === 8 ? 0 : 1) + (i18n[l].navShop ? 0 : 1));
   }).join());
