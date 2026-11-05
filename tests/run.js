@@ -6767,7 +6767,10 @@ async function testAdventureBonus(browser) {
     const tx = await page.evaluate(l => {
       currentLang = l; applyTranslations();
       const T = t();
-      return BONUS_ADV.every(k => T.bonusNames[k] && T.tut.bcDesc[k] && (k === 'lava' || T.bonusDesc[k])) &&
+      return BONUS_ADV.concat(BONUS_BOSS).every(k => T.bonusNames[k] && T.tut.bcDesc[k] && (k === 'lava' || T.bonusDesc[k])) &&
+        ['mirrorUsed', 'shieldRule', 'mirrorRule'].every(k => T.bonusNames[k] && /\{a\}/.test(T.bonusDesc[k]) && /\{t\}/.test(T.bonusDesc[k])) &&
+        ['div3', 'notDiv3', 'div5', 'notDiv5', 'tens', 'units', 'gt', 'lt'].every(k => T.bonusKnow[k]) &&
+        ['storm', 'traps', 'first'].every(k => (T.adv.worldRules[k] || []).length === 3) && T.adv.ruleLabel && /\{b\}/.test(T.adv.bossBonus) &&
         T.forced.freeze && T.bonusKnow.even && T.adv.winStars && T.adv.pfLine && T.prog.q.adv_win2 &&
         T.prog.q.adv_stars3 && T.prog.lad.advStars.forms && T.prog.lad.advWorlds.forms && T.online.rematchAsk;
     }, lang);

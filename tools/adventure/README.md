@@ -9,7 +9,7 @@
 | `specN.py` | правила героев партии N: условие × действие, черты (`pick`, `first`…) |
 | `tN_ru.py`, `tN_en.py`, `tN_fr.py`, `tN_de.py` | имя, правило, реплики на 4 языках |
 | `levelsN.json` | сила: сдвиг мира и поправка героя, подобраны симуляцией |
-| `activateN.py` | включает миры партии в `ADV_WORLDS`, с `art` — ещё и портреты |
+| `activateN.py` | включает миры партии в `ADV_WORLDS` (числа, цвет, бонус мира, правило мира), с `art` — ещё и портреты |
 | `portraits/` | подсказки для Gemini, нарезка листов, готовые `icons/adv-NNN.webp` |
 | `balance/` | симуляция «среднего игрока» и подбор силы |
 
@@ -48,6 +48,10 @@ python3 -I tools/adventure/activate3.py /tmp/game    # миры 26–35
 OUT=/tmp/adv-balance DAMP=0.6 python3 -I tools/adventure/balance/calib.py 1 160 25 /tmp/game
 python3 -I tools/adventure/mklevels.py /tmp/adv-balance/calib_25.json tools/adventure/levels3.json 25
 ```
+
+Если у партии уже есть `levelsN.json`, подбор начинается с него — так пересчитывают
+силу после новых бонусов или правил миров. Состояние подбора — `$OUT/calib_W0.json`:
+чтобы начать заново, его удаляют.
 
 `calib.py` повторяют, пока среднее отклонение не сравняется с шумом
 (около 3 п.п. при 200 играх на героя). Соперник умнее 0,98 не становится: если

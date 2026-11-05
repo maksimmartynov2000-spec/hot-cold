@@ -20,8 +20,13 @@ def eff(n, lv):
     return base(n // 10) + (n % 10) * 0.012 + (0.06 if n % 10 == 9 else 0) + lv
 first, last = W0 * 10, W0 * 10 + 99
 state_f = os.path.join(OUT, 'calib_%d.json' % W0)
+# Первый шаг — с прежней силы партии (levelsN.json), если она уже подбиралась
+levels_f = os.path.join(HERE, '..', 'levels%d.json' % ((W0 - 5) // 10 + 1))
 if os.path.exists(state_f):
     L = {int(k): v for k, v in json.load(open(state_f)).items()}
+elif os.path.exists(levels_f):
+    d = json.load(open(levels_f))
+    L = {n: round(d['shift'][str(n // 10)] + d['level'].get(str(n), 0), 3) for n in range(first, last + 1)}
 else:
     L = {n: (-0.2 if n % 10 == 9 else 0.0) for n in range(first, last + 1)}
 patch = 'for (let w = %d; w < %d; w++) ADV_BRAIN_SHIFT[w] = 0; const LV = ' % (W0, W0 + 10) + \
