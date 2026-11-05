@@ -15,7 +15,6 @@
 -- • Товары: 20 иконок «Стихии», 8 рамок, 8 цветов фона, 10 титулов и 8 фраз.
 --   Купленное — навсегда, надевается там же, где награды пути.
 -- • Трофеи (иконки боссов и соперников, рамки турнира) не продаются.
--- • Соперники-«люди» тоже носят товары магазина — как живые игроки.
 -- Всё считает база: из игры монеты не прислать.
 
 -- ============ 1. Кошелёк и журнал ============
@@ -584,16 +583,7 @@ begin
 end;
 $$;
 
--- ============ 5. Соперники-«люди» тоже с покупками ============
--- Каждый пятый — в рамке из магазина, каждый шестой — с титулом из магазина
-update students s set
-  frame = (shop_codes('frame'))[1 + abs(hashtext(s.username || ':sfr')) % array_length(shop_codes('frame'), 1)]
-where s.is_bot and s.username not like '@bot:%' and abs(hashtext(s.username || ':sf')) % 5 = 0;
-update students s set
-  title = (shop_codes('title'))[1 + abs(hashtext(s.username || ':sti')) % array_length(shop_codes('title'), 1)]
-where s.is_bot and s.username not like '@bot:%' and abs(hashtext(s.username || ':st')) % 6 = 0;
-
--- ============ 6. Прошлое: звёзды и боссы — по тем же правилам ============
+-- ============ 5. Прошлое: звёзды и боссы — по тем же правилам ============
 -- Разница с уже заплаченным: второй запуск миграции ничего не добавит
 do $$
 declare u text;
@@ -603,7 +593,7 @@ begin
   end loop;
 end $$;
 
--- ============ 7. Права ============
+-- ============ 6. Права ============
 revoke execute on function wallet_person(text) from public, anon;
 revoke execute on function wallet_add(text, int, int, text, text) from public, anon;
 revoke execute on function wallet_earn(text, int, text, text) from public, anon;

@@ -16,7 +16,7 @@ do $$ begin
   delete from wallet where username in ('Лев', 'Кира', 'Максим');
   delete from cosmetics where username in ('Лев', 'Кира', 'Максим');
   delete from run_sessions where username in ('Лев', 'Кира', 'Максим');
-  delete from weekend_cup where username in ('Лев', 'Кира', 'Максим');
+  delete from weekend_goal where username in ('Лев', 'Кира', 'Максим');
   -- Задания на сегодня уже выполнены: их 20 🪙 сюда не примешаются
   delete from daily_quests where username in ('Лев', 'Кира', 'Максим');
   insert into daily_quests(username, day, slot, code, goal, progress)
@@ -99,7 +99,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 3. прошлое: по тем же правилам, второй раз — ничего; боту и гостю кошелька нет
+\echo === 3. прошлое: по тем же правилам, второй раз — ничего; гостю кошелька нет
 do $$
 declare r jsonb;
 begin
@@ -108,23 +108,19 @@ begin
   if (r->>'coins')::int <> 300 or (r->>'gems')::int <> 9 then raise exception 'ОШИБКА: прошлое %', r; end if;
   r := adventure_wallet('Кира');
   if (r->>'coins')::int <> 0 or (r->>'gems')::int <> 0 then raise exception 'ОШИБКА: прошлое дважды %', r; end if;
-  r := adventure_wallet((select username from bot_people order by username limit 1));
-  if (r->>'coins')::int <> 0 or exists (select 1 from wallet w join students s using (username) where s.is_bot) then
-    raise exception 'ОШИБКА: кошелёк у бота';
-  end if;
   if wallet_person('#гость-1') or wallet_add('#гость-1', 10, 0, 'test', null) or wallet_person('@bot:owl') then
     raise exception 'ОШИБКА: кошелёк у гостя';
   end if;
 end $$;
 \echo ok
 
-\echo === 4. онлайн: победа 15 🪙, поражение 5, в режиме дня вдвое, сдавшемуся 0; партия платится один раз
+\echo === 4. партия с другом: победа 15 🪙, поражение 5, сдавшемуся 0; партия платится один раз
 do $$
 declare mid bigint; a0 int; b0 int;
 begin
   a0 := (select coins from wallet where username = 'Лев');
   b0 := (select coins from wallet where username = 'Кира');
-  insert into matches(p0, p1, status, ranked, ranked_mode, range_min, range_max) values ('Лев', 'Кира', 'active', true, 0, 1, 100)
+  insert into matches(p0, p1, status, range_min, range_max) values ('Лев', 'Кира', 'active', 1, 100)
   returning id into mid;
   update matches set wins = array[3, 0], match_over = true, status = 'finished' where id = mid;
   if (select coins from wallet where username = 'Лев') <> a0 + 15 or (select coins from wallet where username = 'Кира') <> b0 + 5 then
@@ -135,30 +131,14 @@ begin
   update matches set status = 'active' where id = mid;
   update matches set status = 'finished' where id = mid;
   if (select coins from wallet where username = 'Лев') <> a0 + 15 then raise exception 'ОШИБКА: партия оплачена дважды'; end if;
-  -- Режим дня: вдвое
-  insert into matches(p0, p1, status, ranked, ranked_mode, range_min, range_max) values ('Лев', 'Кира', 'active', true, 4, 1, 100)
-  returning id into mid;
-  update matches set wins = array[0, 3], match_over = true, status = 'finished' where id = mid;
-  if (select coins from wallet where username = 'Лев') <> a0 + 25 or (select coins from wallet where username = 'Кира') <> b0 + 35 then
-    raise exception 'ОШИБКА: режим дня % / %', (select coins from wallet where username = 'Лев') - a0,
-      (select coins from wallet where username = 'Кира') - b0;
-  end if;
   -- Сдался — без монет, победителю — как за победу
-  insert into matches(p0, p1, status, ranked, ranked_mode, range_min, range_max) values ('Лев', 'Кира', 'active', true, 0, 1, 100)
+  insert into matches(p0, p1, status, range_min, range_max) values ('Лев', 'Кира', 'active', 1, 100)
   returning id into mid;
   update matches set forfeit_by = 1, match_over = true, status = 'finished' where id = mid;
-  if (select coins from wallet where username = 'Лев') <> a0 + 40 or (select coins from wallet where username = 'Кира') <> b0 + 35 then
+  if (select coins from wallet where username = 'Лев') <> a0 + 30 or (select coins from wallet where username = 'Кира') <> b0 + 5 then
     raise exception 'ОШИБКА: сдача % / %', (select coins from wallet where username = 'Лев') - a0,
       (select coins from wallet where username = 'Кира') - b0;
   end if;
-  a0 := a0 + 15;
-  -- С ботом: человеку — монеты, боту — ничего
-  insert into matches(p0, p1, status, ranked, ranked_mode, range_min, range_max, bot_seat, bot_level)
-  values ('Лев', (select username from bot_people order by username limit 1), 'active', true, 0, 1, 100, 1, 0.5)
-  returning id into mid;
-  update matches set wins = array[0, 3], match_over = true, status = 'finished' where id = mid;
-  if (select coins from wallet where username = 'Лев') <> a0 + 30 then raise exception 'ОШИБКА: проигрыш боту'; end if;
-  if exists (select 1 from wallet w join students s using (username) where s.is_bot) then raise exception 'ОШИБКА: монеты боту'; end if;
 end $$;
 \echo ok
 
@@ -177,7 +157,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 6. онлайн и Испытание — не больше 300 🪙 в день; задание дня — сверху; завтра — заново
+\echo === 6. игры с другом и Испытание — не больше 300 🪙 в день; задание дня — сверху; завтра — заново
 do $$
 declare mid bigint; a0 int; t int; r jsonb;
 begin
@@ -186,13 +166,13 @@ begin
   -- Сегодня уже 290
   perform wallet_earn('Лев', 290 - t, 'online', 'test:cap');
   a0 := (select coins from wallet where username = 'Лев');
-  insert into matches(p0, p1, status, ranked, ranked_mode, range_min, range_max) values ('Лев', 'Кира', 'active', true, 0, 1, 100)
+  insert into matches(p0, p1, status, range_min, range_max) values ('Лев', 'Кира', 'active', 1, 100)
   returning id into mid;
   update matches set wins = array[3, 0], match_over = true, status = 'finished' where id = mid;
   if (select coins from wallet where username = 'Лев') <> a0 + 10 then
     raise exception 'ОШИБКА: до предела %', (select coins from wallet where username = 'Лев') - a0;
   end if;
-  insert into matches(p0, p1, status, ranked, ranked_mode, range_min, range_max) values ('Лев', 'Кира', 'active', true, 0, 1, 100)
+  insert into matches(p0, p1, status, range_min, range_max) values ('Лев', 'Кира', 'active', 1, 100)
   returning id into mid;
   update matches set wins = array[3, 0], match_over = true, status = 'finished' where id = mid;
   if (select coins from wallet where username = 'Лев') <> a0 + 10 then raise exception 'ОШИБКА: сверх предела'; end if;
@@ -211,7 +191,7 @@ begin
   if (select coins from wallet where username = 'Лев') <> a0 + 30 then raise exception 'ОШИБКА: задание оплачено дважды'; end if;
   -- Другой день (пояс +14 против −11 — дата всегда другая): предел заново
   update students set tz = 'Pacific/Kiritimati' where username = 'Лев';
-  insert into matches(p0, p1, status, ranked, ranked_mode, range_min, range_max) values ('Лев', 'Кира', 'active', true, 0, 1, 100)
+  insert into matches(p0, p1, status, range_min, range_max) values ('Лев', 'Кира', 'active', 1, 100)
   returning id into mid;
   update matches set wins = array[3, 0], match_over = true, status = 'finished' where id = mid;
   if (select coalesce(sum(coins), 0) from wallet_log where username = 'Лев' and day = player_day('Лев') and reason = 'online') <> 15 then
@@ -221,19 +201,19 @@ begin
 end $$;
 \echo ok
 
-\echo === 7. турнир выходных: 1 💎 за 3 победы, 2 💎 за 5 — один раз
+\echo === 7. «Испытание выходных»: 1 💎 за 3 очка, 2 💎 за 5 — один раз
 do $$
 declare r jsonb; g0 int;
 begin
   perform set_config('hc.now', '2026-11-07 12:00+00', true);  -- суббота
-  insert into weekend_cup(username, week, wins) values ('Лев', weekend_key(), 5);
+  insert into weekend_goal(username, week, points) values ('Лев', weekend_key(), 5);
   g0 := (select gems from wallet where username = 'Лев');
   r := weekend_claim('Лев', '1234', 3);
-  if (r->>'gems')::int <> 1 or (select gems from wallet where username = 'Лев') <> g0 + 1 then raise exception 'ОШИБКА: 3 победы %', r; end if;
+  if (r->>'gems')::int <> 1 or (select gems from wallet where username = 'Лев') <> g0 + 1 then raise exception 'ОШИБКА: 3 очка %', r; end if;
   r := weekend_claim('Лев', '1234', 3);
   if (select gems from wallet where username = 'Лев') <> g0 + 1 then raise exception 'ОШИБКА: награда дважды %', r; end if;
   r := weekend_claim('Лев', '1234', 5);
-  if (r->>'gems')::int <> 2 or (select gems from wallet where username = 'Лев') <> g0 + 3 then raise exception 'ОШИБКА: 5 побед %', r; end if;
+  if (r->>'gems')::int <> 2 or (select gems from wallet where username = 'Лев') <> g0 + 3 then raise exception 'ОШИБКА: 5 очков %', r; end if;
   perform set_config('hc.now', '2026-11-04 12:00+00', true);  -- обычная среда, как во всех сценариях
 end $$;
 \echo ok
@@ -255,7 +235,7 @@ begin
   end;
   begin
     perform shop_buy('Лев', '1234', 'frame', 'cup-10');
-    raise exception 'ОШИБКА: трофей турнира продаётся';
+    raise exception 'ОШИБКА: рамка месяца продаётся';
   exception when others then if sqlerrm not like '%no_such_item%' then raise; end if;
   end;
   begin
@@ -339,7 +319,7 @@ begin
                  where f.avatar = 'shop-01' and f.color = 'grad-mint' and f.frame = 'galaxy' and f.title = 'thinker') then
     raise exception 'ОШИБКА: другим не видно';
   end if;
-  insert into matches(p0, p1, status, ranked, ranked_mode, range_min, range_max) values ('Лев', 'Кира', 'active', false, 0, 1, 100)
+  insert into matches(p0, p1, status, range_min, range_max) values ('Лев', 'Кира', 'active', 1, 100)
   returning id into mid;
   if not send_phrase('Лев', '1234', mid, 'bingo') then raise exception 'ОШИБКА: своя фраза'; end if;
   begin
@@ -350,19 +330,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 10. соперники-«люди»: часть в рамках и с титулами из магазина
-do $$ begin
-  if not exists (select 1 from students where is_bot and frame = any (shop_codes('frame')))
-     or not exists (select 1 from students where is_bot and title = any (shop_codes('title'))) then
-    raise exception 'ОШИБКА: у «людей» нет покупок';
-  end if;
-  if exists (select 1 from students where is_bot and username like '@bot:%' and (frame is not null or title is not null)) then
-    raise exception 'ОШИБКА: покупки у служебных ботов';
-  end if;
-end $$;
-\echo ok
-
-\echo === 11. anon: витрина и покупка — да, начислить себе — нет, чужие кошельки не видно
+\echo === 10. anon: витрина и покупка — да, начислить себе — нет, чужие кошельки не видно
 set local role anon;
 do $$ begin
   if has_function_privilege('anon', 'wallet_add(text,int,int,text,text)', 'execute')

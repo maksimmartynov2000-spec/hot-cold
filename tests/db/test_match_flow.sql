@@ -11,7 +11,6 @@ alter table matches enable trigger matches_flow;
 do $$ begin
   update matches set status = 'finished' where status in ('invited', 'active');
   update students set failed_logins = 0, locked_until = null;
-  delete from ranked_queue;
   if friend_status('Лев','Кира') is distinct from 'friend' then
     perform send_friend_request('Лев','1234','Кира');
     if friend_status('Лев','Кира') is distinct from 'friend' then
@@ -38,7 +37,7 @@ begin
   end if;
   if (st->>'lobbyLeft')::int not between 295 and 300 then raise exception 'ОШИБКА: до отмены %', st->>'lobbyLeft'; end if;
   -- Вызов друга звёзд не даёт — игра должна это знать, чтобы сказать заранее
-  if (st->>'ladder')::boolean then raise exception 'ОШИБКА: вызов друга помечен как партия на звёзды'; end if;
+  if st ? 'ladder' or st ? 'ranked' then raise exception 'ОШИБКА: у партии с другом рейтинг'; end if;
   begin
     perform match_guess('Лев','1234',mid,50);
     raise exception 'ОШИБКА: сходил до старта';
@@ -125,55 +124,13 @@ begin
   update matches set accepted_at = now() - interval '6 minutes' where id = mid;
   st := match_state('Кира','4321',mid);
   select * into m from matches where id = mid;
-  if m.status <> 'expired' or m.elo_applied or m.forfeit_by is not null then
-    raise exception 'ОШИБКА: не отменилась или с результатом: % % %', m.status, m.elo_applied, m.forfeit_by;
+  if m.status <> 'expired' or m.forfeit_by is not null then
+    raise exception 'ОШИБКА: не отменилась или с результатом: % %', m.status, m.forfeit_by;
   end if;
 end $$;
 \echo ok
 
-\echo === 6. очередь: партия людей тоже ждёт обоих; уход до старта — без поражения
-do $$
-declare mid bigint; m matches; before int; after int;
-begin
-  delete from ranked_queue;
-  perform join_ranked_queue('Кира','4321',0);
-  perform join_ranked_queue('Лев','1234',0);
-  select id into mid from matches where status = 'active' and ranked and bot_seat is null
-    and (p0, p1) in (('Кира','Лев'), ('Лев','Кира')) order by id desc limit 1;
-  select * into m from matches where id = mid;
-  if mid is null or not m.lobby or not m.ladder then raise exception 'ОШИБКА: партия из очереди без ожидания'; end if;
-  if not (match_state('Кира','4321',mid)->>'ladder')::boolean then raise exception 'ОШИБКА: партия из очереди без звёзд'; end if;
-  select coalesce(max(elo), 1000) into before from elo_ratings where username = 'Кира' and mode = 0;
-  perform leave_match('Кира','4321',mid);
-  select * into m from matches where id = mid;
-  select coalesce(max(elo), 1000) into after from elo_ratings where username = 'Кира' and mode = 0;
-  if m.status <> 'expired' or m.elo_applied or before <> after then
-    raise exception 'ОШИБКА: уход до старта засчитан: % % % → %', m.status, m.elo_applied, before, after;
-  end if;
-  if exists (select 1 from matches where id = mid and star_delta <> array[0, 0]) then
-    raise exception 'ОШИБКА: звёзды за несостоявшуюся партию';
-  end if;
-end $$;
-\echo ok
-
-\echo === 7. с ботом ждать некого: ход сразу, «Готов» одного начинает раунд
-do $$
-declare mid bigint; m matches; r boolean;
-begin
-  insert into matches(p0, p1, ranked, ranked_mode, status, range_min, range_max, bot_seat, bot_level, starter, wins_needed)
-  values ('Лев', '@bot:owl', true, 0, 'active', 1, 100, 1, 0.5, 0, 3) returning matches.id into mid;
-  perform start_match_round(mid);
-  select * into m from matches where id = mid;
-  if m.lobby or m.turn_deadline is null then raise exception 'ОШИБКА: с ботом ждём'; end if;
-  perform match_guess('Лев','1234',mid,m.secret);
-  r := next_match_round('Лев','1234',mid);
-  select * into m from matches where id = mid;
-  if not r or m.round <> 2 or m.round_over then raise exception 'ОШИБКА: с ботом раунд не начался'; end if;
-  update matches set status = 'finished' where id = mid;
-end $$;
-\echo ok
-
-\echo === 8. служебное снаружи не вызвать
+\echo === 6. служебное снаружи не вызвать
 set local role anon;
 do $$
 begin

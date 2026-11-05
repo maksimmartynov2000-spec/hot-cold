@@ -96,13 +96,6 @@ begin
     raise exception 'ОШИБКА: вызвавшему не сказали, что вызов принят';
   end if;
 
-  -- Рейтинговая игра из подбора никого не дёргает: оба и так у экрана
-  delete from matches; delete from push_outbox; delete from ranked_queue;
-  perform join_ranked_queue('Лев','1234', 0);
-  perform join_ranked_queue('Кира','4321', 0);
-  if (select count(*) from push_outbox) is distinct from 0 then
-    raise exception 'ОШИБКА: подбор разослал уведомления';
-  end if;
 end $$;
 \echo ok
 
@@ -180,7 +173,7 @@ end $$;
 \echo === уборка
 do $$ begin
   delete from push_outbox; delete from push_subscriptions;
-  delete from friend_chat; delete from matches; delete from ranked_queue;
+  delete from friend_chat; delete from matches;
   update game_config set vapid_public = null where id = 1;
   delete from students where username like '#%';
 end $$;

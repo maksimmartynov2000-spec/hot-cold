@@ -8,7 +8,7 @@ begin;
 \echo === подготовка
 do $$ begin
   update students set failed_logins = 0, locked_until = null, tutorial_done = false;
-  delete from achievements; delete from player_stats; delete from ladder;
+  delete from achievements; delete from player_stats;
   delete from friendships where 'Лев' in (requester, addressee) or 'Кира' in (requester, addressee) or 'Максим' in (requester, addressee);
 end $$;
 \echo ok
@@ -27,22 +27,26 @@ end $$;
 \echo ok
 
 \echo === 2. лучшая серия запоминается: поражение её не отнимает
-do $$ begin
-  perform ladder_touch('Лев');
-  update ladder set streak = 5 where username = 'Лев';
-  update ladder set streak = 0 where username = 'Лев';
+do $$
+declare i int;
+begin
+  -- Пять побед подряд (Приключение или друг) и поражение
+  for i in 1 .. 5 loop perform stats_game('Лев', true); end loop;
+  perform stats_game('Лев', false);
+  perform achievements_sync('Лев');
   if (select best_win_streak from player_stats where username = 'Лев') <> 5 then raise exception 'ОШИБКА: рекорд серии не запомнен'; end if;
   if not exists (select 1 from achievements where username = 'Лев' and code = 'streak_5') then raise exception 'ОШИБКА: нет «5 подряд»'; end if;
   if exists (select 1 from achievements where username = 'Лев' and code = 'streak_10') then raise exception 'ОШИБКА: «10 подряд» за 5'; end if;
 end $$;
 \echo ok
 
-\echo === 3. лиги: каждая — своей ступенью
+\echo === 3. лиги: рейтинга нет (062) — полученные остаются, новых не бывает
 do $$ begin
-  update ladder set peak = 3 where username = 'Лев';
+  insert into achievements(username, code) values ('Лев', 'league_silver'), ('Лев', 'league_gold'), ('Лев', 'league_platinum');
+  perform achievements_sync('Лев');
   if (select count(*) from achievements where username = 'Лев' and code in ('league_silver','league_gold','league_platinum')) <> 3
-  then raise exception 'ОШИБКА: лиги до Платины'; end if;
-  if exists (select 1 from achievements where username = 'Лев' and code in ('league_diamond','legend')) then raise exception 'ОШИБКА: Алмаз раньше времени'; end if;
+  then raise exception 'ОШИБКА: полученные лиги пропали'; end if;
+  if exists (select 1 from achievements where username = 'Лев' and code in ('league_diamond','legend')) then raise exception 'ОШИБКА: лига без рейтинга'; end if;
 end $$;
 \echo ok
 
@@ -52,7 +56,8 @@ declare s jsonb;
 begin
   insert into friendships(requester, addressee, status) values ('Лев', 'Кира', 'accepted');
   s := my_progress('Лев', '1234', null)->'stats';
-  if (s->>'wins')::int <> 12 or (s->>'games')::int <> 55 or (s->>'winStreak')::int <> 5 or (s->>'peak')::int <> 3
+  -- 12 побед и 55 игр из шага 1, ещё 5 побед и поражение — из шага 2
+  if (s->>'wins')::int <> 17 or (s->>'games')::int <> 61 or (s->>'winStreak')::int <> 5 or (s->>'peak')::int <> 3
      or (s->>'runBest')::int <> 15 or (s->>'questBest')::int <> 7 or (s->>'friends')::int <> 1 or (s->>'tutorial')::boolean
   then raise exception 'ОШИБКА: счётчики %', s; end if;
   if not exists (select 1 from achievements where username = 'Лев' and code = 'friends_1') then raise exception 'ОШИБКА: нет первого друга'; end if;
@@ -82,15 +87,15 @@ begin
 end $$;
 \echo ok
 
-\echo === 6. режимы: считаются только победы на звёзды, каждый режим один раз
+\echo === 6. режимы: разные правила в выигранных партиях, каждые — один раз
 do $$ begin
-  -- Победа над Кирой из шага 5 — не на звёзды, режима у неё нет
-  insert into matches(p0, p1, status, wins, wins_needed, ranked, ranked_mode) values
-    ('Лев', 'Максим', 'finished', array[3, 0], 3, true, 1),
-    ('Максим', 'Лев', 'finished', array[1, 3], 3, true, 1),
-    ('Лев', 'Максим', 'finished', array[3, 2], 3, true, 2),
-    ('Лев', 'Максим', 'finished', array[0, 3], 3, true, 3),   -- проиграл
-    ('Лев', 'Максим', 'active', array[2, 0], 3, true, 0);     -- не доиграна
+  -- Режим — сочетание правил (мороз, бонусы). Победа над Кирой из шага 5 —
+  -- без того и другого
+  insert into matches(p0, p1, status, wins, wins_needed, frost, bonuses_on) values
+    ('Лев', 'Максим', 'finished', array[3, 0], 3, true, false),
+    ('Максим', 'Лев', 'finished', array[1, 3], 3, true, false),
+    ('Лев', 'Максим', 'finished', array[0, 3], 3, false, true),   -- проиграл
+    ('Лев', 'Максим', 'active', array[2, 0], 3, true, true);      -- не доиграна
   if ach_modes('Лев') <> 2 then raise exception 'ОШИБКА: режимов %', ach_modes('Лев'); end if;
   perform achievements_sync('Лев');
   if not exists (select 1 from achievements where username = 'Лев' and code = 'modes_2')

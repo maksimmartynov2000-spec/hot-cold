@@ -31,15 +31,15 @@ do $$ begin
 end $$;
 \echo ok
 
-\echo === 2. партия: очки сезона обоим, победителю больше; день отмечен
+\echo === 2. партия с другом: очки сезона обоим, победителю больше; день отмечен
 do $$
 declare mid bigint; a int; b int;
 begin
-  insert into matches(p0, p1, status, ranked, ranked_mode, range_min, range_max) values ('Лев', 'Кира', 'active', true, 0, 1, 100)
+  insert into matches(p0, p1, status, range_min, range_max) values ('Лев', 'Кира', 'active', 1, 100)
   returning id into mid;
   update matches set wins = array[3, 0], match_over = true, status = 'finished' where id = mid;
-  select xp into a from season_pass where username = 'Лев' and season = ladder_season();
-  select xp into b from season_pass where username = 'Кира' and season = ladder_season();
+  select xp into a from season_pass where username = 'Лев' and season = season_key();
+  select xp into b from season_pass where username = 'Кира' and season = season_key();
   if a is distinct from 20 or b is distinct from 10 then raise exception 'ОШИБКА: очки % / %', a, b; end if;
   if not (my_online('Лев', '1234')->>'played')::boolean then raise exception 'ОШИБКА: день не отмечен'; end if;
 end $$;
@@ -53,7 +53,7 @@ begin
   if (r->>'xp')::int <> 30 or (r->>'streak')::int <> 1 then raise exception 'ОШИБКА: сундук %', r; end if;
   r2 := open_chest('Лев', '1234');
   if not (r2->>'already')::boolean or (r2->>'xp')::int <> 30 then raise exception 'ОШИБКА: второй сундук %', r2; end if;
-  select s.xp into xp from season_pass s where username = 'Лев' and season = ladder_season();
+  select s.xp into xp from season_pass s where username = 'Лев' and season = season_key();
   if xp <> 50 then raise exception 'ОШИБКА: очки после сундука %', xp; end if;
 end $$;
 \echo ok
@@ -136,9 +136,9 @@ begin
 end $$;
 \echo ok
 
-\echo === 7. у ботов очков сезона нет; anon не может выдать награду
+\echo === 7. у гостя очков сезона нет; anon не может выдать награду
 do $$ begin
-  if season_xp((select username from bot_people limit 1), 100) <> 0 then raise exception 'ОШИБКА: очки боту'; end if;
+  if season_xp('#гость-1', 100) <> 0 then raise exception 'ОШИБКА: очки гостю'; end if;
 end $$;
 set local role anon;
 do $$ begin

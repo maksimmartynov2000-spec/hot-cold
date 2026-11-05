@@ -39,10 +39,7 @@ checks(nn, what, ok) as (values
       and not has_function_privilege('anon', 'adventure_wallet(text)', 'execute')
       and not has_function_privilege('anon', 'wallet_add_paid(text,int,text)', 'execute')
       and has_function_privilege('anon', 'shop_buy(text,text,text,text)', 'execute')
-      and has_function_privilege('anon', 'my_wallet(text,text)', 'execute')),
-  (8, 'соперники-«люди» носят рамки и титулы из магазина',
-      exists (select 1 from students where is_bot and frame = any (shop_codes('frame')))
-      and exists (select 1 from students where is_bot and title = any (shop_codes('title'))))
+      and has_function_privilege('anon', 'my_wallet(text,text)', 'execute'))
 )
 select nn as "№",
        case when ok then '✔' else '✘ НЕ ПРИМЕНЕНО' end as "итог",

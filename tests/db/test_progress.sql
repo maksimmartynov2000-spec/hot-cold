@@ -10,9 +10,8 @@ do $$ begin
   update students set failed_logins = 0, locked_until = null, tz = null, tz_set_at = null,
                       tutorial_done = false, avatar = null;
   delete from daily_quests; delete from player_stats; delete from achievements;
-  delete from friendships; delete from ladder; delete from season_badges;
-  delete from season_notices; delete from push_outbox; delete from push_subscriptions;
-  delete from run_sessions; delete from ranked_queue;
+  delete from friendships; delete from push_outbox; delete from push_subscriptions;
+  delete from run_sessions;
   update matches set status = 'expired' where status in ('invited', 'active');
 end $$;
 -- Задания на сегодня — те, что нужны сценарию, а не выпавшие по жребию
@@ -29,13 +28,11 @@ end $$;
 create function pg_temp.progress(p_user text, p_code text) returns int language sql as $$
   select progress from daily_quests where username = p_user and day = player_day(p_user) and code = p_code;
 $$;
--- Партия, законченная так, как её заканчивает игра
--- Партия из очереди (a_ladder) создаётся сразу идущей — так её и помечает база
-create function pg_temp.play(a0 text, a1 text, a_winner int, a_ladder boolean, a_bot int) returns bigint language plpgsql as $$
+-- Партия с другом, законченная так, как её заканчивает игра
+create function pg_temp.play(a0 text, a1 text, a_winner int) returns bigint language plpgsql as $$
 declare mid bigint;
 begin
-  insert into matches(p0, p1, wins_needed, status, ranked, bot_seat)
-  values (a0, a1, 1, 'active', a_ladder, a_bot) returning id into mid;
+  insert into matches(p0, p1, wins_needed, status) values (a0, a1, 1, 'active') returning id into mid;
   update matches set wins[a_winner + 1] = 1, round_winner = a_winner, round_over = true, match_over = true,
                      status = 'finished' where id = mid;
   return mid;
@@ -51,7 +48,7 @@ begin
   if jsonb_array_length(p1->'quests') <> 3 then raise exception 'ОШИБКА: заданий %', p1->'quests'; end if;
   if p1->'quests' <> p2->'quests' then raise exception 'ОШИБКА: задания сменились за день'; end if;
   select array_agg(q->>'code') into codes from jsonb_array_elements(p1->'quests') q;
-  if not (codes[1] in ('play2','play3','ladder2','adv_win2','daily2') and codes[2] in ('win1','daily_win1')
+  if not (codes[1] in ('play2','play3','adv_win2') and codes[2] in ('win1','win2')
           and codes[3] in ('run1','run_rounds5','run_best3','adv_stars3')) then
     raise exception 'ОШИБКА: набор %', codes;
   end if;
@@ -80,13 +77,13 @@ do $$ begin
 end $$;
 \echo ok
 
-\echo === 3. партия с другом: «сыграть» — обоим, победа на звёзды — нет; без исхода — ничего
+\echo === 3. партия с другом: «сыграть» — обоим, «победить» — победителю; без исхода — ничего
 do $$ begin
   perform pg_temp.set_quests('Лев', array['play2','win1','run1']);
   perform pg_temp.set_quests('Кира', array['play2','win1','run1']);
-  perform pg_temp.play('Лев', 'Кира', 0, false, null);
+  perform pg_temp.play('Лев', 'Кира', 0);
   if pg_temp.progress('Лев','play2') <> 1 or pg_temp.progress('Кира','play2') <> 1 then raise exception 'ОШИБКА: «сыграть» не засчитано'; end if;
-  if pg_temp.progress('Лев','win1') <> 0 then raise exception 'ОШИБКА: победа над другом засчитана'; end if;
+  if pg_temp.progress('Лев','win1') <> 1 or pg_temp.progress('Кира','win1') <> 0 then raise exception 'ОШИБКА: победа над другом'; end if;
   if (select online_wins from player_stats where username = 'Лев') <> 1
      or (select online_games from player_stats where username = 'Кира') <> 1 then raise exception 'ОШИБКА: счётчики'; end if;
   -- Ушёл из партии с другом — партия без исхода, никому ничего
@@ -96,17 +93,14 @@ do $$ begin
 end $$;
 \echo ok
 
-\echo === 4. партия на звёзды с ботом: всё — человеку, боту — ничего; прогресс не выше цели
-do $$ begin
-  perform pg_temp.set_quests('Лев', array['ladder2','win1','run1']);
-  perform pg_temp.play('Лев', '@bot:owl', 0, true, 1);
-  perform pg_temp.play('Лев', '@bot:owl', 0, true, 1);
-  perform pg_temp.play('Лев', '@bot:owl', 1, true, 1);
-  if pg_temp.progress('Лев','ladder2') <> 2 then raise exception 'ОШИБКА: на звёзды %', pg_temp.progress('Лев','ladder2'); end if;
+\echo === 4. Приключение: победы — «сыграйте» и «победите»; прогресс не выше цели
+do $$
+declare i int;
+begin
+  perform pg_temp.set_quests('Лев', array['play2','win1','run1']);
+  for i in 0 .. 2 loop perform adventure_result('Лев', '1234', i, 1); end loop;
+  if pg_temp.progress('Лев','play2') <> 2 then raise exception 'ОШИБКА: сыграть %', pg_temp.progress('Лев','play2'); end if;
   if pg_temp.progress('Лев','win1') <> 1 then raise exception 'ОШИБКА: победа %', pg_temp.progress('Лев','win1'); end if;
-  if exists (select 1 from player_stats where username like '@bot:%') or exists (select 1 from daily_quests where username like '@bot:%') then
-    raise exception 'ОШИБКА: боту засчитано';
-  end if;
 end $$;
 \echo ok
 
@@ -144,21 +138,21 @@ declare p jsonb;
 begin
   perform pg_temp.set_quests('Лев', array['play2','win1']);
   update player_stats set quest_streak = 2, quest_best = 2, quest_last = player_day('Лев') - 1 where username = 'Лев';
-  perform pg_temp.play('Лев', '@bot:owl', 0, true, 1);
+  perform pg_temp.play('Лев', 'Максим', 0);
   if (select quest_streak from player_stats where username = 'Лев') <> 2 then raise exception 'ОШИБКА: серия до конца заданий'; end if;
-  perform pg_temp.play('Лев', '@bot:owl', 1, true, 1);
+  perform pg_temp.play('Лев', 'Максим', 1);
   p := my_progress('Лев', '1234', null);
   if (p->>'streak')::int <> 3 or (p->>'bestStreak')::int <> 3 or not (p->>'doneToday')::boolean then
     raise exception 'ОШИБКА: серия %', p;
   end if;
   -- Ещё партия в тот же день — серия не растёт
-  perform pg_temp.play('Лев', '@bot:owl', 0, true, 1);
+  perform pg_temp.play('Лев', 'Максим', 0);
   if (select quest_streak from player_stats where username = 'Лев') <> 3 then raise exception 'ОШИБКА: день посчитан дважды'; end if;
   -- Пропустил два дня — серия видна как 0, новая начинается с 1, лучшая остаётся
   update player_stats set quest_last = player_day('Лев') - 3 where username = 'Лев';
   if (my_progress('Лев', '1234', null)->>'streak')::int <> 0 then raise exception 'ОШИБКА: серия жива после пропуска'; end if;
   perform pg_temp.set_quests('Лев', array['win1']);
-  perform pg_temp.play('Лев', '@bot:owl', 0, true, 1);
+  perform pg_temp.play('Лев', 'Максим', 0);
   if (select quest_streak from player_stats where username = 'Лев') <> 1
      or (select quest_best from player_stats where username = 'Лев') <> 3 then raise exception 'ОШИБКА: после пропуска'; end if;
 end $$;
@@ -180,17 +174,15 @@ do $$ begin
 end $$;
 \echo ok
 
-\echo === 8. достижения: победа, лига, серия побед, друзья, обучение, серия заданий
+\echo === 8. достижения: победа, серия побед, друзья, обучение, серия заданий
 do $$
 declare a jsonb;
 begin
   if not exists (select 1 from achievements where username = 'Лев' and code = 'first_win') then raise exception 'ОШИБКА: нет первой победы'; end if;
   if exists (select 1 from achievements where username = 'Кира' and code = 'first_win') then raise exception 'ОШИБКА: победа у проигравшей'; end if;
-  perform ladder_touch('Кира');
-  update ladder set peak = 2 where username = 'Кира';
-  if not exists (select 1 from achievements where username = 'Кира' and code = 'league_gold') then raise exception 'ОШИБКА: нет Золота'; end if;
-  if exists (select 1 from achievements where username = 'Кира' and code = 'league_diamond') then raise exception 'ОШИБКА: Алмаз за Золото'; end if;
-  update ladder set streak = 3 where username = 'Кира';
+  perform stats_game('Кира', true); perform stats_game('Кира', true); perform stats_game('Кира', true);
+  perform achievements_sync('Кира');
+  if exists (select 1 from achievements where username = 'Кира' and code like 'league%') then raise exception 'ОШИБКА: лига без рейтинга'; end if;
   if not exists (select 1 from achievements where username = 'Кира' and code = 'streak_3') then raise exception 'ОШИБКА: нет серии побед'; end if;
   insert into students(username, pin_hash) values ('Ника', 'x');
   insert into friendships(requester, addressee, status) values ('Кира', 'Лев', 'accepted'), ('Кира', 'Максим', 'accepted'),
@@ -212,56 +204,13 @@ do $$
 declare a jsonb;
 begin
   a := friend_achievements('Лев', '1234', 'Кира');
-  if not a @> '[{"code":"league_gold"}]' then raise exception 'ОШИБКА: другу не видно: %', a; end if;
+  if not a @> '[{"code":"friends_3"}]' then raise exception 'ОШИБКА: другу не видно: %', a; end if;
   delete from friendships where requester = 'Кира' and addressee = 'Лев';
   begin
     perform friend_achievements('Лев', '1234', 'Кира');
     raise exception 'ОШИБКА: видно не другу';
   exception when others then if sqlerrm <> 'not_friends' then raise; end if;
   end;
-end $$;
-\echo ok
-
-\echo === 10. итоги сезона: один раз после смены сезона; победы за сезон считаются
-do $$
-declare s jsonb;
-begin
-  delete from ladder where username = 'Максим';
-  perform ladder_touch('Максим');
-  perform ladder_after('Максим', true);
-  perform ladder_after('Максим', false);
-  if (select wins from ladder where username = 'Максим') <> 1 then raise exception 'ОШИБКА: победы за сезон'; end if;
-  if ladder_status('Максим', '1111')->'summary' <> 'null'::jsonb then raise exception 'ОШИБКА: итоги посреди сезона'; end if;
-  update ladder set season = '2000-01', best = 40, games = 12, wins = 7, stars = 40 where username = 'Максим';
-  s := ladder_status('Максим', '1111')->'summary';
-  if s->>'season' <> '2000-01' or (s->>'league')::int <> 1 or (s->>'games')::int <> 12
-     or (s->>'wins')::int <> 7 or (s->>'best')::int <> 40 then raise exception 'ОШИБКА: итоги %', s; end if;
-  if (select wins from ladder where username = 'Максим') <> 0 then raise exception 'ОШИБКА: победы не обнулились с сезоном'; end if;
-  if ladder_status('Максим', '1111')->'summary' is null then raise exception 'ОШИБКА: итоги пропали до просмотра'; end if;
-  perform season_summary_seen('Максим', '1111', '2000-01');
-  if ladder_status('Максим', '1111')->'summary' <> 'null'::jsonb then raise exception 'ОШИБКА: итоги показаны дважды'; end if;
-end $$;
-\echo ok
-
-\echo === 11. за 2 дня до конца сезона — уведомление играющим, один раз
-do $$
-declare ends timestamptz; cur text;
-begin
-  delete from push_outbox; delete from season_notices;
-  cur := ladder_season();
-  ends := (date_trunc('month', now() at time zone 'UTC') + interval '1 month') at time zone 'UTC';
-  insert into push_subscriptions(endpoint, username, p256dh, auth) values ('e1', 'Лев', 'k', 'a'), ('e2', 'Кира', 'k', 'a');
-  perform ladder_touch('Лев');
-  update ladder set season = cur, games = 3 where username = 'Лев';
-  update ladder set season = cur, games = 0 where username = 'Кира';
-  perform season_end_check(ends - interval '3 days');
-  if exists (select 1 from push_outbox) then raise exception 'ОШИБКА: уведомление за 3 дня'; end if;
-  perform season_end_check(ends - interval '1 day');
-  if (select array_agg(username) from push_outbox where kind = 'season_end') is distinct from array['Лев'] then
-    raise exception 'ОШИБКА: кому %', (select array_agg(username) from push_outbox);
-  end if;
-  perform season_end_check(ends - interval '1 hour');
-  if (select count(*) from push_outbox) <> 1 then raise exception 'ОШИБКА: уведомление дважды'; end if;
 end $$;
 \echo ok
 

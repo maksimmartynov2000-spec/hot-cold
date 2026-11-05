@@ -1,6 +1,8 @@
 -- Проверка миграции 036_block_report.txt.
 -- Вставить целиком в Supabase → SQL Editor → Run. Ничего не меняет, только читает.
 -- В колонке «итог» должно быть ✔ у каждой строки.
+-- Миграция 062 убрала онлайн со случайными соперниками (очередь, рейтинг,
+-- ботов, турнир): проверки этого отсюда убраны
 
 with fn as (
   select p.proname as name, p.prosrc as src
@@ -23,8 +25,6 @@ checks(nn, what, ok) as (values
       exists (select 1 from fn where name = 'send_friend_request' and src like '%players_blocked%')
       and exists (select 1 from fn where name = 'find_students' and src like '%players_blocked%')
       and exists (select 1 from fn where name = 'suggest_students' and src like '%players_blocked%')),
-  (4, 'очередь не сводит заблокированных',
-      exists (select 1 from fn where name = 'ranked_pair' and src like '%players_blocked%')),
   (5, 'реванш между заблокированными не создаётся',
       exists (select 1 from pg_trigger g join pg_class c on c.oid = g.tgrelid
               where c.relname = 'matches' and g.tgname = 'matches_no_blocked' and g.tgenabled = 'O')),

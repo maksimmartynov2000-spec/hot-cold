@@ -90,14 +90,15 @@ begin
 end $$;
 \echo ok
 
-\echo === 5. боту и игроку без ключа — ничего; Realtime сломан — игра идёт
+\echo === 5. игроку без ключа — ничего; Realtime сломан — игра идёт
 do $$
 declare mid bigint;
 begin
   update students set signal_key = null where username = 'Кира';
   delete from pg_temp.sent;
-  insert into matches(p0, p1, status, secret, bot_seat) values ('Кира', '@bot:owl', 'active', 50, 1) returning id into mid;
-  if exists (select 1 from pg_temp.sent) then raise exception 'ОШИБКА: сигнал без ключа или боту'; end if;
+  -- У Киры ключа нет, Максим ключ не заводил
+  insert into matches(p0, p1, status, secret) values ('Кира', 'Максим', 'active', 50) returning id into mid;
+  if exists (select 1 from pg_temp.sent) then raise exception 'ОШИБКА: сигнал без ключа'; end if;
   create or replace function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void
   language plpgsql as $f$ begin raise exception 'realtime down'; end $f$;
   insert into matches(p0, p1, status, secret) values ('Лев', 'Максим', 'invited', 50);

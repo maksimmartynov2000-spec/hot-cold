@@ -11,7 +11,7 @@ declare mid bigint;
 begin
   update matches set status = 'finished' where status in ('invited', 'active');
   update students set failed_logins = 0, locked_until = null;
-  delete from ranked_queue; delete from player_blocks; delete from player_reports;
+  delete from player_blocks; delete from player_reports;
   if friend_status('Лев','Кира') is distinct from 'friend' then
     perform send_friend_request('Лев','1234','Кира');
     if friend_status('Лев','Кира') is distinct from 'friend' then
@@ -138,27 +138,6 @@ begin
   if not exists (select 1 from find_students('Кира','4321','ма') where username = 'Максим') then
     raise exception 'ОШИБКА: поиск сломался для остальных';
   end if;
-end $$;
-\echo ok
-
-\echo === 6. в очереди на рейтинг их не сводит
-do $$
-begin
-  delete from ranked_queue;
-  perform join_ranked_queue('Кира','4321',0);
-  perform join_ranked_queue('Лев','1234',0);
-  if exists (select 1 from matches where status = 'active' and bot_seat is null
-             and (p0, p1) in (('Кира','Лев'), ('Лев','Кира'))) then
-    raise exception 'ОШИБКА: очередь свела заблокированных';
-  end if;
-  -- А с другим игроком сводит
-  perform join_ranked_queue('Максим','1111',0);
-  if not exists (select 1 from matches where status = 'active' and bot_seat is null
-                 and 'Максим' in (p0, p1)) then
-    raise exception 'ОШИБКА: очередь сломалась для остальных';
-  end if;
-  delete from ranked_queue;
-  update matches set status = 'finished' where status = 'active';
 end $$;
 \echo ok
 

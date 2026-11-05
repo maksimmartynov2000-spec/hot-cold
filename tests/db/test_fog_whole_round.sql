@@ -148,28 +148,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 6. бот под туманом видит то же, что человек: ни одного хода соперника
-do $$
-declare mid bigint; v int[];
-begin
-  insert into matches(p0, p1, ranked, ranked_mode, status, range_min, range_max, bot_seat, bot_level)
-  values ('Лев', '@bot:owl', true, 0, 'active', 1, 100, 1, 0.9) returning matches.id into mid;
-  perform start_match_round(mid);
-  update matches set secret = 1, cur = 0 where matches.id = mid;
-  perform match_guess_core(mid, 0, 40);
-  update matches set fog = array[false, true] where id = mid;
-  perform match_guess_core(mid, 1, 27);
-  perform match_guess_core(mid, 0, 38);
-  v := bot_candidates(mid, 1, false);
-  if v is distinct from (select array_agg(x order by x) from generate_series(1, 100) x
-                         where feedback_tier(100, abs(x - 27)) = feedback_tier(100, 26)) then
-    raise exception 'ОШИБКА: бот под туманом видит не то: %', v;
-  end if;
-  update matches set status = 'finished' where id = mid;
-end $$;
-\echo ok
-
-\echo === 7. отметку снаружи не поставить и не вызвать
+\echo === 6. отметку снаружи не поставить и не вызвать
 set local role anon;
 do $$
 begin

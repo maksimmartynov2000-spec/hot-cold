@@ -1,6 +1,8 @@
 -- Проверка миграции 027_profile.txt.
 -- Вставить целиком в Supabase → SQL Editor → Run. Ничего не меняет, только читает.
 -- В колонке «итог» должно быть ✔ у каждой строки.
+-- Миграция 062 убрала онлайн со случайными соперниками (очередь, рейтинг,
+-- ботов, турнир): проверки этого отсюда убраны
 
 with fn as (
   select p.proname as name, p.pronargs as nargs, p.prosrc as src
@@ -21,9 +23,6 @@ checks(nn, what, ok) as (values
        and exists (select 1 from fn where name = 'avatars_for' and nargs = 3)),
   (5,  'имя можно сменить, но не чаще раза в сутки',
        exists (select 1 from fn where name = 'rename_student' and src like '%24 hours%')),
-  (6,  'при смене имени переписка и лесенка перекладываются по алфавиту',
-       exists (select 1 from fn where name = 'rename_student'
-               and src like '%overriding system value%' and src like '%insert into rivalry%')),
   (7,  'переписка переезжает молча, без уведомлений',
        exists (select 1 from fn where name = 'push_on_talk' and src like '%quiet_chat%')),
   (8,  'PIN можно сменить, старая подсказка стирается',

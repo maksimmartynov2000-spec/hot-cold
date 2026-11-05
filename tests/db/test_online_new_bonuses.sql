@@ -88,9 +88,6 @@ begin
     raise exception 'ОШИБКА: компас %', a->'know';
   end if;
   if match_state('Кира', '4321', mid)->'know'->>'gt' is not null then raise exception 'ОШИБКА: соперник видит компас'; end if;
-  -- Бот с этим знанием ищет только между 30 и 60
-  c := bot_candidates(mid, 0, false);
-  if exists (select 1 from unnest(c) v where v <= 30 or v >= 60) then raise exception 'ОШИБКА: бот не учёл компас %', c; end if;
   update matches set status = 'finished' where id = mid;
 end $$;
 \echo ok
@@ -153,21 +150,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 6. бот с «делится на 3» и «на 5» ищет только среди таких
-do $$
-declare mid bigint; c int[];
-begin
-  mid := pg_temp.mk('div3', 70);
-  update matches set know_div3[2] = true, know_div5[2] = false where id = mid;
-  c := bot_candidates(mid, 1, false);
-  if coalesce(array_length(c, 1), 0) = 0 or exists (select 1 from unnest(c) v where v % 3 <> 0 or v % 5 = 0) then
-    raise exception 'ОШИБКА: бот не учёл делимость %', c;
-  end if;
-  update matches set status = 'finished' where id = mid;
-end $$;
-\echo ok
-
-\echo === 7. новый раунд — новое знание и зеркало сначала
+\echo === 6. новый раунд — новое знание и зеркало сначала
 do $$
 declare mid bigint; m matches;
 begin
