@@ -2851,6 +2851,12 @@ function seasonMonth(season) {
 // ---------- задания дня и достижения ----------
 // Иконки за серию дней. Копия — в базе (quest_rewards), сверяется тестом
 const QUEST_ICONS = [{ days: 3, icon: '🔥' }, { days: 7, icon: '🚀' }, { days: 14, icon: '🌋' }, { days: 30, icon: '🌈' }];
+
+// Сундук дня, серия дней и задания дня спрятаны (решение от 05.11.2026, могут
+// вернуться). База их по-прежнему считает — игра не показывает. Пока спрятаны,
+// награды, которые давали только они, видны лишь у тех, у кого они уже есть.
+// Вернуть всё — true
+let DAILY_EXTRAS = false;
 // Достижения — лестницами, как в Hearthstone: 1 → 5 → 10 → … → 1000
 // побед. stat — счётчик из my_progress.stats, по нему видно, сколько до
 // следующей ступени. Порядок и коды — как в базе (achievement_codes), сверяется тестом
@@ -2949,7 +2955,7 @@ function timeLeftText(sec) {
 
 function renderQuestCard() {
   const card = document.getElementById('questCard');
-  const show = !!(progressInfo && runAuth() && progressInfo.quests.length);
+  const show = DAILY_EXTRAS && !!(progressInfo && runAuth() && progressInfo.quests.length);
   card.classList.toggle('hidden', !show);
   if (!show) return;
   const P = t().prog;
@@ -2996,6 +3002,11 @@ function toggleQuests() {
 }
 
 // Сколько ступеней лестницы открыто
+// Лестницы, которые сейчас не пройти: лиги (их нет) и серия заданий (спрятаны)
+function achLadderHidden(ladder) {
+  return ladder.key === 'league' || (ladder.key === 'quests' && !DAILY_EXTRAS);
+}
+
 function achTier(ladder, have) {
   let tier = 0;
   ladder.tiers.forEach(([, code], i) => { if (have.has(code)) tier = i + 1; });
@@ -3008,9 +3019,9 @@ function fillAchLadders(box, got, stats) {
   const P = t().prog;
   const have = new Set((got || []).map(a => a.code));
   box.replaceChildren();
-  // Лиги больше не получить (рейтинга нет): лестница — только у того, у кого
-  // уже есть ступень
-  ACH_LADDERS.filter(l => l.key !== 'league' || achTier(l, have) > 0).forEach(l => {
+  // Лиги больше не получить (рейтинга нет), задания дня спрятаны (DAILY_EXTRAS):
+  // их лестницы — только у того, у кого уже есть ступень
+  ACH_LADDERS.filter(l => !achLadderHidden(l) || achTier(l, have) > 0).forEach(l => {
     const tier = achTier(l, have);
     const row = document.createElement('div');
     row.className = 'lad-row' + (tier === l.tiers.length ? ' done' : '');
@@ -3145,7 +3156,7 @@ function fillProgressProfile() {
   const I = progressInfo;
   const on = !!(runAuth() && I);
   const line = document.getElementById('pfStreak');
-  line.classList.toggle('hidden', !(on && (I.bestStreak || 0) > 0));
+  line.classList.toggle('hidden', !(DAILY_EXTRAS && on && (I.bestStreak || 0) > 0));
   if (on) line.textContent = P.pfStreak.replace('{n}', I.streak || 0).replace('{best}', I.bestStreak || 0);
   // Приключение: звёзды и миры — по телефону, база их только подтверждает
   const adv = document.getElementById('pfAdv');
@@ -3158,9 +3169,9 @@ function fillProgressProfile() {
   fold.classList.toggle('hidden', !on);
   if (!on) return;
   const n = fillAchLadders(document.getElementById('pfAchGrid'), I.achievements, I.stats);
-  // Лиг больше нет (миграция 062): их ступени идут в счёт, только если получены
+  // Лиг больше нет (миграция 062), задания спрятаны: их ступени идут в счёт, только если получены
   const have = new Set((I.achievements || []).map(a => a.code));
-  const total = ACHIEVEMENTS.filter(a => a.ladder.key !== 'league' || have.has(a.code)).length;
+  const total = ACHIEVEMENTS.filter(a => !achLadderHidden(a.ladder) || have.has(a.code)).length;
   document.getElementById('tAchHead').textContent =
     P.achHead.replace('{n}', n).replace('{total}', total);
 }

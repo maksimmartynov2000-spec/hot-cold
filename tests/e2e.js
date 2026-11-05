@@ -331,7 +331,11 @@ async function registerPlayer(p, name, pin) {
     solo && solo.played === true && solo.play_xp === 10, JSON.stringify(solo));
   await A.page.evaluate(() => quitToMenu());
   await A.page.waitForTimeout(900);
-  check('в главном меню — «Открыть сундук»', await A.page.locator('#screenMode #odChest').isVisible());
+  // Сундук дня спрятан (DAILY_EXTRAS) — база его всё равно держит: проверяем её с переключателем
+  check('сундука в меню нет — он спрятан', (await A.page.locator('#odChest').count()) === 0);
+  await A.page.evaluate(() => { DAILY_EXTRAS = true; return loadOnlineInfo(); });
+  await A.page.waitForTimeout(600);
+  check('с переключателем — «Открыть сундук» в главном меню', await A.page.locator('#screenMode #odChest').isVisible());
   // Кнопка пульсирует — «стоять на месте» она не будет, жмём её функцией
   await A.page.evaluate(() => openChest());
   await A.page.waitForTimeout(1200);
@@ -448,7 +452,7 @@ async function registerPlayer(p, name, pin) {
   const ladaStats = (await db.query("select online_games, online_wins from player_stats where username = 'Лада'")).rows[0];
   check('партии Лады с исходом посчитаны базой', decided >= 1 && ladaStats && ladaStats.online_games === decided,
     JSON.stringify({ decided, ladaStats }));
-  await B.page.evaluate(() => quitToMenu());
+  await B.page.evaluate(() => { DAILY_EXTRAS = true; quitToMenu(); });
   await B.page.waitForTimeout(1200);
   const qc = await B.page.evaluate(() => ({ shown: !document.getElementById('questCard').classList.contains('hidden'),
     rows: [...document.querySelectorAll('#qcList .qc-row')].map(r => r.dataset.code + ' ' + r.querySelector('.qc-n').textContent) }));

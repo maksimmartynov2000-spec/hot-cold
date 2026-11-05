@@ -5317,6 +5317,12 @@ async function testProgress(browser) {
     js.q.length === 9, dbQuests.join() + ' / ' + js.q.join());
   check('тексты заданий и достижений есть на всех 4 языках', js.langs.every(Boolean), JSON.stringify(js.langs));
 
+  // Задания дня спрятаны (DAILY_EXTRAS): по умолчанию в меню их нет
+  check('задания дня спрятаны: карточки в меню нет', await page.evaluate(() => !DAILY_EXTRAS &&
+    document.getElementById('questCard').classList.contains('hidden')));
+  // Дальше — так, как будет, когда их вернут
+  await page.evaluate(() => { DAILY_EXTRAS = true; renderQuestCard(); });
+
   // Карточка в меню
   const card = () => page.evaluate(() => {
     const c = document.getElementById('questCard');
@@ -5386,6 +5392,14 @@ async function testProgress(browser) {
   await page.click('#avGrid .av-tile[data-icon="🔥"]');
   await page.waitForTimeout(300);
   check('открытая 🔥 ставится', await page.evaluate(() => window.__profile.avatar === '🔥'));
+  // Как сейчас в игре (задания спрятаны): серии заданий в профиле нет, её лестницы
+  // нет без ступени, в счёт её ступени не идут, закрытых иконок за неё не видно
+  const hid = await page.evaluate(() => { DAILY_EXTRAS = false; fillProfile(); renderAvatarGrid(); showAvatarPicker(true);
+    return { streak: document.getElementById('pfStreak').classList.contains('hidden'),
+      quests: !!document.querySelector('#pfAchGrid .lad-row[data-ladder="quests"]'), head: document.getElementById('tAchHead').textContent,
+      fire: !!document.querySelector('#avGrid .av-tile[data-icon="🔥"]'), rocket: !!document.querySelector('#avGrid .av-tile[data-icon="🚀"]') }; });
+  check('задания спрятаны — в профиле ни серии, ни её лестницы, «2 из 60»; иконка 🔥 (своя) есть, закрытой 🚀 нет',
+    hid.streak && !hid.quests && hid.head === '🏅 Достижения: 2 из 60' && hid.fire && !hid.rocket, JSON.stringify(hid));
   await page.click('#tProfileDone');
   await page.context().close();
 
@@ -5399,7 +5413,7 @@ async function testProgress(browser) {
 
   // Вышел из аккаунта — карточка уходит сразу, чужие задания не висят
   const p6 = await newGame(browser, { user: 'Лев', progress: PROG });
-  const before = await p6.evaluate(() => !document.getElementById('questCard').classList.contains('hidden'));
+  const before = await p6.evaluate(() => { DAILY_EXTRAS = true; renderQuestCard(); return !document.getElementById('questCard').classList.contains('hidden'); });
   await p6.click('#accountChip');
   await p6.waitForTimeout(200);
   await p6.evaluate(() => { document.getElementById('pfMoreFold').open = true; }); await p6.click('#tLogoutStart');
@@ -5411,7 +5425,7 @@ async function testProgress(browser) {
 
   // Без входа — карточки нет
   const p3 = await newGame(browser, { progress: PROG });
-  check('без входа карточки нет', await p3.evaluate(() => document.getElementById('questCard').classList.contains('hidden')));
+  check('без входа карточки нет', await p3.evaluate(() => { DAILY_EXTRAS = true; renderQuestCard(); return document.getElementById('questCard').classList.contains('hidden'); }));
   await p3.context().close();
 
   // Достижения друга: в «⋯» у друга, не у чужого
@@ -5744,7 +5758,9 @@ async function testRedesign(browser) {
     JSON.stringify(tiles));
   check('на плитках короткие названия', await page.locator('#tModeDuel').textContent() === 'С другом');
 
-  // Задания — одна строка; по нажатию раскрываются
+  // Задания (спрятаны, DAILY_EXTRAS) — одна строка; по нажатию раскрываются
+  check('по умолчанию заданий дня в меню нет', !(await page.locator('#questCard').isVisible()));
+  await page.evaluate(() => { DAILY_EXTRAS = true; renderQuestCard(); });
   check('задания свёрнуты: видна строка со счётом', (await page.locator('#qcCount').textContent()) === '1/3' &&
     !(await page.locator('#qcList').isVisible()));
   await page.click('#questCard');
@@ -6443,7 +6459,8 @@ async function testDailyCard(browser) {
     window.__online = { day: '2026-10-30', played: false, chestOpened: false, chest: null, streak: 2, bestStreak: 2, freezeLeft: true,
       season: '2026-10', xp: 250, levelXp: 100, maxLevel: 30, seasonLeft: 86400 * 5, playXp: 0, playXpCap: 150,
       rewards: [{ level: 3, kind: 'phrase', code: 'lava' }, { level: 12, kind: 'frame', code: 'fire' }, { level: 9, kind: 'title', code: 'hunter' }],
-      streakRewards: [{ days: 3, kind: 'phrase', code: 'streak' }], owned: [], frame: null, title: null,
+      streakRewards: [{ days: 3, kind: 'phrase', code: 'streak' }, { days: 7, kind: 'title', code: 'regular' }, { days: 30, kind: 'frame', code: 'streak' }],
+      owned: [], frame: null, title: null,
       weekend: { on: false, points: 0, claim3: null, claim5: null, frame: 'cup-11', startsIn: 3 * 86400 + 600, endsIn: 0 } };
     tutSave({ done: [1, 2, 3], skipped: true, veteran: true });
     await loadOnlineInfo();
@@ -6452,15 +6469,16 @@ async function testDailyCard(browser) {
   await page.waitForTimeout(200);
   const card = await page.evaluate(() => ({ inMenu: !!document.querySelector('#screenMode #olDaily:not(.hidden)'),
     text: document.getElementById('olDaily').textContent, off: document.getElementById('odCup').classList.contains('off'),
-    locked: !!document.querySelector('#olDaily .od-chest.locked'), lvl: document.querySelector('#olDaily .od-lvl').textContent,
+    chest: !!document.querySelector('#olDaily .od-chest, #olDaily .od-streak'), lvl: document.querySelector('#olDaily .od-lvl').textContent,
     online: !!document.querySelector('.mode-btn.online, #screenOnline') }));
   check('карточка дня — в главном меню, онлайна со случайными соперниками нет', card.inMenu && !card.online, JSON.stringify(card));
-  check('до игры сундук закрыт: «Сыграйте любую игру»', card.locked && /Сыграйте любую игру/.test(card.text), card.text);
+  // Сундук дня и серия дней спрятаны (DAILY_EXTRAS): в карточке — путь и выходные
+  check('сундука и серии дней в карточке нет — спрятаны', !card.chest && !/сундук|🔥/i.test(card.text), card.text);
   check('ступень пути и очки до следующей', card.lvl === '2/30' && /50\/100/.test(card.text), card.text);
   check('в будни «Испытание выходных» — одной строкой: когда начнётся', card.off && /Испытание выходных/.test(card.text) &&
     /через 3 дня/.test(card.text), card.text);
 
-  // Тренировка без интернета — тоже игра: база отмечает день, сундук открывается
+  // Тренировка без интернета — тоже игра: база отмечает день и даёт очки пути
   await page.evaluate(() => openSetup('solo'));
   await page.click('#tStartMatch');
   await page.waitForTimeout(200);
@@ -6472,7 +6490,22 @@ async function testDailyCard(browser) {
   check('конец Тренировки — в базу («solo»), день отмечен', after.sent === 'solo' && after.played, JSON.stringify(after));
   await page.evaluate(() => quitToMenu());
   await page.waitForTimeout(200);
-  check('после игры — кнопка «Открыть сундук» в меню', await page.locator('#odChest').isVisible());
+  check('кнопки сундука и после игры нет — он спрятан', (await page.locator('#odChest').count()) === 0);
+  // Путь: правила без сундука и заданий, серии дней в окне нет
+  await page.evaluate(() => openPassModal());
+  await page.waitForTimeout(200);
+  const passRead = () => page.evaluate(() => ({ rows: [...document.querySelectorAll('#passList .pl-row')].map(r => r.dataset.level + (r.classList.contains('got') ? '+' : '-')),
+    sub: document.getElementById('passSub').textContent, how: document.getElementById('passHow').textContent,
+    streak: document.getElementById('passStreak').textContent, streakHidden: document.getElementById('passStreak').classList.contains('hidden') }));
+  let pass = await passRead();
+  check('путь: награды по ступеням, полученные отмечены', pass.rows.join() === '2+,3-,9-,12-' && /Ступень 2 из 30/.test(pass.sub), JSON.stringify(pass));
+  check('путь: очки за любую игру, до 150 в день; ни сундука дня, ни заданий, ни серии', /любую игру/.test(pass.how) && /150/.test(pass.how) &&
+    !/сундук —|задани|онлайн/i.test(pass.how) && pass.streakHidden && !pass.streak, pass.how + ' | ' + pass.streak);
+  await page.evaluate(() => closePassModal());
+
+  // Когда вернём (DAILY_EXTRAS = true): сундук после игры и серия в окне пути работают
+  await page.evaluate(async () => { DAILY_EXTRAS = true; await loadOnlineInfo(); });
+  check('с переключателем — кнопка «Открыть сундук» в меню', await page.locator('#odChest').isVisible());
   await page.evaluate(() => { window.__chestSurprise = { kind: 'phrase', code: 'genius' }; openChest(); });
   await page.waitForTimeout(500);
   const chest = await page.evaluate(() => ({ shown: !document.getElementById('chestModal').classList.contains('hidden'),
@@ -6485,13 +6518,10 @@ async function testDailyCard(browser) {
   check('фраза из сундука — в наборе фраз чата', say.includes('genius') && !say.includes('lava'), say.join());
   await page.evaluate(() => openPassModal());
   await page.waitForTimeout(200);
-  const pass = await page.evaluate(() => ({ rows: [...document.querySelectorAll('#passList .pl-row')].map(r => r.dataset.level + (r.classList.contains('got') ? '+' : '-')),
-    sub: document.getElementById('passSub').textContent, how: document.getElementById('passHow').textContent,
-    streak: document.getElementById('passStreak').textContent }));
-  check('путь: награды по ступеням, полученные отмечены', pass.rows.join() === '2+,3-,9-,12-' && /Ступень 2 из 30/.test(pass.sub), JSON.stringify(pass));
-  check('путь: очки за любую игру, до 150 в день; серия — без «онлайн»', /любая игра/.test(pass.how) && /150/.test(pass.how) &&
-    !/онлайн/i.test(pass.how + pass.streak), pass.how + ' | ' + pass.streak);
-  await page.evaluate(() => closePassModal());
+  pass = await passRead();
+  check('с переключателем в окне пути — серия дней, правила с сундуком и заданиями', !pass.streakHidden &&
+    /Серия дней с игрой/.test(pass.streak) && /любая игра/.test(pass.how) && /задание дня/.test(pass.how), pass.how + ' | ' + pass.streak);
+  await page.evaluate(async () => { closePassModal(); DAILY_EXTRAS = false; await loadOnlineInfo(); });
 
   // Рамки: «Обычная» — первой; из лиг — только полученные, с названием лиги
   await page.evaluate(async () => {
@@ -6503,6 +6533,10 @@ async function testDailyCard(browser) {
     .map(b => b.querySelector('[data-frame]').dataset.frame + ':' + b.textContent));
   check('рамки: «Обычная» первой, из лиг — только полученное «Серебро»', frames[0] === 'base:Обычная' &&
     frames.includes('silver:Серебро') && !frames.some(f => /^(bronze|gold|platinum|diamond|legend):/.test(f)), frames.join(' | '));
+  // Награды серии дней, пока она спрятана, получить нельзя — в выборе их нет
+  const titles = await page.evaluate(() => [...document.querySelectorAll('#pfTitles .st-title')].map(b => b.textContent));
+  check('награды серии дней (рамка «Неудержимый», титул «Завсегдатай») — не видны, пока серия спрятана',
+    !frames.some(f => /^streak:/.test(f)) && !titles.includes('Завсегдатай') && titles.includes('Охотник за числами'), frames.join() + ' / ' + titles.join());
   await page.evaluate(() => chooseStyle('frame', 'ice'));
   const lockedNote = await page.evaluate(() => document.getElementById('styleNote').textContent);
   check('чужая рамка — сказано, где взять', /ступень|серия|сундук/.test(lockedNote), lockedNote);
@@ -6622,7 +6656,9 @@ async function testShop(browser) {
   check('витрина: кошелёк 🪙 160 и 💎 3, сколько сегодня из 300', shop.shown && shop.wallet === '🪙 160|💎 3' && /40 из 300/.test(shop.note), JSON.stringify(shop));
   check('пять разделов, иконок 20, из них 10 редких за 💎', shop.tabs === 'Иконки|Рамки|Фоны|Титулы|Фразы' && shop.items === 20 && shop.rare === 10, JSON.stringify(shop));
   check('у товара имя и цена', /Листовой зайчик/.test(shop.first) && /150 🪙/.test(shop.first), shop.first);
-  check('как копить — восемь строк, трофеи не продаются', shop.earn === 8 && /не продаются/.test(shop.trophy), JSON.stringify(shop));
+  // Задания дня спрятаны (DAILY_EXTRAS) — строки про них нет
+  check('как копить — семь строк, без заданий дня, трофеи не продаются', shop.earn === 7 && !/Задание дня/.test(shop.earnText) &&
+    /не продаются/.test(shop.trophy), JSON.stringify(shop));
   // Онлайна со случайными соперниками нет (миграция 062): монеты — за игру с
   // другом, кристаллы — за «Испытание выходных»
   check('как копить: игра с другом и «Испытание выходных», без онлайна и турнира',
@@ -6728,9 +6764,9 @@ async function testShop(browser) {
       : it.kind === 'frame' ? P.frames[it.code] : it.kind === 'title' ? P.titles[it.code] : i18n[l].say[it.code]));
     const keys = ['title', 'coinsName', 'gemsName', 'toastCoins', 'toastGems', 'worn', 'owned', 'guest', 'login', 'off', 'today', 'earnHead',
       'trophy', 'rare', 'phraseHint', 'wornBtn', 'wear', 'buyFor', 'notEnough', 'back', 'notEnoughShort', 'bought', 'where', 'more',
-      'close', 'coinsHow', 'gemsHow'];
+      'close', 'coinsHow', 'coinsHowNoQuests', 'gemsHow', 'earnQuest'];
     return l + ':' + (miss.length + keys.filter(k => !S[k]).length + SHOP_KINDS.filter(k => !S.tabs[k]).length +
-      (S.earn.length === 8 ? 0 : 1) + (i18n[l].navShop ? 0 : 1));
+      (S.earn.length === 7 ? 0 : 1) + (i18n[l].navShop ? 0 : 1));
   }).join());
   check('магазин переведён на 4 языка: разделы, товары, подсказки', tr === 'en:0,fr:0,de:0,ru:0', tr);
   const art = await p2.evaluate(() => {

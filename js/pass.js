@@ -56,12 +56,21 @@ function passWhere(kind, code) {
   const r = (onlineInfo.rewards || []).find(x => x.kind === kind && x.code === code);
   if (r) return P.whereLevel.replace('{n}', r.level);
   const s = (onlineInfo.streakRewards || []).find(x => x.kind === kind && x.code === code);
-  if (s) return P.whereStreak.replace('{n}', s.days);
+  if (s && DAILY_EXTRAS) return P.whereStreak.replace('{n}', s.days);
   if (kind === 'frame' && code === 'tourney') return P.weekend.where;
   if (kind === 'frame' && /^cup-\d\d$/.test(code)) return P.weekend.whereM.replace('{m}', seasonMonth('2026-' + code.slice(4)));
   if (kind === 'frame' && LEAGUE_FRAMES.indexOf(code) >= 0) return P.whereLeague;
   if (typeof isShopItem === 'function' && isShopItem(kind, code)) return t().shop.where;
-  return P.whereChest;
+  // Сундук дня спрятан — сюрпризы падают из сундуков «Испытания выходных»
+  return DAILY_EXTRAS ? P.whereChest : P.whereWeekendChest;
+}
+// Награда, которую давала только спрятанная серия дней (DAILY_EXTRAS): пока
+// серии не видно, получить её нельзя — в выборе её нет, если она ещё не своя
+function passHiddenSource(kind, code) {
+  if (DAILY_EXTRAS || !onlineInfo || passOwns(kind, code)) return false;
+  const inStreak = (onlineInfo.streakRewards || []).some(x => x.kind === kind && x.code === code);
+  const onPath = (onlineInfo.rewards || []).some(x => x.kind === kind && x.code === code);
+  return inStreak && !onPath;
 }
 // Рамки лиг: лиг больше нет (миграция 062), полученные остались в коллекции
 const LEAGUE_FRAMES = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'legend'];
@@ -103,12 +112,13 @@ function renderOnlineDaily() {
   const chest = I.chestOpened ? '<button class="od-chest done" onclick="openChestModal()">✅ <span>' + escapeHtml(P.chestDone) + '</span></button>'
     : I.played ? '<button class="od-chest ready" id="odChest" onclick="openChest()">🎁 <span>' + escapeHtml(P.chestOpen) + '</span></button>'
     : '<div class="od-chest locked">🔒 <span>' + escapeHtml(P.chestLocked) + '</span></div>';
-  box.innerHTML =
+  // Сундук и серия — пока спрятаны (DAILY_EXTRAS)
+  box.innerHTML = (DAILY_EXTRAS ?
     '<div class="od-top">' + chest +
       '<div class="od-streak' + (I.streak ? ' on' : '') + '"><b>🔥 ' + I.streak + '</b><small>' +
         escapeHtml(withPlural(I.streak, P.dayForms).replace(/^\S+\s/, '')) + '</small>' +
         (I.freezeLeft ? '<i title="' + escapeHtml(P.freezeHint) + '">❄️</i>' : '') + '</div>' +
-    '</div>' +
+    '</div>' : '') +
     '<button class="od-pass" onclick="openPassModal()">' +
       '<span class="od-lvl"><b>' + lvl + '</b><small>/' + I.maxLevel + '</small></span>' +
       '<span class="od-bar"><span style="width:' + Math.round(100 * inLevel / I.levelXp) + '%"></span>' +
@@ -249,7 +259,7 @@ function openPassModal() {
   const days = Math.max(1, Math.ceil(I.seasonLeft / 86400));
   document.getElementById('passSub').textContent = P.pathSub.replace('{n}', lvl).replace('{m}', I.maxLevel)
     .replace('{d}', withPlural(days, P.dayForms));
-  document.getElementById('passHow').textContent = P.how;
+  document.getElementById('passHow').textContent = DAILY_EXTRAS ? P.how : P.howGames;
   const list = document.getElementById('passList');
   const rows = [];
   for (let n = 1; n <= I.maxLevel; n++) {
@@ -264,7 +274,8 @@ function openPassModal() {
   }
   list.innerHTML = rows.join('');
   const sr = document.getElementById('passStreak');
-  sr.innerHTML = '<div class="pl-head">🔥 ' + escapeHtml(P.streakHead) + '</div>' + (I.streakRewards || []).map(r =>
+  sr.classList.toggle('hidden', !DAILY_EXTRAS);
+  sr.innerHTML = !DAILY_EXTRAS ? '' : '<div class="pl-head">🔥 ' + escapeHtml(P.streakHead) + '</div>' + (I.streakRewards || []).map(r =>
     '<div class="pl-row' + (I.bestStreak >= r.days || passOwns(r.kind, r.code) ? ' got' : '') + '"><span class="pl-n">' + r.days + '</span>' +
     '<span class="pl-r">' + passRewardArt(r.kind, r.code) + '<em>' + escapeHtml(passRewardName(r.kind, r.code)) + '</em></span>' +
     '<span class="pl-s">' + (passOwns(r.kind, r.code) ? '✅' : '🔒') + '</span></div>').join('');
@@ -284,9 +295,10 @@ function renderStylePicker() {
   // сейчас. Рамки лиг — только полученные: лиг больше нет
   const cupNow = onlineInfo.weekend && onlineInfo.weekend.frame;
   const frames = [null].concat(PASS_FRAMES.filter(f => !(f === 'tourney' || /^cup-/.test(f)) || passOwns('frame', f) || f === cupNow))
+    .filter(f => !f || !passHiddenSource('frame', f))
     .concat(LEAGUE_FRAMES.filter(f => passOwns('frame', f)))
     .concat(shopOwnedCodes('frame'));
-  const titles = [null].concat(PASS_TITLES).concat(shopOwnedCodes('title'));
+  const titles = [null].concat(PASS_TITLES.filter(x => !passHiddenSource('title', x))).concat(shopOwnedCodes('title'));
   const chip = (cls, sel, locked, html, fn) => {
     const b = document.createElement('button');
     b.type = 'button';
