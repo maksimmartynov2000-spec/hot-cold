@@ -109,7 +109,7 @@ def tidy(lang, v):
 for lang, g in T.items():
     H = g['H']
     cast = [{k: tidy(lang, v) for k, v in h.items() if k != 'n'} for h in H]
-    out = ['// ' + HEAD[lang].replace('{w}', str(5 + texts_upto * 10)).replace('{n}', str(50 + len(H))),
+    out = ['// ' + HEAD[lang].replace('{w}', str(5 + len(H) // 10)).replace('{n}', str(50 + len(H))),
            '// Грузится, когда нужен (advLoadPack в js/adventure.js); порядок — как в ADV_HEROES',
            'ADV_PACKS.%s = {' % lang,
            '  "worlds": ' + json.dumps(g['WORLDS'], ensure_ascii=False) + ',',

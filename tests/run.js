@@ -7815,7 +7815,7 @@ async function testAdvWorlds(browser) {
              files: art.map(iconFile), rules: new Set(Array.from({ length: ADV_TOTAL }, (_, n) => advChar(n).rule)).size };
   });
   check('миры с шестого: у героев правила — записи из известных «когда» и «что»',
-    data.worlds >= 15 && data.total === data.worlds * 10 && data.heroes >= data.total - 50 && data.heroes % 100 === 0 &&
+    data.worlds >= 15 && data.total === data.worlds * 10 && data.heroes >= data.total - 50 && [100, 200, 300, 400, 450].indexOf(data.heroes) >= 0 &&
     !data.bad.length && data.rules === data.total, JSON.stringify([data.worlds, data.total, data.heroes, data.bad]));
   check('сочетания «когда → что» у новых героев не повторяются', data.combos === data.uniq, data.combos + ' / ' + data.uniq);
   check('иконки за боссов новых миров — их портреты adv-60, adv-70 …', data.bossIcons === Array.from({ length: data.worlds - 5 }, (_, w) => 'adv-' + (w + 6) * 10).join() &&
@@ -7894,7 +7894,7 @@ async function testAdvWorlds(browser) {
   check('нажатие на мир раскрывает и сворачивает его', map.two === 20 && map.back === 10 && map.badge === '🚧' &&
     map.name === 'Остров лемуров', JSON.stringify(map));
   check('у закрытых миров — что их откроет; внизу — сколько миров ещё впереди', map.gates === data.worlds - 8 &&
-    map.soon === '🌍 Ещё ' + (50 - data.worlds) + ' миров — скоро',
+    (data.worlds === 50 ? map.soon === undefined : map.soon === '🌍 Ещё ' + (50 - data.worlds) + ' миров — скоро'),
     JSON.stringify(map));
 
   // Сила волнами: внутри волны растёт, первый мир волны — передышка
@@ -7910,7 +7910,9 @@ async function testAdvWorlds(browser) {
   }));
   const RANGES = ['1..50', '-50..50', '1..150', '1..200', '1..300', '1..100', '1..150', '1..200', '1..300', '1..500',
                   '1..100', '1..150', '-150..150', '1..300', '1..500', '1..150', '1..200', '1..300', '-200..200', '1..500',
-                  '1..150', '1..200', '-150..150', '1..400', '1..500', '1..200', '1..300', '-150..150', '1..400', '1..500'];
+                  '1..150', '1..200', '-150..150', '1..400', '1..500', '1..200', '1..300', '-150..150', '1..400', '1..500',
+                  '1..200', '1..300', '1..300', '1..400', '-250..250', '1..200', '1..300', '1..400', '1..400', '-250..250',
+                  '1..300', '1..300', '1..400', '1..500', '-250..250'];
   check('числа миров с шестого и бонус мира в наборе', bonus.length >= 10 &&
     bonus.map(b => b.min + '..' + b.max).join() === RANGES.slice(0, bonus.length).join() && bonus.every(b => b.has && b.field), JSON.stringify(bonus));
 
@@ -8009,6 +8011,45 @@ async function testAdvWorlds(browser) {
   check('манеры хода: «растёт вверх» — ближайшее возможное выше, «любит семёрки» — число с 7', acts.up === true && /7/.test(acts.lucky),
     JSON.stringify(acts));
 
+  // Математика с 36-го мира: делится ли на 3 и на 5, цифра десятков, последняя
+  // цифра — по модулю числа (у −47 те же цифры, что у 47). tell… — вам словами,
+  // know… — себе, и бот этим пользуется. Медоед не боится заморозки и броска
+  const math = await page.evaluate(() => {
+    const out = {};
+    advTest(60, -47);   // мир 7: числа от −50 до 50
+    const R = advCtx();
+    out.words = ['tellDiv3', 'tellDiv5', 'tellTens', 'tellUnits'].map(a => ADV_ACT[a](R).k).join(' | ');
+    const k0 = D.know[0];
+    out.you = [k0.div3, k0.div5, k0.tens, k0.units].join();
+    ['knowDiv3', 'knowDiv5', 'knowTens', 'knowUnits'].forEach(a => ADV_ACT[a](R));
+    const k1 = D.know[1];
+    out.me = [k1.div3, k1.div5, k1.tens, k1.units].join();
+    const cand = botCandidates([], 1, { know: D.know[1] }, false);
+    out.cand = Array.from(cand).map((c, i) => c ? i + RANGE_MIN : null).filter(v => v !== null).join();
+    advTest(60, 30); const R2 = advCtx();
+    out.round = ['tellDiv3', 'tellDiv5', 'tellTens', 'tellUnits'].map(a => ADV_ACT[a](R2).k).join(' | ');
+    // Медоед: «Заморозка» и «Шальной бросок» на него не действуют, туман — действует
+    const badger = 50 + ADV_HEROES.findIndex(h => h.immune && h.immune.indexOf('lava') >= 0);
+    out.badgerN = badger;
+    if (badger >= 50 && badger < ADV_TOTAL) {
+      advTest(badger, 100); applyBonus('freeze', 0); applyBonus('lava', 0); applyBonus('fog', 0);
+      out.badger = { skip: D.skip[1], lava: D.autoLava[1], fog: D.fog[1] };
+    }
+    advTest(50, 25); applyBonus('lava', 0);
+    out.plainLava = D.autoLava[1];
+    quitToMenu();
+    return out;
+  });
+  check('математика: подсказки словами и по модулю числа (−47 — как 47)',
+    math.words === 'не делится на 3 | не делится на 5 | цифра десятков — 4 | последняя цифра — 7' &&
+    math.you === 'false,false,4,7' && math.round === 'делится на 3 | делится на 5 | цифра десятков — 3 | последняя цифра — 0',
+    JSON.stringify(math));
+  check('математика: сам узнал — бот выбирает только из подходящих (−47 и 47)', math.me === 'false,false,4,7' && math.cand === '-47,47',
+    JSON.stringify(math));
+  check('Медоед: заморозка и шальной бросок не действуют, туман — действует; у других бросок срабатывает',
+    !!math.badger && math.badger.skip === false && math.badger.lava === false && math.badger.fog === true && math.plainLava === true,
+    JSON.stringify(math));
+
   // Загаданное число правила не трогают, и ни одно правило не роняет игру
   const same = await page.evaluate(() => {
     let ok = true;
@@ -8056,7 +8097,9 @@ async function testAdvWorlds(browser) {
   // Файл текстов грузится, только когда нужен, и только на своём языке
   const de = await newGame(browser, { user: 'Максим', lang: 'de' });
   await de.evaluate(() => { localStorage.setItem(advKey(), '60'); localStorage.setItem(advStarsKey(), '3'.repeat(60)); openAdventure(); });
-  await de.waitForTimeout(600);
+  // Файл текстов вырос вместе с мирами: ждём сам файл, а не угадываем время
+  await de.waitForFunction(() => !!ADV_PACKS.de, null, { timeout: 5000 }).catch(() => {});
+  await de.waitForTimeout(200);
   const lazy = await de.evaluate(() => ({ scripts: [...document.querySelectorAll('script[src*="adv-"]')].map(s => s.getAttribute('src')),
     head: document.querySelector('#advMap .adv-world[data-w="5"] .aw-name').textContent,
     card: (openAdvCard(50), document.getElementById('acName').textContent) }));
