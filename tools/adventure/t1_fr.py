@@ -1,4 +1,4 @@
-WORLDS = ['Royaume des bonbons', 'Arctique glacé', 'Désert torride', 'Ferme joyeuse', 'Ville des nuages',
+WORLDS = ['Île aux lémuriens', 'Arctique glacé', 'Désert torride', 'Ferme joyeuse', 'Ville des nuages',
           'Jardin fleuri', 'Vallée des dinosaures', 'Île aux pirates', 'Village d’Halloween', 'Château royal']
 H = []
 def r(n, t, d, hi, rule, luck, worry, win, lose):
@@ -12,29 +12,29 @@ LAVA = 'ton coup suivant se joue tout seul — un lancer fou'
 TWICE = 'au tour suivant, il joue deux fois de suite'
 TWICE_F = 'au tour suivant, elle joue deux fois de suite'
 
-# 6 · Royaume des bonbons
-r('Ourson Gelée', 'Collant', 'Si tu es « Froid » ou plus loin, tu restes collé dans la gelée et tu passes ton tour. Une fois par manche.',
-  'Je suis sucré et collant ! 🍬', 'Collé ? Passe ton tour !', 'Mmm, ça sent la victoire !', 'Oh, tu es trop près !', 'Une victoire sucrée ! 🍬', 'J’ai fondu…')
-r('Cupcake Cerise', 'La cerise sur le gâteau', f'Quand il est « Très chaud » ou plus près, il est si content qu’il t’offre un {K}. Une fois par manche.',
-  'Salut ! Sers-toi ! 🍒', 'Tiens, une cerise — « ⚡ +1 coup » !', 'Je suis presque cuit — c’est chaud !', 'Tu es chaud comme un four !', 'La victoire, c’est la cerise sur le gâteau !', 'Oh non, j’ai brûlé…')
-r('Caniche Barbe-à-papa', 'Nuage sucré', f'Après ton premier coup, il t’enveloppe de barbe à papa : {FOG}.',
-  'Je suis tout doux et sucré ! 🍭', 'Pouf ! Nuage sucré !', 'Je crois que je suis tout près !', 'Ne mange pas ma barbe à papa — tu vas deviner !', 'Une victoire toute douce !', 'Ma barbe à papa a fondu… 🍭')
-r('Bonhomme Glaçage', 'Tu ne m’attraperas pas !', f'Quand tu es « Très chaud » ou plus près, il s’enfuit : {TWICE}. Une fois par manche.',
-  'Cours, cours, tu ne m’attraperas pas ! 🏃', 'Tu ne m’attraperas pas — je cours deux fois !', 'J’y suis presque !', 'Oh, tu me rattrapes !', 'Pas attrapé ! Ha !', 'Tu m’as quand même attrapé…')
-r('Hamster Macaron', 'Joues-garde-manger', f'À son deuxième coup, il sort de ses joues un {K} pour lui.',
-  'J’ai tout mis de côté ! 🥮', 'Miam ! Un « ⚡ +1 coup » de ma joue !', 'Ça sent bon par ici !', 'Hé, pas touche à mes réserves !', 'Une réserve de victoire — à moi !', 'Plus de réserves…')
-r('Hippo Gâteau', 'Fais un vœu', 'Après ton premier coup, il souffle une bougie et te dit si le nombre est pair ou impair.',
-  'C’est ma fête ! 🎂', 'Pfff ! Le nombre est {k} !', 'Le cadeau est tout près !', 'Tu as soufflé presque toutes mes bougies !', 'Le plus beau des anniversaires !', 'Au moins, il reste du gâteau 🎂')
-r('Chiot Beignet', 'Queue qui frétille', 'Quand tu chauffes, il est si content qu’il passe son tour suivant. Une fois par manche.',
-  'Ouaf ! On joue ? 🍩', 'Youpi, tu chauffes ! Je remue la queue — je passe mon tour !', 'Snif-snif — c’est par ici !', 'Tu es si près — je vais sauter de joie !', 'Ouaf ! J’ai trouvé !', 'Bravo, ouaf !')
-r('Brebis Guimauve', 'Compter les moutons', 'Après ton deuxième coup, elle se met à compter les moutons — elle s’endort et passe son tour.',
-  'Bêê, je suis douce comme la guimauve ☁️', 'Un mouton, deux moutons… Zzz…', 'Oh, j’ai presque trouvé !', 'Bêê ! Tu as presque deviné !', 'Fais de beaux rêves — j’ai gagné !', 'Je me suis endormie… bêê.')
-r('Glace Cornet', 'Coup de froid', f'Quand tu es « Tiède » ou plus près, ta mémoire gèle : {MEM}. Une fois par manche.',
-  'Je suis la plus fraîche du royaume ! 🍦', 'Brrr ! Tu ne te souviens que de deux coups !', 'Je fonds — donc c’est chaud !', 'Oh, je vais fondre !', 'Une victoire glacée ! 🍦', 'Tout a fondu…')
-b('La Reine Sucrée', 'Impôt sucré', f'Quand tu chauffes, elle te prend ton {K}. Une fois par manche.',
-  'Trésor royal', f'Au quatrième coup de la manche, elle sort de son trésor un {K} pour elle.',
-  'Le royaume des bonbons est à moi ! 👑', 'L’impôt ! Ton « ⚡ » va dans mon trésor !', 'Le trésor est plein — un « ⚡ +1 coup » pour moi !',
-  'Ma couronne sent la victoire !', 'Oh, quel sujet insolent !', 'La Reine a gagné ! 👑', 'Bon… tu es un gagnant tout sucré !')
+# 6 · Île aux lémuriens
+r('Charançon-girafe Échasse', 'Barrière', 'Si tu es « Froid » ou plus loin, il baisse son long cou comme une barrière : tu passes ton tour. Une fois par manche.',
+  'Tu as vu mon cou ? Le plus haut de l’île ! 🦒', 'Barrière baissée — tu passes ton tour !', 'De là-haut, la réponse se voit mieux !', 'Oh, tu es déjà à mon cou !', 'J’ai tendu le cou jusqu’à la victoire !', 'Long cou, mais la victoire est à toi…')
+r('Maki Panache', 'Mangue pour tous', 'Quand il est « Très chaud » ou plus près, il est si content qu’il partage une mangue : un « ⚡ +1 coup » pour toi. Une fois par manche.',
+  'Salut ! Tu vois ma queue ? C’est mon drapeau ! 🥭', 'Tiens, une mangue — un « ⚡ +1 coup » !', 'Ça sent la mangue mûre — très chaud !', 'Eh, tu t’approches de ma mangue !', 'Queue en l’air — j’ai gagné !', 'Bon, la mangue est à toi aujourd’hui.')
+r('Aye-aye Minuit', 'Minuit', 'Après ton premier coup, minuit sonne pour lui : jusqu’à la fin de la manche, tu ne vois plus ses coups.',
+  'Je ne sors que la nuit… 🌙', 'Minuit ! Tu ne vois plus mes coups !', 'Dans le noir, je vois mieux que tous !', 'Toi aussi, tu vois dans le noir ?!', 'La nuit m’appartient !', 'Le jour se lève… tu as gagné.')
+r('Propithèque Gambade', 'Danse du propithèque', 'Quand tu es « Très chaud » ou plus près, il se met à danser : au tour suivant, il joue deux fois de suite. Une fois par manche.',
+  'Je ne marche pas — je danse ! 🕺', 'Hop-hop ! Deux coups de suite !', 'Quelques bonds et j’y suis presque !', 'Oh, tu as pris mon rythme !', 'Danse de la victoire !', 'J’ai trop dansé…')
+r('Microcèbe Grenier', 'Réserve dans la queue', 'À son deuxième coup, il sort de sa queue dodue un « ⚡ +1 coup » pour lui.',
+  'Je suis petit, mais je garde tout ! 🐭', 'Ma queue-grenier — un « ⚡ +1 coup » pour moi !', 'Oh, ça sent la victoire !', 'Ne touche pas à mes réserves !', 'Mes réserves m’ont servi !', 'Mes réserves sont vides…')
+r('Tortue Rayon', 'Sage conseil', 'Après ton premier coup, elle te donne un sage conseil : le nombre est-il pair ou impair.',
+  'J’ai cent ans — je sais beaucoup de choses 🐢', 'Sagesse des siècles : le nombre est {k} !', 'Lentement, mais sûrement !', 'Tu es plus rapide que je ne pensais !', 'Rien ne sert de courir !', 'Ah, la jeunesse… tu as gagné.')
+r('Gecko Feuillu', 'Il fait la feuille', 'Quand tu chauffes, il se fige comme une feuille sèche et passe son tour suivant. Une fois par manche.',
+  'Trouve-moi si tu peux ! 🍂', 'Je suis une feuille… juste une feuille… je passe mon tour.', 'Je bruisse tout près de la réponse !', 'Ne me regarde pas, je suis une feuille !', 'Ha ! Tu ne m’as pas vu !', 'Trouvé… je suis une piètre feuille.')
+r('Tenrec Roupillon', 'Hibernation', 'Après ton deuxième coup, il bâille, s’endort et passe son tour.',
+  'Aaah… salut… 🥱', 'Rrr… réveillez-moi dans un tour…', 'Même endormi, je suis tout près !', 'Je me réveille — et tu es déjà près !', 'Gagné — et au dodo !', 'J’ai trop dormi…')
+r('Grenouille Tomate', 'Gros coassement', 'Quand tu es « Tiède » ou plus près, elle coasse si fort que tu perds le fil : jusqu’à la fin de la manche, tu ne vois que les deux derniers coups. Une fois par manche.',
+  'Croâ ! Je suis ronde et rouge comme une tomate ! 🐸', 'CROÂÂ ! Tu ne te souviens que de deux coups !', 'Croâ ! Très chaud !', 'Croâ… tu m’as surprise !', 'Croâ-croâ — j’ai gagné !', 'Croâ… je me dégonfle.')
+b('Le Seigneur Fossa', 'Bond du chasseur', 'Quand tu chauffes, il bondit et te prend ton « ⚡ +1 coup ». Une fois par manche.',
+  'Butin', 'Au quatrième coup de la manche, il rapporte son butin : un « ⚡ +1 coup » pour lui.',
+  'Toute l’île est à moi ! 👑', 'Bond ! Ton « ⚡ » est à moi !', 'Butin — un « ⚡ +1 coup » pour moi !',
+  'Je sens une proie !', 'Tu es une petite bête courageuse !', 'Le Seigneur de l’île a gagné ! 👑', 'Bon… l’île est à toi pour aujourd’hui.')
 
 # 7 · Arctique glacé
 r('Ourson Glaçon', 'Boule de neige', f'Après ton premier coup, il te lance une boule de neige : {LAVA}.',
@@ -75,8 +75,8 @@ r('Tatou Boule', 'Roule-boule', 'Quand il refroidit, il se roule en boule et rej
   'Je suis comme une balle ! 🥎', 'Je refroidis ? Je roule — et je rejoue !', 'Je roule droit vers le but !', 'Tu me rattrapes !', 'J’ai roulé jusqu’à la victoire !', 'Je suis tombé dans un trou…')
 r('Gerboise Hop', 'À l’opposé', 'Elle saute à l’autre bout : elle dit le nombre « en miroir » du tien — s’il peut encore être le nombre secret.',
   'Hop-hop ! 🔁', 'Hop — à l’autre bout !', 'Encore un saut et je l’ai !', 'Tu sautes mieux que moi !', 'Un bond vers la victoire !', 'J’ai sauté trop loin…')
-r('Cactus Épine', 'Épines', 'Si tu es « Tiède » ou plus près, ton coup se cache dans les épines : tu ne le vois pas. Une fois par manche.',
-  'Un câlin ? 🌵', 'Aïe ! Ton coup est dans mes épines !', 'Je fleuris — donc c’est tout près !', 'Ne te pique pas — tu as presque trouvé !', 'Une victoire piquante ! 🌵', 'J’ai fané…')
+r('Chatte des sables Ombre', 'Derrière la dune', 'Si tu es « Tiède » ou plus près, elle recouvre ton coup de sable : on ne le voit pas. Une fois par manche.',
+  'Miaou… dans le sable, tu ne me verras pas 🏜️', 'Chut… ton coup est enseveli sous le sable !', 'Je sens une proie derrière la dune !', 'Tu as trouvé mon sentier ?!', 'Ronron ! Le désert est à moi !', 'Miaou… les traces mènent à toi.')
 r('Lézard Collerette', 'Collerette effrayante', 'À son premier coup, il ouvre sa collerette et te fait peur : tu passes ton tour.',
   'Regarde, j’ouvre ma collerette ! 😱', 'Bouh ! Peur ? Passe ton tour !', 'Ma collerette frémit — tout près !', 'Je ne te fais pas peur ?!', 'Je t’ai fait peur et j’ai gagné !', 'Ma collerette s’est refermée…')
 b('Le Sphinx Pharaon', 'Tempête de sable', f'Après ton troisième coup, il ensevelit les traces sous le sable : {MEM}.',
@@ -103,10 +103,10 @@ r('Dindon Éventail', 'Queue en éventail', 'Son deuxième coup est caché derri
   'Admire ma queue ! 🎴', 'Frrr ! Ce coup est derrière ma queue !', 'Ma queue s’ouvre — c’est chaud !', 'Tu regardes derrière ma queue ?!', 'Une belle victoire !', 'Ma queue est retombée…')
 r('Souris Fromage', 'Grignotage', f'Si tu es « Très froid », elle grignote en douce : un {K} pour elle. Une fois par manche.',
   'Couic ! Le fromage est à moi ! 🧀', 'Couic ! Je grignote — « ⚡ » pour moi !', 'Ça sent le fromage — tout près !', 'Couic ! Tu es devant mon trou !', 'Couic ! Tout le fromage est à moi !', 'Couic… le fromage m’a échappé.')
-b('L’Épouvantail', 'Corbeau sur l’épaule', f'Quand tu es « Tiède » ou plus près, son corbeau lui rapporte ton {K}. Une fois par manche.',
-  'Tourbillon de paille', f'Quand il refroidit, il tourne comme un tourbillon : {TWICE}. Une fois par manche.',
-  'Je garde ce champ ! 🌾', 'Croa ! Le corbeau a pris ton « ⚡ » !', 'Whoosh ! Tourbillon de paille !',
-  'La récolte est presque à moi !', 'Tu n’as pas peur d’un épouvantail ?!', 'Le champ est à moi ! 🌾', 'Tu as fait fuir tous mes corbeaux !')
+b('Le Général Jars', 'Pincement', 'Quand tu es « Tiède » ou plus près, il te pince et te prend ton « ⚡ +1 coup ». Une fois par manche.',
+  'Marche de l’oie', 'Quand il refroidit, il ordonne « En avant, marche ! » : au tour suivant, il joue deux fois de suite. Une fois par manche.',
+  'Garde-à-vous ! Ici, c’est moi qui commande ! 👑', 'Cacarder ! Pincé — ton « ⚡ » est à moi !', 'En avant, marche ! Deux coups de suite !',
+  'Cac-cac ! Cible en vue !', 'Soldat, tu es trop près !', 'Victoire ! Du grain pour tout le monde ! 👑', 'Retraite… tu as gagné, cac.')
 
 # 10 · Ville des nuages
 r('Perroquet Pilote', 'Perroquet bavard', 'Quand tu es « Brûlant », il répète après toi et laisse échapper : le nombre est plus grand ou plus petit que le tien. Une fois par manche.',
@@ -117,20 +117,20 @@ r('Flamant Fifi', 'Sur une patte', 'Au cinquième coup de la manche, il se met s
   'Je suis le plus gracieux ! 🦩', 'Je tiens sur une patte… je passe mon tour.', 'Oh, comme c’est chaud !', 'Oh ! Tu as presque trouvé !', 'Une victoire gracieuse !', 'Oh… j’ai perdu l’équilibre.')
 r('Aiglon Altitude', 'Œil d’aigle', 'À partir de son deuxième coup, il sait si le nombre est pair ou impair. Il ne te le dira pas.',
   'D’en haut, je vois tout ! 🦅', 'D’ici, je sais s’il est pair ou pas !', 'Cible en vue !', 'Tu voles plus haut que moi !', 'Une victoire d’aigle !', 'Un nuage m’a gêné…')
-r('Nuage Pouf', 'Petit brouillard', 'Il cache ton troisième coup dans le brouillard : tu ne le vois pas.',
-  'Je suis tout doux et moelleux ☁️', 'Pouf ! Ton coup est dans le brouillard !', 'Oh, je vais presque pleuvoir — c’est chaud !', 'Tu vois à travers les nuages ?!', 'Une victoire nuageuse !', 'Je me suis envolé…')
-r('Ballon Brise', 'Décollage', 'Quand il chauffe, il décolle et rejoue tout de suite. Une fois par manche.',
-  'Vent, emporte-moi ! 🎈', 'Je chauffe ! Je décolle — et je rejoue !', 'Je monte de plus en plus haut !', 'Oh, je me dégonfle !', 'Tout là-haut — victoire !', 'Pssst… dégonflé.')
+r('Martinet Foudre', 'Tourbillon', 'Un tourbillon emporte ton troisième coup : on ne le voit pas.',
+  'Fiou ! Je suis plus rapide que le vent ! 💨', 'Fiou ! Ton coup s’est envolé !', 'Je vole droit au but !', 'Toi aussi, tu voles ?!', 'Fiou — j’ai gagné !', 'Je ne suis pas arrivé…')
+r('Albatros Brise', 'Vent arrière', 'Quand il chauffe, il attrape un vent arrière et rejoue tout de suite. Une fois par manche.',
+  'Je traverse tout l’océan sans un battement d’ailes 🌊', 'Vent arrière ! Je rejoue !', 'Le vent me porte vers la réponse !', 'Ça souffle fort… tu es tout près !', 'Je suis arrivé le premier !', 'Le vent a tourné…')
 r('Hirondelle Flèche', 'Une lettre', f'Quand tu refroidis, elle t’apporte une lettre avec un {K}. Une fois par manche.',
   'J’ai une lettre pour toi ! ✉️', 'Ne sois pas triste — voilà un « ⚡ +1 coup » !', 'Je vole droit vers le but !', 'Tu es plus rapide qu’une hirondelle !', 'Je suis arrivée la première !', 'La lettre est arrivée en retard…')
 r('Écureuil Planeur', 'Vol plané', 'Quand il refroidit, il plane en douce : ce coup-là t’est caché.',
   'Je vole sans ailes ! 🪂', 'Whoosh — je plane en cachette !', 'Je plane droit sur la cible !', 'Tu me rattrapes !', 'Atterrissage en douceur — victoire !', 'Je me suis accroché à une branche…')
 r('Cigogne Facteur', 'Un colis', f'Après ton deuxième coup, elle t’apporte un colis : un {K} pour toi.',
   'Courrier ! Pour qui est le colis ? 📦', 'Un colis pour toi — « ⚡ +1 coup » !', 'J’ai presque trouvé l’adresse !', 'Tu as trouvé l’adresse tout seul ?!', 'Livré — victoire !', 'Le colis est revenu…')
-b('Le Roi Tonnerre', 'Coup de tonnerre', 'Quand tu chauffes, il tonne : tu passes ton tour. Une fois par manche.',
-  'Averse', 'Le quatrième coup de la manche se cache sous l’averse : tu ne le vois pas.',
-  'Le ciel est à moi ! Crains le tonnerre ! 🌩️', 'BRAOUM ! Passe ton tour !', 'Averse ! Ce coup a disparu !',
-  'Mes éclairs frappent juste !', 'Tu n’as pas peur de l’orage ?!', 'L’orage a gagné ! 🌩️', 'Les nuages s’écartent… tu brilles !')
+b('L’Oiseau-Tonnerre', 'Coup de tonnerre', 'Quand tu chauffes, le tonnerre gronde : tu passes ton tour. Une fois par manche.',
+  'Averse', 'Le quatrième coup de la manche se cache sous l’averse : on ne le voit pas.',
+  'Le ciel est mon royaume ! 👑', 'BRAOUM ! Tu passes ton tour !', 'Averse ! Ce coup, on ne le voit pas !',
+  'L’orage approche !', 'Tu voles à travers ma tempête !', 'Le tonnerre de la victoire ! 👑', 'La tempête s’est calmée… tu as gagné.')
 
 # 11 · Jardin fleuri
 r('Abeille Butine', 'Miel', f'Quand elle est « Très chaud » ou plus près, elle met du miel de côté : un {K} pour elle. Une fois par manche.',
@@ -185,8 +185,8 @@ r('Mouette Mousse', 'Grande gueule', 'Chaque fois qu’elle refroidit, elle crie
   'Mousse sur le pont ! ⚓', 'Kia-kia ! C’est {k} !', 'Terre ! La terre est proche !', 'Kia ! Tu as trouvé le trésor ?!', 'Le mousse est un héros !', 'Kiaaa… à la mer.')
 r('Carlin Boucanier', 'À l’abordage', f'Quand tu es « Très chaud » ou plus près, il aborde ton navire et te prend ton {K}. Une fois par manche.',
   'Ouaf ! Tout le monde sur le pont ! 🏴‍☠️', 'À l’abordage ! Ton « ⚡ » est à moi !', 'Ça sent le trésor !', 'Ouaf ! Tu es devant mon coffre !', 'Le butin est à moi !', 'Je me rends, capitaine…')
-r('Coffre Perle', 'Trésor', f'Quand tu es « Brûlant », il s’ouvre : un {K} pour toi. Une fois par manche.',
-  'Je suis plein de trésors ! 💎', 'Crrr-ic ! Un trésor — « ⚡ +1 coup » pour toi !', 'Mes perles tintent — tout près !', 'Tu as trouvé ma clé !', 'Le trésor reste chez moi !', 'Tu as trouvé le trésor !')
+r('Perroquet Doublon', 'Des doublons !', 'Quand tu es « Brûlant », il crie « Des doublons ! » et te lance une pièce : un « ⚡ +1 coup ». Une fois par manche.',
+  'Des doublons ! Des doublons ! Salut, moussaillon ! 🦜', 'Des doublons ! Attrape un « ⚡ +1 coup » !', 'Coco sent le trésor !', 'Le moussaillon a presque trouvé le trésor !', 'Les doublons sont à moi !', 'Les doublons… sont à toi.')
 r('Étoile Lueur', 'Étoile du berger', 'Au début de la manche, elle te dit si le nombre est pair ou impair.',
   'Je vais te montrer le chemin ! ⭐', 'L’étoile guide : le nombre est {k} !', 'En plein sur le cap !', 'Tu navigues aux étoiles !', 'Une victoire scintillante !', 'Mon étoile s’est éteinte…')
 r('Rat Sifflet', 'Sifflet', 'À son troisième coup, il siffle : tu te figes et tu passes ton tour.',
@@ -207,8 +207,8 @@ b('Le Capitaine Tigre', 'À l’abordage !', f'Quand tu es « Brûlant », il te
 # 14 · Village d’Halloween
 r('Fantôme Lanterne', 'À travers les murs', 'Quand il est « Très chaud » ou plus près, il passe à travers un mur : ce coup-là t’est caché. Une fois par manche.',
   'Bouh ! N’aie pas peur, je suis gentil 👻', 'Ouuuh ! Ce coup passe à travers le mur !', 'Ma lanterne brille plus fort — tout près !', 'Tu me vois ?!', 'Ouuuh ! Victoire !', 'Je m’efface…')
-r('Citrouille Sourire', 'Lanterne-citrouille', 'Après ton deuxième coup, elle s’illumine : le nombre est plus grand ou plus petit que le tien.',
-  'Hi-hi ! Je suis une citrouille qui brille ! 🎃', 'Je brille : c’est {k} !', 'Ma bougie brille plus fort !', 'Tu as presque soufflé ma bougie !', 'Une victoire citrouille !', 'Ma bougie s’est éteinte…')
+r('Gargouille Index', 'Doigt de pierre', 'Après ton deuxième coup, elle montre de son doigt de pierre si le nombre est plus grand ou plus petit que le tien.',
+  'N’aie pas peur, je suis en pierre, mais gentille 🗿', 'Mon doigt indique : c’est {k} !', 'Je sens le chemin comme la pierre sent la pluie !', 'Tu es sur la bonne voie !', 'La pierre est solide — la victoire est à moi !', 'J’en reste pétrifiée…')
 r('Minette Balai', 'Balai volant', 'Quand elle est « Brûlant », elle s’envole sur son balai et rejoue tout de suite. Une fois par manche.',
   'Miaou ! Je fais de la magie 🧹', 'Miaou ! Sur mon balai — encore un coup !', 'La magie marche !', 'Miaou ! Tu fais de la magie, toi aussi ?!', 'Une victoire magique !', 'Mon balai est cassé…')
 r('Momie Bandelette', 'Bandelettes', 'Après ton troisième coup, elle t’enroule dans ses bandelettes : tu passes ton tour.',
@@ -221,8 +221,8 @@ r('Corbeau Croa', 'Croa !', f'Quand tu refroidis, il croasse dans ton oreille : 
   'Croa ! Je suis le roi de la nuit ! 😵', 'CROA ! Un lancer fou !', 'Croa ! Tout près !', 'Croa-croa ! Tu as presque trouvé !', 'Croa — victoire !', 'Croa… je m’envole.')
 r('Louveteau Hurlou', 'Pleine lune', f'Au sixième coup de la manche, la lune se lève : {TWICE}.',
   'Aouuh ! La lune arrive ! 🌕', 'Pleine lune ! Aouuh ! Deux coups !', 'Mon nez sent le but !', 'Tu hurles mieux que moi !', 'Aouuh ! Victoire !', 'La lune s’est cachée…')
-r('Chaudron Bulle', 'Ça déborde', 'Quand il chauffe, le chaudron bouillonne et t’éclabousse : tu passes ton tour. Une fois par manche.',
-  'Blop-blop ! Je prépare une potion ! 🫧', 'Blop-blop-blop ! Splash — passe ton tour !', 'La potion est presque prête !', 'Tu as lu ma recette ?!', 'La potion de la victoire est prête !', 'La potion a brûlé…')
+r('Gobelin Filou', 'Croc-en-jambe', 'Quand il chauffe, il te fait un croc-en-jambe : tu passes ton tour. Une fois par manche.',
+  'Hé-hé ! Hop — me voilà ! 👀', 'Oups ! Croc-en-jambe — tu passes ton tour !', 'Hé-hé, j’y suis presque !', 'Oh, tu m’as repéré !', 'Hé-hé ! Je t’ai bien eu !', 'Hop… et je file. Tu as gagné.')
 b('Le Comte Crocs', 'Nuée de chauves-souris', f'Quand il est « Brûlant », il lâche ses chauves-souris : {FOG}. Une fois par manche.',
   'Croc', f'Quand tu chauffes, il croque ton {K} : il disparaît. Une fois par manche.',
   'Bienvenue dans mon château… 🦇', 'Volez, mes chauves-souris !', 'Crac ! Ton « ⚡ » a disparu !',
@@ -243,8 +243,8 @@ r('Griffon Doré', 'Serres', f'Quand il chauffe, il emporte ton {K} dans ses ser
   'Je suis un griffon — fort et rapide ! 🦅', 'Je chauffe ! Ton « ⚡ » est dans mes serres !', 'Mes ailes me portent vers le but !', 'Tu es plus courageux qu’un lion !', 'Une victoire de griffon !', 'Je m’envole vers les montagnes…')
 r('Beagle Mousquetaire', 'Touché !', f'Quand il est « Très chaud » ou plus près, il attaque à l’épée : ton {K} disparaît. Une fois par manche.',
   'Un pour tous ! 🤺', 'Touché ! Ton « ⚡ » a disparu !', 'Mon épée sent le but !', 'En garde !', 'Pour le roi — victoire !', 'Touché… tu as gagné.')
-r('Le Cavalier d’échecs', 'Les blancs commencent', 'Il joue toujours en premier et, à son deuxième coup, il te dit si le nombre est pair ou impair.',
-  'Échec ! Je me déplace en L ♞', 'Coup du cavalier : le nombre est {k} !', 'Échec — c’est chaud !', 'Tu joues comme un grand maître !', 'Échec et mat ! Victoire !', 'J’abandonne…')
+r('Blaireau Vaillant', 'Le chevalier commence', 'Joue toujours en premier et, à son deuxième coup, te dit honnêtement si le nombre est pair ou impair.',
+  'Un chevalier commence toujours ! 🛡️', 'Parole de chevalier : le nombre est {k} !', 'En avant, vers la victoire !', 'Un adversaire digne de moi !', 'Victoire au chevalier !', 'Je baisse mon bouclier — tu as gagné.')
 r('Troll Pont', 'Péage du pont', f'Après ton deuxième coup, il fait payer le pont : ton {K} est pour lui.',
   'Tu veux passer mon pont ? Paie ! 🌉', 'Péage ! Le « ⚡ » est à moi !', 'Le troll sent la victoire !', 'Tu es plus malin qu’un troll !', 'Le pont est à moi !', 'Passe… tu as gagné.')
 b('Le Roi Lion', 'Rugissement royal', f'Quand tu es « Brûlant », il rugit si fort que, {MEM}. Une fois par manche.',

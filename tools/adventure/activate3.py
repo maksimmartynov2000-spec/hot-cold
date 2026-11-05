@@ -10,13 +10,13 @@ if "key: 'swamp'" not in s:
     s = s.replace(anchor, anchor + """,
   // Волна 6
   { key: 'swamp', range: 150, color: '#5f8f3e', bonus: 'shield', rule: 'traps' },
-  { key: 'music', range: 200, color: '#00b8a9', bonus: 'div3' },
+  { key: 'tsardom', range: 200, color: '#e74c3c', bonus: 'div3' },
   { key: 'peaks', range: 300, color: '#6c8ebf', bonus: 'freeze', frost: true },
   { key: 'robots', range: 400, color: '#95a5a6', bonus: 'div5', rule: 'first' },
   { key: 'myths', range: 500, color: '#8e44ad', bonus: 'lava' },
   // Волна 7
   { key: 'autumn', range: 200, color: '#d35400', bonus: 'thief' },
-  { key: 'kitchen', range: 300, color: '#ff9f80', bonus: 'half' },
+  { key: 'pyramids', range: 300, color: '#d4a017', bonus: 'half' },
   { key: 'atlantis', range: 300, color: '#16a085', bonus: 'compass', frost: true },
   { key: 'dreams', range: 400, color: '#6c5ce7', bonus: 'mirror', rule: 'storm' },
   { key: 'forge', range: 500, color: '#c0392b', bonus: 'lava', rule: 'traps' }""")
