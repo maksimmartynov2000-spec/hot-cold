@@ -12,11 +12,12 @@ def load(name):
     exec(open(os.path.join(here, name), encoding='utf-8').read(), g)
     return g
 S, T, LV = [], {l: {'WORLDS': [], 'H': []} for l in LANGS}, {'shift': {}, 'level': {}}
-texts_upto = 0
+texts_upto, sizes = 0, []
 for b in range(1, NB + 1):
     part = load('spec%d.py' % b)['S']
-    assert len(part) == 100, (b, len(part))
-    S += part
+    # Партия — 10 миров (100 героев); последняя, пятая, — 5 миров (50)
+    assert len(part) == (50 if b == 5 else 100), (b, len(part))
+    S += part; sizes.append(len(part))
     lf = os.path.join(here, 'levels%d.json' % b)
     if os.path.exists(lf):
         d = json.load(open(lf))
@@ -29,16 +30,20 @@ for b in range(1, NB + 1):
 for i, s_ in enumerate(S):
     v = LV['level'].get(str(50 + i), 0)
     if v: s_['level'] = v
-WORLDS_RU = sum((load('t%d_ru.py' % b)['WORLDS'] for b in range(1, NB + 1)), [])
+# Имена миров для комментариев: из текстов, а пока их нет — из списка портретов
+def worlds_ru(b):
+    if os.path.exists(os.path.join(here, 't%d_ru.py' % b)): return load('t%d_ru.py' % b)['WORLDS']
+    return [w for w, _ in load(os.path.join('portraits', 'heroes%d.py' % b))['W']]
+WORLDS_RU = sum((worlds_ru(b) for b in range(1, NB + 1)), [])
 
-TELL = {'tellDir', 'tellParity', 'tellHalf'}
+TELL = {'tellDir', 'tellParity', 'tellHalf', 'tellDiv3', 'tellDiv5', 'tellTens', 'tellUnits'}
 def acts(s):
     if s.get('boss'): return [('a1', s['a1']), ('a2', s['a2'])]
     return [('rule', s['on'])] if s.get('on') else []
 # Проверки: у каждого героя все поля, {k} — ровно там, где правило что-то говорит
 for lang, g in T.items():
     H = g['H']
-    assert len(H) == 100 * texts_upto, (lang, len(H))
+    assert len(H) == sum(sizes[:texts_upto]), (lang, len(H))
     names = [h['n'] for h in H]
     assert len(set(names)) == len(names), (lang, [n for n in names if names.count(n) > 1])
     for i, h in enumerate(H):
@@ -60,7 +65,7 @@ def js(v):
     if isinstance(v, str): return "'" + v.replace('\\', '\\\\').replace("'", "\\'") + "'"
     if isinstance(v, list): return '[' + ', '.join(js(x) for x in v) + ']'
     raise TypeError(v)
-ORDER = ['boss', 'icon', 'on', 'a1icon', 'a1', 'a2icon', 'a2', 'pick', 'first', 'think', 'level', 'tokens', 'frost']
+ORDER = ['boss', 'icon', 'on', 'a1icon', 'a1', 'a2icon', 'a2', 'pick', 'first', 'think', 'immune', 'level', 'tokens', 'frost']
 lines = ['// Герои миров 6–50: правило — запись, а не функция (см. advCompile). Номер',
          '// героя n = 50 + индекс; тексты — в js/adv-<язык>.js в том же порядке',
          'const ADV_HEROES = [']

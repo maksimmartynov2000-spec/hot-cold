@@ -6,7 +6,7 @@ def load(f):
     g = {}; exec(open(os.path.join(here, f), encoding='utf-8').read(), g); return g
 S = load('spec%d.py' % b)['S']
 T = load('t%d_%s.py' % (b, lang))
-TELL = {'tellDir', 'tellParity', 'tellHalf'}
+TELL = {'tellDir', 'tellParity', 'tellHalf', 'tellDiv3', 'tellDiv5', 'tellTens', 'tellUnits'}
 bad = []
 for i, (s, h) in enumerate(zip(S, T['H'])):
     keys = ['n', 'a1t', 'a1d', 'a2t', 'a2d', 'hi', 'a1', 'a2', 'luck', 'worry', 'win', 'lose'] if s.get('boss') else ['n', 't', 'd', 'hi', 'rule', 'luck', 'worry', 'win', 'lose']

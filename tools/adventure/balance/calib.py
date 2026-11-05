@@ -18,7 +18,9 @@ def base(w):
     return min(0.9, 0.17 + 0.03 * (w // 5) + 0.14 * (w % 5))
 def eff(n, lv):
     return base(n // 10) + (n % 10) * 0.012 + (0.06 if n % 10 == 9 else 0) + lv
-first, last = W0 * 10, W0 * 10 + 99
+# Партия — 10 миров, последняя (миры 46–50) — 5: всего героев до номера 500 (n до 499)
+first, last = W0 * 10, min(W0 * 10 + 99, 499)
+NW = (last - first + 1) // 10
 state_f = os.path.join(OUT, 'calib_%d.json' % W0)
 # Первый шаг — с прежней силы партии (levelsN.json), если она уже подбиралась
 levels_f = os.path.join(HERE, '..', 'levels%d.json' % ((W0 - 5) // 10 + 1))
@@ -29,7 +31,7 @@ elif os.path.exists(levels_f):
     L = {n: round(d['shift'][str(n // 10)] + d['level'].get(str(n), 0), 3) for n in range(first, last + 1)}
 else:
     L = {n: (-0.2 if n % 10 == 9 else 0.0) for n in range(first, last + 1)}
-patch = 'for (let w = %d; w < %d; w++) ADV_BRAIN_SHIFT[w] = 0; const LV = ' % (W0, W0 + 10) + \
+patch = 'for (let w = %d; w < %d; w++) ADV_BRAIN_SHIFT[w] = 0; const LV = ' % (W0, W0 + NW) + \
         json.dumps({str(n - 50): round(v, 3) for n, v in L.items()}) + \
         '; ADV_HEROES.forEach((h, i) => { if (i in LV) h.level = LV[i]; }); advHeroRules.length = 0;'
 tag = 'c%d_%d' % (W0, it)
@@ -39,7 +41,7 @@ for line in open(os.path.join(OUT, 'bal_%s.txt' % tag)):
     p = line.split()
     if len(p) >= 4 and p[0].isdigit():
         res[int(p[0])] = 100.0 * int(p[2]) / int(p[3])
-assert len(res) == 100, len(res)
+assert len(res) == last - first + 1, len(res)
 damp = float(os.environ.get('DAMP', '0.8'))
 rows, off = [], 0
 for n in range(first, last + 1):
@@ -59,8 +61,8 @@ for n in range(first, last + 1):
     rows.append((n, T, win, old, L[n]))
     off += abs(win - T)
 json.dump({str(k): v for k, v in L.items()}, open(state_f, 'w'))
-for w in range(W0, W0 + 10):
+for w in range(W0, W0 + NW):
     rs = [r for r in rows if r[0] // 10 == w]
     print('w%-2d avg %4.1f (цель %4.1f) | ' % (w + 1, sum(r[2] for r in rs) / 10, sum(r[1] for r in rs) / 10) +
           ' '.join('%3d' % r[2] for r in rs) + ' | ' + ' '.join('%+.2f' % r[3] for r in rs))
-print('сумма |откл.| %.0f, среднее %.1f' % (off, off / 100))
+print('сумма |откл.| %.0f, среднее %.1f' % (off, off / (last - first + 1)))

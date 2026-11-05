@@ -1240,7 +1240,7 @@ function bonusBlocked(type, victim) {
 function applyBonus(type, by, guess) {
   const rival = 1 - by;
   if (rival === 1 && vsBot && vsBot.adv && typeof advImmune === 'function' &&
-      (type === 'fog' || type === 'blind' || type === 'freeze') && advImmune(type)) return;
+      (type === 'fog' || type === 'blind' || type === 'freeze' || type === 'lava') && advImmune(type)) return;
   if (type === 'extra') D.tokens[by] += 2;
   // Отметка — номер следующего хода: этот ход уже в истории и остаётся виден
   // Туман закрывает все ходы соперника в раунде, слепота — все свои, и прежние

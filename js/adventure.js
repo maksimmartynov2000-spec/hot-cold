@@ -92,7 +92,7 @@ const ADV_DIFFS = ['easy', 'normal', 'hard'];
 // Поля: icon — значок, level / think — сила и раздумья, tokens — прибавка
 // «⚡ +1 ход» [игроку, сопернику], frost — числа с минусом, first — ходит
 // первым, forget — помнит два хода, gamble — доля ходов наугад, immune — какие
-// помехи на него не действуют, bonus — свои бонусы на прямой, noTokens — сам
+// помехи на него не действуют (fog, blind, freeze, lava), bonus — свои бонусы на прямой, noTokens — сам
 // «+1 ход» не берёт.
 // Загаданное число правила не трогают никогда: меняется только, кто что
 // видит, кто когда ходит и у кого сколько «+1 ход».
@@ -258,7 +258,9 @@ const ADV_RULES = {
 //     видно его ходов, blindYou — своих; memoryYou — видны только два последних
 //     хода; lavaYou — ваш следующий ход — шальной бросок; tellDir / tellParity /
 //     tellHalf — говорит вам «больше/меньше», чётность, половину; knowDir /
-//     knowParity / knowHalf — знает сам
+//     knowParity / knowHalf — знает сам; tellDiv3 / tellDiv5 / tellTens /
+//     tellUnits — говорит, делится ли на 3, на 5, цифру десятков, последнюю
+//     цифру; knowDiv3 / knowDiv5 / knowTens / knowUnits — знает сам
 //   pick — как выбирает число: tens (круглые), mirror (зеркально вашему), creep
 //     (шажками), up (всё выше), lucky (с семёркой)
 function advTrend(R, m) {
@@ -313,6 +315,16 @@ const ADV_ACT = {
   knowHalf: R => { R.know(1, 'half'); },
   // Сам узнаёт, больше загаданное этого числа или меньше. Вам не скажет
   knowDir: (R, m) => { R.know(1, R.dir(m.guess), m.guess); },
+  // Математика (с 36-го мира): делится ли на 3 и на 5, цифра десятков, последняя
+  // цифра — по модулю, как у бонусов ➗3, ➗5, 🔟, 🔢. tell… — вам, know… — себе
+  tellDiv3: R => { R.know(0, 'div3'); return { k: R.word('div3') }; },
+  tellDiv5: R => { R.know(0, 'div5'); return { k: R.word('div5') }; },
+  tellTens: R => { R.know(0, 'tens'); return { k: R.word('tens') }; },
+  tellUnits: R => { R.know(0, 'units'); return { k: R.word('units') }; },
+  knowDiv3: R => { R.know(1, 'div3'); },
+  knowDiv5: R => { R.know(1, 'div5'); },
+  knowTens: R => { R.know(1, 'tens'); },
+  knowUnits: R => { R.know(1, 'units'); },
   swapTokens: () => { if (D.tokens[0] === D.tokens[1]) return false; D.tokens.reverse(); },
   giveBoth: R => { R.give(0, 1); R.give(1, 1); },
   burnMe: R => { if (!D.tokens[1]) return false; R.take(1, 1); }
@@ -886,12 +898,22 @@ function advCtx() {
       if (key === 'half') k.half = secret <= halfMark() ? 'low' : 'high';
       if (key === 'gt') k.gt = k.gt === undefined ? x : Math.max(k.gt, x);
       if (key === 'lt') k.lt = k.lt === undefined ? x : Math.min(k.lt, x);
+      const a = Math.abs(secret);
+      if (key === 'div3') k.div3 = a % 3 === 0;
+      if (key === 'div5') k.div5 = a % 5 === 0;
+      if (key === 'tens') k.tens = Math.floor(a / 10) % 10;
+      if (key === 'units') k.units = a % 10;
     },
     // Слово для реплики: «чётное», «больше 23», «не больше 50»
     word: (key, x) => {
       const W = t().adv.kw;
       if (key === 'parity') return Math.abs(secret) % 2 === 0 ? W.even : W.odd;
       if (key === 'half') return (secret <= halfMark() ? W.low : W.high).replace('{m}', formatNum(halfMark()));
+      const a = Math.abs(secret);
+      if (key === 'div3') return a % 3 === 0 ? W.div3 : W.notDiv3;
+      if (key === 'div5') return a % 5 === 0 ? W.div5 : W.notDiv5;
+      if (key === 'tens') return W.tens.replace('{d}', Math.floor(a / 10) % 10);
+      if (key === 'units') return W.units.replace('{d}', a % 10);
       return W[key].replace('{n}', formatNum(x));
     },
     // Правило сработало: в первый раз за раунд — большой карточкой посреди
