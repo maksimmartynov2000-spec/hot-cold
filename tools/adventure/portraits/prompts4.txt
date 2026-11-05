@@ -1,0 +1,160 @@
+ПОРТРЕТЫ: миры 36–50 — листы 1–5 (миры 36–45, герои 351–450)
+
+Как сделать каждый лист (так же, как партии 2 и 3):
+1. Откройте Gemini, приложите ту же картинку-образец стиля (style-ref).
+2. Вставьте текст листа целиком — от «Match» до последней строки.
+3. Готовую картинку пришлите сюда. Если Gemini дал два варианта — присылайте оба. Нарежу и подключу сам.
+Листы 1–7 — по 20 героев (5 в ряд, 4 ряда), лист 8 — 10 героев (5 в ряд, 2 ряда).
+Если какой-то герой вышел плохо — скажите, кого переделать: дам подсказку на него одного.
+
+Кто есть кто (по рядам слева направо; 👑 — босс):
+Лист 1.
+  ряд 1: Борзая Рывок (мир 36), Кенгуру Хук (мир 36), Выдра Брасс (мир 36), Морской слон Штанга (мир 36), Бобр Шайба (мир 36)
+  ряд 2: Соболь Пируэт (мир 36), Шимпанзе Сальто (мир 36), Импала Марафон (мир 36), Окапи Данк (мир 36), 👑 Гризли Чемпион (мир 36)
+  ряд 3: Бассет Нюхач (мир 37), Бульдог Инспектор (мир 37), Сорока Улика (мир 37), Сиамская кошка Шифр (мир 37), Голубь Связной (мир 37)
+  ряд 4: Морская свинка Картотека (мир 37), Коала Отпечаток (мир 37), Скворец Сплетник (мир 37), Енот Отмычка (мир 37), 👑 Пантера Фантом (мир 37)
+Лист 2.
+  ряд 1: Морская игуана Соль (мир 38), Олуша Танго (мир 38), Фрегат Шарик (мир 38), Вьюрок Дарвин (мир 38), Морской лев Лежебока (мир 38)
+  ряд 2: Летучая рыба Брызг (мир 38), Баклан Нелетун (мир 38), Лавовая ящерица Отжимашка (мир 38), Ястреб Страж (мир 38), 👑 Патриарх Джордж (мир 38)
+  ряд 3: Луговая собачка Тявка (мир 39), Койот Бродяга (мир 39), Гремучник Погремушка (мир 39), Мустанг Ветер (мир 39), Дикобраз Колючка (мир 39)
+  ряд 4: Кукушка-подорожник Пыль (мир 39), Кроличья сова Кочка (мир 39), Ядозуб Бусинка (мир 39), Вилорог Рогатик (мир 39), 👑 Шериф Бизон (мир 39)
+Лист 3.
+  ряд 1: Каппа Огуречик (мир 40), Тэнгу Опахало (мир 40), Нэкомата Двухвостка (мир 40), Кама-итати Порыв (мир 40), Кодама Шептун (мир 40)
+  ряд 2: Амабиэ Сияние (мир 40), Юки-онна Снежинка (мир 40), Дзасики-вараси Удача (мир 40), Снежная макака Онсэн (мир 40), 👑 Король Они (мир 40)
+  ряд 3: Орангутан Борнео (мир 41), Балийский скворец Жемчуг (мир 41), Птица-носорог Шлемик (мир 41), Тапир Пижамка (мир 41), Толстый лори Тихоход (мир 41)
+  ряд 4: Носач Носик (мир 41), Рыба-мандарин Карнавал (мир 41), Бинтуронг Мурлыка (мир 41), Малайский медведь Луч (мир 41), 👑 Король Комодо (мир 41)
+Лист 4.
+  ряд 1: Нетопырь Эхолот (мир 42), Ворона Шестерёнка (мир 42), Капуцин Пробирка (мир 42), Голый землекоп Геолог (мир 42), Жако Полиглот (мир 42)
+  ряд 2: Коати Колба (мир 42), Пчела Геометр (мир 42), Альпака Чертёжница (мир 42), Песчанка Опыт (мир 42), 👑 Ректор Сипуха (мир 42)
+  ряд 3: Кетцаль Изумруд (мир 43), Ревун Голосище (мир 43), Пекари Копатель (мир 43), Коата Пятилапка (мир 43), Ящерица-василиск Бегун (мир 43)
+  ряд 4: Кинкажу Цепкий (мир 43), Оцелот Пятныш (мир 43), Тамандуа Язычок (мир 43), Ара Факел (мир 43), 👑 Ягуар-вождь Балам (мир 43)
+Лист 5.
+  ряд 1: Манул Хмурик (мир 44), Сайгак Горбоносик (мир 44), Лошадь Пржевальского Буланка (мир 44), Кулан Скакун (мир 44), Двугорбый верблюд Караван (мир 44)
+  ряд 2: Суслик Столбик (мир 44), Дрофа Важная (мир 44), Перевязка Пестрик (мир 44), Корсак Степняк (мир 44), 👑 Хан Беркут (мир 44)
+  ряд 3: Слейпнир Восьминожка (мир 45), Ворон Хугин (мир 45), Белка Рататоск (мир 45), Волчонок Фенрир (мир 45), Козлик Громобой (мир 45)
+  ряд 4: Ётун Сосулька (мир 45), Валькирия Сигрун (мир 45), Лесная кошка Фрейя (мир 45), Медвежонок Берсерк (мир 45), 👑 Змей Ёрмунганд (мир 45)
+
+=============== ЛИСТ 1 из 8 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no letters, no grid lines, no borders.
+Row 1, column 1: a greyhound sprinter in a red running vest, leaning forward at the start line
+Row 1, column 2: a young kangaroo in soft red boxing gloves and a sporty headband, bouncing happily
+Row 1, column 3: a river otter in swimming goggles and a swim cap, swimming breaststroke with a happy splash
+Row 1, column 4: a chubby elephant seal proudly lifting a light training barbell
+Row 1, column 5: a beaver in a hockey helmet and jersey holding a hockey stick, a puck at its feet
+Row 2, column 1: a sable in a sparkly figure-skating outfit spinning on ice skates
+Row 2, column 2: a chimpanzee gymnast in a leotard doing a handstand on gymnastics rings
+Row 2, column 3: an impala antelope marathon runner with a sweatband, jogging
+Row 2, column 4: an okapi in a basketball jersey jumping to dunk a ball
+Row 2, column 5: a big friendly grizzly bear champion with a golden medal and a laurel wreath, raising a trophy cup, slightly bigger and grander than the others
+Row 3, column 1: a basset hound detective in a deerstalker hat holding a magnifying glass, sniffing
+Row 3, column 2: a bulldog police inspector in a trench coat and a flat cap, holding a notepad
+Row 3, column 3: a magpie holding a shiny little key in its beak, proud of its find
+Row 3, column 4: a Siamese cat secret agent in dark sunglasses with a tiny earpiece
+Row 3, column 5: a carrier pigeon in a messenger cap with a tiny message tube on its leg
+Row 4, column 1: a guinea pig archivist with round glasses sitting on a stack of folders
+Row 4, column 2: a koala forensic expert dusting for fingerprints with a soft little brush
+Row 4, column 3: a speckled starling whispering a secret behind its wing
+Row 4, column 4: a raccoon cat burglar in a striped shirt tiptoeing, cheeky smile
+Row 4, column 5: a sleek black panther master thief in a black eye mask and a cape, mysterious smile, slightly bigger and grander than the others
+
+=============== ЛИСТ 2 из 8 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no letters, no grid lines, no borders.
+Row 1, column 1: a black marine iguana sunbathing on a lava rock, sneezing a tiny puff of salt
+Row 1, column 2: a blue-footed booby dancing and lifting one bright blue foot
+Row 1, column 3: a frigatebird proudly puffing out a huge red throat balloon
+Row 1, column 4: a Darwin finch with a sturdy beak and tiny round explorer glasses
+Row 1, column 5: a sea lion pup lounging lazily on its back
+Row 2, column 1: a flying fish gliding above a splash with its wing-like fins spread
+Row 2, column 2: a flightless cormorant with tiny stubby wings, shrugging happily
+Row 2, column 3: a lava lizard with a red throat doing push-ups on a rock
+Row 2, column 4: a Galapagos hawk perched on a cactus, keeping watch
+Row 2, column 5: an enormous ancient Galapagos giant tortoise with a long neck, a mossy shell and a wise smile, slightly bigger and grander than the others
+Row 3, column 1: a prairie dog standing on its hind legs in a tiny cowboy hat, on lookout
+Row 3, column 2: a coyote wanderer with a red bandana and a cowboy hat, howling happily at the sky
+Row 3, column 3: a friendly rattlesnake in a cowboy hat shaking its rattle tail, no fangs
+Row 3, column 4: a wild mustang horse with a flowing mane, galloping
+Row 3, column 5: a porcupine in a cowboy vest with its quills fluffed up
+Row 4, column 1: a roadrunner bird running fast with a little dust cloud behind it
+Row 4, column 2: a burrowing owl with long legs and big yellow eyes peeking out of a burrow
+Row 4, column 3: a Gila monster lizard with beaded orange-and-black skin, smiling
+Row 4, column 4: a pronghorn antelope with short forked horns, leaping
+Row 4, column 5: a big American bison sheriff with a golden star badge and a cowboy hat, slightly bigger and grander than the others
+
+=============== ЛИСТ 3 из 8 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no letters, no grid lines, no borders.
+Row 1, column 1: a kappa, a cute green turtle-like water sprite with a water dish on its head, holding a cucumber
+Row 1, column 2: a cute crow tengu, a little crow-headed mountain spirit in a monk robe, waving a big feather fan
+Row 1, column 3: a nekomata, a cute cat with two tails holding a small glowing paper lantern
+Row 1, column 4: a kamaitachi, a cute weasel spirit spinning in a little whirlwind
+Row 1, column 5: a kodama, a tiny white tree spirit with a round head and dot eyes, sitting on a mossy branch
+Row 2, column 1: an amabie, a cute mermaid-like spirit with long hair, a little bird beak and glowing scales
+Row 2, column 2: a yuki-onna, a little snow girl in a white kimono with snowflakes around her, kind smile
+Row 2, column 3: a zashiki-warashi, a little house-spirit child with a bob haircut in a red kimono, giggling
+Row 2, column 4: a Japanese snow monkey with a red face soaking in a steaming hot spring, snow on its head
+Row 2, column 5: a big friendly red oni ogre king with small horns, curly hair, a tiger-striped belt and a crown, holding a big drum, slightly bigger and grander than the others
+Row 3, column 1: a fluffy orange orangutan holding a big leaf like an umbrella
+Row 3, column 2: a Bali myna, a snow-white bird with a bright blue mask around its eyes and black wingtips
+Row 3, column 3: a rhinoceros hornbill with a huge curved orange casque on its beak
+Row 3, column 4: a Malayan tapir that looks like it wears black-and-white pajamas, with a short trunk
+Row 3, column 5: a slow loris with huge round eyes slowly hugging a branch
+Row 4, column 1: a proboscis monkey with a big funny nose, laughing
+Row 4, column 2: a mandarinfish with swirly bright blue and orange patterns
+Row 4, column 3: a binturong bearcat with shaggy black fur and a long curly tail, sleepy smile
+Row 4, column 4: a sun bear cub with a golden sun-shaped patch on its chest, licking its paw
+Row 4, column 5: a big Komodo dragon king with a crown, friendly grin, no sharp teeth, slightly bigger and grander than the others
+
+=============== ЛИСТ 4 из 8 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no letters, no grid lines, no borders.
+Row 1, column 1: a little bat physicist wearing headphones, listening to sound waves
+Row 1, column 2: a crow inventor in welding goggles holding a little wrench
+Row 1, column 3: a capuchin monkey chemist in a lab coat holding a bubbling test tube
+Row 1, column 4: a naked mole-rat geologist in a hard hat examining a crystal
+Row 1, column 5: an African grey parrot linguist in round glasses holding a big book
+Row 2, column 1: a coati scientist with a striped tail holding a round glass flask
+Row 2, column 2: a bee mathematician holding a drawing compass, standing on a honeycomb of perfect hexagons
+Row 2, column 3: an alpaca engineer with fluffy hair holding a rolled blueprint, a pencil behind its ear
+Row 2, column 4: a gerbil lab assistant in a tiny lab coat and safety goggles holding a magnifier
+Row 2, column 5: a barn owl rector in an academic gown and a square graduation cap, wise smile, slightly bigger and grander than the others
+Row 3, column 1: a resplendent quetzal bird with emerald feathers and a long flowing tail
+Row 3, column 2: a howler monkey howling loudly with a round open mouth
+Row 3, column 3: a peccary with a bristly collar sniffing the ground
+Row 3, column 4: a spider monkey hanging by its long tail like a fifth hand
+Row 3, column 5: a crested basilisk lizard running on water on its hind legs
+Row 4, column 1: a kinkajou with big dark eyes curling its tail around a branch
+Row 4, column 2: an ocelot kitten with beautiful spotted fur
+Row 4, column 3: a tamandua anteater with a vest-like dark fur patch, sticking out its long tongue
+Row 4, column 4: a scarlet macaw with fiery red, yellow and blue feathers
+Row 4, column 5: a jaguar chief in a feathered headdress and jade jewelry, noble smile, slightly bigger and grander than the others
+
+=============== ЛИСТ 5 из 8 ===============
+
+Match the exact art style and lighting of the attached image.
+A sprite sheet of 20 cute character icons for a kids' mobile game, a perfectly even grid of 5 columns and 4 rows, pure white background, landscape 5:4 image. Glossy 3D cartoon, soft studio light, big friendly eyes, happy faces, rich saturated colors. Every character is a living creature — an animal, a person or a magical being, never an object, food or a toy. Each character is shown from the chest up (small creatures whole), front-facing, centered in its cell, all the same size, with generous empty space between them. Nothing scary — everything cute and friendly, no sharp teeth. No background shapes, no circles, no shadows, no text, no letters, no grid lines, no borders.
+Row 1, column 1: a Pallas cat with a round grumpy face and very fluffy fur
+Row 1, column 2: a saiga antelope with a funny bulbous nose
+Row 1, column 3: a Przewalski horse foal with a short upright mane and a dun coat
+Row 1, column 4: a kulan, a wild donkey galloping across the grass
+Row 1, column 5: a two-humped Bactrian camel with shaggy winter fur
+Row 2, column 1: a ground squirrel standing on its hind legs and whistling
+Row 2, column 2: a great bustard proudly puffing out its white feathers
+Row 2, column 3: a marbled polecat with a mottled yellow-brown coat and a black-and-white face mask
+Row 2, column 4: a corsac fox with big ears and a fluffy grey coat
+Row 2, column 5: a golden eagle khan in a fur hat with a feather, proud, slightly bigger and grander than the others
+Row 3, column 1: Sleipnir, a cute grey foal with eight legs and a braided mane
+Row 3, column 2: a clever raven with a tiny silver pendant, head tilted thoughtfully
+Row 3, column 3: Ratatoskr, a red squirrel messenger running down a giant tree trunk
+Row 3, column 4: Fenrir, a big fluffy grey wolf pup, playful
+Row 3, column 5: a sturdy goat kid with curled horns and little lightning sparks around it
+Row 4, column 1: a little frost giant child with icy blue skin and icicle hair, friendly
+Row 4, column 2: a young valkyrie girl with braids, a winged helmet and a round shield
+Row 4, column 3: a Norwegian forest cat with a long fluffy coat, ear tufts and a flower crown
+Row 4, column 4: a bear cub in a horned Viking helmet roaring cutely
+Row 4, column 5: Jormungandr, a huge friendly sea serpent curled in a circle holding its own tail, kind eyes, slightly bigger and grander than the others
