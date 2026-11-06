@@ -8134,6 +8134,68 @@ async function testScreensEverywhere(browser) {
   await ip.close();
 }
 
+// iPhone в установленной игре: страница рисуется и под часами с батареей
+// (viewport-fit=cover, прозрачная строка состояния), а снизу — полоска «Домой».
+// Окна шли от верха на 20 px, и их заголовок оказывался размыт под строкой
+// состояния. «Чёлку» задаём как у iPhone с Dynamic Island: 59 px и 34 px
+async function testSafeArea(browser) {
+  console.log('\niPhone с «чёлкой»: окна не заходят под часы и полоску «Домой»');
+  const TOP = 59, BOTTOM = 34;
+  const context = await browser.newContext({ viewport: PHONE });
+  const page = await context.newPage();
+  page.on('pageerror', e => check('без ошибок JS', false, e.message));
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: TOP, bottom: BOTTOM, left: 0, right: 0 } });
+  await applyStub(page, { user: 'Максим' });
+  await page.goto(GAME_URL);
+  await page.waitForTimeout(300);
+  // Окна появляются с увеличением — мерить надо уже на месте
+  await page.addStyleTag({ content: '*, *::before, *::after { animation: none !important; transition: none !important; }' });
+  // Каждое окно игры — с длинным содержимым, то есть во весь рост: самый тесный случай
+  const r = await page.evaluate(([TOP, BOTTOM]) => {
+    const bad = [];
+    let n = 0;
+    document.querySelectorAll('.modal-backdrop').forEach(bd => {
+      const card = bd.querySelector(':scope > .modal-card');
+      if (!card) { bad.push(bd.id + ': не окно'); return; }
+      const was = bd.classList.contains('hidden');
+      bd.classList.remove('hidden');
+      const fill = document.createElement('div');
+      fill.style.height = '3000px';
+      card.appendChild(fill);
+      const rc = card.getBoundingClientRect();
+      n++;
+      if (rc.top < TOP + 12 || innerHeight - rc.bottom < BOTTOM + 12) bad.push(bd.id + ' ' + Math.round(rc.top) + '/' + Math.round(innerHeight - rc.bottom));
+      fill.remove();
+      if (was) bd.classList.add('hidden');
+    });
+    return { n, bad };
+  }, [TOP, BOTTOM]);
+  check('ни одно окно не заходит под часы и полоску «Домой», даже во весь рост', r.n >= 20 && !r.bad.length, r.n + ' окон; ' + r.bad.join(', '));
+  // Магазин — во всю высоту: верх ниже часов, «Закрыть» выше полоски «Домой»
+  await page.evaluate(async () => { window.__wallet = { coins: 100, gems: 0, today: 0, cap: 300 }; await openShop('icon'); });
+  await page.waitForTimeout(200);
+  const shop = await page.evaluate(() => { const c = document.querySelector('#shopModal > .modal-card').getBoundingClientRect(),
+    t = document.getElementById('shopTitle').getBoundingClientRect(), ok = document.getElementById('shopOk').getBoundingClientRect(),
+    bd = document.getElementById('shopModal');
+    return { top: Math.round(c.top), title: Math.round(t.top), close: Math.round(innerHeight - ok.bottom), scroll: bd.scrollHeight > bd.clientHeight + 1 }; });
+  check('магазин: заголовок и кошелёк ниже часов, «Закрыть» выше полоски «Домой», окно не прокручивается целиком',
+    shop.top >= TOP + 12 && shop.title >= TOP + 20 && shop.close >= BOTTOM + 12 && !shop.scroll, JSON.stringify(shop));
+  await page.evaluate(() => closeShop());
+  // Меню, партия и всплывашка достижения — тоже ниже часов
+  const top = await page.evaluate(() => ({ head: Math.round(document.querySelector('.header').getBoundingClientRect().top),
+    ach: parseFloat(getComputedStyle(document.getElementById('achToast')).top),
+    tabbar: parseFloat(getComputedStyle(document.getElementById('tabbar')).paddingBottom) }));
+  await page.click('#tModeSolo');
+  await page.click('#tStartMatch');
+  await page.waitForTimeout(300);
+  const game = await page.evaluate(() => ({ info: Math.round(document.getElementById('infoBar').getBoundingClientRect().top),
+    dock: parseFloat(getComputedStyle(document.getElementById('guessSection')).paddingBottom) }));
+  check('меню и партия начинаются ниже часов, достижение выезжает под ними, меню и поле ввода — над полоской «Домой»',
+    top.head >= TOP && top.ach >= TOP && top.tabbar >= BOTTOM && game.info >= TOP && game.dock >= BOTTOM, JSON.stringify({ top, game }));
+  await context.close();
+}
+
 async function testAudit(browser) {
   console.log('\nРазбор глазами игрока');
 
@@ -8933,6 +8995,7 @@ async function testKeyPage(browser) {
     await testNoJumps(browser);
     await testTablet(browser);
     await testScreensEverywhere(browser);
+    await testSafeArea(browser);
     await testAdvDifficulty(browser);
     await testAdvRules(browser);
     await testAdvWorlds(browser);
