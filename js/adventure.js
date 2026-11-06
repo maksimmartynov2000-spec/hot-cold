@@ -1409,7 +1409,6 @@ function advIconOpen(icon) {
 function openAdventure() {
   endLessonMode();
   showScreen('adventure');
-  advOpenWorlds = null;
   renderAdventure(true);
   // Тексты миров 6+ — своим файлом: пришёл — перерисовать имена
   if (!ADV_PACKS[currentLang]) advLoadPack().then(() => { if (screen === 'adventure') renderAdventure(); });
@@ -1418,13 +1417,75 @@ function openAdventure() {
   advSync().then(() => { if (screen === 'adventure' && advDone() + '|' + advStars() !== was) renderAdventure(); });
 }
 
-// Какие миры раскрыты на карте: сначала — тот, где вы сейчас. Остальные —
-// одной строкой, раскрываются нажатием: 50 миров с картинками сразу — долгая
-// карта и заметная пауза на слабом телефоне
-let advOpenWorlds = null;
-function advToggleWorld(w) {
-  if (advOpenWorlds.has(w)) advOpenWorlds.delete(w); else advOpenWorlds.add(w);
-  renderAdventure();
+// ---------- путь ----------
+// Миры идут одной тропой сверху вниз, как уроки в Duolingo: кружок на каждого
+// соперника, змейкой, линия ведёт к следующему. Пройденные — с портретом и
+// звёздами, следующий подсвечен «В бой!», дальше — загадка «?». Боссы видны у
+// всех миров заранее, но нажать на будущего нельзя: кто ждёт внутри мира —
+// узнаёте, когда дойдёте
+const ADV_PATH_DX = [0, 52, 84, 64, 14, -46, -82, -66, -24, 0];
+const ADV_PATH_STEP = 78, ADV_PATH_TOP = 48, ADV_PATH_BOSS_GAP = 16;
+function advPathPoint(w, i) {
+  return [ADV_PATH_DX[i] * (w % 2 ? -1 : 1), ADV_PATH_TOP + i * ADV_PATH_STEP + (i === ADV_PER_WORLD - 1 ? ADV_PATH_BOSS_GAP : 0)];
+}
+function advPathHeight() { return advPathPoint(0, ADV_PER_WORLD - 1)[1] + 74; }
+// Линия через центры кружков — плавная кривая: куски Catmull-Rom как кубические Безье
+function advPathSegs(pts) {
+  const r = v => Math.round(v * 10) / 10;
+  return pts.slice(0, -1).map((p1, i) => {
+    const p0 = pts[i - 1] || p1, p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    return ' C' + r(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + r(p1[1] + (p2[1] - p0[1]) / 6) + ' ' +
+      r(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + r(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + p2[0] + ' ' + p2[1];
+  });
+}
+// Портрет в кружке — картинкой с ленивой загрузкой: 50 боссов на одной карте
+// не тянут разом полсотни файлов
+function advNodeArt(code) {
+  if (!ICON_ART.has(code) && !isNamedArt(code)) return '<span class="at-emo">' + escapeHtml(code) + '</span>';
+  return '<img class="at-img" src="' + iconFile(code) + '" alt="" loading="lazy" decoding="async">';
+}
+function advWorldPath(w, open) {
+  const A = t().adv, done = advDone();
+  const path = document.createElement('div');
+  path.className = 'aw-path';
+  path.style.setProperty('--ph', advPathHeight());
+  const pts = Array.from({ length: ADV_PER_WORLD }, (_, i) => advPathPoint(w, i));
+  const segs = advPathSegs(pts);
+  // Пройденная часть тропы — цветом мира, до следующего соперника включительно
+  const reach = open ? Math.min(ADV_PER_WORLD - 1, done - w * ADV_PER_WORLD) : -1;
+  const start = 'M' + pts[0][0] + ' ' + pts[0][1];
+  path.innerHTML = '<svg class="aw-line" viewBox="-150 0 300 ' + advPathHeight() + '" aria-hidden="true">' +
+    '<path class="todo" d="' + start + segs.join('') + '"/>' +
+    (reach > 0 ? '<path class="done" d="' + start + segs.slice(0, reach).join('') + '"/>' : '') + '</svg>';
+  for (let i = 0; i < ADV_PER_WORLD; i++) {
+    const n = w * ADV_PER_WORLD + i, c = advChar(n);
+    const state = n < done ? 'done' : n === done && open ? 'next' : 'locked';
+    const b = document.createElement(state === 'locked' ? 'div' : 'button');
+    if (state !== 'locked') b.type = 'button';
+    b.className = 'adv-tile ' + state + (c.boss ? ' boss' : '');
+    b.dataset.n = n;
+    b.style.setProperty('--x', pts[i][0]);
+    b.style.setProperty('--y', pts[i][1]);
+    const crown = c.boss ? '<span class="at-crown" aria-hidden="true">👑</span>' : '';
+    if (state === 'locked') {
+      // Будущий: обычный — «?», босс — портрет под замком. Не нажимается
+      b.innerHTML = (c.boss ? advNodeArt(c.icon) + '<span class="at-mark">🔒</span>' : '<span class="at-q">?</span>') + crown;
+      b.setAttribute('role', 'img');
+      b.setAttribute('aria-label', c.boss ? A.bossTitle + ' · ' + advWorldName(w) : A.pathLocked);
+      b.onclick = () => { b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); };
+    } else {
+      const st = advStarAt(n);
+      // Значок особенности; у босса это та же корона, что сверху, — второй раз не нужна
+      const quirk = c.boss && c.R.icon === '👑' ? '' : '<span class="at-quirk">' + c.R.icon + '</span>';
+      b.innerHTML = advNodeArt(c.icon) + quirk + crown +
+        (state === 'done' ? '<span class="at-stars s' + st + '">' + advStarRow(st) + '</span>'
+          : '<span class="at-go ' + (pts[i][0] > 0 ? 'l' : 'r') + '">' + escapeHtml(A.fight) + '</span>');
+      b.setAttribute('aria-label', advName(n));
+      b.onclick = () => openAdvCard(n);
+    }
+    path.appendChild(b);
+  }
+  return path;
 }
 
 function renderAdventure(scroll) {
@@ -1440,63 +1501,31 @@ function renderAdventure(scroll) {
   document.getElementById('advStarsTotal').innerHTML = '<b>⭐ ' + advStarTotal() + '</b><span> / ' + ADV_TOTAL * 3 + '</span>' +
     '<small>' + escapeHtml(A.starsHint) + '</small>';
 
-  const done = advDone(), cur = advCurrentWorld();
-  if (!advOpenWorlds) advOpenWorlds = new Set([cur]);
+  const done = advDone();
   const worlds = ADV_WORLDS.map((W, w) => {
-    const open = advWorldOpen(w), shown = advOpenWorlds.has(w);
+    const open = advWorldOpen(w);
     const sec = document.createElement('section');
-    sec.className = 'adv-world' + (open ? '' : ' locked') + (shown ? ' shown' : '');
+    sec.className = 'adv-world' + (open ? '' : ' locked');
     sec.dataset.w = w;
     sec.style.setProperty('--wc', W.color);
     const beaten = Math.max(0, Math.min(ADV_PER_WORLD, done - w * ADV_PER_WORLD));
-    // Строка мира — кнопка: раскрыть и свернуть
-    const head = document.createElement('button');
-    head.type = 'button';
-    head.className = 'aw-head';
-    head.setAttribute('aria-expanded', shown ? 'true' : 'false');
-    head.onclick = () => advToggleWorld(w);
-    // Имя сверху, счёт под ним: длинное имя не рвёт счёт на куски. У закрытого
-    // мира счёта нет (там всегда 0) — что его откроет, сказано строкой ниже
-    // Рядом с именем — бонус мира и значок правила: видно, чего ждать, ещё до боя
+    // Шапка мира, как раздел в Duolingo: номер, имя, бонус и правило, счёт
     const rule = W.rule && A.worldRules[W.rule];
-    head.innerHTML = '<span class="aw-title"><span class="aw-top"><span class="aw-name">' + escapeHtml(advWorldName(w)) + '</span>' +
+    const head = document.createElement('div');
+    head.className = 'aw-banner';
+    head.innerHTML = '<span class="aw-title"><span class="aw-no">' + escapeHtml(A.worldNo.replace('{n}', w + 1)) + '</span>' +
+      '<span class="aw-top"><span class="aw-name">' + escapeHtml(advWorldName(w)) + '</span>' +
       '<span class="aw-tags">' + bonusArtHtml(W.bonus, BONUS_ICON[W.bonus]) + (rule ? rule[0] : '') + '</span></span>' +
       (open ? '<span class="aw-count">' + A.progress.replace('{n}', beaten) +
-        ' · <span class="aw-stars">⭐ ' + advWorldStars(w) + '/' + ADV_PER_WORLD * 3 + '</span></span>' : '') + '</span>' +
-      '<span class="aw-reward' + (advWorldDone(w) ? ' got' : '') + '" title="' + escapeHtml(A.reward) + '">' +
-      (iconArt(W.boss, 0) || W.boss) + '</span>' +
-      '<span class="aw-fold">' + (shown ? '▾' : '▸') + '</span>';
+        ' · <span class="aw-stars">⭐ ' + advWorldStars(w) + '/' + ADV_PER_WORLD * 3 + '</span></span>'
+        : '<span class="aw-gate">' + escapeHtml(advGateText(w)) + '</span>') + '</span>';
     sec.appendChild(head);
-    // Закрытый мир — почему: босс прошлого мира или звёзды в нём
-    if (!open) {
-      const gate = document.createElement('div');
-      gate.className = 'aw-gate';
-      gate.textContent = advGateText(w);
-      sec.appendChild(gate);
-    }
-    if (!shown) return sec;
-    const grid = document.createElement('div');
-    grid.className = 'aw-grid';
-    for (let i = 0; i < ADV_PER_WORLD; i++) {
-      const n = w * ADV_PER_WORLD + i;
-      const c = advChar(n);
-      const b = document.createElement('button');
-      const state = n < done ? 'done' : n === done && open ? 'next' : 'locked';
-      b.className = 'adv-tile ' + state + (c.boss ? ' boss' : '');
-      b.dataset.n = n;
-      const st = advStarAt(n);
-      b.innerHTML = iconArt(c.icon, 0) + '<span class="at-quirk">' + c.R.icon + '</span>' +
-        (state === 'done' ? '<span class="at-stars s' + st + '">' + advStarRow(st) + '</span>'
-          : state === 'locked' ? '<span class="at-mark">🔒</span>' : '');
-      b.setAttribute('aria-label', advName(n));
-      b.onclick = () => openAdvCard(n);
-      grid.appendChild(b);
-    }
+    sec.appendChild(advWorldPath(w, open));
     // Цель мира: ★★★ у всех — их иконки в профиль. У закрытого мира не видна
     const goal = document.createElement('div');
     goal.className = 'aw-goal' + (advWorldGold(w) ? ' got' : '') + (open ? '' : ' hidden');
     goal.textContent = advWorldGold(w) ? A.goldDone : A.goldGoal.replace('{n}', advWorldThree(w));
-    sec.append(grid, goal);
+    sec.appendChild(goal);
     return sec;
   });
   // Миры выходят партиями: сколько ещё впереди
@@ -1508,7 +1537,8 @@ function renderAdventure(scroll) {
   }
   document.getElementById('advMap').replaceChildren(...worlds);
   if (!scroll) return;
-  const next = document.querySelector('#advMap .adv-tile.next') || document.querySelector('#advMap .adv-world.shown');
+  const next = document.querySelector('#advMap .adv-tile.next') ||
+    document.querySelector('#advMap .adv-world[data-w="' + advCurrentWorld() + '"]');
   if (next && next.scrollIntoView && done > 0) next.scrollIntoView({ block: 'center' });
 }
 
