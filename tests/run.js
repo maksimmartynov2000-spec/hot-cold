@@ -5893,35 +5893,31 @@ async function testAdventure(browser) {
   const map = await page.evaluate(() => ({
     shown: !document.getElementById('screenAdventure').classList.contains('hidden'),
     worlds: document.querySelectorAll('#advMap .adv-world').length,
-    open: [...document.querySelectorAll('#advMap .adv-world.shown')].map(e => +e.dataset.w).join(),
+    paths: document.querySelectorAll('#advMap .aw-path').length,
     tiles: document.querySelectorAll('#advMap .adv-tile').length,
     next: [...document.querySelectorAll('#advMap .adv-tile.next')].map(e => +e.dataset.n),
     locked: document.querySelectorAll('#advMap .adv-tile.locked').length,
+    q: document.querySelectorAll('#advMap .adv-tile .at-q').length,
     bosses: [...document.querySelectorAll('#advMap .adv-tile.boss')].map(e => +e.dataset.n),
-    art: document.querySelectorAll('#advMap .adv-tile svg.icon-art').length,
+    art: [...document.querySelectorAll('#advMap .adv-tile .at-img')].map(e => e.closest('.adv-tile').dataset.n),
+    buttons: document.querySelectorAll('#advMap button.adv-tile').length,
     diff: (document.querySelector('#advDiff .ad-btn.on') || {}).dataset.diff }));
   const nWorlds = await page.evaluate(() => ADV_WORLDS.length);
-  check('карта: все миры, раскрыт первый — 10 соперников с портретами', map.shown && map.worlds === nWorlds && nWorlds >= 15 && map.open === '0' &&
-    map.tiles === 10 && map.art === 10, JSON.stringify(map));
-  check('открыт только первый, остальные под замком', map.next.join() === '0' && map.locked === 9, JSON.stringify(map));
-  // Раскрыть все миры: 150 соперников, десятый в каждом — босс
-  const all = await page.evaluate(() => {
-    for (let w = 1; w < ADV_WORLDS.length; w++) advToggleWorld(w);
-    const r = { tiles: document.querySelectorAll('#advMap .adv-tile').length,
-                bosses: [...document.querySelectorAll('#advMap .adv-tile.boss')].map(e => +e.dataset.n) };
-    for (let w = 1; w < ADV_WORLDS.length; w++) advToggleWorld(w);
-    return r;
-  });
-  check('десятый в каждом мире — босс', all.tiles === nWorlds * 10 && all.bosses.join() === Array.from({ length: nWorlds }, (_, w) => w * 10 + 9).join(),
-    JSON.stringify(all));
+  check('карта — тропа: у каждого мира кружок на каждого из 10 соперников', map.shown && map.worlds === nWorlds && nWorlds >= 15 &&
+    map.paths === nWorlds && map.tiles === nWorlds * 10, JSON.stringify(map).slice(0, 300));
+  check('открыт только первый, остальные — загадка «?», боссы видны под замком', map.next.join() === '0' &&
+    map.locked === nWorlds * 10 - 1 && map.q === nWorlds * 9 - 1 && map.buttons === 1, JSON.stringify(map).slice(0, 300));
+  check('портреты — у следующего соперника и у боссов всех миров', map.art.length === nWorlds + 1 && map.art[0] === '0' &&
+    map.art.slice(1).join() === Array.from({ length: nWorlds }, (_, w) => w * 10 + 9).join(), map.art.join());
+  check('десятый в каждом мире — босс', map.bosses.join() === Array.from({ length: nWorlds }, (_, w) => w * 10 + 9).join(), map.bosses.join());
   check('сложность по умолчанию — нормальная', map.diff === 'normal');
 
-  // Закрытый соперник: карточка есть, а в бой нельзя
+  // Будущий соперник и будущий босс не нажимаются: кто там — загадка
   await page.click('.adv-tile[data-n="5"]');
+  await page.click('.adv-tile[data-n="19"]');
   await page.waitForTimeout(150);
-  check('закрытого — посмотреть можно, сыграть нельзя', await page.locator('#acGo').isDisabled() &&
-    /Сначала обыграйте/.test(await page.locator('#acGo').textContent()));
-  await page.click('#acBack');
+  check('на будущего соперника и босса нажать нельзя — карточка не открывается',
+    await page.evaluate(() => document.getElementById('advCard').classList.contains('hidden')));
 
   // Первый — карточка и партия
   await page.click('.adv-tile[data-n="0"]');
@@ -6185,8 +6181,6 @@ async function testAdventureBonus(browser) {
     localStorage.setItem('hc_advs_максим', '3333333333' + '3333332111');
     progressInfo = Object.assign({ quests: [], achievements: [] }, progressInfo || {}, { stats: { advGold: 1 } });
     openAdventure();
-    // Раскрыт только мир, где вы сейчас; второй раскрываем сами
-    advToggleWorld(1);
     const goals = [...document.querySelectorAll('#advMap .aw-goal')].map(e => e.textContent);
     openLogoutModal(); showAvatarPicker(true); renderAvatarGrid();
     const tiles = [...document.querySelectorAll('#avGrid .av-tile.adv-icon')];
@@ -7033,7 +7027,6 @@ async function testNewBonuses(browser) {
     openAdventure(); openAdvCard(sw * 10 + 9);
     out.card = document.getElementById('acFacts').textContent;
     closeAdvCard();
-    advToggleWorld(sw);
     out.tags = document.querySelector('#advMap .adv-world[data-w="' + sw + '"] .aw-tags').textContent;
     out.name = document.querySelector('#advMap .adv-world[data-w="' + sw + '"] .aw-name').textContent;
     return out;
@@ -7133,12 +7126,12 @@ async function testTablet(browser) {
     const tr = await page.evaluate(() => { const a = document.getElementById('tRunStart').getBoundingClientRect(),
       b = document.getElementById('trialDaily').getBoundingClientRect(); return Math.abs(a.top - b.top) < 4 && b.left > a.right; });
     check(w + '×' + h + ': Испытание — ' + (w > h ? 'две колонки' : 'одна колонка'), tr === (w > h), String(tr));
-    // Приключение: два мира в ряд — только горизонтально
+    // Приключение: одна тропа — миры друг под другом при любом повороте
     await page.evaluate(() => { showScreen('mode'); openAdventure(); });
     await page.waitForTimeout(400);
     const adv = await page.evaluate(() => { const w = document.querySelectorAll('#advMap .adv-world');
-      const a = w[0].getBoundingClientRect(), b = w[1].getBoundingClientRect(); return Math.abs(a.top - b.top) < 4; });
-    check(w + '×' + h + ': Приключение — ' + (w > h ? 'два мира в ряд' : 'один под другим'), adv === (w > h), String(adv));
+      const a = w[0].getBoundingClientRect(), b = w[1].getBoundingClientRect(); return b.top > a.bottom - 4; });
+    check(w + '×' + h + ': Приключение — миры одной тропой', adv, String(adv));
     await page.evaluate(() => showScreen('mode'));
     await page.click('.mode-btn.solo');
     await page.evaluate(() => { document.getElementById('rangeMax').value = '100'; onRangeChange(); });
@@ -7180,7 +7173,7 @@ async function testAdvRules(browser) {
 
   // Карточка: правило — вместо прежней «особенности»; у босса — две способности
   const card = await page.evaluate(() => {
-    openAdventure(); advToggleWorld(0); openAdvCard(2);
+    localStorage.setItem(advKey(), '9'); openAdventure(); openAdvCard(2);
     const reg = document.getElementById('acQuirk').textContent;
     closeAdvCard(); openAdvCard(9);
     const boss = { text: document.getElementById('acQuirk').textContent, ab: document.querySelectorAll('#acQuirk .ac-ab').length };
@@ -7437,7 +7430,8 @@ async function testAdvWorlds(browser) {
     r.text = advGateText(5);
     openAdventure();
     r.shown = (document.querySelector('#advMap .adv-world[data-w="5"] .aw-gate') || {}).textContent;
-    r.cur = [...document.querySelectorAll('#advMap .adv-world.shown')].map(e => +e.dataset.w).join();
+    r.cur = String(advCurrentWorld());
+    r.next = document.querySelectorAll('#advMap .adv-tile.next').length;
     openAdvCard(50);
     r.btn = document.getElementById('acGo').textContent; r.dis = document.getElementById('acGo').disabled;
     closeAdvCard();
@@ -7453,7 +7447,7 @@ async function testAdvWorlds(browser) {
     return r;
   });
   check('мир 6 закрыт, пока в Космосе меньше 20 ⭐: на карте и в карточке сказано, сколько нужно',
-    gate.locked && gate.text === '🔒 Нужно 20 ⭐ в мире «Космос» — сейчас 19' && gate.shown === gate.text && gate.cur === '4' &&
+    gate.locked && gate.text === '🔒 Нужно 20 ⭐ в мире «Космос» — сейчас 19' && gate.shown === gate.text && gate.cur === '4' && gate.next === 0 &&
     gate.btn === gate.text && gate.dis, JSON.stringify(gate));
   check('20 ⭐ — мир 6 открыт; начатый мир не закрывается', gate.open && gate.started, JSON.stringify(gate));
   check('мир 7 ждёт 20 ⭐ на Острове лемуров; без босса — «Откроется после мира»', gate.w7locked &&
@@ -7474,29 +7468,28 @@ async function testAdvWorlds(browser) {
   check('Космос пройден на 10 ⭐: «Дальше» нет, сказано про 20 ⭐', after.done === 50 && /Нужно 20 ⭐/.test(after.lines) &&
     !after.btns.some(b => /Дальше/.test(b)), JSON.stringify(after));
 
-  // Карта: 15 миров одной строкой, раскрыт мир, где вы сейчас; внизу — сколько ещё впереди
+  // Карта: все миры одной тропой; следующий — в мире, где вы сейчас; внизу — сколько ещё впереди
   const map = await page.evaluate(() => {
     localStorage.setItem(advKey(), '73'); localStorage.setItem(advStarsKey(), '3'.repeat(73));
     openAdventure();
     const r = { worlds: document.querySelectorAll('#advMap .adv-world').length,
-      shown: [...document.querySelectorAll('#advMap .adv-world.shown')].map(e => +e.dataset.w).join(),
       tiles: document.querySelectorAll('#advMap .adv-tile').length,
+      done: document.querySelectorAll('#advMap .adv-tile.done').length,
       next: [...document.querySelectorAll('#advMap .adv-tile.next')].map(e => +e.dataset.n).join(),
+      nextWorld: +document.querySelector('#advMap .adv-tile.next').closest('.adv-world').dataset.w,
       gates: document.querySelectorAll('#advMap .aw-gate').length,
       soon: (document.querySelector('#advMap .adv-soon') || {}).textContent,
-      head: document.querySelector('#advMap .adv-world[data-w="7"] .aw-head').getAttribute('aria-expanded') };
-    advToggleWorld(5);
-    r.two = document.querySelectorAll('#advMap .adv-tile').length;
-    r.badge = (document.querySelector('#advMap .adv-tile[data-n="50"] .at-quirk') || {}).textContent;
-    r.name = document.querySelector('#advMap .adv-world[data-w="5"] .aw-name').textContent;
-    advToggleWorld(5);
-    r.back = document.querySelectorAll('#advMap .adv-tile').length;
+      badge: (document.querySelector('#advMap .adv-tile[data-n="50"] .at-quirk') || {}).textContent,
+      ahead: (document.querySelector('#advMap .adv-tile[data-n="80"] .at-quirk') || {}).textContent,
+      name: document.querySelector('#advMap .adv-world[data-w="5"] .aw-name').textContent,
+      no: document.querySelector('#advMap .adv-world[data-w="5"] .aw-no').textContent,
+      line: !!document.querySelector('#advMap .adv-world[data-w="7"] .aw-line path.done') };
     return r;
   });
-  check('карта: все миры строками, раскрыт только текущий (Пустыня), в нём следующий — 74-й', map.worlds === data.worlds && map.shown === '7' &&
-    map.tiles === 10 && map.next === '73' && map.head === 'true', JSON.stringify(map));
-  check('нажатие на мир раскрывает и сворачивает его', map.two === 20 && map.back === 10 && map.badge === '🚧' &&
-    map.name === 'Остров лемуров', JSON.stringify(map));
+  check('карта: все миры тропой, пройдено 73, следующий — 74-й в Пустыне, линия до него — цветом мира', map.worlds === data.worlds &&
+    map.tiles === data.worlds * 10 && map.done === 73 && map.next === '73' && map.nextWorld === 7 && map.line, JSON.stringify(map));
+  check('у пройденного — значок правила, у будущего — нет; шапка мира — номер и имя', map.badge === '🚧' && map.ahead === undefined &&
+    map.name === 'Остров лемуров' && map.no === 'Мир 6', JSON.stringify(map));
   check('у закрытых миров — что их откроет; внизу — сколько миров ещё впереди', map.gates === data.worlds - 8 &&
     (data.worlds === 50 ? map.soon === undefined : map.soon === '🌍 Ещё ' + (50 - data.worlds) + ' миров — скоро'),
     JSON.stringify(map));

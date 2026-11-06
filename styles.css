@@ -1865,35 +1865,66 @@ body.on-game #guessInput, body.on-game #tSubmitGuess { min-height: 56px; }
   color: var(--muted); cursor: pointer; }
 .ad-btn.on { background: var(--accent); color: #fff; box-shadow: 0 3px 0 var(--accent-depth); }
 .adv-diff-hint { font-size: 13px; color: var(--muted); text-align: center; margin: 6px 0 14px; }
-.adv-world { margin-bottom: 16px; padding: 12px; border-radius: 22px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--wc) 22%, transparent), rgb(var(--ink) / 0.04));
-  border: 2px solid color-mix(in srgb, var(--wc) 55%, transparent); }
-.adv-world.locked { opacity: 0.55; }
-.aw-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.aw-name { font-size: 18px; font-weight: 900; }
-.aw-count { margin-left: auto; font-size: 14px; font-weight: 800; color: var(--muted); }
-.aw-reward { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  background: rgb(var(--ink) / 0.1); filter: grayscale(1) opacity(0.6); }
-.aw-reward.got { filter: none; background: color-mix(in srgb, var(--wc) 40%, transparent); box-shadow: 0 0 12px var(--wc); }
-.aw-reward .icon-art { width: 30px; height: 30px; }
-.aw-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
-.adv-tile { all: unset; position: relative; aspect-ratio: 1; border-radius: 50%; cursor: pointer;
-  background: color-mix(in srgb, var(--wc) 45%, #1d1650); box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3); }
-.adv-tile .icon-art { display: block; width: 100%; height: 100%; }
-.adv-tile.locked .icon-art { filter: grayscale(1) brightness(0.6); }
-.adv-tile.next { box-shadow: 0 0 0 3px #fff, 0 0 18px var(--wc); }
-/* Пульсирует кольцо вокруг, а не сама клетка: клетка стоит на месте, и в неё легко попасть */
-.adv-tile.next::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 3px solid var(--wc);
+/* ---- Путь Приключения ----
+   Миры — одной тропой сверху вниз, как уроки в Duolingo. Шапка мира — цветная
+   плашка; под ней кружки соперников змейкой и линия к следующему. Координаты
+   кружка — от середины тропы (--x) и от её верха (--y), в пикселях: те же
+   числа рисуют линию в SVG, поэтому кружки всегда сидят на ней */
+.adv-world { margin-bottom: 22px; }
+.aw-banner { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 20px; color: #fff;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--wc) 62%, #1d1650), color-mix(in srgb, var(--wc) 30%, #1d1650));
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--wc) 30%, #0b0820); }
+.adv-world.locked .aw-banner { filter: saturate(0.5) brightness(0.82); }
+.aw-no { font-size: 12px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
+.aw-name { font-size: 19px; font-weight: 900; }
+.aw-count { font-size: 13px; font-weight: 800; color: rgb(255 255 255 / 0.85); }
+.aw-path { position: relative; height: calc(var(--ph) * 1px); max-width: 360px; margin: 6px auto 0; }
+.aw-line { position: absolute; left: 50%; top: 0; width: 300px; height: 100%; margin-left: -150px; overflow: visible; pointer-events: none; }
+.aw-line path { fill: none; stroke-width: 9; stroke-linecap: round; }
+.aw-line .todo { stroke: rgb(var(--ink) / 0.16); stroke-dasharray: 1 16; }
+.aw-line .done { stroke: var(--wc); opacity: 0.9; }
+.adv-tile { all: unset; box-sizing: border-box; position: absolute; left: calc(50% + var(--x) * 1px); top: calc(var(--y) * 1px);
+  width: 62px; height: 62px; margin: -31px 0 0 -31px; border-radius: 50%; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  background: color-mix(in srgb, var(--wc) 45%, #1d1650); box-shadow: 0 5px 0 rgba(0, 0, 0, 0.32); }
+.adv-tile.boss { width: 86px; height: 86px; margin: -43px 0 0 -43px; box-shadow: 0 0 0 4px #ffd166, 0 6px 0 rgba(0, 0, 0, 0.32); }
+.at-img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.at-emo { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 30px; }
+.adv-tile.done { box-shadow: 0 0 0 3px color-mix(in srgb, var(--wc) 75%, #fff), 0 5px 0 rgba(0, 0, 0, 0.32); }
+.adv-tile.done.boss { box-shadow: 0 0 0 4px #ffd166, 0 6px 0 rgba(0, 0, 0, 0.32); }
+.adv-tile.next { box-shadow: 0 0 0 4px #fff, 0 0 22px var(--wc); }
+.adv-tile.boss.next { box-shadow: 0 0 0 4px #ffd166, 0 0 24px #ffd166; }
+/* Пульсирует кольцо вокруг, а не сам кружок: он стоит на месте, и в него легко попасть */
+.adv-tile.next::after { content: ''; position: absolute; inset: -8px; border-radius: 50%; border: 3px solid var(--wc);
   animation: advPulse 1.6s ease-in-out infinite; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .adv-tile.next::after { animation: none; } }
-.adv-tile.boss { box-shadow: 0 0 0 3px #ffd166, 0 4px 0 rgba(0, 0, 0, 0.3); }
-.adv-tile.boss.next { box-shadow: 0 0 0 3px #ffd166, 0 0 20px #ffd166; }
 @keyframes advPulse { 0%, 100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 0.2; } }
+/* Впереди: обычный соперник — загадка «?», босс — портрет под замком. Не нажимаются */
+.adv-tile.locked { cursor: default; background: rgb(var(--ink) / 0.08); box-shadow: inset 0 0 0 3px rgb(var(--ink) / 0.14), 0 5px 0 rgba(0, 0, 0, 0.22); }
+.adv-tile.locked.boss { background: #1d1650; box-shadow: 0 0 0 4px color-mix(in srgb, #ffd166 45%, transparent), 0 6px 0 rgba(0, 0, 0, 0.25); }
+.adv-tile.locked.boss .at-img { filter: saturate(0.55) brightness(0.62); }
+.at-q { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center;
+  font-size: 26px; font-weight: 900; color: rgb(var(--ink) / 0.3); }
+.adv-tile.nope { animation: advNope 0.35s ease; }
+@keyframes advNope { 0%, 100% { translate: 0; } 25% { translate: -5px; } 75% { translate: 5px; } }
+@media (prefers-reduced-motion: reduce) { .adv-tile.next::after, .adv-tile.nope { animation: none; } }
+.at-crown { position: absolute; left: 50%; top: -19px; transform: translateX(-50%); font-size: 20px; line-height: 1; pointer-events: none;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35)); }
+/* «В бой!» — сбоку, со стороны, где свободно: сверху и снизу соседние кружки со звёздами */
+.at-go { position: absolute; top: 50%; padding: 5px 10px; border-radius: 10px; transform: translateY(-50%);
+  background: #fff; color: #1d1650; font-size: 13px; font-weight: 900; white-space: nowrap; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+  pointer-events: none; animation: advBob 1.6s ease-in-out infinite; }
+.at-go.r { left: calc(100% + 14px); }
+.at-go.l { right: calc(100% + 14px); }
+.at-go::after { content: ''; position: absolute; top: 50%; margin-top: -6px; border: 6px solid transparent; }
+.at-go.r::after { left: -6px; border-left: 0; border-right-color: #fff; }
+.at-go.l::after { right: -6px; border-right: 0; border-left-color: #fff; }
+@keyframes advBob { 0%, 100% { translate: 0 0; } 50% { translate: 3px 0; } }
+.at-go.l { animation-name: advBobL; }
+@keyframes advBobL { 0%, 100% { translate: 0 0; } 50% { translate: -3px 0; } }
+@media (prefers-reduced-motion: reduce) { .at-go { animation: none; } }
 .at-quirk { position: absolute; left: -4px; bottom: -4px; font-size: 14px; line-height: 20px; width: 20px; height: 20px;
   text-align: center; border-radius: 50%; background: #1d1650; }
-.at-mark { position: absolute; right: -4px; top: -4px; font-size: 12px; font-weight: 900; line-height: 20px;
-  width: 20px; height: 20px; text-align: center; border-radius: 50%; background: #2bd18f; color: #fff; }
-.adv-tile.locked .at-mark { background: #1d1650; }
+.at-mark { position: absolute; right: -4px; top: -4px; font-size: 12px; font-weight: 900; line-height: 22px;
+  width: 22px; height: 22px; text-align: center; border-radius: 50%; background: #1d1650; }
 .adv-card .ac-face { width: 120px; height: 120px; margin: 0 auto 10px; border-radius: 50%; box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3); }
 .adv-card .ac-face .icon-art { width: 100%; height: 100%; display: block; }
 .adv-card .ac-world { font-size: 13px; font-weight: 800; color: var(--muted); }
@@ -2006,7 +2037,7 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .adv-stars span { font-weight: 800; color: var(--muted); }
 .adv-stars small { flex-basis: 100%; font-size: 12px; color: var(--muted); line-height: 1.35; }
 .aw-stars { color: var(--gold); }
-.at-stars { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); font-size: 10px; line-height: 15px;
+.at-stars { position: absolute; left: 50%; bottom: -12px; transform: translateX(-50%); font-size: 10px; line-height: 15px;
   padding: 0 4px; border-radius: 8px; background: #1d1650; color: var(--gold); letter-spacing: -0.5px; white-space: nowrap; }
 .adv-card .ac-facts { flex-wrap: wrap; gap: 6px 16px; }
 .adv-card .ac-best b, .adv-got { color: var(--gold) !important; letter-spacing: 1px; }
@@ -2386,12 +2417,10 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 
 }
 
-/* ---- iPad горизонтально: Приключение — два мира в ряд ----
-   Шапка (звёзды и сложность) — во всю ширину, карта миров — в две колонки */
+/* ---- iPad горизонтально: Приключение — одна тропа посередине ----
+   Карточка уже, чтобы тропа не терялась на широком экране */
 @media (min-width: 1024px) and (orientation: landscape) and (pointer: coarse) {
-  body.on-adventure .card { max-width: 980px; }
-  #advMap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
-  #advMap .adv-world { margin: 0; }
+  body.on-adventure .card { max-width: 640px; }
 }
 
 /* ================= ЭКРАНЫ НА ВСЕХ УСТРОЙСТВАХ =================
@@ -2475,9 +2504,7 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
   #screenRunHub > .frost-row { grid-row: 3; }
   #screenRunHub > #trialBest { grid-row: 4 / span 2; }
 
-  body.on-adventure .card { max-width: 980px; }
-  #advMap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
-  #advMap .adv-world { margin: 0; }
+  body.on-adventure .card { max-width: 640px; }
 }
 
 /* ---- Высокий экран (большой iPhone, iPad вертикально) ----
@@ -2494,7 +2521,7 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
    Миры Приключения за краем экрана браузер не раскладывает и не рисует, пока
    до них не долистали: при открытии карты — один-два мира, а не пять с 50
    картинками. Место под них держится по последнему размеру */
-.adv-world { content-visibility: auto; contain-intrinsic-size: auto 270px; }
+.adv-world { content-visibility: auto; contain-intrinsic-size: auto 960px; }
 /* Запуск: до первого экрана видно только фон. Не сработал скрипт — через
    3 секунды показываем как есть, чтобы не остаться с пустым экраном */
 body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forwards; }
@@ -2551,22 +2578,10 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
 }
 
 /* ---- Приключение: 50 миров ----
-   Мир — строкой-кнопкой; раскрыт тот, где вы сейчас, остальные — по нажатию.
-   Закрытый мир говорит, почему закрыт: нужен босс или звёзды в прошлом мире */
-.aw-head { -webkit-appearance: none; appearance: none; background: none; border: 0; padding: 0; font: inherit; color: inherit;
-  width: 100%; text-align: left; cursor: pointer; margin-bottom: 0; -webkit-tap-highlight-color: transparent; }
-.adv-world.shown .aw-head { margin-bottom: 10px; }
-.aw-fold { flex: none; width: 18px; text-align: center; font-size: 14px; color: var(--muted); }
-.adv-world.locked { opacity: 1; }
-.adv-world.locked .aw-head, .adv-world.locked .aw-grid { opacity: 0.6; }
-.aw-gate { margin-top: 8px; font-size: 13px; font-weight: 800; color: var(--muted); line-height: 1.35; }
-.adv-world.shown .aw-gate { margin: 0 0 10px; }
+   Закрытый мир говорит в шапке, почему закрыт: нужен босс или звёзды в прошлом мире */
+.aw-gate { font-size: 13px; font-weight: 800; color: rgb(255 255 255 / 0.85); line-height: 1.35; }
 .aw-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.aw-title .aw-count { margin-left: 0; font-size: 13px; }
 .aw-stars { white-space: nowrap; }
-.adv-world:not(.shown) { contain-intrinsic-size: auto 72px; }
-/* iPad набок — миры в две колонки, «ещё N миров» — во всю ширину */
-#advMap .adv-soon { grid-column: 1 / -1; }
 .adv-soon { margin: 4px 0 8px; padding: 12px; border-radius: 18px; text-align: center; font-weight: 800; color: var(--muted);
   border: 2px dashed rgb(var(--ink) / 0.15); }
 /* Бонус и правило мира: значки у имени на карте, строка в карточке */
