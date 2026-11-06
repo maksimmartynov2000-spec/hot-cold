@@ -10,8 +10,8 @@ with fn as (
 checks(nn, what, ok) as (values
   (1, 'кошелёк и журнал на месте',
       (select count(*) from information_schema.tables where table_schema = 'public' and table_name in ('wallet', 'wallet_log')) = 2),
-  (2, 'в магазине 54 товара, у каждого одна цена: монеты или кристаллы',
-      (select count(*) from shop_items()) = 54
+  (2, 'в магазине не меньше 54 товаров, у каждого одна цена: монеты или кристаллы',
+      (select count(*) from shop_items()) >= 54
       and not exists (select 1 from shop_items() i where (i.coins > 0) = (i.gems > 0))),
   (3, 'Приключение платит: звёзды, боссы, миры на ★★★',
       (select count(*) from fn where name in ('adventure_result', 'adventure_sync', 'adventure_save')

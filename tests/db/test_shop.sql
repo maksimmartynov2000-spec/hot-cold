@@ -24,11 +24,11 @@ do $$ begin
 end $$;
 \echo ok
 
-\echo === 1. товары: 54, цена одна (монеты или кристаллы), в игре и в базе одинаково, награды не продаются
+\echo === 1. товары: 75, цена одна (монеты или кристаллы), в игре и в базе одинаково, награды не продаются
 create temp table js_shop(kind text, code text, coins int, gems int);
 \copy js_shop from 'shop_js.csv' with (format csv, header true)
 do $$ begin
-  if (select count(*) from shop_items()) <> 54 then raise exception 'ОШИБКА: товаров %', (select count(*) from shop_items()); end if;
+  if (select count(*) from shop_items()) <> 75 then raise exception 'ОШИБКА: товаров %', (select count(*) from shop_items()); end if;
   if exists (select 1 from shop_items() i where (i.coins > 0) = (i.gems > 0) or i.coins < 0 or i.gems < 0) then
     raise exception 'ОШИБКА: у товара две цены или ни одной';
   end if;
@@ -38,7 +38,7 @@ do $$ begin
                 except select i.kind, i.code, i.coins, i.gems from shop_items() i) then
     raise exception 'ОШИБКА: товары в игре и в базе разные';
   end if;
-  if (select count(*) from js_shop) <> 54 then raise exception 'ОШИБКА: в игре товаров %', (select count(*) from js_shop); end if;
+  if (select count(*) from js_shop) <> 75 then raise exception 'ОШИБКА: в игре товаров %', (select count(*) from js_shop); end if;
   -- Коды не совпадают ни с чем, что уже есть: награды и трофеи не продаются
   if shop_codes('icon') && (avatar_choices() || reward_icons() || tutorial_icon() || quest_icons() || adventure_icons()
                             || adventure_char_icons() || pass_icons()) then
@@ -247,13 +247,13 @@ begin
   c0 := (select coins from wallet where username = 'Лев');
   g0 := (select gems from wallet where username = 'Лев');
   r := shop_buy('Лев', '1234', 'icon', 'shop-01');
-  if (r->>'coins')::int <> c0 - 150 or (r->>'gems')::int <> g0 or (select coins from wallet where username = 'Лев') <> c0 - 150 then
+  if (r->>'coins')::int <> c0 - 90 or (r->>'gems')::int <> g0 or (select coins from wallet where username = 'Лев') <> c0 - 90 then
     raise exception 'ОШИБКА: покупка %', r;
   end if;
   if not exists (select 1 from cosmetics where username = 'Лев' and kind = 'icon' and code = 'shop-01' and source = 'shop') then
     raise exception 'ОШИБКА: иконки нет в наградах';
   end if;
-  if not exists (select 1 from wallet_log where username = 'Лев' and reason = 'buy' and coins = -150 and ref = 'icon:shop-01') then
+  if not exists (select 1 from wallet_log where username = 'Лев' and reason = 'buy' and coins = -90 and ref = 'icon:shop-01') then
     raise exception 'ОШИБКА: покупки нет в журнале';
   end if;
   begin
@@ -261,11 +261,11 @@ begin
     raise exception 'ОШИБКА: купил второй раз';
   exception when others then if sqlerrm not like '%already_owned%' then raise; end if;
   end;
-  if (select coins from wallet where username = 'Лев') <> c0 - 150 then raise exception 'ОШИБКА: второй раз списано'; end if;
+  if (select coins from wallet where username = 'Лев') <> c0 - 90 then raise exception 'ОШИБКА: второй раз списано'; end if;
   -- За кристаллы: не хватает — отказ, деньги на месте
   begin
     perform shop_buy('Лев', '1234', 'frame', 'galaxy');
-    raise exception 'ОШИБКА: рамка за 12 💎 при %', g0;
+    raise exception 'ОШИБКА: рамка за 14 💎 при %', g0;
   exception when others then if sqlerrm not like '%not_enough%' then raise; end if;
   end;
   -- Кристаллы за деньги (на будущее): номер платежа — один раз
@@ -275,11 +275,11 @@ begin
     raise exception 'ОШИБКА: кристаллы за деньги';
   end if;
   r := shop_buy('Лев', '1234', 'frame', 'galaxy');
-  if (r->>'gems')::int <> g0 + 38 then raise exception 'ОШИБКА: рамка за кристаллы %', r; end if;
+  if (r->>'gems')::int <> g0 + 36 then raise exception 'ОШИБКА: рамка за кристаллы %', r; end if;
   perform shop_buy('Лев', '1234', 'color', 'grad-mint');
   perform shop_buy('Лев', '1234', 'title', 'thinker');
   perform shop_buy('Лев', '1234', 'phrase', 'bingo');
-  if (select coins from wallet where username = 'Лев') <> c0 - 500 then raise exception 'ОШИБКА: итог покупок'; end if;
+  if (select coins from wallet where username = 'Лев') <> c0 - 320 then raise exception 'ОШИБКА: итог покупок'; end if;
   if (select count(*) from jsonb_array_elements(my_online('Лев', '1234')->'owned') o where o->>'code' in
       ('shop-01', 'galaxy', 'grad-mint', 'thinker', 'bingo')) <> 5 then
     raise exception 'ОШИБКА: купленного нет в my_online';

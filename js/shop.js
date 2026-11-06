@@ -1,46 +1,68 @@
 // ================= МАГАЗИН =================
 // Монеты 🪙 и кристаллы 💎 копит база (миграции 061 и 062): за звёзды
-// Приключения, партии с другом, Испытание, задания дня и «Испытание выходных».
-// Купленное ложится к наградам пути (cosmetics) и надевается там же — в профиле.
+// Приключения, партии с другом, Испытание и «Испытание выходных».
+// Купленное ложится к наградам пути (cosmetics). Иконки, рамки, фоны и
+// титулы надеваются в профиле; питомцы, вещи для них, градусники и эффекты
+// победы (миграция 063) — здесь же и на экране питомца.
 // Без входа витрину видно, а купить нельзя; без миграции — «скоро откроется».
 
-// Товары — копия из базы (shop_items), сверяется тестом. Цена — либо в
-// монетах, либо в кристаллах
+// Товары — копия из базы (shop_catalog, миграция 063), сверяется тестом.
+// Цена — либо в монетах, либо в кристаллах; редкость: common, rare, epic, legend
 const SHOP_ITEMS = [
-  { kind: 'icon', code: 'shop-01', coins: 150 }, { kind: 'icon', code: 'shop-02', coins: 150 },
-  { kind: 'icon', code: 'shop-03', coins: 150 }, { kind: 'icon', code: 'shop-04', coins: 150 },
-  { kind: 'icon', code: 'shop-05', coins: 150 }, { kind: 'icon', code: 'shop-06', coins: 150 },
-  { kind: 'icon', code: 'shop-07', coins: 150 }, { kind: 'icon', code: 'shop-08', coins: 150 },
-  { kind: 'icon', code: 'shop-09', coins: 150 }, { kind: 'icon', code: 'shop-10', coins: 150 },
-  { kind: 'icon', code: 'shop-11', gems: 15 }, { kind: 'icon', code: 'shop-12', gems: 15 },
-  { kind: 'icon', code: 'shop-13', gems: 15 }, { kind: 'icon', code: 'shop-14', gems: 15 },
-  { kind: 'icon', code: 'shop-15', gems: 15 }, { kind: 'icon', code: 'shop-16', gems: 15 },
-  { kind: 'icon', code: 'shop-17', gems: 15 }, { kind: 'icon', code: 'shop-18', gems: 15 },
-  { kind: 'icon', code: 'shop-19', gems: 15 }, { kind: 'icon', code: 'shop-20', gems: 15 },
-  { kind: 'frame', code: 'leaf', coins: 150 }, { kind: 'frame', code: 'ocean', coins: 150 },
-  { kind: 'frame', code: 'coral', coins: 150 }, { kind: 'frame', code: 'ember', coins: 150 },
-  { kind: 'frame', code: 'night', coins: 150 }, { kind: 'frame', code: 'galaxy', gems: 12 },
-  { kind: 'frame', code: 'aurora', gems: 12 }, { kind: 'frame', code: 'prism', gems: 12 },
-  { kind: 'color', code: 'grad-mint', coins: 100 }, { kind: 'color', code: 'grad-peach', coins: 100 },
-  { kind: 'color', code: 'grad-sky', coins: 100 }, { kind: 'color', code: 'grad-violet', coins: 100 },
-  { kind: 'color', code: 'grad-sand', coins: 100 }, { kind: 'color', code: 'grad-galaxy', gems: 10 },
-  { kind: 'color', code: 'grad-rainbow', gems: 10 }, { kind: 'color', code: 'grad-sun', gems: 10 },
-  { kind: 'title', code: 'thinker', coins: 150 }, { kind: 'title', code: 'explorer', coins: 150 },
-  { kind: 'title', code: 'lucky', coins: 150 }, { kind: 'title', code: 'strategist', coins: 150 },
-  { kind: 'title', code: 'speedy', coins: 150 }, { kind: 'title', code: 'calm', coins: 150 },
-  { kind: 'title', code: 'sleuth', coins: 150 }, { kind: 'title', code: 'friend', coins: 150 },
-  { kind: 'title', code: 'legend', gems: 10 }, { kind: 'title', code: 'genius', gems: 10 },
-  { kind: 'phrase', code: 'bingo', coins: 100 }, { kind: 'phrase', code: 'respect', coins: 100 },
-  { kind: 'phrase', code: 'brain', coins: 100 }, { kind: 'phrase', code: 'whatluck', coins: 100 },
-  { kind: 'phrase', code: 'thanks', coins: 100 }, { kind: 'phrase', code: 'math', coins: 100 },
-  { kind: 'phrase', code: 'comeback', coins: 100 }, { kind: 'phrase', code: 'bravo', coins: 100 }
+  { kind: 'icon', code: 'shop-01', coins: 90, rar: 'common' }, { kind: 'icon', code: 'shop-02', coins: 100, rar: 'common' },
+  { kind: 'icon', code: 'shop-03', coins: 110, rar: 'common' }, { kind: 'icon', code: 'shop-04', coins: 120, rar: 'common' },
+  { kind: 'icon', code: 'shop-05', coins: 160, rar: 'rare' }, { kind: 'icon', code: 'shop-06', coins: 170, rar: 'rare' },
+  { kind: 'icon', code: 'shop-07', coins: 180, rar: 'rare' }, { kind: 'icon', code: 'shop-08', coins: 200, rar: 'rare' },
+  { kind: 'icon', code: 'shop-09', coins: 220, rar: 'rare' }, { kind: 'icon', code: 'shop-10', coins: 260, rar: 'epic' },
+  { kind: 'icon', code: 'shop-11', gems: 12, rar: 'epic' }, { kind: 'icon', code: 'shop-12', gems: 14, rar: 'epic' },
+  { kind: 'icon', code: 'shop-13', gems: 14, rar: 'epic' }, { kind: 'icon', code: 'shop-14', gems: 16, rar: 'epic' },
+  { kind: 'icon', code: 'shop-15', gems: 16, rar: 'epic' }, { kind: 'icon', code: 'shop-16', gems: 20, rar: 'legend' },
+  { kind: 'icon', code: 'shop-17', gems: 22, rar: 'legend' }, { kind: 'icon', code: 'shop-18', gems: 22, rar: 'legend' },
+  { kind: 'icon', code: 'shop-19', gems: 24, rar: 'legend' }, { kind: 'icon', code: 'shop-20', gems: 25, rar: 'legend' },
+  { kind: 'frame', code: 'leaf', coins: 100, rar: 'common' }, { kind: 'frame', code: 'ocean', coins: 180, rar: 'rare' },
+  { kind: 'frame', code: 'coral', coins: 200, rar: 'rare' }, { kind: 'frame', code: 'ember', coins: 220, rar: 'rare' },
+  { kind: 'frame', code: 'night', coins: 300, rar: 'epic' }, { kind: 'frame', code: 'galaxy', gems: 14, rar: 'epic' },
+  { kind: 'frame', code: 'aurora', gems: 18, rar: 'legend' }, { kind: 'frame', code: 'prism', gems: 20, rar: 'legend' },
+  { kind: 'color', code: 'grad-mint', coins: 80, rar: 'common' }, { kind: 'color', code: 'grad-peach', coins: 80, rar: 'common' },
+  { kind: 'color', code: 'grad-sky', coins: 90, rar: 'common' }, { kind: 'color', code: 'grad-violet', coins: 140, rar: 'rare' },
+  { kind: 'color', code: 'grad-sand', coins: 120, rar: 'rare' }, { kind: 'color', code: 'grad-galaxy', gems: 10, rar: 'epic' },
+  { kind: 'color', code: 'grad-rainbow', gems: 14, rar: 'legend' }, { kind: 'color', code: 'grad-sun', gems: 12, rar: 'epic' },
+  { kind: 'title', code: 'thinker', coins: 90, rar: 'common' }, { kind: 'title', code: 'explorer', coins: 100, rar: 'common' },
+  { kind: 'title', code: 'lucky', coins: 150, rar: 'rare' }, { kind: 'title', code: 'strategist', coins: 180, rar: 'rare' },
+  { kind: 'title', code: 'speedy', coins: 160, rar: 'rare' }, { kind: 'title', code: 'calm', coins: 110, rar: 'common' },
+  { kind: 'title', code: 'sleuth', coins: 170, rar: 'rare' }, { kind: 'title', code: 'friend', coins: 80, rar: 'common' },
+  { kind: 'title', code: 'legend', gems: 15, rar: 'legend' }, { kind: 'title', code: 'genius', gems: 12, rar: 'epic' },
+  { kind: 'phrase', code: 'bingo', coins: 60, rar: 'common' }, { kind: 'phrase', code: 'respect', coins: 70, rar: 'common' },
+  { kind: 'phrase', code: 'brain', coins: 80, rar: 'common' }, { kind: 'phrase', code: 'whatluck', coins: 120, rar: 'rare' },
+  { kind: 'phrase', code: 'thanks', coins: 60, rar: 'common' }, { kind: 'phrase', code: 'math', coins: 100, rar: 'rare' },
+  { kind: 'phrase', code: 'comeback', coins: 140, rar: 'rare' }, { kind: 'phrase', code: 'bravo', coins: 70, rar: 'common' },
+  { kind: 'pet', code: 'fox', coins: 450, rar: 'epic' }, { kind: 'pet', code: 'wolf', coins: 450, rar: 'epic' },
+  { kind: 'pet', code: 'drake', gems: 30, rar: 'legend' },
+  { kind: 'gear', code: 'crown', gems: 20, rar: 'legend' }, { kind: 'gear', code: 'wizard', coins: 360, rar: 'epic' },
+  { kind: 'gear', code: 'viking', coins: 220, rar: 'rare' }, { kind: 'gear', code: 'shades', coins: 180, rar: 'rare' },
+  { kind: 'gear', code: 'scarf', coins: 100, rar: 'common' }, { kind: 'gear', code: 'bowtie', coins: 80, rar: 'common' },
+  { kind: 'gear', code: 'cape', coins: 400, rar: 'epic' }, { kind: 'gear', code: 'aura_fire', gems: 12, rar: 'epic' },
+  { kind: 'gear', code: 'aura_ice', gems: 12, rar: 'epic' }, { kind: 'gear', code: 'aura_storm', gems: 12, rar: 'epic' },
+  { kind: 'thermo', code: 'ice', coins: 200, rar: 'rare' }, { kind: 'thermo', code: 'lava', coins: 200, rar: 'rare' },
+  { kind: 'thermo', code: 'neon', coins: 350, rar: 'epic' }, { kind: 'thermo', code: 'space', gems: 15, rar: 'legend' },
+  { kind: 'winfx', code: 'confetti', coins: 120, rar: 'common' }, { kind: 'winfx', code: 'fireworks', coins: 240, rar: 'rare' },
+  { kind: 'winfx', code: 'lightning', coins: 400, rar: 'epic' }, { kind: 'winfx', code: 'meteors', gems: 18, rar: 'legend' }
 ];
-// Разделы витрины по порядку
-const SHOP_KINDS = ['icon', 'frame', 'color', 'title', 'phrase'];
+// Наборы — копия из базы (shop_bundles). Все вещи набора — в одной валюте.
+// Цена — за то, чего у игрока ещё нет, со скидкой набора
+const SHOP_BUNDLES = [
+  { code: 'set_fox', currency: 'coins', pct: 20, items: ['pet:fox', 'thermo:lava', 'frame:ember'] },
+  { code: 'set_wolf', currency: 'coins', pct: 20, items: ['pet:wolf', 'thermo:ice', 'frame:ocean'] },
+  { code: 'set_drake', currency: 'gems', pct: 20, items: ['pet:drake', 'gear:aura_storm', 'frame:galaxy'] },
+  { code: 'set_style', currency: 'coins', pct: 20, items: ['gear:shades', 'gear:scarf', 'gear:bowtie'] }
+];
+// Разделы витрины по порядку. Первый — «Витрина»: товары дня и наборы
+const SHOP_KINDS = ['deals', 'pet', 'gear', 'icon', 'frame', 'color', 'title', 'phrase', 'thermo', 'winfx'];
+const SHOP_RARS = ['common', 'rare', 'epic', 'legend'];
 
 let shopWallet = null;   // { coins, gems, today, cap } — как сказала база
-let shopKind = 'icon';   // открытый раздел
-let shopOpenItem = null; // { kind, code } в карточке товара
+let shopKind = 'deals';  // открытый раздел
+let shopOpenItem = null; // { kind, code } или { bundle } в карточке товара
 let shopState = 'ok';    // 'ok' | 'guest' | 'off' (нет сети или миграции)
 
 function shopCodes(kind) {
@@ -58,9 +80,51 @@ function shopOwned(kind, code) {
 function shopOwnedCodes(kind) {
   return shopCodes(kind).filter(c => shopOwned(kind, c));
 }
-// Цена словами: «150 🪙», «15 💎»
+// Цена словами: «150 🪙», «15 💎». Со скидкой дня — уже со скидкой
 function shopPriceText(it) {
-  return it.gems ? it.gems + ' 💎' : it.coins + ' 🪙';
+  const p = shopPrice(it);
+  return p.gems ? p.gems + ' 💎' : p.coins + ' 🪙';
+}
+// Товары дня (миграция 063): у каждого свои три вещи со скидкой
+function shopDeals() {
+  return petLookDeals().filter(d => isShopItem(d.kind, d.code));
+}
+function petLookDeals() {
+  return typeof petLook !== 'undefined' && petLook && Array.isArray(petLook.deals) ? petLook.deals : [];
+}
+function shopDealOf(it) {
+  return shopDeals().find(d => d.kind === it.kind && d.code === it.code) || null;
+}
+// Цена для игрока — как считает база: скидка дня, округление до целых
+function shopPrice(it) {
+  const d = shopDealOf(it), pct = d ? d.pct : 0;
+  const cut = v => v ? Math.max(1, Math.round(v * (100 - pct) / 100)) : 0;
+  return { coins: cut(it.coins || 0), gems: cut(it.gems || 0), pct };
+}
+function shopFullPriceText(it) { return it.gems ? it.gems + ' 💎' : it.coins + ' 🪙'; }
+// Наборы: цена за недостающее со скидкой набора. Монеты — до десятков
+function shopBundle(code) { return SHOP_BUNDLES.find(b => b.code === code) || null; }
+function shopBundleItems(b) {
+  return b.items.map(x => { const [kind, code] = x.split(':'); return shopItem(kind, code); }).filter(Boolean);
+}
+function shopBundlePrice(b) {
+  if (typeof petLook !== 'undefined' && petLook && petLook.bundles && typeof petLook.bundles[b.code] === 'number') return petLook.bundles[b.code];
+  const sum = shopBundleItems(b).filter(i => !shopOwned(i.kind, i.code)).reduce((a, i) => a + (b.currency === 'coins' ? i.coins || 0 : i.gems || 0), 0);
+  return b.currency === 'coins' ? Math.round(sum * (100 - b.pct) / 1000) * 10 : Math.round(sum * (100 - b.pct) / 100);
+}
+function shopBundleFull(b) {
+  return shopBundleItems(b).reduce((a, i) => a + (b.currency === 'coins' ? i.coins || 0 : i.gems || 0), 0);
+}
+function shopBundleOwned(b) { return shopBundleItems(b).every(i => shopOwned(i.kind, i.code)); }
+function shopBundlePet(b) { const x = b.items.find(i => i.startsWith('pet:')); return x ? x.slice(4) : null; }
+function shopMoney(n, currency) { return n + (currency === 'gems' ? ' 💎' : ' 🪙'); }
+// Через сколько сменятся товары дня: «5 ч 12 мин»
+function shopDealsLeftText() {
+  if (typeof petLook === 'undefined' || !petLook || typeof petLook.dealsLeft !== 'number') return '';
+  const left = Math.max(0, petLook.dealsLeft - Math.round((Date.now() - petLookAt) / 1000));
+  const h = Math.floor(left / 3600), m = Math.floor(left % 3600 / 60);
+  const S = t().shop;
+  return S.dealsLeft.replace('{t}', h ? S.hm.replace('{h}', h).replace('{m}', m) : S.mins.replace('{m}', Math.max(1, m)));
 }
 
 // ---------- кошелёк ----------
@@ -123,14 +187,17 @@ function renderShopWallet() {
 }
 
 // ---------- витрина ----------
-async function openShop() {
+async function openShop(kind) {
   const m = document.getElementById('shopModal');
   m.classList.remove('hidden');
+  if (kind && SHOP_KINDS.indexOf(kind) >= 0) shopKind = kind;
   shopState = runAuth() ? 'ok' : 'guest';
   renderShop();
+  document.getElementById('shopScroll').scrollTop = 0;
   if (shopState !== 'ok') return;
-  // Своё (купленное и награды) и кошелёк — свежие
-  const [, w] = await Promise.all([typeof loadOnlineInfo === 'function' ? loadOnlineInfo() : null, loadWallet()]);
+  // Своё (купленное и награды), питомец с товарами дня и кошелёк — свежие
+  const [, , w] = await Promise.all([typeof loadOnlineInfo === 'function' ? loadOnlineInfo() : null,
+    typeof loadLook === 'function' ? loadLook() : null, loadWallet()]);
   shopState = w ? 'ok' : 'off';
   renderShop();
 }
@@ -154,22 +221,14 @@ function renderShop() {
     b.onclick = () => { shopKind = k; renderShop(); document.getElementById('shopScroll').scrollTop = 0; };
     return b;
   }));
-  // Товары раздела
+  // Выбранный раздел — на виду в ряду, который прокручивается вбок
+  const sel = tabs.querySelector('.sel');
+  if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  // Товары раздела; «Витрина» — товары дня и наборы
   const grid = document.getElementById('shopGrid');
   grid.className = 'sh-grid sh-' + shopKind;
-  grid.replaceChildren(...SHOP_ITEMS.filter(i => i.kind === shopKind).map(it => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    const own = shopOwned(it.kind, it.code), worn = shopWorn(it.kind, it.code);
-    b.className = 'sh-item' + (it.gems ? ' rare' : '') + (own ? ' own' : '') + (worn ? ' worn' : '');
-    b.dataset.kind = it.kind;
-    b.dataset.code = it.code;
-    b.innerHTML = '<span class="sh-art">' + shopArtHtml(it.kind, it.code) + '</span>' +
-      '<span class="sh-name">' + escapeHtml(shopName(it.kind, it.code)) + '</span>' +
-      '<span class="sh-price">' + escapeHtml(worn ? S.worn : own ? S.owned : shopPriceText(it)) + '</span>';
-    b.onclick = () => openShopItem(it.kind, it.code);
-    return b;
-  }));
+  if (shopKind === 'deals') renderShopDeals(grid);
+  else grid.replaceChildren(...SHOP_ITEMS.filter(i => i.kind === shopKind).map(shopItemButton));
   // Что сверху: вход, нет сети, или как копить
   const note = document.getElementById('shopNote');
   note.className = 'sh-note' + (shopState === 'ok' ? '' : ' warn');
@@ -184,11 +243,72 @@ function renderShop() {
   document.getElementById('shopOk').textContent = S.close;
 }
 
+function shopItemButton(it) {
+  const S = t().shop;
+  const b = document.createElement('button');
+  b.type = 'button';
+  const own = shopOwned(it.kind, it.code), worn = shopWorn(it.kind, it.code), deal = !own && shopDealOf(it);
+  b.className = 'sh-item rar-' + it.rar + (it.gems ? ' rare' : '') + (own ? ' own' : '') + (worn ? ' worn' : '') + (deal ? ' deal' : '');
+  b.dataset.kind = it.kind;
+  b.dataset.code = it.code;
+  b.innerHTML = (deal ? '<span class="sh-off">−' + deal.pct + '%</span>' : '') +
+    '<span class="sh-art">' + shopArtHtml(it.kind, it.code) + '</span>' +
+    '<span class="sh-name">' + escapeHtml(shopName(it.kind, it.code)) + '</span>' +
+    '<span class="sh-price">' + (worn ? escapeHtml(S.worn) : own ? escapeHtml(S.owned) :
+      (deal ? '<s>' + escapeHtml(shopFullPriceText(it)) + '</s> ' : '') + escapeHtml(shopPriceText(it))) + '</span>';
+  b.onclick = () => openShopItem(it.kind, it.code);
+  return b;
+}
+// Витрина: три товара дня со скидкой и наборы
+function renderShopDeals(grid) {
+  const S = t().shop;
+  const parts = [];
+  const head = (text, sub) => {
+    const h = document.createElement('div');
+    h.className = 'sh-head';
+    h.innerHTML = '<b>' + escapeHtml(text) + '</b>' + (sub ? '<span>' + escapeHtml(sub) + '</span>' : '');
+    return h;
+  };
+  // Товары дня знает только база: без входа — «после входа», без ответа
+  // базы — ни слова (а не «у вас уже всё есть»)
+  const deals = shopDeals(), known = typeof petLook !== 'undefined' && !!petLook;
+  if (deals.length || shopState === 'guest' || known) parts.push(head(S.deals, deals.length ? shopDealsLeftText() : ''));
+  if (deals.length) deals.forEach(d => parts.push(shopItemButton(shopItem(d.kind, d.code))));
+  else if (shopState === 'guest' || known) {
+    const n = document.createElement('div');
+    n.className = 'sh-empty';
+    n.textContent = shopState === 'guest' ? S.dealsGuest : S.dealsNone;
+    parts.push(n);
+  }
+  parts.push(head(S.bundles, S.bundlesSub));
+  SHOP_BUNDLES.forEach(bd => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const owned = shopBundleOwned(bd), price = shopBundlePrice(bd), full = shopBundleFull(bd);
+    b.className = 'sh-bundle' + (owned ? ' own' : '') + (bd.currency === 'gems' ? ' rare' : '');
+    b.dataset.bundle = bd.code;
+    b.innerHTML = '<span class="sb-arts">' + shopBundleItems(bd).map(i => '<span class="sb-art' + (shopOwned(i.kind, i.code) ? ' have' : '') + '">' +
+      shopArtHtml(i.kind, i.code, shopBundlePet(bd)) + '</span>').join('') + '</span>' +
+      '<span class="sb-text"><b>' + escapeHtml(S.bundleNames[bd.code]) + '</b><span>' + escapeHtml(owned ? S.bundleOwned :
+        S.bundleHint.replace('{p}', bd.pct)) + '</span></span>' +
+      '<span class="sb-price">' + (owned ? '✓' : (price < full ? '<s>' + escapeHtml(shopMoney(full, bd.currency)) + '</s>' : '') +
+        '<b>' + escapeHtml(shopMoney(price, bd.currency)) + '</b>') + '</span>';
+    b.onclick = () => openShopBundle(bd.code);
+    parts.push(b);
+  });
+  grid.replaceChildren(...parts);
+}
+
 // Надето ли сейчас: иконка, фон, рамка, титул. Фраза не «надевается»
 function shopWorn(kind, code) {
   if (kind === 'icon') return typeof myAvatar === 'function' && myAvatar() === code;
   if (kind === 'color') return typeof myColor === 'function' && myColor() === code;
   if (kind === 'frame' || kind === 'title') return !!onlineInfo && onlineInfo[kind] === code;
+  // Питомец, вещи на нём, градусник и эффект победы (миграция 063)
+  if (typeof petLook === 'undefined' || !petLook) return false;
+  if (kind === 'pet') return petLook.pet === code;
+  if (kind === 'gear') return !!petLook.gear && PET_GEAR[code] && petLook.gear[PET_GEAR[code].slot] === code;
+  if (kind === 'thermo' || kind === 'winfx') return petLook[kind] === code;
   return false;
 }
 
@@ -199,6 +319,10 @@ function shopName(kind, code) {
   if (kind === 'color') return S.colors[code] || code;
   if (kind === 'frame') return P.frames[code] || code;
   if (kind === 'title') return P.titles[code] || code;
+  if (kind === 'pet') return t().pets.names[code] || code;
+  if (kind === 'gear') return S.gear[code] || code;
+  if (kind === 'thermo') return S.thermos[code] || code;
+  if (kind === 'winfx') return S.winfxs[code] || code;
   return (t().say[code] || code);
 }
 
@@ -209,7 +333,14 @@ function shopBg() {
 
 // Картинка товара: иконка на своём фоне, рамка вокруг своего кружка, кружок
 // цвета, табличка титула, облачко фразы
-function shopArtHtml(kind, code) {
+// Вещь питомца крупным планом: голова и глаза — голова, шея — грудь, плащ и аура — целиком
+const SHOP_GEAR_VIEW = { head: '30 4 180 180', eyes: '40 30 160 160', neck: '30 50 180 180', back: '0 0 240 240', aura: '0 0 240 240' };
+function shopGearArt(code, petFor) {
+  const kind = petFor || (typeof myPet === 'function' && myPet()) || 'fox';
+  // Крупный план обрезан: что за краем кадра, не вылезает на подписи рядом
+  return '<span class="sha-pet sha-crop">' + petSvg(kind, { gear: [code] }).replace('viewBox="0 0 240 240"', 'viewBox="' + SHOP_GEAR_VIEW[PET_GEAR[code].slot] + '"') + '</span>';
+}
+function shopArtHtml(kind, code, petFor) {
   const bg = shopBg();
   if (kind === 'icon') {
     const art = iconArt(code, 0);
@@ -227,6 +358,11 @@ function shopArtHtml(kind, code) {
       (isShinyBg(bg) ? ' shine' : '') + '" style="background:' + avatarBgCss(bg) + '">' + face + '</span></span>';
   }
   if (kind === 'title') return '<span class="sha-title">' + escapeHtml(shopName(kind, code)) + '</span>';
+  // Питомец — сам, вещь — на своём питомце (без него — на Огнелисе)
+  if (kind === 'pet') return '<span class="sha-pet">' + petSvg(code) + '</span>';
+  if (kind === 'gear') return shopGearArt(code, petFor);
+  if (kind === 'thermo') return thermoMiniHtml(code);
+  if (kind === 'winfx') return '<span class="sha-fx">' + WINFX[code] + '</span>';
   return '<span class="sha-phrase">' + escapeHtml(shopName(kind, code)) + '</span>';
 }
 
@@ -236,41 +372,75 @@ function openShopItem(kind, code) {
   renderShopItem();
   document.getElementById('shopItemModal').classList.remove('hidden');
 }
+function openShopBundle(code) {
+  shopOpenItem = { bundle: code };
+  renderShopItem();
+  document.getElementById('shopItemModal').classList.remove('hidden');
+}
 function closeShopItem() {
   const m = document.getElementById('shopItemModal');
   if (m) m.classList.add('hidden');
   shopOpenItem = null;
 }
+// Что вещь даёт и где видна: питомец — характер, вещь — на какое место, и т. п.
+function shopItemAbout(kind, code) {
+  const S = t().shop;
+  if (kind === 'phrase') return S.phraseHint;
+  if (kind === 'pet') return t().pets.who[code];
+  if (kind === 'gear') return S.gearHint.replace('{slot}', S.slots[PET_GEAR[code].slot]);
+  if (kind === 'thermo') return S.thermoHint;
+  if (kind === 'winfx') return S.winfxHint;
+  return '';
+}
 function renderShopItem() {
   if (!shopOpenItem) return;
+  if (shopOpenItem.bundle) { renderShopBundle(); return; }
   const S = t().shop, P = t().pass;
   const { kind, code } = shopOpenItem;
   const it = shopItem(kind, code);
-  const own = shopOwned(kind, code), worn = shopWorn(kind, code);
+  const own = shopOwned(kind, code), worn = shopWorn(kind, code), deal = !own && shopDealOf(it);
+  const card = document.querySelector('#shopItemModal .shop-item-card');
+  card.className = 'modal-card shop-item-card rar-' + it.rar;
   document.getElementById('siArt').className = 'si-art si-' + kind;
   document.getElementById('siArt').innerHTML = shopArtHtml(kind, code);
-  document.getElementById('siKind').textContent = P.kinds[kind] + (it.gems ? ' · ' + S.rare : '');
+  // Питомца можно потрогать: подпрыгнет
+  document.getElementById('siArt').onclick = () => { if (typeof petReact === 'function') petReact(document.getElementById('siArt'), 'jump'); };
+  document.getElementById('siKind').innerHTML = escapeHtml(P.kinds[kind] || S.kindNames[kind]) + ' · <span class="si-rar">' + escapeHtml(S.rarity[it.rar]) + '</span>';
   document.getElementById('siName').textContent = shopName(kind, code);
-  document.getElementById('siPrice').textContent = own ? (worn ? S.worn : S.owned) : shopPriceText(it);
-  document.getElementById('siPrice').className = 'si-price' + (it.gems && !own ? ' gem' : '');
+  const price = document.getElementById('siPrice');
+  price.innerHTML = own ? escapeHtml(worn ? S.worn : S.owned) :
+    (deal ? '<s>' + escapeHtml(shopFullPriceText(it)) + '</s> ' : '') + escapeHtml(shopPriceText(it)) + (deal ? ' <span class="si-off">−' + deal.pct + '%</span>' : '');
+  price.className = 'si-price' + (it.gems && !own ? ' gem' : '');
   const btn = document.getElementById('siBuy');
   const note = document.getElementById('siNote');
   note.className = 'si-note';
-  note.textContent = kind === 'phrase' ? S.phraseHint : '';
+  note.textContent = shopItemAbout(kind, code);
+  // Эффект победы — посмотреть прямо здесь
+  const prev = document.getElementById('siPreview');
+  prev.classList.toggle('hidden', kind !== 'winfx');
+  prev.textContent = S.preview;
+  prev.onclick = () => playWinFx(code, false);
   btn.disabled = false;
   btn.classList.remove('hidden');
   if (own) {
     if (kind === 'phrase') btn.classList.add('hidden');
-    btn.textContent = worn ? S.wornBtn : S.wear;
-    btn.disabled = worn;
-    btn.onclick = () => shopWear(kind, code);
+    // Вещь питомца, градусник и эффект победы снимаются той же кнопкой
+    const canOff = kind === 'gear' || kind === 'thermo' || kind === 'winfx';
+    btn.textContent = worn ? (canOff ? S.unwear : kind === 'pet' ? t().pets.withYou : S.wornBtn) : kind === 'pet' ? t().pets.takeWith : S.wear;
+    btn.disabled = worn && !canOff;
+    btn.onclick = () => shopWear(kind, code, worn);
+    if (kind === 'gear' && !(typeof myPet === 'function' && myPet())) {
+      btn.disabled = true;
+      note.textContent = S.gearNoPet;
+    }
   } else if (shopState !== 'ok' || !shopWallet) {
     btn.textContent = shopState === 'guest' ? S.login : S.buyFor.replace('{p}', shopPriceText(it));
     btn.disabled = shopState !== 'guest';
     btn.onclick = () => { closeShop(); openLogoutModal(); };
     note.textContent = shopState === 'guest' ? S.guest : S.off;
   } else {
-    const have = it.gems ? shopWallet.gems : shopWallet.coins, need = it.gems || it.coins;
+    const p = shopPrice(it);
+    const have = it.gems ? shopWallet.gems : shopWallet.coins, need = it.gems ? p.gems : p.coins;
     btn.textContent = S.buyFor.replace('{p}', shopPriceText(it));
     if (have < need) {
       btn.disabled = true;
@@ -283,9 +453,71 @@ function renderShopItem() {
   }
   document.getElementById('siBack').textContent = S.back;
 }
-
-async function shopBuy(kind, code) {
+// Карточка набора: три вещи, что уже есть — отмечено, цена за недостающее
+function renderShopBundle() {
   const S = t().shop;
+  const bd = shopBundle(shopOpenItem.bundle);
+  const items = shopBundleItems(bd), owned = shopBundleOwned(bd), price = shopBundlePrice(bd), full = shopBundleFull(bd);
+  const card = document.querySelector('#shopItemModal .shop-item-card');
+  card.className = 'modal-card shop-item-card rar-' + (bd.currency === 'gems' ? 'legend' : 'epic');
+  const art = document.getElementById('siArt');
+  art.className = 'si-art si-bundle';
+  art.innerHTML = items.map(i => '<span class="sb-art' + (shopOwned(i.kind, i.code) ? ' have' : '') + '">' + shopArtHtml(i.kind, i.code, shopBundlePet(bd)) + '</span>').join('');
+  art.onclick = null;
+  document.getElementById('siKind').innerHTML = escapeHtml(S.bundle) + ' · <span class="si-rar">−' + bd.pct + '%</span>';
+  document.getElementById('siName').textContent = S.bundleNames[bd.code];
+  const pr = document.getElementById('siPrice');
+  pr.innerHTML = owned ? escapeHtml(S.bundleOwned) : (price < full ? '<s>' + escapeHtml(shopMoney(full, bd.currency)) + '</s> ' : '') + escapeHtml(shopMoney(price, bd.currency));
+  pr.className = 'si-price' + (bd.currency === 'gems' && !owned ? ' gem' : '');
+  const note = document.getElementById('siNote');
+  note.className = 'si-note';
+  note.innerHTML = items.map(i => '<span class="si-line">' + (shopOwned(i.kind, i.code) ? '✓ ' : '• ') + escapeHtml(shopName(i.kind, i.code)) +
+    ' <small>' + escapeHtml(shopOwned(i.kind, i.code) ? S.owned : shopFullPriceText(i)) + '</small></span>').join('') +
+    (owned ? '' : '<span class="si-how">' + escapeHtml(S.bundleHint.replace('{p}', bd.pct)) + '</span>');
+  document.getElementById('siPreview').classList.add('hidden');
+  const btn = document.getElementById('siBuy');
+  btn.classList.remove('hidden');
+  btn.disabled = owned;
+  if (owned) btn.textContent = S.bundleOwned;
+  else if (shopState !== 'ok' || !shopWallet) {
+    btn.textContent = shopState === 'guest' ? S.login : S.buyBundle.replace('{p}', shopMoney(price, bd.currency));
+    btn.disabled = shopState !== 'guest';
+    btn.onclick = () => { closeShop(); openLogoutModal(); };
+  } else {
+    btn.textContent = S.buyBundle.replace('{p}', shopMoney(price, bd.currency));
+    const have = bd.currency === 'gems' ? shopWallet.gems : shopWallet.coins;
+    if (have < price) {
+      btn.disabled = true;
+      note.innerHTML += '<span class="si-how warn">' + escapeHtml(S.notEnough.replace('{p}', shopMoney(price - have, bd.currency))) + '</span>';
+    }
+    btn.onclick = () => shopBuyBundle(bd.code);
+  }
+  document.getElementById('siBack').textContent = S.back;
+}
+
+function shopBuyError(e) {
+  const S = t().shop;
+  const m = /not_enough/.test(e.message) ? S.notEnoughShort : /already_owned/.test(e.message) ? S.owned : friendErrorText(e.message);
+  const note = document.getElementById('siNote');
+  note.className = 'si-note warn';
+  note.textContent = m;
+}
+// Купленное — сразу своё, не дожидаясь my_online; питомец, цены наборов и
+// товары дня — свежие из базы
+function shopGotItems(list) {
+  if (onlineInfo) onlineInfo.owned = (onlineInfo.owned || []).concat(list.map(x => ({ kind: x[0], code: x[1] })));
+}
+async function shopAfterBuy() {
+  if (typeof loadLook === 'function') await loadLook();
+  renderShop();
+  renderShopItem();
+  const note = document.getElementById('siNote');
+  note.className = 'si-note good';
+  note.textContent = t().shop.bought;
+  if (typeof confettiBurst === 'function') confettiBurst();
+  else if (typeof celebrate === 'function') celebrate('buy:' + Date.now(), ['✨', '⭐', '🎉'], false);
+}
+async function shopBuy(kind, code) {
   const btn = document.getElementById('siBuy');
   btn.disabled = true;
   let r;
@@ -293,30 +525,50 @@ async function shopBuy(kind, code) {
     r = await friendRpc('shop_buy', { p_kind: kind, p_code: code });
   } catch (e) {
     btn.disabled = false;
-    const m = /not_enough/.test(e.message) ? S.notEnoughShort : /already_owned/.test(e.message) ? S.owned : friendErrorText(e.message);
-    const note = document.getElementById('siNote');
-    note.className = 'si-note warn';
-    note.textContent = m;
+    shopBuyError(e);
     return;
   }
   if (r && typeof r.coins === 'number' && shopWallet) { shopWallet.coins = r.coins; shopWallet.gems = r.gems; }
-  // Купленное — сразу своё, не дожидаясь my_online
-  if (onlineInfo) {
-    onlineInfo.owned = (onlineInfo.owned || []).concat([{ kind, code }]);
+  shopGotItems([[kind, code]]);
+  await shopAfterBuy();
+}
+async function shopBuyBundle(code) {
+  const btn = document.getElementById('siBuy');
+  btn.disabled = true;
+  let r;
+  try {
+    r = await friendRpc('shop_buy_bundle', { p_code: code });
+  } catch (e) {
+    btn.disabled = false;
+    shopBuyError(e);
+    return;
   }
-  renderShop();
-  renderShopItem();
-  const note = document.getElementById('siNote');
-  note.className = 'si-note good';
-  note.textContent = S.bought;
-  if (typeof confettiBurst === 'function') confettiBurst();
+  if (r && typeof r.coins === 'number' && shopWallet) { shopWallet.coins = r.coins; shopWallet.gems = r.gems; }
+  shopGotItems(shopBundle(code).items.map(x => x.split(':')));
+  await shopAfterBuy();
 }
 
-// Надеть купленное — тем же путём, что и награды в профиле
-async function shopWear(kind, code) {
-  if (kind === 'icon') await chooseAvatar(code);
-  else if (kind === 'color') await chooseColor(code);
-  else if (kind === 'frame' || kind === 'title') await chooseStyle(kind, code);
+// Надеть купленное: иконка, фон, рамка, титул — тем же путём, что и награды в
+// профиле; питомец, его вещи, градусник и эффект победы — своими запросами.
+// Надетые вещь, градусник и эффект той же кнопкой снимаются
+async function shopWear(kind, code, off) {
+  try {
+    if (kind === 'icon') await chooseAvatar(code);
+    else if (kind === 'color') await chooseColor(code);
+    else if (kind === 'frame' || kind === 'title') await chooseStyle(kind, code);
+    else if (kind === 'pet') await petChoose(code);
+    else if (kind === 'gear') await petWearGear(PET_GEAR[code].slot, code);
+    else if (kind === 'thermo' || kind === 'winfx') {
+      const v = off ? null : code;
+      await friendRpc(kind === 'thermo' ? 'set_thermo' : 'set_winfx', { p_code: v });
+      if (petLook) petLook[kind] = v;
+      if (kind === 'thermo') applyThermoSkin();
+      else if (v) playWinFx(v, false);
+    }
+  } catch (e) {
+    shopBuyError(e);
+    return;
+  }
   renderShop();
   renderShopItem();
 }

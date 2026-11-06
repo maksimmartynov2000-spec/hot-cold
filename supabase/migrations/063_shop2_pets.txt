@@ -1,0 +1,386 @@
+-- Магазин 2.0 и питомцы. Применять в Supabase: SQL Editor → вставить целиком →
+-- Run. Применить ДО мёржа. Повторный запуск ничего не ломает и ничего не
+-- начисляет второй раз.
+--
+-- • Редкость у каждого товара: обычный, редкий, эпический, легендарный — и
+--   своя цена (раньше у всех в разделе была одна). Купленное остаётся.
+-- • Новые разделы: питомцы (Огнелис, Ледяной волк, Грозовой дракон), вещи
+--   для питомцев (на голову, глаза, шею, спину и ауры), облики градусника,
+--   эффекты победы.
+-- • Наборы со скидкой: берёте всё, чего ещё нет, со скидкой набора.
+-- • Товары дня: у каждого игрока свои три вещи со скидкой, меняются в
+--   полночь по его времени. Питомцы в товары дня не попадают.
+-- • Питомец: выбранный — в профиле. Опыт — от любой игры (столько же, сколько
+--   очков пути за неё, не больше 200 в день). Вещи надеваются на питомца, по
+--   одной на место. Первый купленный питомец, градусник и эффект победы
+--   надеваются сами.
+-- Всё считает база: цену, скидку и опыт из игры не прислать.
+
+-- ============ 1. Новые разделы, выбор игрока, опыт питомцев ============
+alter table cosmetics drop constraint if exists cosmetic_kind;
+alter table cosmetics add constraint cosmetic_kind
+  check (kind in ('frame', 'title', 'phrase', 'icon', 'color', 'pet', 'gear', 'thermo', 'winfx'));
+
+alter table students add column if not exists pet text;
+alter table students add column if not exists pet_gear jsonb not null default '{}'::jsonb;
+alter table students add column if not exists thermo text;
+alter table students add column if not exists winfx text;
+
+create table if not exists pet_xp (
+  username text not null references students(username) on update cascade on delete cascade,
+  pet text not null,
+  xp int not null default 0 check (xp >= 0),
+  primary key (username, pet)
+);
+alter table pet_xp enable row level security;
+
+-- Опыт питомцев за день — рядом с очками пути за день
+alter table online_days add column if not exists pet_xp int not null default 0;
+
+-- ============ 2. Товары ============
+-- Копия — в js/shop.js (SHOP_ITEMS), сверяется тестом. Цена — в монетах или в
+-- кристаллах (одно из двух); редкость: common, rare, epic, legend
+create or replace function shop_catalog()
+returns table(kind text, code text, coins int, gems int, rarity text)
+language sql immutable as $$
+  values
+    -- Иконки «Стихии»
+    ('icon', 'shop-01', 90, 0, 'common'), ('icon', 'shop-02', 100, 0, 'common'), ('icon', 'shop-03', 110, 0, 'common'),
+    ('icon', 'shop-04', 120, 0, 'common'), ('icon', 'shop-05', 160, 0, 'rare'), ('icon', 'shop-06', 170, 0, 'rare'),
+    ('icon', 'shop-07', 180, 0, 'rare'), ('icon', 'shop-08', 200, 0, 'rare'), ('icon', 'shop-09', 220, 0, 'rare'),
+    ('icon', 'shop-10', 260, 0, 'epic'),
+    ('icon', 'shop-11', 0, 12, 'epic'), ('icon', 'shop-12', 0, 14, 'epic'), ('icon', 'shop-13', 0, 14, 'epic'),
+    ('icon', 'shop-14', 0, 16, 'epic'), ('icon', 'shop-15', 0, 16, 'epic'), ('icon', 'shop-16', 0, 20, 'legend'),
+    ('icon', 'shop-17', 0, 22, 'legend'), ('icon', 'shop-18', 0, 22, 'legend'), ('icon', 'shop-19', 0, 24, 'legend'),
+    ('icon', 'shop-20', 0, 25, 'legend'),
+    -- Рамки
+    ('frame', 'leaf', 100, 0, 'common'), ('frame', 'ocean', 180, 0, 'rare'), ('frame', 'coral', 200, 0, 'rare'),
+    ('frame', 'ember', 220, 0, 'rare'), ('frame', 'night', 300, 0, 'epic'), ('frame', 'galaxy', 0, 14, 'epic'),
+    ('frame', 'aurora', 0, 18, 'legend'), ('frame', 'prism', 0, 20, 'legend'),
+    -- Фоны кружка
+    ('color', 'grad-mint', 80, 0, 'common'), ('color', 'grad-peach', 80, 0, 'common'), ('color', 'grad-sky', 90, 0, 'common'),
+    ('color', 'grad-violet', 140, 0, 'rare'), ('color', 'grad-sand', 120, 0, 'rare'), ('color', 'grad-galaxy', 0, 10, 'epic'),
+    ('color', 'grad-rainbow', 0, 14, 'legend'), ('color', 'grad-sun', 0, 12, 'epic'),
+    -- Титулы
+    ('title', 'thinker', 90, 0, 'common'), ('title', 'explorer', 100, 0, 'common'), ('title', 'lucky', 150, 0, 'rare'),
+    ('title', 'strategist', 180, 0, 'rare'), ('title', 'speedy', 160, 0, 'rare'), ('title', 'calm', 110, 0, 'common'),
+    ('title', 'sleuth', 170, 0, 'rare'), ('title', 'friend', 80, 0, 'common'), ('title', 'legend', 0, 15, 'legend'),
+    ('title', 'genius', 0, 12, 'epic'),
+    -- Фразы для чата в партии
+    ('phrase', 'bingo', 60, 0, 'common'), ('phrase', 'respect', 70, 0, 'common'), ('phrase', 'brain', 80, 0, 'common'),
+    ('phrase', 'whatluck', 120, 0, 'rare'), ('phrase', 'thanks', 60, 0, 'common'), ('phrase', 'math', 100, 0, 'rare'),
+    ('phrase', 'comeback', 140, 0, 'rare'), ('phrase', 'bravo', 70, 0, 'common'),
+    -- Питомцы
+    ('pet', 'fox', 450, 0, 'epic'), ('pet', 'wolf', 450, 0, 'epic'), ('pet', 'drake', 0, 30, 'legend'),
+    -- Вещи для питомцев
+    ('gear', 'crown', 0, 20, 'legend'), ('gear', 'wizard', 360, 0, 'epic'), ('gear', 'viking', 220, 0, 'rare'),
+    ('gear', 'shades', 180, 0, 'rare'), ('gear', 'scarf', 100, 0, 'common'), ('gear', 'bowtie', 80, 0, 'common'),
+    ('gear', 'cape', 400, 0, 'epic'), ('gear', 'aura_fire', 0, 12, 'epic'), ('gear', 'aura_ice', 0, 12, 'epic'),
+    ('gear', 'aura_storm', 0, 12, 'epic'),
+    -- Облики градусника
+    ('thermo', 'ice', 200, 0, 'rare'), ('thermo', 'lava', 200, 0, 'rare'), ('thermo', 'neon', 350, 0, 'epic'),
+    ('thermo', 'space', 0, 15, 'legend'),
+    -- Эффекты победы
+    ('winfx', 'confetti', 120, 0, 'common'), ('winfx', 'fireworks', 240, 0, 'rare'), ('winfx', 'lightning', 400, 0, 'epic'),
+    ('winfx', 'meteors', 0, 18, 'legend');
+$$;
+
+-- Прежний вид списка — для всего, что уже на него опирается (иконки, фразы, фоны)
+create or replace function shop_items()
+returns table(kind text, code text, coins int, gems int)
+language sql immutable as $$
+  select c.kind, c.code, c.coins, c.gems from shop_catalog() c;
+$$;
+
+-- Куда надевается вещь питомца
+create or replace function pet_gear_slot(p_code text)
+returns text language sql immutable as $$
+  select case
+    when p_code in ('crown', 'wizard', 'viking') then 'head'
+    when p_code = 'shades' then 'eyes'
+    when p_code in ('scarf', 'bowtie') then 'neck'
+    when p_code = 'cape' then 'back'
+    when p_code like 'aura\_%' then 'aura'
+  end;
+$$;
+
+-- ============ 3. Наборы ============
+-- Копия — в js/shop.js (SHOP_BUNDLES). Все вещи набора — в одной валюте
+create or replace function shop_bundles()
+returns table(code text, currency text, pct int, items text[])
+language sql immutable as $$
+  values
+    ('set_fox', 'coins', 20, array['pet:fox', 'thermo:lava', 'frame:ember']),
+    ('set_wolf', 'coins', 20, array['pet:wolf', 'thermo:ice', 'frame:ocean']),
+    ('set_drake', 'gems', 20, array['pet:drake', 'gear:aura_storm', 'frame:galaxy']),
+    ('set_style', 'coins', 20, array['gear:shades', 'gear:scarf', 'gear:bowtie']);
+$$;
+
+-- Цена набора для игрока: только то, чего у него ещё нет, со скидкой.
+-- Монеты — до десятков, кристаллы — до целых
+create or replace function shop_bundle_price(p_username text, p_code text)
+returns int language sql stable security definer set search_path = public, pg_temp as $$
+  with b as (select * from shop_bundles() where code = p_code),
+  miss as (
+    select c.coins, c.gems
+      from b cross join lateral unnest(b.items) as it(item)
+      join shop_catalog() c on c.kind || ':' || c.code = it.item
+     where not cosmetic_has(p_username, c.kind, c.code)
+  )
+  select case when (select currency from b) = 'coins'
+              then (round(coalesce((select sum(coins) from miss), 0) * (100 - (select pct from b)) / 1000.0) * 10)::int
+              else round(coalesce((select sum(gems) from miss), 0) * (100 - (select pct from b)) / 100.0)::int end;
+$$;
+
+-- ============ 4. Товары дня ============
+create table if not exists shop_deals (
+  username text not null references students(username) on update cascade on delete cascade,
+  day date not null,
+  items jsonb not null,
+  primary key (username, day)
+);
+alter table shop_deals enable row level security;
+
+-- Три вещи со скидкой 40, 25 и 15 % на сегодня: из того, чего у игрока нет,
+-- кроме питомцев. Выбираются один раз за день и дальше не меняются
+create or replace function shop_deals_today(p_username text)
+returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare d date; got jsonb;
+begin
+  d := player_day(p_username);
+  select items into got from shop_deals where username = p_username and day = d;
+  if got is not null then return got; end if;
+  select coalesce(jsonb_agg(jsonb_build_object('kind', x.kind, 'code', x.code, 'pct', (array[40, 25, 15])[x.n]) order by x.n), '[]'::jsonb)
+    into got
+    from (select c.kind, c.code, (row_number() over (order by random()))::int as n
+            from shop_catalog() c
+           where c.kind <> 'pet' and not cosmetic_has(p_username, c.kind, c.code)) x
+   where x.n <= 3;
+  insert into shop_deals(username, day, items) values (p_username, d, got) on conflict do nothing;
+  delete from shop_deals where username = p_username and day < d - 7;
+  select items into got from shop_deals where username = p_username and day = d;
+  return got;
+end;
+$$;
+
+-- Цена вещи для игрока: со скидкой дня, если вещь сегодня в товарах дня
+create or replace function shop_price(p_username text, p_kind text, p_code text, out coins int, out gems int, out pct int)
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare it record; deal jsonb;
+begin
+  select * into it from shop_catalog() c where c.kind = p_kind and c.code = p_code;
+  if it.kind is null then coins := null; gems := null; pct := 0; return; end if;
+  select x into deal from shop_deals s, jsonb_array_elements(s.items) x
+   where s.username = p_username and s.day = player_day(p_username)
+     and x->>'kind' = p_kind and x->>'code' = p_code;
+  pct := coalesce((deal->>'pct')::int, 0);
+  coins := case when it.coins > 0 then greatest(1, round(it.coins * (100 - pct) / 100.0)::int) else 0 end;
+  gems := case when it.gems > 0 then greatest(1, round(it.gems * (100 - pct) / 100.0)::int) else 0 end;
+end;
+$$;
+
+-- ============ 5. Покупка ============
+-- Купить вещь. Цена — со скидкой дня, если вещь сегодня в товарах дня. Первый
+-- питомец, первый градусник и первый эффект победы сразу надеваются
+create or replace function shop_buy(p_username text, p_pin text, p_kind text, p_code text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; pr record; w wallet;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if not exists (select 1 from shop_catalog() c where c.kind = p_kind and c.code = p_code) then raise exception 'no_such_item'; end if;
+  insert into wallet(username) values (me) on conflict do nothing;
+  select * into w from wallet where username = me for update;
+  if cosmetic_has(me, p_kind, p_code) then raise exception 'already_owned'; end if;
+  select * into pr from shop_price(me, p_kind, p_code);
+  if w.coins < pr.coins or w.gems < pr.gems then raise exception 'not_enough'; end if;
+  update wallet set coins = coins - pr.coins, gems = gems - pr.gems, updated_at = now()
+   where username = me returning * into w;
+  insert into wallet_log(username, coins, gems, reason, ref, day)
+  values (me, -pr.coins, -pr.gems, 'buy', p_kind || ':' || p_code, player_day(me));
+  perform cosmetic_grant(me, p_kind, p_code, 'shop');
+  if p_kind = 'pet' then update students set pet = p_code where username = me and pet is null; end if;
+  if p_kind = 'thermo' then update students set thermo = p_code where username = me and thermo is null; end if;
+  if p_kind = 'winfx' then update students set winfx = p_code where username = me and winfx is null; end if;
+  return jsonb_build_object('coins', w.coins, 'gems', w.gems, 'kind', p_kind, 'code', p_code, 'paid', pr.coins + pr.gems, 'pct', pr.pct);
+end;
+$$;
+
+-- Купить набор: всё, чего ещё нет, со скидкой набора
+create or replace function shop_buy_bundle(p_username text, p_pin text, p_code text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; b record; w wallet; price int; it text; k text; c text; got text[] := '{}';
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into b from shop_bundles() x where x.code = p_code;
+  if b.code is null then raise exception 'no_such_bundle'; end if;
+  insert into wallet(username) values (me) on conflict do nothing;
+  select * into w from wallet where username = me for update;
+  if not exists (select 1 from unnest(b.items) i
+                  where not cosmetic_has(me, split_part(i, ':', 1), split_part(i, ':', 2))) then
+    raise exception 'already_owned';
+  end if;
+  price := shop_bundle_price(me, p_code);
+  if (b.currency = 'coins' and w.coins < price) or (b.currency = 'gems' and w.gems < price) then raise exception 'not_enough'; end if;
+  update wallet set coins = coins - case when b.currency = 'coins' then price else 0 end,
+                    gems = gems - case when b.currency = 'gems' then price else 0 end, updated_at = now()
+   where username = me returning * into w;
+  insert into wallet_log(username, coins, gems, reason, ref, day)
+  values (me, case when b.currency = 'coins' then -price else 0 end, case when b.currency = 'gems' then -price else 0 end,
+          'buy', 'bundle:' || p_code, player_day(me));
+  foreach it in array b.items loop
+    k := split_part(it, ':', 1); c := split_part(it, ':', 2);
+    if cosmetic_grant(me, k, c, 'shop') then got := got || it; end if;
+    if k = 'pet' then update students set pet = c where username = me and pet is null; end if;
+    if k = 'thermo' then update students set thermo = c where username = me and thermo is null; end if;
+    if k = 'winfx' then update students set winfx = c where username = me and winfx is null; end if;
+  end loop;
+  return jsonb_build_object('coins', w.coins, 'gems', w.gems, 'bundle', p_code, 'paid', price, 'got', to_jsonb(got));
+end;
+$$;
+
+-- ============ 6. Питомец, градусник, эффект победы ============
+-- Опыт питомцу за игру: столько же, сколько очков пути за неё, не больше
+-- 200 в день. Без выбранного питомца опыт никому не идёт
+create or replace function pet_gain(p_username text, p_xp int)
+returns int
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare d date; have int; amt int; p text;
+begin
+  select pet into p from students where username = p_username;
+  if p is null or not cosmetic_has(p_username, 'pet', p) then return 0; end if;
+  d := player_day(p_username);
+  insert into online_days(username, day) values (p_username, d) on conflict do nothing;
+  select pet_xp into have from online_days where username = p_username and day = d for update;
+  amt := least(greatest(coalesce(p_xp, 0), 0), greatest(0, 200 - have));
+  if amt > 0 then
+    update online_days set pet_xp = pet_xp + amt where username = p_username and day = d;
+    insert into pet_xp(username, pet, xp) values (p_username, p, amt)
+    on conflict (username, pet) do update set xp = pet_xp.xp + amt;
+  end if;
+  return amt;
+end;
+$$;
+
+-- Любая игра — очки пути (062) и опыт питомцу
+create or replace function play_done(p_username text, p_xp int)
+returns int
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare d date; have int; amt int;
+begin
+  if not wallet_person(p_username) then return 0; end if;
+  d := player_day(p_username);
+  insert into online_days(username, day, played) values (p_username, d, true)
+  on conflict (username, day) do update set played = true;
+  select play_xp into have from online_days where username = p_username and day = d for update;
+  amt := least(greatest(coalesce(p_xp, 0), 0), greatest(0, play_xp_cap() - have));
+  if amt > 0 then
+    update online_days set play_xp = play_xp + amt where username = p_username and day = d;
+    perform season_xp(p_username, amt);
+  end if;
+  perform pet_gain(p_username, p_xp);
+  return amt;
+end;
+$$;
+
+create or replace function set_pet(p_username text, p_pin text, p_pet text)
+returns text language plpgsql security definer set search_path = public, extensions, pg_temp as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_pet is not null and not cosmetic_has(me, 'pet', p_pet) then raise exception 'pet_locked'; end if;
+  update students set pet = p_pet where username = me;
+  return p_pet;
+end;
+$$;
+
+-- Надеть вещь на место (голова, глаза, шея, спина, аура) или снять (null)
+create or replace function set_pet_gear(p_username text, p_pin text, p_slot text, p_code text)
+returns jsonb language plpgsql security definer set search_path = public, extensions, pg_temp as $$
+declare me text; g jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_slot is null or p_slot not in ('head', 'eyes', 'neck', 'back', 'aura') then raise exception 'bad_slot'; end if;
+  if p_code is not null then
+    if pet_gear_slot(p_code) is distinct from p_slot then raise exception 'bad_slot'; end if;
+    if not cosmetic_has(me, 'gear', p_code) then raise exception 'gear_locked'; end if;
+  end if;
+  update students
+     set pet_gear = case when p_code is null then pet_gear - p_slot else pet_gear || jsonb_build_object(p_slot, p_code) end
+   where username = me returning pet_gear into g;
+  return g;
+end;
+$$;
+
+create or replace function set_thermo(p_username text, p_pin text, p_code text)
+returns text language plpgsql security definer set search_path = public, extensions, pg_temp as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_code is not null and not cosmetic_has(me, 'thermo', p_code) then raise exception 'thermo_locked'; end if;
+  update students set thermo = p_code where username = me;
+  return p_code;
+end;
+$$;
+
+create or replace function set_winfx(p_username text, p_pin text, p_code text)
+returns text language plpgsql security definer set search_path = public, extensions, pg_temp as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if p_code is not null and not cosmetic_has(me, 'winfx', p_code) then raise exception 'winfx_locked'; end if;
+  update students set winfx = p_code where username = me;
+  return p_code;
+end;
+$$;
+
+-- Всё про облик разом: питомец, его вещи и опыт, градусник, эффект победы,
+-- товары дня (и через сколько секунд они сменятся), цены наборов для игрока
+create or replace function my_look(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; s students; xp jsonb; deals jsonb; bundles jsonb; left_s int;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into s from students where username = me;
+  select coalesce(jsonb_object_agg(x.pet, x.xp), '{}'::jsonb) into xp from pet_xp x where x.username = me;
+  deals := shop_deals_today(me);
+  select coalesce(jsonb_object_agg(b.code, shop_bundle_price(me, b.code)), '{}'::jsonb) into bundles from shop_bundles() b;
+  left_s := greatest(0, extract(epoch from (((player_day(me) + 1)::timestamp at time zone coalesce(s.tz, 'UTC')) - now()))::int);
+  return jsonb_build_object('pet', s.pet, 'gear', coalesce(s.pet_gear, '{}'::jsonb), 'xp', xp,
+                            'thermo', s.thermo, 'winfx', s.winfx,
+                            'deals', deals, 'dealsLeft', left_s, 'bundles', bundles);
+end;
+$$;
+
+-- ============ 7. Права ============
+revoke execute on function pet_gain(text, int) from public, anon;
+revoke execute on function play_done(text, int) from public, anon;
+revoke execute on function shop_deals_today(text) from public, anon;
+revoke execute on function shop_price(text, text, text) from public, anon;
+revoke execute on function shop_bundle_price(text, text) from public, anon;
+grant execute on function shop_buy(text, text, text, text) to anon;
+grant execute on function shop_buy_bundle(text, text, text) to anon;
+grant execute on function set_pet(text, text, text) to anon;
+grant execute on function set_pet_gear(text, text, text, text) to anon;
+grant execute on function set_thermo(text, text, text) to anon;
+grant execute on function set_winfx(text, text, text) to anon;
+grant execute on function my_look(text, text) to anon;
