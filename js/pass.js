@@ -42,6 +42,7 @@ function localGameDone(kind) {
     .then(() => {
       loadOnlineInfo();
       if (typeof loadProgress === 'function') loadProgress();
+      if (typeof loadLook === 'function') loadLook();
     })
     .catch(() => {});
 }

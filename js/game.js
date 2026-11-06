@@ -170,6 +170,15 @@ function renderVizToggles() {
   document.getElementById('tVizKnown').textContent = L.train.knownToggle;
   // «Где может быть число» — только в тренировке
   document.getElementById('toggleKnownBtn').classList.toggle('hidden', mode !== 'solo');
+  // Питомец в партии — у кого он есть
+  const petBtn = document.getElementById('togglePetBtn');
+  const hasPet = typeof myPet === 'function' && !!myPet();
+  petBtn.classList.toggle('hidden', !hasPet);
+  if (hasPet) {
+    document.getElementById('tVizPet').textContent = L.pets.vizPet;
+    petBtn.classList.toggle('on', petInGame());
+    petBtn.setAttribute('aria-pressed', petInGame() ? 'true' : 'false');
+  }
   const snd = document.getElementById('vizSound');
   snd.classList.toggle('on', soundOn);
   snd.querySelector('.vr-ic').textContent = soundOn ? '🔊' : '🔇';
@@ -646,7 +655,11 @@ function showScreen(name) {
     renderModeInfo(); loadProgress(); loadOnlineInfo();
     // Кошелёк — заранее: после партии всплывашка «+15 🪙» считает разницу с ним
     if (typeof loadWallet === 'function') loadWallet();
+    // Питомец: опыт за только что сыгранную партию, вещи, товары дня
+    if (typeof loadLook === 'function') loadLook();
   }
+  // Питомец на доске появляется вместе с ней и уходит с неё
+  if (typeof gamePetEnter === 'function') { if (name === 'game') gamePetEnter(); else gamePetSync(); }
   // Ушёл с доски — праздник звёзд и салют закрываются: они про только что сыгранную партию
   if (name !== 'game') {
     closeVizPanel();
@@ -1473,6 +1486,7 @@ function renderAll() {
   checkBonusFx();
   checkBonusCard();
   botTick();
+  if (typeof gamePetOnMove === 'function') { gamePetOnMove(currentMove()); gamePetPlace(); }
 }
 
 function renderBonusLine() {
@@ -2185,6 +2199,8 @@ function renderResult() {
     // Только на доске: перерисовки в меню и настройках салют не запускают
     if (gameOverType === 'win' && screen === 'game') {
       celebrate(history, lastWinIsRecord ? ['🏆', '⭐', '✨', '🎉'] : ['🎉', '✨', '⭐'], lastWinIsRecord);
+    } else if (gameOverType === 'lose' && screen === 'game' && typeof gamePetOutcome === 'function') {
+      gamePetOutcome(history, false);
     }
 
     // Точность партии сразу в итогах; нажатие открывает разбор ходов
@@ -2614,8 +2630,11 @@ async function loadOnlineReview() {
 function duelCelebrate() {
   if (!D.roundOver) return;
   const mine = online ? online.seat : (vsBot ? 0 : D.roundWinner);
-  if (D.roundWinner !== mine) return;
   const key = online ? 'o:' + online.id + ':' + D.round + (D.matchOver ? ':m' : '') : history;
+  if (D.roundWinner !== mine) {
+    if (typeof gamePetOutcome === 'function') gamePetOutcome(key, false);
+    return;
+  }
   celebrate(key, ['🎉', '✨', '⭐'], D.matchOver);
 }
 
@@ -3644,6 +3663,12 @@ function celebrate(key, icons, big) {
   if (key === celebratedFor) return false;
   celebratedFor = key;
   if (big) soundFanfare();
+  // Победа в партии: питомец радуется, а вместо салюта — свой эффект победы из магазина
+  if (screen === 'game' && typeof gamePetOutcome === 'function') {
+    gamePetOutcome(key, true);
+    const fx = myWinFx();
+    if (fx) { playWinFx(fx, big); return true; }
+  }
   try {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
   } catch (e) {}

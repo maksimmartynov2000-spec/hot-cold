@@ -286,6 +286,7 @@ function trialRoundWon() {
                 mult: RUN.mult, next: next, nextMod: nextMod, reward: reward };
   trialSaveState();
   renderAll();
+  if (typeof gamePetOutcome === 'function') gamePetOutcome('run:' + RUN.round + ':' + RUN.totalScore, true);
 }
 
 function trialRoundLost(why) {
@@ -448,6 +449,7 @@ function finishRun(res, quit) {
   trialReport(rounds, score);
   applyTranslations();
   renderAll();
+  if (!quit && typeof gamePetOutcome === 'function') gamePetOutcome('runover:' + score + ':' + rounds, false);
 }
 
 // Итог — в базу: задания дня, достижения, рекорд. Без входа или сети — молча

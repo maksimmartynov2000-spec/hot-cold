@@ -100,10 +100,11 @@ async function openPlayer(browser, db, lang) {
     // Обучение проверяет run.js; здесь игроки его уже прошли
     if (localStorage.getItem('hc_tutorial') === null) {
       localStorage.setItem('hc_tutorial', JSON.stringify({ done: [1, 2, 3], skipped: false }));
-      // Все бонусы партий с другом, и четыре из Приключения (миграция 057) тоже: иначе
-      // случайный ход на 🩻/🌗/🛡️/🧊 открывал окно-объяснение поверх кнопок
+      // Все бонусы партий с другом, четыре из Приключения (миграция 057) и новые
+      // (060) тоже: иначе случайный ход на 🩻/🌗/🛡️/🧊/3️⃣/5️⃣/🧭/🦝/🪞 открывал
+      // окно-объяснение поверх кнопок
       localStorage.setItem('hc_seen_bonus', JSON.stringify(['extra', 'fog', 'blind', 'rush', 'lava', 'skip', 'gift', 'memory', 'near',
-        'xray', 'half', 'shield', 'freeze']));
+        'xray', 'half', 'shield', 'freeze', 'div3', 'div5', 'compass', 'thief', 'mirror', 'tens', 'units']));
     }
   }, lang || 'ru');
   await page.goto(GAME);

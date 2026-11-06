@@ -2700,3 +2700,268 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
 /* Ссылка «Ещё — в магазине» под рамками и иконками профиля */
 .st-shop { margin-top: 4px; }
 .av-shop { grid-column: 1 / -1; margin-top: 6px; }
+
+/* ================= Питомцы ================= */
+/* Части рисунка крутятся вокруг своих точек (transform-origin задан в рисунке
+   в координатах 240×240) — для этого отсчёт от рамки рисунка, а не от части */
+.pet { display: block; overflow: visible; }
+.pet g, .pet path, .pet ellipse { transform-box: view-box; }
+.pet .pt-mouth-open { display: none; }
+
+/* Покой: дышит, поводит головой, моргает, шевелит ушами и хвостом */
+.pet .pt-body { animation: ptBreath 3.2s ease-in-out infinite; }
+.pet .pt-head { animation: ptHead 5.2s ease-in-out infinite; }
+.pet .pt-eyes { animation: ptBlink 4.7s infinite; }
+.pet .pt-ear.l { animation: ptEarL 7.3s infinite; }
+.pet .pt-ear.r { animation: ptEarR 9.1s infinite; }
+.pet .pt-tail { animation: ptTail 3.8s ease-in-out infinite; }
+.pet .pt-glow { animation: ptGlow 2.8s ease-in-out infinite; }
+.pet .pt-fx { animation: ptTwinkle 2.3s ease-in-out infinite; }
+.pet .pt-flame { transform-origin: 96px 206px; animation: ptFlame 0.45s ease-in-out infinite alternate; }
+.pet .pt-wing.l { animation: ptWingL 2.6s ease-in-out infinite; }
+.pet .pt-wing.r { animation: ptWingR 2.6s ease-in-out infinite; }
+.pet .g-aura { animation: ptSpin 18s linear infinite; }
+@keyframes ptBreath { 50% { transform: scale(1.012, 1.03); } }
+@keyframes ptHead { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2.2deg) translateY(1px); } }
+@keyframes ptBlink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.08); } }
+@keyframes ptEarL { 0%, 86%, 100% { transform: rotate(0); } 89% { transform: rotate(-14deg); } 93% { transform: rotate(5deg); } }
+@keyframes ptEarR { 0%, 84%, 100% { transform: rotate(0); } 87% { transform: rotate(14deg); } 91% { transform: rotate(-5deg); } }
+@keyframes ptTail { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(5deg); } }
+@keyframes ptGlow { 50% { opacity: 0.6; } }
+@keyframes ptTwinkle { 50% { opacity: 0.3; } }
+@keyframes ptFlame { from { transform: scale(1, 1) skewX(0deg); } to { transform: scale(1.04, 1.09) skewX(-3deg); } }
+@keyframes ptWingL { 50% { transform: rotate(-9deg); } }
+@keyframes ptWingR { 50% { transform: rotate(9deg); } }
+@keyframes ptSpin { to { transform: rotate(360deg); } }
+
+/* Прыжок: присел — взлетел — приземлился */
+.pet.r-jump .pt-all, .pet.r-win .pt-all { animation: ptJump 0.75s cubic-bezier(0.3, 0.6, 0.4, 1) 1; }
+.pet.r-win .pt-all { animation-iteration-count: 2; }
+@keyframes ptJump {
+  0% { transform: none; } 15% { transform: scale(1.08, 0.9); } 45% { transform: translateY(-28px) scale(0.95, 1.06); }
+  75% { transform: scale(1.06, 0.92); } 100% { transform: none; }
+}
+/* Победа и рык: пасть открыта, свечение ярче */
+.pet.r-win .pt-mouth, .pet.r-roar .pt-mouth { display: none; }
+.pet.r-win .pt-mouth-open, .pet.r-roar .pt-mouth-open { display: inline; }
+.pet.r-win .pt-glow, .pet.r-element .pt-glow { animation: ptBurst 0.7s ease-out 2; }
+@keyframes ptBurst { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 1; transform: scale(1.25); } 100% { opacity: 0.8; transform: scale(1); } }
+.pet.r-roar .pt-head { animation: ptRoar 1.2s ease-out 1; }
+@keyframes ptRoar { 0% { transform: none; } 15% { transform: rotate(-6deg) translateY(-4px) scale(1.06); }
+  25%, 45%, 65% { transform: rotate(-4deg) translateY(-4px) scale(1.06) translateX(-2px); }
+  35%, 55% { transform: rotate(-4deg) translateY(-4px) scale(1.06) translateX(2px); } 100% { transform: none; } }
+/* Стихия: всплеск у каждого свой */
+.pet.r-element .pt-fx { animation: ptStrobe 0.18s steps(2) 7; }
+@keyframes ptStrobe { 50% { opacity: 0.1; } }
+.pet-fox.r-element .pt-tail, .pet-fox.r-hot .pt-tail { animation: ptFlare 1.3s ease-out 1; }
+@keyframes ptFlare { 0% { transform: none; } 30% { transform: scale(1.2) rotate(-4deg); } 60% { transform: scale(1.12) rotate(3deg); } 100% { transform: none; } }
+.pet-wolf.r-element .pt-ice, .pet-wolf.r-cold .pt-ice { animation: ptIce 1.3s ease-out 1; }
+@keyframes ptIce { 30% { transform: scale(1.12); filter: drop-shadow(0 0 6px #9fe8ff); } }
+.pet-drake.r-element .pt-wing.l, .pet-drake.r-win .pt-wing.l { animation: ptFlapL 0.35s ease-in-out 4; }
+.pet-drake.r-element .pt-wing.r, .pet-drake.r-win .pt-wing.r { animation: ptFlapR 0.35s ease-in-out 4; }
+@keyframes ptFlapL { 50% { transform: rotate(-22deg) scale(1.05); } }
+@keyframes ptFlapR { 50% { transform: rotate(22deg) scale(1.05); } }
+
+/* «Горячо»: Огнелису в радость (подскоки, хвост вспыхивает), волку жарко (трясёт
+   головой, иней тускнеет), дракон искрит */
+.pet-fox.r-hot .pt-all { animation: ptHop 0.5s ease-in-out 3; }
+@keyframes ptHop { 50% { transform: translateY(-10px); } }
+.pet-wolf.r-hot .pt-head { animation: ptNo 0.5s ease-in-out 3; }
+@keyframes ptNo { 25% { transform: rotate(-7deg); } 75% { transform: rotate(7deg); } }
+.pet-wolf.r-hot .pt-glow, .pet-wolf.r-hot .pt-ice { opacity: 0.35; transition: opacity 0.3s; }
+.pet-drake.r-hot .pt-fx { animation: ptStrobe 0.16s steps(2) 8; }
+.pet-drake.r-hot .pt-all { animation: ptHop 0.5s ease-in-out 2; }
+
+/* «Холодно»: Огнелис дрожит и пламя никнет, волку в радость (воет), дракон ёжится */
+.pet-fox.r-cold .pt-all, .pet-drake.r-cold .pt-all { animation: ptShiver 0.09s linear 16; }
+@keyframes ptShiver { 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
+.pet-fox.r-cold .pt-flame { animation: ptShrink 1.5s ease-in-out 1; }
+@keyframes ptShrink { 20%, 80% { transform: scale(0.82, 0.72); } }
+.pet-fox.r-cold .pt-ear.l, .pet-drake.r-cold .pt-ear.l { animation: none; transform: rotate(-18deg); transition: transform 0.2s; }
+.pet-fox.r-cold .pt-ear.r, .pet-drake.r-cold .pt-ear.r { animation: none; transform: rotate(18deg); transition: transform 0.2s; }
+.pet-wolf.r-cold .pt-head { animation: ptHowl 1.6s ease-in-out 1; }
+.pet-wolf.r-cold .pt-mouth { display: none; }
+.pet-wolf.r-cold .pt-mouth-open { display: inline; }
+@keyframes ptHowl { 0% { transform: none; } 25%, 75% { transform: rotate(-10deg) translateY(-6px); } 100% { transform: none; } }
+
+/* Проигрыш: голова вниз, уши в стороны, свечение тускнеет */
+.pet.r-lose .pt-head { animation: none; transform: rotate(5deg) translateY(6px); transition: transform 0.35s; }
+.pet.r-lose .pt-ear.l { animation: none; transform: rotate(-24deg); transition: transform 0.35s; }
+.pet.r-lose .pt-ear.r { animation: none; transform: rotate(24deg); transition: transform 0.35s; }
+.pet.r-lose .pt-eyes { animation: none; transform: scaleY(0.55); }
+.pet.r-lose .pt-glow, .pet.r-lose .pt-fx { opacity: 0.25; transition: opacity 0.35s; }
+.pet.r-lose .pt-tail { animation: none; transform: rotate(-10deg); transition: transform 0.35s; }
+
+/* Золотой облик (10-й уровень): своя золотая раскраска, переливается */
+.pet.gold { animation: ptGold 2.6s ease-in-out infinite; }
+@keyframes ptGold { 0%, 100% { filter: brightness(1) drop-shadow(0 0 0 rgba(255, 214, 90, 0)); }
+  50% { filter: brightness(1.14) drop-shadow(0 0 8px rgba(255, 214, 90, 0.55)); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pet *, .pet.gold { animation: none !important; }
+}
+
+/* ---- Питомец в меню ---- */
+.pet-card { display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 8px; border-radius: 20px; cursor: pointer;
+  background: linear-gradient(135deg, rgba(176, 124, 255, 0.22), rgba(255, 159, 28, 0.12)), var(--tile);
+  box-shadow: inset 0 0 0 2px rgba(176, 124, 255, 0.35), 0 4px 0 var(--depth); -webkit-tap-highlight-color: transparent; }
+.pet-card:active { transform: scale(0.98); }
+.pc-pet { flex: none; width: 84px; height: 84px; margin: -6px 0; }
+.pc-pet .pet, .pc-mini .pet { width: 100%; height: 100%; }
+.pc-trio { flex: none; display: flex; }
+.pc-mini { width: 52px; height: 52px; margin-right: -10px; }
+.pc-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.pc-text b { font-size: 16px; font-weight: 900; }
+.pc-text b small { font-size: 12px; font-weight: 800; color: var(--gold); margin-left: 4px; }
+.pc-text > span { font-size: 12.5px; font-weight: 700; color: var(--muted); line-height: 1.3; }
+.pc-bar { display: block; height: 8px; border-radius: 99px; background: rgb(var(--ink) / 0.12); overflow: hidden; }
+.pc-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #b07cff, #ffd166); }
+.pc-next { font-size: 12px !important; }
+.pet-card .m-go { flex: none; font-size: 22px; color: var(--muted); }
+
+/* ---- Экран питомца ---- */
+.pet-modal { max-width: 380px; text-align: center; }
+.pm-top { display: flex; align-items: baseline; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.pm-name { font-size: 22px; font-weight: 900; }
+.pm-rar { font-size: 12px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; }
+.rar-common { --rar: #c9cfdd; } .rar-rare { --rar: #4fa8ff; } .rar-epic { --rar: #b07cff; } .rar-legend { --rar: #ff9f1c; }
+.pm-rar { color: var(--rar); }
+.pm-stage { width: 210px; height: 210px; margin: 2px auto 0; border-radius: 50%; cursor: pointer;
+  background: radial-gradient(closest-side, rgba(176, 124, 255, 0.22), transparent); }
+.pm-stage .pet { width: 100%; height: 100%; }
+.pm-level { font-size: 15px; font-weight: 900; color: var(--gold); }
+.pm-xp { display: flex; flex-direction: column; gap: 4px; margin: 4px 10px 0; }
+.pm-xp small { font-size: 12px; color: var(--muted); font-weight: 700; }
+.pm-who { margin: 8px 0 10px; font-size: 13.5px; color: var(--muted); line-height: 1.4; }
+.pm-row, .pm-gearbox { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 10px; }
+.pm-row > b, .pm-gearbox > b { flex-basis: 100%; font-size: 12px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.pm-trick, .pm-gear { all: unset; cursor: pointer; padding: 8px 11px; border-radius: 12px; background: var(--tile);
+  font-size: 13px; font-weight: 800; box-shadow: 0 3px 0 var(--depth); -webkit-tap-highlight-color: transparent; }
+.pm-trick:active, .pm-gear:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--depth); }
+.pm-trick.locked { opacity: 0.55; cursor: default; }
+.pm-trick small { font-size: 11px; color: var(--muted); }
+.pm-trick[aria-pressed="true"], .pm-gear.on { background: #5b50f0; color: #fff; box-shadow: 0 3px 0 #3730a3; }
+.pm-gear.none { color: var(--muted); }
+.pm-slot { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pm-slot-name { min-width: 64px; text-align: left; font-size: 12.5px; font-weight: 800; color: var(--muted); }
+.pm-pets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 4px 0 12px; }
+.pm-pick { all: unset; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px 8px;
+  border-radius: 14px; background: var(--tile); font-size: 12px; font-weight: 800; -webkit-tap-highlight-color: transparent; }
+.pm-pick.sel { box-shadow: inset 0 0 0 2px var(--gold); }
+.pm-pick.locked .pm-pick-art { filter: grayscale(0.7) brightness(0.7); }
+.pm-pick small { font-size: 11px; color: var(--muted); }
+.pm-pick-art { width: 64px; height: 64px; }
+.pm-pick-art .pet { width: 100%; height: 100%; }
+#pmClose { margin-top: 8px; }
+
+/* ---- Питомец в партии: над полем ввода справа ---- */
+.game-pet { position: fixed; right: max(6px, env(safe-area-inset-right)); bottom: 96px; z-index: 39; width: 86px; height: 86px;
+  pointer-events: none; }
+.game-pet .pet { width: 100%; height: 100%; pointer-events: auto; cursor: pointer; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35)); }
+body.kb-open .game-pet { display: none; }
+
+/* ---- Магазин: редкость, товары дня, наборы ---- */
+.sh-item.rar-common { --rar: #c9cfdd; } .sh-item.rar-rare { --rar: #4fa8ff; } .sh-item.rar-epic { --rar: #b07cff; } .sh-item.rar-legend { --rar: #ff9f1c; }
+.sh-item { background: linear-gradient(170deg, color-mix(in srgb, var(--rar, transparent) 20%, transparent), transparent 55%), var(--tile); }
+.sh-item::after { content: ''; position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; transform: rotate(45deg);
+  border-radius: 2px; background: var(--rar, transparent); box-shadow: 0 0 6px var(--rar, transparent); }
+.sh-item.rare { background: linear-gradient(170deg, color-mix(in srgb, var(--rar, transparent) 24%, transparent), transparent 55%), var(--tile);
+  box-shadow: none; }
+.sh-item.own { box-shadow: inset 0 0 0 2px #34d399; }
+.sh-item.worn { box-shadow: inset 0 0 0 2px var(--gold); }
+.sh-item.deal { box-shadow: inset 0 0 0 2px #ff5d73; }
+.sh-off { position: absolute; top: 5px; left: 5px; z-index: 1; padding: 2px 6px; border-radius: 8px; background: #ff3b5c; color: #fff;
+  font-size: 11px; font-weight: 900; }
+.sh-price s, .si-price s, .sb-price s { color: var(--muted); font-weight: 700; font-size: 0.85em; margin-right: 2px; }
+.si-off { display: inline-block; padding: 1px 6px; border-radius: 8px; background: #ff3b5c; color: #fff; font-size: 13px; vertical-align: 2px; }
+.si-rar { color: var(--rar, var(--muted)); }
+.shop-item-card.rar-common { --rar: #c9cfdd; } .shop-item-card.rar-rare { --rar: #4fa8ff; }
+.shop-item-card.rar-epic { --rar: #b07cff; } .shop-item-card.rar-legend { --rar: #ff9f1c; }
+.shop-item-card { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rar, transparent) 60%, transparent), 0 20px 60px rgba(0, 0, 0, 0.5); }
+.sh-head { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 4px 2px 0; }
+.sh-head b { font-size: 14px; font-weight: 900; }
+.sh-head span { font-size: 12px; font-weight: 800; color: var(--muted); }
+.sh-head:not(:first-child) { margin-top: 12px; }
+.sh-empty { grid-column: 1 / -1; padding: 12px; border-radius: 14px; background: var(--tile); font-size: 13px; color: var(--muted); text-align: center; }
+.sh-bundle { all: unset; box-sizing: border-box; grid-column: 1 / -1; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px 8px 8px; border-radius: 16px; -webkit-tap-highlight-color: transparent;
+  background: linear-gradient(120deg, rgba(176, 124, 255, 0.24), rgba(255, 159, 28, 0.14)), var(--tile);
+  box-shadow: inset 0 0 0 2px rgba(176, 124, 255, 0.4); }
+.sh-bundle.rare { box-shadow: inset 0 0 0 2px rgba(255, 159, 28, 0.5); }
+.sh-bundle.own { opacity: 0.6; }
+.sh-bundle:active { transform: scale(0.98); }
+.sb-arts { flex: none; display: flex; }
+.sb-art { width: 46px; height: 46px; margin-right: -8px; display: flex; align-items: center; justify-content: center; border-radius: 12px;
+  background: rgb(0 0 0 / 0.18); }
+.sb-art.have { opacity: 0.45; }
+.sb-art .sha-face { width: 38px; height: 38px; font-size: 16px; }
+.sb-art .sha-ring .sha-face { width: 28px; height: 28px; }
+.sb-art .sha-ring::before { inset: -5px; padding: 4px; }
+.sb-art .sha-pet { width: 46px; height: 46px; }
+.sb-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; margin-left: 10px; text-align: left; }
+.sb-text b { font-size: 14px; font-weight: 900; }
+.sb-text span { font-size: 12px; font-weight: 700; color: var(--muted); line-height: 1.3; }
+.sb-price { flex: none; display: flex; flex-direction: column; align-items: flex-end; font-size: 14px; font-weight: 900; color: var(--gold); }
+.sh-bundle.rare .sb-price { color: #7dd3fc; }
+.sha-pet { display: block; width: 72px; height: 72px; }
+.sha-pet .pet { width: 100%; height: 100%; }
+.sha-fx { font-size: 40px; line-height: 1; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35)); }
+.si-art .sha-pet { width: 170px; height: 170px; cursor: pointer; }
+.si-art .sha-fx { font-size: 80px; }
+.si-art.si-bundle { gap: 4px; }
+.si-art.si-bundle .sb-art { width: 76px; height: 76px; margin: 0; }
+.si-art.si-bundle .sha-pet { width: 72px; height: 72px; }
+.si-line { display: block; text-align: left; font-weight: 800; color: rgb(var(--ink) / 0.9); }
+.si-line small { color: var(--muted); font-weight: 700; }
+.si-how.warn { color: #fb923c; }
+#siPreview { margin-bottom: 8px; }
+
+/* ---- Облики градусника (миграция 063) ----
+   Трубка и колба меняют вид; цвет ртути — по-прежнему пояс хода */
+.thermo-mini { display: inline-flex; flex-direction: column; align-items: center; transform: scale(0.62); transform-origin: center; margin: -18px 0; }
+.si-art .thermo-mini { transform: scale(1.1); margin: 6px 0; }
+.thermo-mini .thermo-tube { width: 18px; height: 70px; border-radius: 9px 9px 0 0; position: relative; overflow: hidden; display: block;
+  background: rgba(255, 255, 255, 0.07); border: 2px solid rgba(255, 255, 255, 0.32); border-bottom: none; }
+.thermo-mini .thermo-fill { position: absolute; bottom: 0; left: 0; width: 100%; }
+.thermo-mini .thermo-bulb { display: block; width: 40px; height: 40px; margin-top: -5px; border-radius: 50%; position: relative;
+  border: 2px solid rgba(255, 255, 255, 0.32); }
+.sk-ice .thermo-tube { border-color: #bdf4ff; background: linear-gradient(90deg, rgba(190, 240, 255, 0.28), rgba(120, 200, 255, 0.08));
+  box-shadow: 0 0 10px rgba(150, 230, 255, 0.55); }
+.sk-ice .thermo-bulb { border-color: #bdf4ff; box-shadow: 0 0 14px 3px rgba(150, 230, 255, 0.6) !important; }
+.sk-ice .thermo-tube::after { content: ''; position: absolute; top: -2px; left: -4px; right: -4px; height: 10px; z-index: 4;
+  background: radial-gradient(circle at 20% 60%, #fff 0 2px, transparent 3px), radial-gradient(circle at 60% 40%, #e0fbff 0 2.5px, transparent 3.5px),
+              radial-gradient(circle at 85% 70%, #fff 0 1.8px, transparent 2.8px); }
+.sk-lava .thermo-tube { border-color: #ff7a1a; background: linear-gradient(180deg, #3a1a10, #241010);
+  box-shadow: 0 0 12px rgba(255, 106, 0, 0.6), inset 0 0 6px rgba(255, 106, 0, 0.5); }
+.sk-lava .thermo-bulb { border-color: #ff7a1a; box-shadow: 0 0 18px 4px rgba(255, 106, 0, 0.65) !important;
+  background-image: radial-gradient(circle at 35% 35%, rgba(255, 230, 140, 0.8), transparent 40%) !important; }
+.sk-neon .thermo-tube { border-color: #ff4fd8; background: rgba(20, 0, 40, 0.5);
+  box-shadow: 0 0 6px #ff4fd8, 0 0 16px rgba(255, 79, 216, 0.7), inset 0 0 6px rgba(255, 79, 216, 0.5); }
+.sk-neon .thermo-bulb { border-color: #4ff0ff; box-shadow: 0 0 6px #4ff0ff, 0 0 20px 4px rgba(79, 240, 255, 0.75) !important; }
+.sk-space .thermo-tube { border-color: #a78bfa; box-shadow: 0 0 12px rgba(167, 139, 250, 0.6);
+  background: radial-gradient(circle at 30% 20%, #fff 0 1px, transparent 1.6px), radial-gradient(circle at 70% 55%, #fff 0 1px, transparent 1.6px),
+              radial-gradient(circle at 40% 80%, #c4b5fd 0 1.2px, transparent 1.8px), linear-gradient(180deg, #120a3a, #0a0620); }
+.sk-space .thermo-bulb { border-color: #a78bfa; box-shadow: 0 0 20px 5px rgba(167, 139, 250, 0.7) !important; }
+.sk-space .thermo-fill, .sk-neon .thermo-fill { opacity: 0.92; }
+
+/* ---- Эффекты победы (миграция 063): на весь экран, полторы секунды ---- */
+.winfx { position: fixed; inset: 0; z-index: 80; pointer-events: none; overflow: hidden; }
+.winfx-confetti i { position: absolute; top: -20px; width: 9px; height: 14px; border-radius: 2px;
+  animation: wfFall linear forwards; }
+@keyframes wfFall { to { transform: translate(var(--x), 110vh) rotate(var(--r)); } }
+.winfx-fireworks .fw { position: absolute; width: 0; height: 0; }
+.winfx-fireworks .fw i { position: absolute; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%; opacity: 0;
+  box-shadow: 0 0 8px currentColor; animation: wfBurst 1.2s ease-out forwards; }
+@keyframes wfBurst { 0% { opacity: 1; transform: translate(0, 0) scale(1); } 100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 30px)) scale(0.4); } }
+.winfx-lightning .flash { position: absolute; inset: 0; background: rgba(220, 240, 255, 0.55); opacity: 0; animation: wfFlash 0.7s ease-out forwards; }
+@keyframes wfFlash { 0%, 30% { opacity: 0; } 35% { opacity: 1; } 45% { opacity: 0.2; } 55% { opacity: 0.8; } 100% { opacity: 0; } }
+.winfx-lightning svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; animation: wfBolt 0.9s steps(1) forwards;
+  filter: drop-shadow(0 0 6px #7df9ff); }
+@keyframes wfBolt { 0% { opacity: 0; } 10% { opacity: 1; } 22% { opacity: 0; } 30% { opacity: 1; } 60% { opacity: 0; } 100% { opacity: 0; } }
+.winfx-meteors i { position: absolute; width: 120px; height: 3px; border-radius: 3px; opacity: 0; transform: rotate(-35deg);
+  background: linear-gradient(90deg, transparent, #fff6c8 70%, #fff); box-shadow: 0 0 10px #ffd166; animation: wfMeteor 1.1s ease-in forwards; }
+@keyframes wfMeteor { 0% { opacity: 0; translate: 0 0; } 10% { opacity: 1; } 100% { opacity: 0; translate: -60vw 45vh; } }
+.winfx-meteors s { position: absolute; text-decoration: none; color: #fff6c8; font-size: 14px; opacity: 0; animation: wfTwinkle 1.4s ease-in-out forwards; }
+@keyframes wfTwinkle { 30% { opacity: 1; transform: scale(1.3); } 100% { opacity: 0; transform: scale(0.6); } }
+.pm-none { font-size: 12.5px; color: var(--muted); font-weight: 700; }
+.pm-gearbox > .pm-none { flex-basis: 100%; }

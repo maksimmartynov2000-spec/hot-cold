@@ -201,17 +201,63 @@ function stubSupabase(opts) {
             return { data: null, error: { message: 'Could not find the function public.' + name } };
           }
           if (name === 'my_wallet') return { data: JSON.parse(JSON.stringify(window.__wallet)), error: null };
+          // Скидка дня и первый питомец, градусник, эффект победы — надеваются сами (063)
           if (name === 'shop_buy') {
-            const W = window.__wallet, O = window.__online || { owned: [] };
+            const W = window.__wallet, O = window.__online || { owned: [] }, L = window.__look;
             (window.__bought = window.__bought || []).push(args.p_kind + ':' + args.p_code);
             const it = SHOP_ITEMS.find(i => i.kind === args.p_kind && i.code === args.p_code);
             if (!it) return { data: null, error: { message: 'no_such_item' } };
             if (O.owned.some(o => o.kind === it.kind && o.code === it.code)) return { data: null, error: { message: 'already_owned' } };
-            if (W.coins < (it.coins || 0) || W.gems < (it.gems || 0)) return { data: null, error: { message: 'not_enough' } };
-            W.coins -= it.coins || 0; W.gems -= it.gems || 0;
+            const deal = L && (L.deals || []).find(d => d.kind === it.kind && d.code === it.code);
+            const cut = v => v ? Math.max(1, Math.round(v * (100 - (deal ? deal.pct : 0)) / 100)) : 0;
+            const c = cut(it.coins || 0), g = cut(it.gems || 0);
+            if (W.coins < c || W.gems < g) return { data: null, error: { message: 'not_enough' } };
+            W.coins -= c; W.gems -= g;
             O.owned.push({ kind: it.kind, code: it.code });
-            return { data: { coins: W.coins, gems: W.gems, kind: it.kind, code: it.code }, error: null };
+            if (L && ['pet', 'thermo', 'winfx'].includes(it.kind) && !L[it.kind]) L[it.kind] = it.code;
+            return { data: { coins: W.coins, gems: W.gems, kind: it.kind, code: it.code, paid: c + g, pct: deal ? deal.pct : 0 }, error: null };
           }
+          // Питомцы, вещи, градусник, эффект победы, товары дня (миграция 063):
+          // window.__look. Не задан — база без 063
+          if (['my_look', 'shop_buy_bundle', 'set_pet', 'set_pet_gear', 'set_thermo', 'set_winfx'].includes(name) && !window.__look) {
+            return { data: null, error: { message: 'Could not find the function public.' + name } };
+          }
+          // Цены наборов — как в базе: недостающее со скидкой набора (если тест не задал свои)
+          if (name === 'my_look') {
+            const L = JSON.parse(JSON.stringify(window.__look)), O = window.__online || { owned: [] };
+            if (!L.bundles) {
+              L.bundles = {};
+              SHOP_BUNDLES.forEach(b => {
+                const sum = b.items.filter(x => !O.owned.some(o => o.kind + ':' + o.code === x))
+                  .map(x => SHOP_ITEMS.find(i => i.kind + ':' + i.code === x)).reduce((a, i) => a + (b.currency === 'coins' ? i.coins : i.gems), 0);
+                L.bundles[b.code] = b.currency === 'coins' ? Math.round(sum * (100 - b.pct) / 1000) * 10 : Math.round(sum * (100 - b.pct) / 100);
+              });
+            }
+            return { data: L, error: null };
+          }
+          if (name === 'shop_buy_bundle') {
+            const W = window.__wallet, O = window.__online, L = window.__look;
+            const b = SHOP_BUNDLES.find(x => x.code === args.p_code);
+            const has = x => O.owned.some(o => o.kind + ':' + o.code === x);
+            const miss = b.items.filter(x => !has(x));
+            if (!miss.length) return { data: null, error: { message: 'already_owned' } };
+            const sum = miss.map(x => SHOP_ITEMS.find(i => i.kind + ':' + i.code === x)).reduce((a, i) => a + (b.currency === 'coins' ? i.coins : i.gems), 0);
+            const price = b.currency === 'coins' ? Math.round(sum * (100 - b.pct) / 1000) * 10 : Math.round(sum * (100 - b.pct) / 100);
+            if ((b.currency === 'coins' ? W.coins : W.gems) < price) return { data: null, error: { message: 'not_enough' } };
+            if (b.currency === 'coins') W.coins -= price; else W.gems -= price;
+            miss.forEach(x => { const [kind, code] = x.split(':'); O.owned.push({ kind, code }); if (['pet', 'thermo', 'winfx'].includes(kind) && !L[kind]) L[kind] = code; });
+            (window.__bought = window.__bought || []).push('bundle:' + b.code);
+            return { data: { coins: W.coins, gems: W.gems, bundle: b.code, paid: price, got: miss }, error: null };
+          }
+          if (name === 'set_pet') { window.__look.pet = args.p_pet; return { data: args.p_pet, error: null }; }
+          if (name === 'set_pet_gear') {
+            const g = window.__look.gear = window.__look.gear || {};
+            if (args.p_code && PET_GEAR[args.p_code].slot !== args.p_slot) return { data: null, error: { message: 'bad_slot' } };
+            if (args.p_code) g[args.p_slot] = args.p_code; else delete g[args.p_slot];
+            return { data: JSON.parse(JSON.stringify(g)), error: null };
+          }
+          if (name === 'set_thermo') { window.__look.thermo = args.p_code; return { data: args.p_code, error: null }; }
+          if (name === 'set_winfx') { window.__look.winfx = args.p_code; return { data: args.p_code, error: null }; }
           // «Испытание выходных» (миграция 062): weekend в __online, очки — points
           if (name === 'weekend_claim') {
             const W = window.__online && window.__online.weekend;
@@ -235,6 +281,8 @@ function stubSupabase(opts) {
           if (name === 'local_game_done') {
             (window.__localDone = window.__localDone || []).push(args.p_kind);
             if (window.__online) { window.__online.played = true; window.__online.xp += 10; }
+            const L = window.__look;
+            if (L && L.pet) { L.xp = L.xp || {}; L.xp[L.pet] = (L.xp[L.pet] || 0) + 10; }
             return { data: { xp: 10 }, error: null };
           }
           if (name === 'set_frame') { window.__online.frame = args.p_frame; return { data: args.p_frame, error: null }; }
