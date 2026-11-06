@@ -337,7 +337,8 @@ function shopBg() {
 const SHOP_GEAR_VIEW = { head: '30 4 180 180', eyes: '40 30 160 160', neck: '30 50 180 180', back: '0 0 240 240', aura: '0 0 240 240' };
 function shopGearArt(code, petFor) {
   const kind = petFor || (typeof myPet === 'function' && myPet()) || 'fox';
-  return '<span class="sha-pet">' + petSvg(kind, { gear: [code] }).replace('viewBox="0 0 240 240"', 'viewBox="' + SHOP_GEAR_VIEW[PET_GEAR[code].slot] + '"') + '</span>';
+  // Крупный план обрезан: что за краем кадра, не вылезает на подписи рядом
+  return '<span class="sha-pet sha-crop">' + petSvg(kind, { gear: [code] }).replace('viewBox="0 0 240 240"', 'viewBox="' + SHOP_GEAR_VIEW[PET_GEAR[code].slot] + '"') + '</span>';
 }
 function shopArtHtml(kind, code, petFor) {
   const bg = shopBg();
