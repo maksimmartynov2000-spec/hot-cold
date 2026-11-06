@@ -177,7 +177,9 @@ function renderShop() {
   else if (shopState === 'off') note.textContent = S.off;
   else note.textContent = shopWallet ? S.today.replace('{n}', shopWallet.today).replace('{m}', shopWallet.cap) : '';
   document.getElementById('shopEarnHead').textContent = S.earnHead;
-  document.getElementById('shopEarn').innerHTML = S.earn.map(x => '<div class="sh-earn-row">' + escapeHtml(x) + '</div>').join('');
+  // Задания дня спрятаны (DAILY_EXTRAS) — и строки про них нет
+  const earn = DAILY_EXTRAS ? S.earn.slice(0, 5).concat([S.earnQuest], S.earn.slice(5)) : S.earn;
+  document.getElementById('shopEarn').innerHTML = earn.map(x => '<div class="sh-earn-row">' + escapeHtml(x) + '</div>').join('');
   document.getElementById('shopTrophy').textContent = S.trophy;
   document.getElementById('shopOk').textContent = S.close;
 }
@@ -275,7 +277,7 @@ function renderShopItem() {
       note.className = 'si-note warn';
       // Сколько не хватает и за что дают: кристаллы — не за любую игру
       note.innerHTML = escapeHtml(S.notEnough.replace('{p}', (need - have) + (it.gems ? ' 💎' : ' 🪙'))) +
-        '<span class="si-how">' + escapeHtml(it.gems ? S.gemsHow : S.coinsHow) + '</span>';
+        '<span class="si-how">' + escapeHtml(it.gems ? S.gemsHow : DAILY_EXTRAS ? S.coinsHow : S.coinsHowNoQuests) + '</span>';
     }
     btn.onclick = () => shopBuy(kind, code);
   }

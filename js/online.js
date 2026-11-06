@@ -399,6 +399,7 @@ function renderAvatarGrid() {
     AVATAR_BG.concat(rewardsOf('color')).concat(onlineInfo ? PASS_COLORS : []).concat(shopOwnedCodes('color')).forEach(color => {
       const c = document.createElement('button');
       const locked = PASS_COLORS.indexOf(color) >= 0 && !passOwns('color', color);
+      if (locked && passHiddenSource('color', color)) return;
       c.className = 'av-color' + (color === bg ? ' sel' : '') + (locked ? ' locked' : '') + (isShinyBg(color) ? ' shine' : '');
       c.dataset.color = color;
       c.style.background = avatarBgCss(color);
@@ -413,8 +414,9 @@ function renderAvatarGrid() {
   // Первая клетка — буква: вернуться к ней можно так же, как выбрать иконку
   // Иконка за обучение — когда сервер о ней знает (миграция 037)
   const tutIcon = profileInfo && 'tutorialDone' in profileInfo ? [TUTORIAL_ICON] : [];
-  // Иконки за серию заданий — когда сервер знает задания (миграция 041)
-  const questIcons = progressInfo ? QUEST_ICONS.map(q => q.icon) : [];
+  // Иконки за серию заданий — когда сервер знает задания (миграция 041).
+  // Пока задания спрятаны (DAILY_EXTRAS) — только уже открытые
+  const questIcons = progressInfo ? QUEST_ICONS.map(q => q.icon).filter(i => DAILY_EXTRAS || questIconOpen(i)) : [];
   // Иконки боссов Приключения — когда база о них знает (миграция 049)
   const advIcons = advServer ? ADV_PICK_BOSSES : [];
   const passIcons = onlineInfo ? PASS_ICONS : [];
