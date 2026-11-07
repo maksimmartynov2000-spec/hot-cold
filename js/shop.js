@@ -6,9 +6,12 @@
 // победы (миграция 063) — здесь же и на экране питомца.
 // Без входа витрину видно, а купить нельзя; без миграции — «скоро откроется».
 
-// Товары — копия из базы (shop_catalog, миграция 063), сверяется тестом.
-// Цена — либо в монетах, либо в кристаллах; редкость: common, rare, epic, legend
+// Товары — копия из базы (shop_catalog, миграция 064), сверяется тестом.
+// Цена — либо в монетах, либо в кристаллах; редкость: common, rare, epic, legend.
+// Облик (skin) — <питомец>_<облик>; вещь одного питомца (PET_GEAR[code].pet)
+// и облик продаются только тому, у кого этот питомец есть
 const SHOP_ITEMS = [
+  // Иконки «Стихии»
   { kind: 'icon', code: 'shop-01', coins: 90, rar: 'common' }, { kind: 'icon', code: 'shop-02', coins: 100, rar: 'common' },
   { kind: 'icon', code: 'shop-03', coins: 110, rar: 'common' }, { kind: 'icon', code: 'shop-04', coins: 120, rar: 'common' },
   { kind: 'icon', code: 'shop-05', coins: 160, rar: 'rare' }, { kind: 'icon', code: 'shop-06', coins: 170, rar: 'rare' },
@@ -19,45 +22,83 @@ const SHOP_ITEMS = [
   { kind: 'icon', code: 'shop-15', gems: 16, rar: 'epic' }, { kind: 'icon', code: 'shop-16', gems: 20, rar: 'legend' },
   { kind: 'icon', code: 'shop-17', gems: 22, rar: 'legend' }, { kind: 'icon', code: 'shop-18', gems: 22, rar: 'legend' },
   { kind: 'icon', code: 'shop-19', gems: 24, rar: 'legend' }, { kind: 'icon', code: 'shop-20', gems: 25, rar: 'legend' },
+  // Рамки
   { kind: 'frame', code: 'leaf', coins: 100, rar: 'common' }, { kind: 'frame', code: 'ocean', coins: 180, rar: 'rare' },
   { kind: 'frame', code: 'coral', coins: 200, rar: 'rare' }, { kind: 'frame', code: 'ember', coins: 220, rar: 'rare' },
   { kind: 'frame', code: 'night', coins: 300, rar: 'epic' }, { kind: 'frame', code: 'galaxy', gems: 14, rar: 'epic' },
   { kind: 'frame', code: 'aurora', gems: 18, rar: 'legend' }, { kind: 'frame', code: 'prism', gems: 20, rar: 'legend' },
+  // Фоны кружка
   { kind: 'color', code: 'grad-mint', coins: 80, rar: 'common' }, { kind: 'color', code: 'grad-peach', coins: 80, rar: 'common' },
   { kind: 'color', code: 'grad-sky', coins: 90, rar: 'common' }, { kind: 'color', code: 'grad-violet', coins: 140, rar: 'rare' },
   { kind: 'color', code: 'grad-sand', coins: 120, rar: 'rare' }, { kind: 'color', code: 'grad-galaxy', gems: 10, rar: 'epic' },
   { kind: 'color', code: 'grad-rainbow', gems: 14, rar: 'legend' }, { kind: 'color', code: 'grad-sun', gems: 12, rar: 'epic' },
+  // Титулы
   { kind: 'title', code: 'thinker', coins: 90, rar: 'common' }, { kind: 'title', code: 'explorer', coins: 100, rar: 'common' },
   { kind: 'title', code: 'lucky', coins: 150, rar: 'rare' }, { kind: 'title', code: 'strategist', coins: 180, rar: 'rare' },
   { kind: 'title', code: 'speedy', coins: 160, rar: 'rare' }, { kind: 'title', code: 'calm', coins: 110, rar: 'common' },
   { kind: 'title', code: 'sleuth', coins: 170, rar: 'rare' }, { kind: 'title', code: 'friend', coins: 80, rar: 'common' },
   { kind: 'title', code: 'legend', gems: 15, rar: 'legend' }, { kind: 'title', code: 'genius', gems: 12, rar: 'epic' },
+  // Фразы для чата в партии
   { kind: 'phrase', code: 'bingo', coins: 60, rar: 'common' }, { kind: 'phrase', code: 'respect', coins: 70, rar: 'common' },
   { kind: 'phrase', code: 'brain', coins: 80, rar: 'common' }, { kind: 'phrase', code: 'whatluck', coins: 120, rar: 'rare' },
   { kind: 'phrase', code: 'thanks', coins: 60, rar: 'common' }, { kind: 'phrase', code: 'math', coins: 100, rar: 'rare' },
   { kind: 'phrase', code: 'comeback', coins: 140, rar: 'rare' }, { kind: 'phrase', code: 'bravo', coins: 70, rar: 'common' },
-  { kind: 'pet', code: 'fox', coins: 450, rar: 'epic' }, { kind: 'pet', code: 'wolf', coins: 450, rar: 'epic' },
-  { kind: 'pet', code: 'drake', gems: 30, rar: 'legend' },
-  { kind: 'gear', code: 'crown', gems: 20, rar: 'legend' }, { kind: 'gear', code: 'wizard', coins: 360, rar: 'epic' },
-  { kind: 'gear', code: 'viking', coins: 220, rar: 'rare' }, { kind: 'gear', code: 'shades', coins: 180, rar: 'rare' },
-  { kind: 'gear', code: 'scarf', coins: 100, rar: 'common' }, { kind: 'gear', code: 'bowtie', coins: 80, rar: 'common' },
-  { kind: 'gear', code: 'cape', coins: 400, rar: 'epic' }, { kind: 'gear', code: 'aura_fire', gems: 12, rar: 'epic' },
-  { kind: 'gear', code: 'aura_ice', gems: 12, rar: 'epic' }, { kind: 'gear', code: 'aura_storm', gems: 12, rar: 'epic' },
+  // Питомцы: все шесть покупаются
+  { kind: 'pet', code: 'badger', coins: 450, rar: 'epic' }, { kind: 'pet', code: 'owl', coins: 500, rar: 'epic' },
+  { kind: 'pet', code: 'toucan', coins: 450, rar: 'epic' }, { kind: 'pet', code: 'cham', coins: 550, rar: 'epic' },
+  { kind: 'pet', code: 'crab', coins: 500, rar: 'epic' }, { kind: 'pet', code: 'penguin', coins: 550, rar: 'epic' },
+  // Облики питомцев (кристаллы): <питомец>_<облик>; звёздный — не товар, он за 10-й уровень
+  { kind: 'skin', code: 'badger_honey', gems: 8, rar: 'rare' }, { kind: 'skin', code: 'badger_midnight', gems: 12, rar: 'epic' },
+  { kind: 'skin', code: 'badger_snow', gems: 8, rar: 'rare' }, { kind: 'skin', code: 'badger_autumn', gems: 10, rar: 'rare' },
+  { kind: 'skin', code: 'badger_mint', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'owl_snowy', gems: 8, rar: 'rare' },
+  { kind: 'skin', code: 'owl_night', gems: 12, rar: 'epic' }, { kind: 'skin', code: 'owl_ruby', gems: 10, rar: 'rare' },
+  { kind: 'skin', code: 'owl_ash', gems: 8, rar: 'rare' }, { kind: 'skin', code: 'owl_moon', gems: 12, rar: 'epic' },
+  { kind: 'skin', code: 'toucan_sunset', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'toucan_lime', gems: 8, rar: 'rare' },
+  { kind: 'skin', code: 'toucan_arctic', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'toucan_neon', gems: 12, rar: 'epic' },
+  { kind: 'skin', code: 'toucan_cherry', gems: 8, rar: 'rare' }, { kind: 'skin', code: 'cham_lava', gems: 12, rar: 'epic' },
+  { kind: 'skin', code: 'cham_ocean', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'cham_lemon', gems: 8, rar: 'rare' },
+  { kind: 'skin', code: 'cham_berry', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'cham_midnight', gems: 12, rar: 'epic' },
+  { kind: 'skin', code: 'crab_blue', gems: 8, rar: 'rare' }, { kind: 'skin', code: 'crab_sand', gems: 8, rar: 'rare' },
+  { kind: 'skin', code: 'crab_neon', gems: 12, rar: 'epic' }, { kind: 'skin', code: 'crab_sunny', gems: 10, rar: 'rare' },
+  { kind: 'skin', code: 'crab_deep', gems: 12, rar: 'epic' }, { kind: 'skin', code: 'penguin_emperor', gems: 12, rar: 'epic' },
+  { kind: 'skin', code: 'penguin_night', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'penguin_snowy', gems: 8, rar: 'rare' },
+  { kind: 'skin', code: 'penguin_rose', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'penguin_sunny', gems: 8, rar: 'rare' },
+  // Вещи: корона — всем, остальные — одному питомцу
+  { kind: 'gear', code: 'crown', coins: 450, rar: 'epic' }, { kind: 'gear', code: 'mortar', coins: 250, rar: 'rare' },
+  { kind: 'gear', code: 'starglasses', coins: 200, rar: 'rare' }, { kind: 'gear', code: 'tophat', coins: 250, rar: 'rare' },
+  { kind: 'gear', code: 'argyle', coins: 150, rar: 'common' }, { kind: 'gear', code: 'lei', coins: 150, rar: 'common' },
+  { kind: 'gear', code: 'sunglasses', coins: 200, rar: 'rare' }, { kind: 'gear', code: 'cap', coins: 150, rar: 'common' },
+  { kind: 'gear', code: 'safari', coins: 250, rar: 'rare' }, { kind: 'gear', code: 'lifebuoy', coins: 250, rar: 'rare' },
+  { kind: 'gear', code: 'striped', coins: 150, rar: 'common' }, { kind: 'gear', code: 'jacket', coins: 300, rar: 'rare' },
+  { kind: 'gear', code: 'binoculars', coins: 200, rar: 'rare' },
+  // Ауры: четыре общие (стихии и звёзды) и по две своих у каждого
+  { kind: 'gear', code: 'aura_fire', coins: 700, rar: 'epic' }, { kind: 'gear', code: 'aura_ice', coins: 700, rar: 'epic' },
+  { kind: 'gear', code: 'aura_storm', coins: 700, rar: 'epic' }, { kind: 'gear', code: 'aura_star', coins: 900, rar: 'legend' },
+  { kind: 'gear', code: 'aura_leaves', coins: 500, rar: 'epic' }, { kind: 'gear', code: 'aura_fireflies', coins: 500, rar: 'epic' },
+  { kind: 'gear', code: 'aura_moon', coins: 500, rar: 'epic' }, { kind: 'gear', code: 'aura_feathers', coins: 500, rar: 'epic' },
+  { kind: 'gear', code: 'aura_tropics', coins: 500, rar: 'epic' }, { kind: 'gear', code: 'aura_fruit', coins: 500, rar: 'epic' },
+  { kind: 'gear', code: 'aura_rainbow', coins: 500, rar: 'epic' }, { kind: 'gear', code: 'aura_butterflies', coins: 500, rar: 'epic' },
+  { kind: 'gear', code: 'aura_bubbles', coins: 500, rar: 'epic' }, { kind: 'gear', code: 'aura_seabed', coins: 500, rar: 'epic' },
+  { kind: 'gear', code: 'aura_snow', coins: 500, rar: 'epic' }, { kind: 'gear', code: 'aura_fish', coins: 500, rar: 'epic' },
+  // Облики градусника
   { kind: 'thermo', code: 'ice', coins: 200, rar: 'rare' }, { kind: 'thermo', code: 'lava', coins: 200, rar: 'rare' },
   { kind: 'thermo', code: 'neon', coins: 350, rar: 'epic' }, { kind: 'thermo', code: 'space', gems: 15, rar: 'legend' },
+  // Эффекты победы
   { kind: 'winfx', code: 'confetti', coins: 120, rar: 'common' }, { kind: 'winfx', code: 'fireworks', coins: 240, rar: 'rare' },
   { kind: 'winfx', code: 'lightning', coins: 400, rar: 'epic' }, { kind: 'winfx', code: 'meteors', gems: 18, rar: 'legend' }
 ];
-// Наборы — копия из базы (shop_bundles). Все вещи набора — в одной валюте.
+// Наборы — копия из базы (shop_bundles): питомец и две его вещи, за монеты.
 // Цена — за то, чего у игрока ещё нет, со скидкой набора
 const SHOP_BUNDLES = [
-  { code: 'set_fox', currency: 'coins', pct: 20, items: ['pet:fox', 'thermo:lava', 'frame:ember'] },
-  { code: 'set_wolf', currency: 'coins', pct: 20, items: ['pet:wolf', 'thermo:ice', 'frame:ocean'] },
-  { code: 'set_drake', currency: 'gems', pct: 20, items: ['pet:drake', 'gear:aura_storm', 'frame:galaxy'] },
-  { code: 'set_style', currency: 'coins', pct: 20, items: ['gear:shades', 'gear:scarf', 'gear:bowtie'] }
+  { code: 'set_badger', currency: 'coins', pct: 20, items: ['pet:badger', 'gear:mortar', 'gear:starglasses'] },
+  { code: 'set_owl', currency: 'coins', pct: 20, items: ['pet:owl', 'gear:tophat', 'gear:argyle'] },
+  { code: 'set_toucan', currency: 'coins', pct: 20, items: ['pet:toucan', 'gear:lei', 'gear:sunglasses'] },
+  { code: 'set_cham', currency: 'coins', pct: 20, items: ['pet:cham', 'gear:cap', 'gear:safari'] },
+  { code: 'set_crab', currency: 'coins', pct: 20, items: ['pet:crab', 'gear:lifebuoy', 'gear:striped'] },
+  { code: 'set_penguin', currency: 'coins', pct: 20, items: ['pet:penguin', 'gear:jacket', 'gear:binoculars'] }
 ];
 // Разделы витрины по порядку. Первый — «Витрина»: товары дня и наборы
-const SHOP_KINDS = ['deals', 'pet', 'gear', 'icon', 'frame', 'color', 'title', 'phrase', 'thermo', 'winfx'];
+const SHOP_KINDS = ['deals', 'pet', 'skin', 'gear', 'icon', 'frame', 'color', 'title', 'phrase', 'thermo', 'winfx'];
 const SHOP_RARS = ['common', 'rare', 'epic', 'legend'];
 
 let shopWallet = null;   // { coins, gems, today, cap } — как сказала база
@@ -228,6 +269,7 @@ function renderShop() {
   const grid = document.getElementById('shopGrid');
   grid.className = 'sh-grid sh-' + shopKind;
   if (shopKind === 'deals') renderShopDeals(grid);
+  else if (shopKind === 'skin' || shopKind === 'gear') renderShopByPet(grid, shopKind);
   else grid.replaceChildren(...SHOP_ITEMS.filter(i => i.kind === shopKind).map(shopItemButton));
   // Что сверху: вход, нет сети, или как копить
   const note = document.getElementById('shopNote');
@@ -243,32 +285,51 @@ function renderShop() {
   document.getElementById('shopOk').textContent = S.close;
 }
 
+// Вещь или облик чужого питомца: купить нельзя, пока его нет
+function shopPetLocked(kind, code) {
+  const who = typeof petItemFor === 'function' ? petItemFor(kind, code) : null;
+  return !!who && !shopOwned('pet', who);
+}
 function shopItemButton(it) {
   const S = t().shop;
   const b = document.createElement('button');
   b.type = 'button';
-  const own = shopOwned(it.kind, it.code), worn = shopWorn(it.kind, it.code), deal = !own && shopDealOf(it);
-  b.className = 'sh-item rar-' + it.rar + (it.gems ? ' rare' : '') + (own ? ' own' : '') + (worn ? ' worn' : '') + (deal ? ' deal' : '');
+  const own = shopOwned(it.kind, it.code), worn = shopWorn(it.kind, it.code), deal = !own && shopDealOf(it), locked = !own && shopPetLocked(it.kind, it.code);
+  b.className = 'sh-item rar-' + it.rar + (it.gems ? ' rare' : '') + (own ? ' own' : '') + (worn ? ' worn' : '') + (deal ? ' deal' : '') + (locked ? ' locked' : '');
   b.dataset.kind = it.kind;
   b.dataset.code = it.code;
   b.innerHTML = (deal ? '<span class="sh-off">−' + deal.pct + '%</span>' : '') +
     '<span class="sh-art">' + shopArtHtml(it.kind, it.code) + '</span>' +
     '<span class="sh-name">' + escapeHtml(shopName(it.kind, it.code)) + '</span>' +
-    '<span class="sh-price">' + (worn ? escapeHtml(S.worn) : own ? escapeHtml(S.owned) :
+    '<span class="sh-price">' + (worn ? escapeHtml(S.worn) : own ? escapeHtml(S.owned) : (locked ? '🔒 ' : '') +
       (deal ? '<s>' + escapeHtml(shopFullPriceText(it)) + '</s> ' : '') + escapeHtml(shopPriceText(it))) + '</span>';
   b.onclick = () => openShopItem(it.kind, it.code);
   return b;
+}
+function shopHead(text, sub) {
+  const h = document.createElement('div');
+  h.className = 'sh-head';
+  h.innerHTML = '<b>' + escapeHtml(text) + '</b>' + (sub ? '<span>' + escapeHtml(sub) + '</span>' : '');
+  return h;
+}
+// Облики и вещи — по питомцам: сначала то, что подходит всем (корона, ауры
+// стихий), потом у каждого своё. Чужого питомца — с замком
+function renderShopByPet(grid, kind) {
+  const S = t().shop, parts = [];
+  const items = SHOP_ITEMS.filter(i => i.kind === kind);
+  const groups = [[null, items.filter(i => !petItemFor(kind, i.code))]].concat(PETS.map(k => [k, items.filter(i => petItemFor(kind, i.code) === k)]));
+  groups.forEach(([k, list]) => {
+    if (!list.length) return;
+    parts.push(shopHead(k ? petName(k) : S.forAll, k && !shopOwned('pet', k) ? S.petLockedShort : ''));
+    list.forEach(it => parts.push(shopItemButton(it)));
+  });
+  grid.replaceChildren(...parts);
 }
 // Витрина: три товара дня со скидкой и наборы
 function renderShopDeals(grid) {
   const S = t().shop;
   const parts = [];
-  const head = (text, sub) => {
-    const h = document.createElement('div');
-    h.className = 'sh-head';
-    h.innerHTML = '<b>' + escapeHtml(text) + '</b>' + (sub ? '<span>' + escapeHtml(sub) + '</span>' : '');
-    return h;
-  };
+  const head = shopHead;
   // Товары дня знает только база: без входа — «после входа», без ответа
   // базы — ни слова (а не «у вас уже всё есть»)
   const deals = shopDeals(), known = typeof petLook !== 'undefined' && !!petLook;
@@ -307,7 +368,9 @@ function shopWorn(kind, code) {
   // Питомец, вещи на нём, градусник и эффект победы (миграция 063)
   if (typeof petLook === 'undefined' || !petLook) return false;
   if (kind === 'pet') return petLook.pet === code;
-  if (kind === 'gear') return !!petLook.gear && PET_GEAR[code] && petLook.gear[PET_GEAR[code].slot] === code;
+  const p = typeof myPet === 'function' ? myPet() : null;
+  if (kind === 'gear') return !!p && !!PET_GEAR[code] && petOutfit(p)[PET_GEAR[code].slot] === code;
+  if (kind === 'skin') return !!p && petItemFor('skin', code) === p && petOutfit(p).skin === shopSkinOf(code);
   if (kind === 'thermo' || kind === 'winfx') return petLook[kind] === code;
   return false;
 }
@@ -320,6 +383,7 @@ function shopName(kind, code) {
   if (kind === 'frame') return P.frames[code] || code;
   if (kind === 'title') return P.titles[code] || code;
   if (kind === 'pet') return t().pets.names[code] || code;
+  if (kind === 'skin') return petSkinName(shopSkinOf(code));
   if (kind === 'gear') return S.gear[code] || code;
   if (kind === 'thermo') return S.thermos[code] || code;
   if (kind === 'winfx') return S.winfxs[code] || code;
@@ -333,12 +397,24 @@ function shopBg() {
 
 // Картинка товара: иконка на своём фоне, рамка вокруг своего кружка, кружок
 // цвета, табличка титула, облачко фразы
-// Вещь питомца крупным планом: голова и глаза — голова, шея — грудь, плащ и аура — целиком
-const SHOP_GEAR_VIEW = { head: '30 4 180 180', eyes: '40 30 160 160', neck: '30 50 180 180', back: '0 0 240 240', aura: '0 0 240 240' };
+// Облик из кода товара: badger_honey → honey
+function shopSkinOf(code) { return code.slice(code.indexOf('_') + 1); }
+// Вещь питомца крупным планом: голова и глаза — голова, шея — грудь, тело и
+// аура — целиком. Макушка, глаза и шея у каждого питомца на своей высоте
+const PET_VIEW_Y = { badger: { head: 54, eyes: 90, neck: 124 }, owl: { head: 60, eyes: 100, neck: 150 }, toucan: { head: 58, eyes: 94, neck: 124 },
+  cham: { head: 56, eyes: 86, neck: 130 }, crab: { head: 98, eyes: 72, neck: 150 }, penguin: { head: 62, eyes: 92, neck: 130 } };
+function shopGearView(kind, slot) {
+  const y = PET_VIEW_Y[kind] || PET_VIEW_Y.badger;
+  if (slot === 'head') return '35 ' + Math.max(0, y.head - 50) + ' 170 170';
+  if (slot === 'eyes') return '45 ' + Math.max(0, y.eyes - 60) + ' 150 150';
+  if (slot === 'neck') return '30 ' + Math.max(0, y.neck - 74) + ' 180 180';
+  return '0 0 240 240';
+}
 function shopGearArt(code, petFor) {
-  const kind = petFor || (typeof myPet === 'function' && myPet()) || 'fox';
+  const g = PET_GEAR[code];
+  const kind = g.pet || petFor || (typeof myPet === 'function' && myPet()) || PETS[0];
   // Крупный план обрезан: что за краем кадра, не вылезает на подписи рядом
-  return '<span class="sha-pet sha-crop">' + petSvg(kind, { gear: [code] }).replace('viewBox="0 0 240 240"', 'viewBox="' + SHOP_GEAR_VIEW[PET_GEAR[code].slot] + '"') + '</span>';
+  return '<span class="sha-pet sha-crop">' + petSvg(kind, { gear: [code] }).replace('viewBox="0 0 240 240"', 'viewBox="' + shopGearView(kind, g.slot) + '"') + '</span>';
 }
 function shopArtHtml(kind, code, petFor) {
   const bg = shopBg();
@@ -358,8 +434,9 @@ function shopArtHtml(kind, code, petFor) {
       (isShinyBg(bg) ? ' shine' : '') + '" style="background:' + avatarBgCss(bg) + '">' + face + '</span></span>';
   }
   if (kind === 'title') return '<span class="sha-title">' + escapeHtml(shopName(kind, code)) + '</span>';
-  // Питомец — сам, вещь — на своём питомце (без него — на Огнелисе)
-  if (kind === 'pet') return '<span class="sha-pet">' + petSvg(code) + '</span>';
+  // Питомец — сам (свой — в наряде), облик — на своём питомце, вещь — на том, чья она
+  if (kind === 'pet') return '<span class="sha-pet">' + (shopOwned('pet', code) ? myPetSvg(code) : petSvg(code)) + '</span>';
+  if (kind === 'skin') return '<span class="sha-pet">' + petSvg(petItemFor('skin', code), { skin: shopSkinOf(code) }) + '</span>';
   if (kind === 'gear') return shopGearArt(code, petFor);
   if (kind === 'thermo') return thermoMiniHtml(code);
   if (kind === 'winfx') return '<span class="sha-fx">' + WINFX[code] + '</span>';
@@ -386,8 +463,12 @@ function closeShopItem() {
 function shopItemAbout(kind, code) {
   const S = t().shop;
   if (kind === 'phrase') return S.phraseHint;
-  if (kind === 'pet') return t().pets.who[code];
-  if (kind === 'gear') return S.gearHint.replace('{slot}', S.slots[PET_GEAR[code].slot]);
+  if (kind === 'pet') return petHeroText(code) + ' ' + t().pets.who[code];
+  if (kind === 'gear') {
+    const who = petItemFor('gear', code);
+    return S.gearHint.replace('{slot}', S.slots[PET_GEAR[code].slot]) + ' ' + (who ? S.gearFor.replace('{pet}', petName(who)) : S.gearAll);
+  }
+  if (kind === 'skin') return S.skinHint.replace('{pet}', petName(petItemFor('skin', code)));
   if (kind === 'thermo') return S.thermoHint;
   if (kind === 'winfx') return S.winfxHint;
   return '';
@@ -403,8 +484,8 @@ function renderShopItem() {
   card.className = 'modal-card shop-item-card rar-' + it.rar;
   document.getElementById('siArt').className = 'si-art si-' + kind;
   document.getElementById('siArt').innerHTML = shopArtHtml(kind, code);
-  // Питомца можно потрогать: подпрыгнет
-  document.getElementById('siArt').onclick = () => { if (typeof petReact === 'function') petReact(document.getElementById('siArt'), 'jump'); };
+  // Питомца можно потрогать: сделает сальто
+  document.getElementById('siArt').onclick = () => { if (typeof petReact === 'function') petReact(document.getElementById('siArt'), 'flip'); };
   document.getElementById('siKind').innerHTML = escapeHtml(P.kinds[kind] || S.kindNames[kind]) + ' · <span class="si-rar">' + escapeHtml(S.rarity[it.rar]) + '</span>';
   document.getElementById('siName').textContent = shopName(kind, code);
   const price = document.getElementById('siPrice');
@@ -424,15 +505,21 @@ function renderShopItem() {
   btn.classList.remove('hidden');
   if (own) {
     if (kind === 'phrase') btn.classList.add('hidden');
-    // Вещь питомца, градусник и эффект победы снимаются той же кнопкой
-    const canOff = kind === 'gear' || kind === 'thermo' || kind === 'winfx';
+    // Вещь питомца, облик, градусник и эффект победы снимаются той же кнопкой
+    const canOff = kind === 'gear' || kind === 'skin' || kind === 'thermo' || kind === 'winfx';
     btn.textContent = worn ? (canOff ? S.unwear : kind === 'pet' ? t().pets.withYou : S.wornBtn) : kind === 'pet' ? t().pets.takeWith : S.wear;
     btn.disabled = worn && !canOff;
     btn.onclick = () => shopWear(kind, code, worn);
-    if (kind === 'gear' && !(typeof myPet === 'function' && myPet())) {
+    if ((kind === 'gear' || kind === 'skin') && !(typeof myPet === 'function' && myPet())) {
       btn.disabled = true;
       note.textContent = S.gearNoPet;
     }
+  } else if (shopPetLocked(kind, code)) {
+    // Вещь или облик питомца, которого ещё нет: сначала он
+    btn.textContent = S.buyFor.replace('{p}', shopPriceText(it));
+    btn.disabled = true;
+    note.className = 'si-note warn';
+    note.textContent = S.petFirst.replace('{pet}', petName(petItemFor(kind, code)));
   } else if (shopState !== 'ok' || !shopWallet) {
     btn.textContent = shopState === 'guest' ? S.login : S.buyFor.replace('{p}', shopPriceText(it));
     btn.disabled = shopState !== 'guest';
@@ -497,7 +584,9 @@ function renderShopBundle() {
 
 function shopBuyError(e) {
   const S = t().shop;
-  const m = /not_enough/.test(e.message) ? S.notEnoughShort : /already_owned/.test(e.message) ? S.owned : friendErrorText(e.message);
+  const who = shopOpenItem && shopOpenItem.kind && typeof petItemFor === 'function' ? petItemFor(shopOpenItem.kind, shopOpenItem.code) : null;
+  const m = /not_enough/.test(e.message) ? S.notEnoughShort : /already_owned/.test(e.message) ? S.owned :
+    /pet_locked/.test(e.message) && who ? S.petFirst.replace('{pet}', petName(who)) : friendErrorText(e.message);
   const note = document.getElementById('siNote');
   note.className = 'si-note warn';
   note.textContent = m;
@@ -549,15 +638,21 @@ async function shopBuyBundle(code) {
 }
 
 // Надеть купленное: иконка, фон, рамка, титул — тем же путём, что и награды в
-// профиле; питомец, его вещи, градусник и эффект победы — своими запросами.
-// Надетые вещь, градусник и эффект той же кнопкой снимаются
+// профиле; питомец, его вещи и облики, градусник и эффект победы — своими
+// запросами. Вещь или облик другого своего питомца сначала зовёт его.
+// Надетые вещь, облик, градусник и эффект той же кнопкой снимаются
 async function shopWear(kind, code, off) {
   try {
     if (kind === 'icon') await chooseAvatar(code);
     else if (kind === 'color') await chooseColor(code);
     else if (kind === 'frame' || kind === 'title') await chooseStyle(kind, code);
     else if (kind === 'pet') await petChoose(code);
-    else if (kind === 'gear') await petWearGear(PET_GEAR[code].slot, code);
+    else if (kind === 'gear' || kind === 'skin') {
+      const who = petItemFor(kind, code);
+      if (who && who !== myPet()) await petChoose(who);
+      if (kind === 'gear') await petWearGear(PET_GEAR[code].slot, off ? null : code);
+      else await petWearGear('skin', off ? null : shopSkinOf(code));
+    }
     else if (kind === 'thermo' || kind === 'winfx') {
       const v = off ? null : code;
       await friendRpc(kind === 'thermo' ? 'set_thermo' : 'set_winfx', { p_code: v });

@@ -1,0 +1,277 @@
+-- Шесть питомцев — герои Приключения. Применять в Supabase: SQL Editor →
+-- вставить целиком → Run. Применить ДО мёржа. Повторный запуск ничего не
+-- ломает и ничего не возвращает второй раз.
+--
+-- • Питомцы теперь — герои миров: Барсук Очкарик и Филин Монокль (Волшебный
+--   лес), Тукан Панама и Хамелеон Очки (Джунгли), Краб Матрос и Пингвин
+--   Капитан (Морская глубина). Все шесть покупаются за монеты.
+-- • Огнелис, Ледяной волк и Грозовой дракон и вещи для них (колпак мага, шлем
+--   викинга, тёмные очки, шарф, бабочка, плащ) из игры уходят: купившим —
+--   полная цена назад, в монетах или кристаллах, как платили. Корона и ауры
+--   стихий остаются: они подходят новым питомцам.
+-- • Облики (новый вид вещи skin) — за кристаллы, по пять у каждого питомца;
+--   звёздный облик не продаётся, он открывается на 10-м уровне питомца.
+-- • Вещи — за монеты: корона всем, по одной-две своих у каждого. Ауры дороже
+--   вещей: четыре общие (пламя, иней, гроза, звёзды) и по две своих у каждого.
+-- • Наряд хранится на каждого питомца отдельно: сменили питомца — у прежнего
+--   всё осталось надетым. Места: голова, глаза, шея, тело, аура и облик.
+-- • Вещь или облик одного питомца продаются только тому, у кого он есть; в
+--   товары дня попадают только вещи своих питомцев.
+-- Всё считает база: цену, скидку и опыт из игры не прислать.
+
+-- ============ 1. Облик — новый вид вещи ============
+alter table cosmetics drop constraint if exists cosmetic_kind;
+alter table cosmetics add constraint cosmetic_kind
+  check (kind in ('frame', 'title', 'phrase', 'icon', 'color', 'pet', 'gear', 'skin', 'thermo', 'winfx'));
+
+-- ============ 2. Товары ============
+-- Копия — в js/shop.js (SHOP_ITEMS), сверяется тестом. Цена — в монетах или в
+-- кристаллах (одно из двух); редкость: common, rare, epic, legend
+create or replace function shop_catalog()
+returns table(kind text, code text, coins int, gems int, rarity text)
+language sql immutable as $$
+  values
+    -- Иконки «Стихии»
+    ('icon', 'shop-01', 90, 0, 'common'), ('icon', 'shop-02', 100, 0, 'common'), ('icon', 'shop-03', 110, 0, 'common'),
+    ('icon', 'shop-04', 120, 0, 'common'), ('icon', 'shop-05', 160, 0, 'rare'), ('icon', 'shop-06', 170, 0, 'rare'),
+    ('icon', 'shop-07', 180, 0, 'rare'), ('icon', 'shop-08', 200, 0, 'rare'), ('icon', 'shop-09', 220, 0, 'rare'),
+    ('icon', 'shop-10', 260, 0, 'epic'), ('icon', 'shop-11', 0, 12, 'epic'), ('icon', 'shop-12', 0, 14, 'epic'),
+    ('icon', 'shop-13', 0, 14, 'epic'), ('icon', 'shop-14', 0, 16, 'epic'), ('icon', 'shop-15', 0, 16, 'epic'),
+    ('icon', 'shop-16', 0, 20, 'legend'), ('icon', 'shop-17', 0, 22, 'legend'), ('icon', 'shop-18', 0, 22, 'legend'),
+    ('icon', 'shop-19', 0, 24, 'legend'), ('icon', 'shop-20', 0, 25, 'legend'),
+    -- Рамки
+    ('frame', 'leaf', 100, 0, 'common'), ('frame', 'ocean', 180, 0, 'rare'), ('frame', 'coral', 200, 0, 'rare'),
+    ('frame', 'ember', 220, 0, 'rare'), ('frame', 'night', 300, 0, 'epic'), ('frame', 'galaxy', 0, 14, 'epic'),
+    ('frame', 'aurora', 0, 18, 'legend'), ('frame', 'prism', 0, 20, 'legend'),
+    -- Фоны кружка
+    ('color', 'grad-mint', 80, 0, 'common'), ('color', 'grad-peach', 80, 0, 'common'), ('color', 'grad-sky', 90, 0, 'common'),
+    ('color', 'grad-violet', 140, 0, 'rare'), ('color', 'grad-sand', 120, 0, 'rare'), ('color', 'grad-galaxy', 0, 10, 'epic'),
+    ('color', 'grad-rainbow', 0, 14, 'legend'), ('color', 'grad-sun', 0, 12, 'epic'),
+    -- Титулы
+    ('title', 'thinker', 90, 0, 'common'), ('title', 'explorer', 100, 0, 'common'), ('title', 'lucky', 150, 0, 'rare'),
+    ('title', 'strategist', 180, 0, 'rare'), ('title', 'speedy', 160, 0, 'rare'), ('title', 'calm', 110, 0, 'common'),
+    ('title', 'sleuth', 170, 0, 'rare'), ('title', 'friend', 80, 0, 'common'), ('title', 'legend', 0, 15, 'legend'),
+    ('title', 'genius', 0, 12, 'epic'),
+    -- Фразы для чата в партии
+    ('phrase', 'bingo', 60, 0, 'common'), ('phrase', 'respect', 70, 0, 'common'), ('phrase', 'brain', 80, 0, 'common'),
+    ('phrase', 'whatluck', 120, 0, 'rare'), ('phrase', 'thanks', 60, 0, 'common'), ('phrase', 'math', 100, 0, 'rare'),
+    ('phrase', 'comeback', 140, 0, 'rare'), ('phrase', 'bravo', 70, 0, 'common'),
+    -- Питомцы: все шесть покупаются
+    ('pet', 'badger', 450, 0, 'epic'), ('pet', 'owl', 500, 0, 'epic'), ('pet', 'toucan', 450, 0, 'epic'),
+    ('pet', 'cham', 550, 0, 'epic'), ('pet', 'crab', 500, 0, 'epic'), ('pet', 'penguin', 550, 0, 'epic'),
+    -- Облики питомцев (кристаллы): <питомец>_<облик>; звёздный — не товар, он за 10-й уровень
+    ('skin', 'badger_honey', 0, 8, 'rare'), ('skin', 'badger_midnight', 0, 12, 'epic'), ('skin', 'badger_snow', 0, 8, 'rare'),
+    ('skin', 'badger_autumn', 0, 10, 'rare'), ('skin', 'badger_mint', 0, 10, 'rare'), ('skin', 'owl_snowy', 0, 8, 'rare'),
+    ('skin', 'owl_night', 0, 12, 'epic'), ('skin', 'owl_ruby', 0, 10, 'rare'), ('skin', 'owl_ash', 0, 8, 'rare'),
+    ('skin', 'owl_moon', 0, 12, 'epic'), ('skin', 'toucan_sunset', 0, 10, 'rare'), ('skin', 'toucan_lime', 0, 8, 'rare'),
+    ('skin', 'toucan_arctic', 0, 10, 'rare'), ('skin', 'toucan_neon', 0, 12, 'epic'), ('skin', 'toucan_cherry', 0, 8, 'rare'),
+    ('skin', 'cham_lava', 0, 12, 'epic'), ('skin', 'cham_ocean', 0, 10, 'rare'), ('skin', 'cham_lemon', 0, 8, 'rare'),
+    ('skin', 'cham_berry', 0, 10, 'rare'), ('skin', 'cham_midnight', 0, 12, 'epic'), ('skin', 'crab_blue', 0, 8, 'rare'),
+    ('skin', 'crab_sand', 0, 8, 'rare'), ('skin', 'crab_neon', 0, 12, 'epic'), ('skin', 'crab_sunny', 0, 10, 'rare'),
+    ('skin', 'crab_deep', 0, 12, 'epic'), ('skin', 'penguin_emperor', 0, 12, 'epic'), ('skin', 'penguin_night', 0, 10, 'rare'),
+    ('skin', 'penguin_snowy', 0, 8, 'rare'), ('skin', 'penguin_rose', 0, 10, 'rare'), ('skin', 'penguin_sunny', 0, 8, 'rare'),
+    -- Вещи: корона — всем, остальные — одному питомцу
+    ('gear', 'crown', 450, 0, 'epic'), ('gear', 'mortar', 250, 0, 'rare'), ('gear', 'starglasses', 200, 0, 'rare'),
+    ('gear', 'tophat', 250, 0, 'rare'), ('gear', 'argyle', 150, 0, 'common'), ('gear', 'lei', 150, 0, 'common'),
+    ('gear', 'sunglasses', 200, 0, 'rare'), ('gear', 'cap', 150, 0, 'common'), ('gear', 'safari', 250, 0, 'rare'),
+    ('gear', 'lifebuoy', 250, 0, 'rare'), ('gear', 'striped', 150, 0, 'common'), ('gear', 'jacket', 300, 0, 'rare'),
+    ('gear', 'binoculars', 200, 0, 'rare'),
+    -- Ауры: четыре общие (стихии и звёзды) и по две своих у каждого
+    ('gear', 'aura_fire', 700, 0, 'epic'), ('gear', 'aura_ice', 700, 0, 'epic'), ('gear', 'aura_storm', 700, 0, 'epic'),
+    ('gear', 'aura_star', 900, 0, 'legend'), ('gear', 'aura_leaves', 500, 0, 'epic'), ('gear', 'aura_fireflies', 500, 0, 'epic'),
+    ('gear', 'aura_moon', 500, 0, 'epic'), ('gear', 'aura_feathers', 500, 0, 'epic'), ('gear', 'aura_tropics', 500, 0, 'epic'),
+    ('gear', 'aura_fruit', 500, 0, 'epic'), ('gear', 'aura_rainbow', 500, 0, 'epic'), ('gear', 'aura_butterflies', 500, 0, 'epic'),
+    ('gear', 'aura_bubbles', 500, 0, 'epic'), ('gear', 'aura_seabed', 500, 0, 'epic'), ('gear', 'aura_snow', 500, 0, 'epic'),
+    ('gear', 'aura_fish', 500, 0, 'epic'),
+    -- Облики градусника
+    ('thermo', 'ice', 200, 0, 'rare'), ('thermo', 'lava', 200, 0, 'rare'), ('thermo', 'neon', 350, 0, 'epic'),
+    ('thermo', 'space', 0, 15, 'legend'),
+    -- Эффекты победы
+    ('winfx', 'confetti', 120, 0, 'common'), ('winfx', 'fireworks', 240, 0, 'rare'), ('winfx', 'lightning', 400, 0, 'epic'),
+    ('winfx', 'meteors', 0, 18, 'legend');
+$$;
+
+-- Чья вещь: облик и вещь одного питомца — его код; корона и ауры стихий — всем (null)
+create or replace function pet_item_for(p_kind text, p_code text)
+returns text language sql immutable as $$
+  select case
+    when p_kind = 'skin' then split_part(p_code, '_', 1)
+    when p_kind = 'gear' then case
+      when p_code in ('mortar', 'starglasses', 'aura_leaves', 'aura_fireflies') then 'badger'
+      when p_code in ('tophat', 'argyle', 'aura_moon', 'aura_feathers') then 'owl'
+      when p_code in ('lei', 'sunglasses', 'aura_tropics', 'aura_fruit') then 'toucan'
+      when p_code in ('cap', 'safari', 'aura_rainbow', 'aura_butterflies') then 'cham'
+      when p_code in ('lifebuoy', 'striped', 'aura_bubbles', 'aura_seabed') then 'crab'
+      when p_code in ('jacket', 'binoculars', 'aura_snow', 'aura_fish') then 'penguin'
+    end
+  end;
+$$;
+
+-- Куда надевается вещь питомца: голова, глаза, шея, тело, аура
+create or replace function pet_gear_slot(p_code text)
+returns text language sql immutable as $$
+  select case
+    when p_code in ('crown', 'mortar', 'tophat', 'cap', 'safari') then 'head'
+    when p_code in ('starglasses', 'sunglasses') then 'eyes'
+    when p_code in ('argyle', 'lei', 'binoculars') then 'neck'
+    when p_code in ('lifebuoy', 'striped', 'jacket') then 'body'
+    when p_code like 'aura\_%' then 'aura'
+  end;
+$$;
+
+-- Звёздный облик открывается на 10-м уровне: 2700 опыта (как petLevel в js/pets.js)
+create or replace function pet_star_xp()
+returns int language sql immutable as $$ select 2700 $$;
+
+-- ============ 3. Наборы ============
+-- Копия — в js/shop.js (SHOP_BUNDLES). Набор — питомец и две его вещи
+create or replace function shop_bundles()
+returns table(code text, currency text, pct int, items text[])
+language sql immutable as $$
+  values
+    ('set_badger', 'coins', 20, array['pet:badger', 'gear:mortar', 'gear:starglasses']),
+    ('set_owl', 'coins', 20, array['pet:owl', 'gear:tophat', 'gear:argyle']),
+    ('set_toucan', 'coins', 20, array['pet:toucan', 'gear:lei', 'gear:sunglasses']),
+    ('set_cham', 'coins', 20, array['pet:cham', 'gear:cap', 'gear:safari']),
+    ('set_crab', 'coins', 20, array['pet:crab', 'gear:lifebuoy', 'gear:striped']),
+    ('set_penguin', 'coins', 20, array['pet:penguin', 'gear:jacket', 'gear:binoculars']);
+$$;
+
+-- ============ 4. Товары дня ============
+-- Три вещи со скидкой 40, 25 и 15 % на сегодня: из того, чего у игрока нет,
+-- кроме питомцев и вещей чужих питомцев. Выбираются один раз за день
+create or replace function shop_deals_today(p_username text)
+returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare d date; got jsonb;
+begin
+  d := player_day(p_username);
+  select items into got from shop_deals where username = p_username and day = d;
+  if got is not null then return got; end if;
+  select coalesce(jsonb_agg(jsonb_build_object('kind', x.kind, 'code', x.code, 'pct', (array[40, 25, 15])[x.n]) order by x.n), '[]'::jsonb)
+    into got
+    from (select c.kind, c.code, (row_number() over (order by random()))::int as n
+            from shop_catalog() c
+           where c.kind <> 'pet' and not cosmetic_has(p_username, c.kind, c.code)
+             and (pet_item_for(c.kind, c.code) is null or cosmetic_has(p_username, 'pet', pet_item_for(c.kind, c.code)))) x
+   where x.n <= 3;
+  insert into shop_deals(username, day, items) values (p_username, d, got) on conflict do nothing;
+  delete from shop_deals where username = p_username and day < d - 7;
+  select items into got from shop_deals where username = p_username and day = d;
+  return got;
+end;
+$$;
+
+-- ============ 5. Покупка ============
+-- Как в 063, и ещё: вещь или облик одного питомца — только тому, у кого он есть
+create or replace function shop_buy(p_username text, p_pin text, p_kind text, p_code text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; pr record; w wallet; who text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  if not exists (select 1 from shop_catalog() c where c.kind = p_kind and c.code = p_code) then raise exception 'no_such_item'; end if;
+  insert into wallet(username) values (me) on conflict do nothing;
+  select * into w from wallet where username = me for update;
+  if cosmetic_has(me, p_kind, p_code) then raise exception 'already_owned'; end if;
+  who := pet_item_for(p_kind, p_code);
+  if who is not null and not cosmetic_has(me, 'pet', who) then raise exception 'pet_locked'; end if;
+  select * into pr from shop_price(me, p_kind, p_code);
+  if w.coins < pr.coins or w.gems < pr.gems then raise exception 'not_enough'; end if;
+  update wallet set coins = coins - pr.coins, gems = gems - pr.gems, updated_at = now()
+   where username = me returning * into w;
+  insert into wallet_log(username, coins, gems, reason, ref, day)
+  values (me, -pr.coins, -pr.gems, 'buy', p_kind || ':' || p_code, player_day(me));
+  perform cosmetic_grant(me, p_kind, p_code, 'shop');
+  if p_kind = 'pet' then update students set pet = p_code where username = me and pet is null; end if;
+  if p_kind = 'thermo' then update students set thermo = p_code where username = me and thermo is null; end if;
+  if p_kind = 'winfx' then update students set winfx = p_code where username = me and winfx is null; end if;
+  return jsonb_build_object('coins', w.coins, 'gems', w.gems, 'kind', p_kind, 'code', p_code, 'paid', pr.coins + pr.gems, 'pct', pr.pct);
+end;
+$$;
+
+-- ============ 6. Наряд: на каждого питомца свой ============
+-- pet_gear у игрока: {"badger": {"head": "crown", "skin": "honey"}, "owl": {...}}.
+-- Надеть на выбранного питомца вещь (голова, глаза, шея, тело, аура) или
+-- облик (skin: свой купленный или star с 10-го уровня), снять — null.
+-- Возвращает наряды всех питомцев
+create or replace function set_pet_gear(p_username text, p_pin text, p_slot text, p_code text)
+returns jsonb language plpgsql security definer set search_path = public, extensions, pg_temp as $$
+declare me text; p text; g jsonb; o jsonb;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select pet, coalesce(pet_gear, '{}'::jsonb) into p, g from students where username = me;
+  if p is null or not cosmetic_has(me, 'pet', p) then raise exception 'no_pet'; end if;
+  if p_slot is null or p_slot not in ('head', 'eyes', 'neck', 'body', 'aura', 'skin') then raise exception 'bad_slot'; end if;
+  if p_code is not null then
+    if p_slot = 'skin' then
+      if p_code = 'star' then
+        if coalesce((select x.xp from pet_xp x where x.username = me and x.pet = p), 0) < pet_star_xp() then raise exception 'skin_locked'; end if;
+      elsif not cosmetic_has(me, 'skin', p || '_' || p_code) then raise exception 'skin_locked'; end if;
+    else
+      if pet_gear_slot(p_code) is distinct from p_slot then raise exception 'bad_slot'; end if;
+      if not cosmetic_has(me, 'gear', p_code) then raise exception 'gear_locked'; end if;
+      if pet_item_for('gear', p_code) is not null and pet_item_for('gear', p_code) <> p then raise exception 'gear_locked'; end if;
+    end if;
+  end if;
+  o := coalesce(g -> p, '{}'::jsonb);
+  o := case when p_code is null then o - p_slot else o || jsonb_build_object(p_slot, p_code) end;
+  g := g || jsonb_build_object(p, o);
+  update students set pet_gear = g where username = me;
+  return g;
+end;
+$$;
+
+-- ============ 7. Прежние питомцы и вещи: монеты назад ============
+-- Купившим Огнелиса, волка, дракона и вещи для них — полная цена назад.
+-- Второй раз не вернётся: запись о возврате с той же ссылкой в wallet_log
+-- вставляется только однажды, а сами вещи из коллекции удаляются.
+-- Прежние наряды снимаются: места изменились, а вещи теперь у каждого свои.
+-- Возвращает, за сколько вещей вернулись деньги
+create or replace function six_pets_cleanup()
+returns int language plpgsql security definer set search_path = public, pg_temp as $$
+declare r record; n int; total int := 0;
+begin
+  for r in
+    select c.username, c.kind, c.code, o.coins, o.gems
+      from cosmetics c
+      join (values ('pet', 'fox', 450, 0), ('pet', 'wolf', 450, 0), ('pet', 'drake', 0, 30),
+                   ('gear', 'wizard', 360, 0), ('gear', 'viking', 220, 0), ('gear', 'shades', 180, 0),
+                   ('gear', 'scarf', 100, 0), ('gear', 'bowtie', 80, 0), ('gear', 'cape', 400, 0)) as o(kind, code, coins, gems)
+        on o.kind = c.kind and o.code = c.code
+  loop
+    insert into wallet(username) values (r.username) on conflict do nothing;
+    insert into wallet_log(username, coins, gems, reason, ref, day)
+    values (r.username, r.coins, r.gems, 'refund', r.kind || ':' || r.code, player_day(r.username))
+    on conflict do nothing;
+    get diagnostics n = row_count;
+    if n > 0 then
+      update wallet set coins = coins + r.coins, gems = gems + r.gems, updated_at = now() where username = r.username;
+      total := total + 1;
+    end if;
+    delete from cosmetics where username = r.username and kind = r.kind and code = r.code;
+  end loop;
+  update students set pet = null where pet in ('fox', 'wolf', 'drake');
+  -- Прежний наряд лежал по местам ({"head": …}), новый — по питомцам ({"badger": {…}})
+  update students set pet_gear = '{}'::jsonb
+   where pet_gear <> '{}'::jsonb and not (pet_gear ? 'badger' or pet_gear ? 'owl' or pet_gear ? 'toucan' or pet_gear ? 'cham' or pet_gear ? 'crab' or pet_gear ? 'penguin');
+  delete from pet_xp where pet in ('fox', 'wolf', 'drake');
+  -- Товары дня с ушедшими вещами выбираются заново
+  delete from shop_deals s
+   where exists (select 1 from jsonb_array_elements(s.items) x
+                  where not exists (select 1 from shop_catalog() c where c.kind = x->>'kind' and c.code = x->>'code'));
+  return total;
+end;
+$$;
+select six_pets_cleanup();
+
+-- ============ 8. Права ============
+grant execute on function shop_buy(text, text, text, text) to anon;
+grant execute on function set_pet_gear(text, text, text, text) to anon;
+revoke execute on function shop_deals_today(text) from public, anon;
+revoke execute on function six_pets_cleanup() from public, anon;
