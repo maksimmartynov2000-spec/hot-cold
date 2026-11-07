@@ -2,8 +2,9 @@
 \pset format unaligned
 \pset tuples_only on
 
--- Магазин 2.0 и питомцы (миграция 063): редкость, товары дня, наборы,
--- питомец, вещи на нём, опыт, градусник и эффект победы. Откатывается в конце
+-- Магазин 2.0 и питомцы (миграции 063 и 064): редкость, товары дня, наборы,
+-- питомец, наряд на каждого, облики, опыт, градусник и эффект победы.
+-- Откатывается в конце
 begin;
 
 \echo === подготовка
@@ -21,13 +22,13 @@ do $$ begin
 end $$;
 \echo ok
 
-\echo === 1. каталог: 75 товаров, у каждого редкость; в игре и в базе одинаково; наборы — в одной валюте
+\echo === 1. каталог: 127 товаров, у каждого редкость; в игре и в базе одинаково; наборы — в одной валюте
 create temp table js_rar(kind text, code text, rarity text);
 \copy js_rar from 'shop_rar_js.csv' with (format csv, header true)
 create temp table js_bundles(code text, currency text, pct int, items text);
 \copy js_bundles from 'shop_bundles_js.csv' with (format csv, header true)
 do $$ begin
-  if (select count(*) from shop_catalog()) <> 75 then raise exception 'ОШИБКА: товаров %', (select count(*) from shop_catalog()); end if;
+  if (select count(*) from shop_catalog()) <> 127 then raise exception 'ОШИБКА: товаров %', (select count(*) from shop_catalog()); end if;
   if exists (select 1 from shop_catalog() c where c.rarity not in ('common', 'rare', 'epic', 'legend')) then raise exception 'ОШИБКА: редкость'; end if;
   if exists (select c.kind, c.code, c.rarity from shop_catalog() c except select j.kind, j.code, j.rarity from js_rar j)
      or exists (select j.kind, j.code, j.rarity from js_rar j except select c.kind, c.code, c.rarity from shop_catalog() c) then
@@ -45,8 +46,16 @@ do $$ begin
     raise exception 'ОШИБКА: в наборе вещь не той валюты или её нет';
   end if;
   if exists (select 1 from shop_catalog() c where c.kind = 'gear' and pet_gear_slot(c.code) is null) then raise exception 'ОШИБКА: вещь без места'; end if;
+  -- Шесть питомцев, по пять обликов у каждого за кристаллы; вещи и ауры — за монеты
+  if (select count(*) from shop_catalog() where kind = 'pet') <> 6 or (select count(*) from shop_catalog() where kind = 'skin') <> 30
+     or (select count(*) from shop_catalog() where kind = 'gear') <> 29 then raise exception 'ОШИБКА: состав разделов'; end if;
+  if exists (select 1 from shop_catalog() c where c.kind = 'skin' and (c.gems = 0 or pet_item_for('skin', c.code) not in (select p.code from shop_catalog() p where p.kind = 'pet'))) then
+    raise exception 'ОШИБКА: облик не за кристаллы или без питомца';
+  end if;
+  if exists (select 1 from shop_catalog() c where c.kind in ('pet', 'gear') and c.coins = 0) then raise exception 'ОШИБКА: питомец или вещь не за монеты'; end if;
+  if (select count(*) from shop_catalog() c where c.kind = 'skin' and pet_item_for('skin', c.code) = 'badger') <> 5 then raise exception 'ОШИБКА: обликов у барсука'; end if;
   -- Прежние иконки, фразы и фоны по-прежнему разрешены: старый список — из нового
-  if (select count(*) from shop_items()) <> 75 or shop_codes('icon') <> (select array_agg(code order by code) from shop_catalog() where kind = 'icon') then
+  if (select count(*) from shop_items()) <> 127 or shop_codes('icon') <> (select array_agg(code order by code) from shop_catalog() where kind = 'icon') then
     raise exception 'ОШИБКА: shop_items не сходится с каталогом';
   end if;
 end $$;
@@ -56,61 +65,125 @@ end $$;
 do $$
 declare r jsonb;
 begin
-  r := shop_buy('Лев', '1234', 'pet', 'fox');
-  if (r->>'paid')::int <> 450 or (select pet from students where username = 'Лев') <> 'fox' then raise exception 'ОШИБКА: первый питомец %', r; end if;
-  perform shop_buy('Лев', '1234', 'pet', 'drake');
-  if (select pet from students where username = 'Лев') <> 'fox' then raise exception 'ОШИБКА: второй питомец сменил первого'; end if;
-  if (select gems from wallet where username = 'Лев') <> 170 then raise exception 'ОШИБКА: дракон не за 30 💎'; end if;
+  r := shop_buy('Лев', '1234', 'pet', 'badger');
+  if (r->>'paid')::int <> 450 or (select pet from students where username = 'Лев') <> 'badger' then raise exception 'ОШИБКА: первый питомец %', r; end if;
+  perform shop_buy('Лев', '1234', 'pet', 'owl');
+  if (select pet from students where username = 'Лев') <> 'badger' then raise exception 'ОШИБКА: второй питомец сменил первого'; end if;
+  if (select coins from wallet where username = 'Лев') <> 4050 then raise exception 'ОШИБКА: филин не за 500 🪙'; end if;
   begin
-    perform set_pet('Лев', '1234', 'wolf');
+    perform set_pet('Лев', '1234', 'toucan');
     raise exception 'ОШИБКА: чужой питомец';
   exception when others then if sqlerrm not like '%pet_locked%' then raise; end if;
   end;
-  if set_pet('Лев', '1234', 'drake') <> 'drake' then raise exception 'ОШИБКА: выбор питомца'; end if;
-  perform set_pet('Лев', '1234', 'fox');
+  if set_pet('Лев', '1234', 'owl') <> 'owl' then raise exception 'ОШИБКА: выбор питомца'; end if;
+  perform set_pet('Лев', '1234', 'badger');
 end $$;
 \echo ok
 
-\echo === 3. вещи: только свои и только на своё место; снять — null
+\echo === 3. вещи: только свои, только своему питомцу и на своё место; наряд у каждого питомца свой
 do $$
 declare g jsonb;
 begin
-  perform shop_buy('Лев', '1234', 'gear', 'shades');
+  perform shop_buy('Лев', '1234', 'gear', 'mortar');
   perform shop_buy('Лев', '1234', 'gear', 'crown');
-  g := set_pet_gear('Лев', '1234', 'eyes', 'shades');
+  if (select coins from wallet where username = 'Лев') <> 3350 then raise exception 'ОШИБКА: шапочка 250 и корона 450'; end if;
+  g := set_pet_gear('Лев', '1234', 'head', 'mortar');
+  if g <> '{"badger": {"head": "mortar"}}'::jsonb then raise exception 'ОШИБКА: надеть %', g; end if;
   g := set_pet_gear('Лев', '1234', 'head', 'crown');
-  if g <> '{"eyes": "shades", "head": "crown"}'::jsonb then raise exception 'ОШИБКА: надеть %', g; end if;
+  if g <> '{"badger": {"head": "crown"}}'::jsonb then raise exception 'ОШИБКА: сменить на том же месте %', g; end if;
   begin
-    perform set_pet_gear('Лев', '1234', 'head', 'shades');
-    raise exception 'ОШИБКА: очки на голову';
+    perform set_pet_gear('Лев', '1234', 'eyes', 'mortar');
+    raise exception 'ОШИБКА: шапочка на глаза';
   exception when others then if sqlerrm not like '%bad_slot%' then raise; end if;
   end;
   begin
-    perform set_pet_gear('Лев', '1234', 'neck', 'scarf');
+    perform set_pet_gear('Лев', '1234', 'neck', 'argyle');
     raise exception 'ОШИБКА: чужой шарф';
   exception when others then if sqlerrm not like '%gear_locked%' then raise; end if;
   end;
-  g := set_pet_gear('Лев', '1234', 'eyes', null);
-  if g <> '{"head": "crown"}'::jsonb then raise exception 'ОШИБКА: снять %', g; end if;
+  -- Цилиндр филина купить можно (филин свой), а на барсука не надеть
+  perform shop_buy('Лев', '1234', 'gear', 'tophat');
+  begin
+    perform set_pet_gear('Лев', '1234', 'head', 'tophat');
+    raise exception 'ОШИБКА: цилиндр на барсука';
+  exception when others then if sqlerrm not like '%gear_locked%' then raise; end if;
+  end;
+  perform set_pet('Лев', '1234', 'owl');
+  g := set_pet_gear('Лев', '1234', 'head', 'tophat');
+  if g <> '{"badger": {"head": "crown"}, "owl": {"head": "tophat"}}'::jsonb then raise exception 'ОШИБКА: наряд филина %', g; end if;
+  perform set_pet('Лев', '1234', 'badger');
+  g := set_pet_gear('Лев', '1234', 'head', null);
+  if g <> '{"badger": {}, "owl": {"head": "tophat"}}'::jsonb then raise exception 'ОШИБКА: снять %', g; end if;
+  if (my_look('Лев', '1234')->'gear') <> g then raise exception 'ОШИБКА: наряд в my_look'; end if;
+  -- Без питомца вещь его не купить и надеть не на кого
+  begin
+    perform shop_buy('Кира', '4321', 'gear', 'mortar');
+    raise exception 'ОШИБКА: вещь чужого питомца';
+  exception when others then if sqlerrm not like '%pet_locked%' then raise; end if;
+  end;
+  begin
+    perform set_pet_gear('Кира', '4321', 'head', 'crown');
+    raise exception 'ОШИБКА: наряд без питомца';
+  exception when others then if sqlerrm not like '%no_pet%' then raise; end if;
+  end;
 end $$;
 \echo ok
 
-\echo === 4. опыт: столько же, сколько очков пути за игру, не больше 200 в день; без питомца — никому
+\echo === 4. облики: за кристаллы, только для своего питомца; надеть — только свой; звёздный — с 2700 опыта
+do $$
+declare g jsonb; r jsonb;
+begin
+  -- Товары дня Льва уже выбраны (my_look выше) и могли задеть облик: цены ниже — без скидок
+  delete from shop_deals where username = 'Лев';
+  r := shop_buy('Лев', '1234', 'skin', 'badger_honey');
+  if (r->>'paid')::int <> 8 or (select gems from wallet where username = 'Лев') <> 192 then raise exception 'ОШИБКА: облик за 8 💎 %', r; end if;
+  perform shop_buy('Лев', '1234', 'skin', 'owl_night');
+  begin
+    perform shop_buy('Лев', '1234', 'skin', 'toucan_lime');
+    raise exception 'ОШИБКА: облик чужого питомца';
+  exception when others then if sqlerrm not like '%pet_locked%' then raise; end if;
+  end;
+  g := set_pet_gear('Лев', '1234', 'skin', 'honey');
+  if g->'badger' <> '{"skin": "honey"}'::jsonb then raise exception 'ОШИБКА: облик надеть %', g; end if;
+  begin
+    perform set_pet_gear('Лев', '1234', 'skin', 'midnight');
+    raise exception 'ОШИБКА: некупленный облик';
+  exception when others then if sqlerrm not like '%skin_locked%' then raise; end if;
+  end;
+  begin
+    perform set_pet_gear('Лев', '1234', 'skin', 'night');
+    raise exception 'ОШИБКА: облик филина на барсука';
+  exception when others then if sqlerrm not like '%skin_locked%' then raise; end if;
+  end;
+  begin
+    perform set_pet_gear('Лев', '1234', 'skin', 'star');
+    raise exception 'ОШИБКА: звёздный до 10-го уровня';
+  exception when others then if sqlerrm not like '%skin_locked%' then raise; end if;
+  end;
+  insert into pet_xp(username, pet, xp) values ('Лев', 'badger', 2700);
+  g := set_pet_gear('Лев', '1234', 'skin', 'star');
+  if g->'badger'->>'skin' <> 'star' then raise exception 'ОШИБКА: звёздный облик %', g; end if;
+  g := set_pet_gear('Лев', '1234', 'skin', null);
+  if g->'badger' ? 'skin' then raise exception 'ОШИБКА: снять облик %', g; end if;
+end $$;
+\echo ok
+
+\echo === 5. опыт: столько же, сколько очков пути за игру, не больше 200 в день; без питомца — никому
 do $$
 declare x int;
 begin
   perform play_done('Лев', 20);
   perform local_game_done('Лев', '1234', 'solo');
-  if (select xp from pet_xp where username = 'Лев' and pet = 'fox') <> 30 then raise exception 'ОШИБКА: опыт %', (select xp from pet_xp where username = 'Лев'); end if;
+  if (select xp from pet_xp where username = 'Лев' and pet = 'badger') <> 2730 then raise exception 'ОШИБКА: опыт %', (select xp from pet_xp where username = 'Лев' and pet = 'badger'); end if;
   perform play_done('Лев', 500);
-  if (select xp from pet_xp where username = 'Лев' and pet = 'fox') <> 200 then raise exception 'ОШИБКА: предел за день'; end if;
+  if (select xp from pet_xp where username = 'Лев' and pet = 'badger') <> 2900 then raise exception 'ОШИБКА: предел за день'; end if;
   perform play_done('Кира', 20);
   if exists (select 1 from pet_xp where username = 'Кира') then raise exception 'ОШИБКА: опыт без питомца'; end if;
-  if (my_look('Лев', '1234')->'xp'->>'fox')::int <> 200 then raise exception 'ОШИБКА: опыт в my_look'; end if;
+  if (my_look('Лев', '1234')->'xp'->>'badger')::int <> 2900 then raise exception 'ОШИБКА: опыт в my_look'; end if;
 end $$;
 \echo ok
 
-\echo === 5. товары дня: три вещи, 40/25/15 %, не питомцы и не своё; весь день те же; покупка — со скидкой
+\echo === 6. товары дня: три вещи, 40/25/15 %, не питомцы и не вещи чужих питомцев; весь день те же; покупка — со скидкой
 do $$
 declare l jsonb; d jsonb; it record; c0 int; g0 int; r jsonb;
 begin
@@ -120,6 +193,10 @@ begin
     raise exception 'ОШИБКА: скидки %', l->'deals';
   end if;
   if exists (select 1 from jsonb_array_elements(l->'deals') x where x->>'kind' = 'pet') then raise exception 'ОШИБКА: питомец в товарах дня'; end if;
+  -- У Максима питомцев нет: облики и вещи питомцев ему не предлагаются
+  if exists (select 1 from jsonb_array_elements(l->'deals') x where pet_item_for(x->>'kind', x->>'code') is not null) then
+    raise exception 'ОШИБКА: вещь чужого питомца в товарах дня %', l->'deals';
+  end if;
   if (my_look('Максим', '1111')->'deals') <> l->'deals' then raise exception 'ОШИБКА: товары дня поменялись за день'; end if;
   if (l->>'dealsLeft')::int <= 0 or (l->>'dealsLeft')::int > 86400 then raise exception 'ОШИБКА: до смены %', l->>'dealsLeft'; end if;
   d := (select x from jsonb_array_elements(l->'deals') x where (x->>'pct')::int = 40);
@@ -139,43 +216,53 @@ begin
    where c.kind = 'phrase' and c.code not in (select x->>'code' from jsonb_array_elements(l->'deals') x) limit 1;
   r := shop_buy('Максим', '1111', it.kind, it.code);
   if (r->>'pct')::int <> 0 or (r->>'paid')::int <> it.coins then raise exception 'ОШИБКА: полная цена %', r; end if;
+  -- У Льва есть барсук и филин: их вещи в товары дня попасть могут, остальных — нет
+  l := my_look('Лев', '1234');
+  if exists (select 1 from jsonb_array_elements(l->'deals') x where pet_item_for(x->>'kind', x->>'code') not in ('badger', 'owl')) then
+    raise exception 'ОШИБКА: вещь чужого питомца у Льва %', l->'deals';
+  end if;
 end $$;
 \echo ok
 
-\echo === 6. наборы: недостающее со скидкой, своё не продаётся дважды, всё есть — отказ
+\echo === 7. наборы: недостающее со скидкой, своё не продаётся дважды, всё есть — отказ
 do $$
 declare p int; r jsonb; c0 int;
 begin
-  -- У Киры ничего нет: Огнелис 450 + лавовый 200 + «Угли» 220 = 870 → −20 % = 696 → до десятков 700
-  if shop_bundle_price('Кира', 'set_fox') <> 700 then raise exception 'ОШИБКА: цена набора %', shop_bundle_price('Кира', 'set_fox'); end if;
+  -- У Киры ничего нет: барсук 450 + шапочка 250 + очки-звёзды 200 = 900 → −20 % = 720
+  if shop_bundle_price('Кира', 'set_badger') <> 720 then raise exception 'ОШИБКА: цена набора %', shop_bundle_price('Кира', 'set_badger'); end if;
   begin
-    perform shop_buy_bundle('Кира', '4321', 'set_fox');
+    perform shop_buy_bundle('Кира', '4321', 'set_badger');
     raise exception 'ОШИБКА: набор без денег';
   exception when others then if sqlerrm not like '%not_enough%' then raise; end if;
   end;
-  -- У Льва Огнелис уже есть: 420 → 336 → 340
-  p := shop_bundle_price('Лев', 'set_fox');
-  if p <> 340 then raise exception 'ОШИБКА: набор без своего %', p; end if;
+  -- У Льва барсук и шапочка уже есть: очки-звёзды 200 → 160
+  p := shop_bundle_price('Лев', 'set_badger');
+  if p <> 160 then raise exception 'ОШИБКА: набор без своего %', p; end if;
   c0 := (select coins from wallet where username = 'Лев');
-  r := shop_buy_bundle('Лев', '1234', 'set_fox');
-  if (r->>'paid')::int <> 340 or (select coins from wallet where username = 'Лев') <> c0 - 340 then raise exception 'ОШИБКА: покупка набора %', r; end if;
-  if (r->'got') <> '["thermo:lava", "frame:ember"]'::jsonb then raise exception 'ОШИБКА: что пришло %', r->'got'; end if;
-  if not cosmetic_has('Лев', 'thermo', 'lava') or not cosmetic_has('Лев', 'frame', 'ember') then raise exception 'ОШИБКА: вещей набора нет'; end if;
-  -- Первый градусник надевается сам
-  if (select thermo from students where username = 'Лев') <> 'lava' then raise exception 'ОШИБКА: градусник не надет'; end if;
+  r := shop_buy_bundle('Лев', '1234', 'set_badger');
+  if (r->>'paid')::int <> 160 or (select coins from wallet where username = 'Лев') <> c0 - 160 then raise exception 'ОШИБКА: покупка набора %', r; end if;
+  if (r->'got') <> '["gear:starglasses"]'::jsonb then raise exception 'ОШИБКА: что пришло %', r->'got'; end if;
+  if not cosmetic_has('Лев', 'gear', 'starglasses') then raise exception 'ОШИБКА: вещи набора нет'; end if;
   begin
-    perform shop_buy_bundle('Лев', '1234', 'set_fox');
+    perform shop_buy_bundle('Лев', '1234', 'set_badger');
     raise exception 'ОШИБКА: набор дважды';
   exception when others then if sqlerrm not like '%already_owned%' then raise; end if;
   end;
-  if (my_look('Лев', '1234')->'bundles'->>'set_fox')::int <> 0 then raise exception 'ОШИБКА: цена купленного набора'; end if;
-  -- Набор за кристаллы: дракон уже есть — аура грозы 12 + «Галактика» 14 = 26 → 21
-  if shop_bundle_price('Лев', 'set_drake') <> 21 then raise exception 'ОШИБКА: набор дракона %', shop_bundle_price('Лев', 'set_drake'); end if;
+  if (my_look('Лев', '1234')->'bundles'->>'set_badger')::int <> 0 then raise exception 'ОШИБКА: цена купленного набора'; end if;
+  -- Набор филина: филин и цилиндр есть — шарф 150 → 120
+  if shop_bundle_price('Лев', 'set_owl') <> 120 then raise exception 'ОШИБКА: набор филина %', shop_bundle_price('Лев', 'set_owl'); end if;
+  -- Набор с питомцем, которого нет: питомец приходит вместе с вещами
+  c0 := (select coins from wallet where username = 'Лев');
+  r := shop_buy_bundle('Лев', '1234', 'set_crab');
+  if (r->>'paid')::int <> 720 or (select coins from wallet where username = 'Лев') <> c0 - 720 then raise exception 'ОШИБКА: набор краба %', r; end if;
+  if not cosmetic_has('Лев', 'pet', 'crab') or not cosmetic_has('Лев', 'gear', 'lifebuoy') then raise exception 'ОШИБКА: краб с кругом не пришли'; end if;
 end $$;
 \echo ok
 
-\echo === 7. градусник и эффект победы: свои надеваются и снимаются, чужие — нет
+\echo === 8. градусник и эффект победы: свои надеваются и снимаются, чужие — нет
 do $$ begin
+  perform shop_buy('Лев', '1234', 'thermo', 'lava');
+  if (select thermo from students where username = 'Лев') <> 'lava' then raise exception 'ОШИБКА: первый градусник не надет'; end if;
   begin
     perform set_thermo('Лев', '1234', 'neon');
     raise exception 'ОШИБКА: чужой градусник';
@@ -194,7 +281,7 @@ do $$ begin
 end $$;
 \echo ok
 
-\echo === 8. без PIN — ничего
+\echo === 9. без PIN — ничего
 do $$ begin
   begin
     perform my_look('Лев', '0000');
@@ -202,8 +289,13 @@ do $$ begin
   exception when others then if sqlerrm not like '%auth_failed%' then raise; end if;
   end;
   begin
-    perform shop_buy_bundle('Лев', '0000', 'set_wolf');
+    perform shop_buy_bundle('Лев', '0000', 'set_owl');
     raise exception 'ОШИБКА: набор без PIN';
+  exception when others then if sqlerrm not like '%auth_failed%' then raise; end if;
+  end;
+  begin
+    perform set_pet_gear('Лев', '0000', 'skin', 'honey');
+    raise exception 'ОШИБКА: облик без PIN';
   exception when others then if sqlerrm not like '%auth_failed%' then raise; end if;
   end;
 end $$;

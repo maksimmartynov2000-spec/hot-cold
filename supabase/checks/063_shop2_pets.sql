@@ -8,14 +8,14 @@ with fn as (
   where n.nspname = 'public'
 ),
 checks(nn, what, ok) as (values
-  (1, 'в магазине 75 товаров, у каждого редкость и одна цена: монеты или кристаллы',
-      (select count(*) from shop_catalog()) = 75
+  (1, 'в магазине не меньше 75 товаров, у каждого редкость и одна цена: монеты или кристаллы',
+      (select count(*) from shop_catalog()) >= 75
       and not exists (select 1 from shop_catalog() c where c.rarity not in ('common', 'rare', 'epic', 'legend'))
       and not exists (select 1 from shop_catalog() c where (c.coins > 0) = (c.gems > 0))
-      and (select count(*) from shop_items()) = 75),
+      and (select count(*) from shop_items()) = (select count(*) from shop_catalog())),
   (2, 'новые разделы: питомцы, вещи для них, градусник, эффект победы',
-      (select count(*) from shop_catalog() where kind = 'pet') = 3
-      and (select count(*) from shop_catalog() where kind = 'gear') = 10
+      (select count(*) from shop_catalog() where kind = 'pet') >= 3
+      and (select count(*) from shop_catalog() where kind = 'gear') >= 10
       and (select count(*) from shop_catalog() where kind = 'thermo') = 4
       and (select count(*) from shop_catalog() where kind = 'winfx') = 4
       and exists (select 1 from pg_constraint where conname = 'cosmetic_kind' and pg_get_constraintdef(oid) like '%winfx%')),
@@ -29,8 +29,8 @@ checks(nn, what, ok) as (values
                    where table_schema = 'public' and table_name = 'online_days' and column_name = 'pet_xp')
       and exists (select 1 from fn where name = 'play_done' and src like '%pet_gain%')
       and exists (select 1 from fn where name = 'pet_gain' and src like '%200%')),
-  (5, 'наборы со скидкой: 4 набора, в каждом одна валюта',
-      (select count(*) from shop_bundles()) = 4
+  (5, 'наборы со скидкой: не меньше 4, в каждом одна валюта',
+      (select count(*) from shop_bundles()) >= 4
       and not exists (select 1 from shop_bundles() b cross join lateral unnest(b.items) as it(item)
                         left join shop_catalog() c on c.kind || ':' || c.code = it.item
                        where c.kind is null or (b.currency = 'coins' and c.coins = 0) or (b.currency = 'gems' and c.gems = 0))),

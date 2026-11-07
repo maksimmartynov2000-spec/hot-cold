@@ -6639,16 +6639,16 @@ async function testShop(browser) {
   check('в нижнем меню — «Магазин» вторым', /Магазин/.test(tab.text) && tab.order === 'navPlay,shopBtn,friendsBtn,accountChip', JSON.stringify(tab));
   await page.click('#shopBtn');
   await page.waitForTimeout(400);
-  // Магазин 2.0 (миграция 063): десять разделов, первой открывается «Витрина» —
-  // товары дня и наборы. База без 063 товаров дня не знает: их и не видно
+  // Магазин 2.0 (миграции 063 и 064): одиннадцать разделов, первой открывается
+  // «Витрина» — товары дня и наборы. База без 063 товаров дня не знает: их и не видно
   const front = await page.evaluate(() => ({ tabs: [...document.querySelectorAll('#shopTabs .sh-tab')].map(b => b.textContent).join('|'),
     sel: document.querySelector('#shopTabs .sh-tab.sel').textContent, bundles: document.querySelectorAll('#shopGrid .sh-bundle').length,
     heads: [...document.querySelectorAll('#shopGrid .sh-head b')].map(h => h.textContent).join('|'),
     empty: document.querySelectorAll('#shopGrid .sh-empty').length }));
-  check('десять разделов, открыта «Витрина»: наборы есть, товаров дня без базы 063 нет',
-    front.tabs === 'Витрина|Питомцы|Для питомца|Иконки|Рамки|Фоны|Титулы|Фразы|Градусники|Победа' && front.sel === 'Витрина' &&
-    front.bundles === 4 && front.heads === '🎁 Наборы' && !front.empty, JSON.stringify(front));
-  await page.click('#shopTabs .sh-tab:nth-child(4)');
+  check('одиннадцать разделов, открыта «Витрина»: шесть наборов, товаров дня без базы 063 нет',
+    front.tabs === 'Витрина|Питомцы|Облики|Для питомца|Иконки|Рамки|Фоны|Титулы|Фразы|Градусники|Победа' && front.sel === 'Витрина' &&
+    front.bundles === 6 && front.heads === '🎁 Наборы' && !front.empty, JSON.stringify(front));
+  await page.click('#shopTabs .sh-tab:nth-child(5)');
   await page.waitForTimeout(150);
   const shop = await page.evaluate(() => ({ shown: !document.getElementById('shopModal').classList.contains('hidden'),
     wallet: [...document.querySelectorAll('#shopWallet .sw-chip')].map(c => c.textContent).join('|'),
@@ -6764,7 +6764,7 @@ async function testShop(browser) {
     return { note: document.getElementById('shopNote').textContent, btn: document.getElementById('siBuy').textContent,
       off: document.getElementById('siBuy').disabled, login: !!document.querySelector('#shopNote .btn'), deals, bundles }; });
   check('без входа: витрина видна, купить — после входа', /после входа/.test(g.note) && g.btn === 'Войти' && !g.off && g.login, JSON.stringify(g));
-  check('без входа: товары дня — «после входа», наборы видны', /после входа/.test(g.deals) && g.bundles === 4, JSON.stringify(g));
+  check('без входа: товары дня — «после входа», наборы видны', /после входа/.test(g.deals) && g.bundles === 6, JSON.stringify(g));
   await guest.context().close();
   // Тексты на всех языках, рисунки, рамки, фоны
   const p2 = await newGame(browser, {});
@@ -6772,14 +6772,17 @@ async function testShop(browser) {
     const S = i18n[l].shop, P = i18n[l].pass;
     const names = { icon: S.icons, color: S.colors, frame: P.frames, title: P.titles, pet: i18n[l].pets.names, gear: S.gear,
       thermo: S.thermos, winfx: S.winfxs, phrase: i18n[l].say };
-    const miss = SHOP_ITEMS.filter(it => !names[it.kind][it.code]);
+    const miss = SHOP_ITEMS.filter(it => it.kind === 'skin' ? !i18n[l].pets.skins[it.code.slice(it.code.indexOf('_') + 1)] : !names[it.kind][it.code]);
     const keys = ['title', 'coinsName', 'gemsName', 'toastCoins', 'toastGems', 'worn', 'owned', 'guest', 'login', 'off', 'today', 'earnHead',
       'trophy', 'rare', 'phraseHint', 'wornBtn', 'wear', 'buyFor', 'notEnough', 'back', 'notEnoughShort', 'bought', 'where', 'more',
       'close', 'coinsHow', 'coinsHowNoQuests', 'gemsHow', 'earnQuest', 'deals', 'dealsLeft', 'hm', 'mins', 'dealsGuest', 'dealsNone',
       'bundles', 'bundlesSub', 'bundleHint', 'bundleOwned', 'bundle', 'buyBundle', 'unwear', 'preview', 'gearHint', 'gearNoPet',
-      'thermoHint', 'winfxHint'];
+      'gearFor', 'gearAll', 'skinHint', 'petFirst', 'forAll', 'petLockedShort', 'thermoHint', 'winfxHint'];
+    const Pp = i18n[l].pets, petKeys = ['star', 'skinsHead', 'skinPlain', 'skinShop', 'hero', 'level', 'lv', 'xp', 'xpHow', 'maxLevel', 'tricksHead',
+      'gearHead', 'gearShop', 'withYou', 'takeWith', 'cardNone', 'cardNoneSub', 'cardNext', 'vizPet', 'gearNone'];
     return l + ':' + (miss.length + keys.filter(k => !S[k]).length + SHOP_KINDS.filter(k => !S.tabs[k]).length +
-      SHOP_RARS.filter(r => !S.rarity[r]).length + ['pet', 'gear', 'thermo', 'winfx'].filter(k => !S.kindNames[k]).length +
+      petKeys.filter(k => !Pp[k]).length + PETS.filter(k => !Pp.names[k] || !Pp.who[k]).length + PET_TRICKS.filter(x => !Pp.tricks[x.code]).length +
+      SHOP_RARS.filter(r => !S.rarity[r]).length + ['pet', 'skin', 'gear', 'thermo', 'winfx'].filter(k => !S.kindNames[k]).length +
       PET_SLOTS.filter(k => !S.slots[k]).length + SHOP_BUNDLES.filter(b => !S.bundleNames[b.code]).length +
       (S.earn.length === 7 ? 0 : 1) + (i18n[l].navShop ? 0 : 1));
   }).join());
@@ -6801,16 +6804,17 @@ async function testShop(browser) {
   await p2.context().close();
 }
 
-// Магазин 2.0 и питомцы (миграция 063): товары дня, наборы, питомец в меню,
-// его экран и вещи, питомец в партии, облик градусника и эффект победы
+// Магазин 2.0 и питомцы (миграции 063 и 064): шесть героев Приключения, облики
+// и вещи по питомцам, товары дня, наборы, питомец в меню, его экран, питомец в
+// партии, облик градусника и эффект победы
 async function testPets(browser) {
-  console.log('\nПитомцы, товары дня, наборы, градусник и эффект победы');
+  console.log('\nПитомцы — герои Приключения, облики, товары дня, наборы, градусник и эффект победы');
   const page = await newGame(browser, { user: 'Максим' });
   await page.evaluate(async () => {
     window.__online = { day: '2026-11-04', played: false, chestOpened: false, chest: null, streak: 0, bestStreak: 0, freezeLeft: true,
       season: '2026-11', xp: 0, levelXp: 100, maxLevel: 30, seasonLeft: 86400 * 20, rewards: [], streakRewards: [],
       owned: [], frame: null, title: null };
-    window.__wallet = { coins: 1500, gems: 40, today: 0, cap: 300 };
+    window.__wallet = { coins: 3000, gems: 40, today: 0, cap: 300 };
     window.__look = { pet: null, gear: {}, xp: {}, thermo: null, winfx: null, dealsLeft: 5 * 3600 + 12 * 60 + 30,
       deals: [{ kind: 'icon', code: 'shop-05', pct: 40 }, { kind: 'gear', code: 'crown', pct: 25 }, { kind: 'title', code: 'lucky', pct: 15 }] };
     tutSave({ done: [1, 2, 3], skipped: true, veteran: true });
@@ -6828,10 +6832,20 @@ async function testPets(browser) {
   await page.waitForTimeout(400);
   const pets = await page.evaluate(() => ({ sel: document.querySelector('#shopTabs .sh-tab.sel').textContent,
     items: [...document.querySelectorAll('#shopGrid .sh-item')].map(b => b.dataset.code + ':' + b.className.match(/rar-(\w+)/)[1] + ':' +
-      b.querySelector('.sh-price').textContent).join('|'), art: document.querySelectorAll('#shopGrid .sh-item svg.pet').length }));
-  check('карточка ведёт в магазин к питомцам: Огнелис и волк — эпические за 450 🪙, дракон — легендарный за 30 💎',
-    pets.sel === 'Питомцы' && pets.items === 'fox:epic:450 🪙|wolf:epic:450 🪙|drake:legend:30 💎' && pets.art === 3, JSON.stringify(pets));
-  // Витрина: три товара дня со скидкой, до смены — часы и минуты; четыре набора
+      b.querySelector('.sh-price').textContent).join('|'), art: document.querySelectorAll('#shopGrid .sh-item svg.pet').length,
+    names: [...document.querySelectorAll('#shopGrid .sh-name')].map(x => x.textContent).join('|') }));
+  check('карточка ведёт в магазин к питомцам: шесть героев Приключения, эпические, за монеты',
+    pets.sel === 'Питомцы' && pets.items === 'badger:epic:450 🪙|owl:epic:500 🪙|toucan:epic:450 🪙|cham:epic:550 🪙|crab:epic:500 🪙|penguin:epic:550 🪙' &&
+    pets.art === 6 && pets.names === 'Барсук Очкарик|Филин Монокль|Тукан Панама|Хамелеон Очки|Краб Матрос|Пингвин Капитан', JSON.stringify(pets));
+  // Карточка питомца: герой какого мира и характер
+  await page.click('#shopGrid .sh-item[data-code="penguin"]');
+  await page.waitForTimeout(150);
+  const pcard = await page.evaluate(() => ({ note: document.getElementById('siNote').textContent, kind: document.getElementById('siKind').textContent,
+    btn: document.getElementById('siBuy').textContent }));
+  check('карточка питомца: «Герой мира „Морская глубина“», характер, «Купить за 550 🪙»', /Герой мира «Морская глубина»/.test(pcard.note) &&
+    /Капитан\. Холод ему в радость/.test(pcard.note) && pcard.kind === 'Питомец · Эпический' && pcard.btn === 'Купить за 550 🪙', JSON.stringify(pcard));
+  await page.evaluate(() => closeShopItem());
+  // Витрина: три товара дня со скидкой, до смены — часы и минуты; шесть наборов
   await page.click('#shopTabs .sh-tab:nth-child(1)');
   await page.waitForTimeout(150);
   const front = await page.evaluate(() => ({
@@ -6840,14 +6854,15 @@ async function testPets(browser) {
       b.querySelector('.sh-price').textContent).join('|'),
     bundles: [...document.querySelectorAll('#shopGrid .sh-bundle')].map(b => b.dataset.bundle + ':' + b.querySelector('.sb-price').textContent).join('|') }));
   check('товары дня: −40 %, −25 %, −15 %, старая цена зачёркнута, «новые через 5 ч 12 мин»',
-    front.deals === 'shop-05:−40%:160 🪙 96 🪙|crown:−25%:20 💎 15 💎|lucky:−15%:150 🪙 128 🪙' &&
+    front.deals === 'shop-05:−40%:160 🪙 96 🪙|crown:−25%:450 🪙 338 🪙|lucky:−15%:150 🪙 128 🪙' &&
     front.heads === '🔥 Товары дняновые через 5 ч 12 мин|🎁 Наборыдешевле, чем по отдельности', JSON.stringify(front));
-  check('наборы: цена за всё со скидкой 20 % (как в базе: 700, 660, 45 💎, 290)',
-    front.bundles === 'set_fox:870 🪙700 🪙|set_wolf:830 🪙660 🪙|set_drake:56 💎45 💎|set_style:360 🪙290 🪙', front.bundles);
+  check('наборы: питомец и две его вещи со скидкой 20 % (как в базе: 720, 720, 640, 760, 720, 840)',
+    front.bundles === 'set_badger:900 🪙720 🪙|set_owl:900 🪙720 🪙|set_toucan:800 🪙640 🪙|set_cham:950 🪙760 🪙|set_crab:900 🪙720 🪙|set_penguin:1050 🪙840 🪙',
+    front.bundles);
   // Без цены от базы магазин считает так же
   const fallback = await page.evaluate(() => { const saved = petLook.bundles; petLook.bundles = null;
     const r = SHOP_BUNDLES.map(b => shopBundlePrice(b)).join(); petLook.bundles = saved; return r; });
-  check('цена набора в игре считается так же, как в базе', fallback === '700,660,45,290', fallback);
+  check('цена набора в игре считается так же, как в базе', fallback === '720,720,640,760,720,840', fallback);
   // Товар дня — со скидкой
   await page.click('#shopGrid .sh-item[data-code="shop-05"]');
   await page.waitForTimeout(150);
@@ -6857,104 +6872,160 @@ async function testPets(browser) {
     dealCard.kind === 'Иконка · Редкий', JSON.stringify(dealCard));
   await page.click('#siBuy');
   await page.waitForTimeout(300);
-  check('купил со скидкой: списано 96 🪙', await page.evaluate(() => window.__wallet.coins) === 1404);
+  check('купил со скидкой: списано 96 🪙', await page.evaluate(() => window.__wallet.coins) === 2904);
   await page.evaluate(() => closeShopItem());
-  // Набор Огнелиса: питомец, градусник и рамка разом
-  await page.click('#shopGrid .sh-bundle[data-bundle="set_fox"]');
+  // Набор Барсука: питомец, шапочка учёного и очки-звёзды разом
+  await page.click('#shopGrid .sh-bundle[data-bundle="set_badger"]');
   await page.waitForTimeout(150);
   const bcard = await page.evaluate(() => ({ name: document.getElementById('siName').textContent, kind: document.getElementById('siKind').textContent,
     lines: [...document.querySelectorAll('#siNote .si-line')].map(x => x.textContent).join('|'), btn: document.getElementById('siBuy').textContent,
-    art: document.querySelectorAll('#siArt .sb-art').length, fox: document.querySelectorAll('#siArt svg.pet-fox').length }));
-  check('карточка набора: три вещи, скидка, «Купить набор за 700 🪙»', bcard.name === 'Набор Огнелиса' && bcard.kind === 'Набор · −20%' &&
-    bcard.lines === '• Огнелис 450 🪙|• Лавовый 200 🪙|• Угли 220 🪙' && bcard.btn === 'Купить набор за 700 🪙' && bcard.art === 3 && bcard.fox >= 1,
-    JSON.stringify(bcard));
+    art: document.querySelectorAll('#siArt .sb-art').length, badger: document.querySelectorAll('#siArt svg.pet-badger').length }));
+  check('карточка набора: три вещи на барсуке, скидка, «Купить набор за 720 🪙»', bcard.name === 'Набор Барсука' && bcard.kind === 'Набор · −20%' &&
+    bcard.lines === '• Барсук Очкарик 450 🪙|• Шапочка учёного 250 🪙|• Очки-звёзды 200 🪙' && bcard.btn === 'Купить набор за 720 🪙' && bcard.art === 3 &&
+    bcard.badger === 3, JSON.stringify(bcard));
   await page.click('#siBuy');
   await page.waitForTimeout(400);
-  const after = await page.evaluate(() => ({ coins: window.__wallet.coins, pet: myPet(), thermo: petLook.thermo,
+  const after = await page.evaluate(() => ({ coins: window.__wallet.coins, pet: myPet(),
     owned: window.__online.owned.map(o => o.kind + ':' + o.code).join(), price: document.getElementById('siPrice').textContent,
     btn: document.getElementById('siBuy').textContent, off: document.getElementById('siBuy').disabled,
-    wolf: (document.querySelector('#shopGrid .sh-bundle[data-bundle="set_wolf"] .sb-price') || {}).textContent }));
-  check('набор куплен: 700 🪙, Огнелис сразу с вами, лавовый градусник надет', after.coins === 704 && after.pet === 'fox' && after.thermo === 'lava' &&
-    /pet:fox,thermo:lava,frame:ember/.test(after.owned) && after.price === 'Всё уже есть' && after.off, JSON.stringify(after));
-  check('после покупки цены наборов — от базы заново', after.wolf === '830 🪙660 🪙', JSON.stringify(after));
+    owl: (document.querySelector('#shopGrid .sh-bundle[data-bundle="set_owl"] .sb-price') || {}).textContent }));
+  check('набор куплен: 720 🪙, Барсук сразу с вами, шапочка и очки свои', after.coins === 2184 && after.pet === 'badger' &&
+    /pet:badger,gear:mortar,gear:starglasses/.test(after.owned) && after.price === 'Всё уже есть' && after.off, JSON.stringify(after));
+  check('после покупки цены наборов — от базы заново', after.owl === '900 🪙720 🪙', JSON.stringify(after));
   await page.evaluate(() => closeShopItem());
-  // Вещь для питомца: на нём в витрине, купить и надеть
-  await page.evaluate(() => { shopKind = 'gear'; renderShop(); });
-  const gear = await page.evaluate(() => ({ n: document.querySelectorAll('#shopGrid .sh-item').length,
-    onFox: document.querySelectorAll('#shopGrid .sh-item svg.pet-fox').length,
-    crop: document.querySelector('#shopGrid .sh-item[data-code="shades"] svg').getAttribute('viewBox') }));
-  check('вещей для питомца 10, каждая — на своём питомце крупным планом', gear.n === 10 && gear.onFox === 10 && gear.crop === '40 30 160 160', JSON.stringify(gear));
-  await page.click('#shopGrid .sh-item[data-code="shades"]');
+  // Облики: по питомцам, чужого питомца — с замком; свой купить и надеть
+  await page.evaluate(() => { shopKind = 'skin'; renderShop(); });
+  const skins = await page.evaluate(() => ({ n: document.querySelectorAll('#shopGrid .sh-item').length,
+    heads: [...document.querySelectorAll('#shopGrid .sh-head')].map(h => h.textContent).join('|'),
+    locked: document.querySelectorAll('#shopGrid .sh-item.locked').length, lockedBadger: document.querySelectorAll('#shopGrid .sh-item.locked[data-code^="badger_"]').length,
+    onBadger: document.querySelectorAll('#shopGrid .sh-item[data-code^="badger_"] svg.pet-badger.skin-honey').length,
+    price: document.querySelector('#shopGrid .sh-item[data-code="owl_night"] .sh-price').textContent,
+    gems: [...document.querySelectorAll('#shopGrid .sh-item')].every(b => /💎/.test(b.querySelector('.sh-price').textContent)) }));
+  check('обликов 30 по шести питомцам, все за 💎; у чужих питомцев — с замком, свои — без', skins.n === 30 && skins.gems &&
+    skins.heads === 'Барсук Очкарик|Филин Мональсначала сам питомец'.replace('Мональ', 'Монокль') + '|Тукан Панамасначала сам питомец|Хамелеон Очкисначала сам питомец|Краб Матроссначала сам питомец|Пингвин Капитансначала сам питомец' &&
+    skins.locked === 25 && skins.lockedBadger === 0 && skins.onBadger === 1 && skins.price === '🔒 12 💎', JSON.stringify(skins));
+  await page.click('#shopGrid .sh-item[data-code="owl_night"]');
   await page.waitForTimeout(150);
-  const gc = await page.evaluate(() => document.getElementById('siNote').textContent + '|' + document.getElementById('siKind').textContent);
-  check('карточка вещи: куда надевается', gc === 'Надевается на питомца: Глаза.|Вещь для питомца · Редкий', gc);
+  const lockedCard = await page.evaluate(() => ({ note: document.getElementById('siNote').textContent, off: document.getElementById('siBuy').disabled,
+    kind: document.getElementById('siKind').textContent }));
+  check('облик чужого питомца: «Сначала заведите питомца: Филин Монокль», кнопка выключена', lockedCard.off &&
+    lockedCard.note === 'Сначала заведите питомца: Филин Монокль.' && lockedCard.kind === 'Облик питомца · Эпический', JSON.stringify(lockedCard));
+  await page.evaluate(() => closeShopItem());
+  await page.click('#shopGrid .sh-item[data-code="badger_honey"]');
+  await page.waitForTimeout(150);
+  const sk = await page.evaluate(() => ({ name: document.getElementById('siName').textContent, note: document.getElementById('siNote').textContent,
+    price: document.getElementById('siPrice').textContent, btn: document.getElementById('siBuy').textContent }));
+  check('карточка облика: «Медовый», для Барсука, 8 💎', sk.name === 'Медовый' && sk.note === 'Облик для питомца: Барсук Очкарик.' && sk.price === '8 💎' &&
+    sk.btn === 'Купить за 8 💎', JSON.stringify(sk));
   await page.click('#siBuy');
   await page.waitForTimeout(300);
+  await page.click('#siBuy');
+  await page.waitForTimeout(300);
+  const skOn = await page.evaluate(() => ({ gems: window.__wallet.gems, gear: JSON.stringify(petLook.gear), btn: document.getElementById('siBuy').textContent,
+    art: !!document.querySelector('#siArt svg.pet-badger.skin-honey'), card: !!document.querySelector('#petCard svg.pet-badger.skin-honey') }));
+  check('облик куплен за 8 💎 и надет — в карточке и на питомце в меню, кнопка «Снять»', skOn.gems === 32 && skOn.gear === '{"badger":{"skin":"honey"}}' &&
+    skOn.btn === 'Снять' && skOn.art && skOn.card, JSON.stringify(skOn));
+  await page.evaluate(() => closeShopItem());
+  // Вещи: общие и по питомцам; шапочка из набора — надеть
+  await page.evaluate(() => { shopKind = 'gear'; renderShop(); });
+  const gear = await page.evaluate(() => ({ n: document.querySelectorAll('#shopGrid .sh-item').length,
+    heads: [...document.querySelectorAll('#shopGrid .sh-head b')].map(h => h.textContent).join('|'),
+    all: [...document.querySelectorAll('#shopGrid .sh-item')].slice(0, 5).map(b => b.dataset.code).join(),
+    onBadger: document.querySelectorAll('#shopGrid .sh-item svg.pet-badger').length, onOwl: document.querySelectorAll('#shopGrid .sh-item svg.pet-owl').length,
+    crop: document.querySelector('#shopGrid .sh-item[data-code="mortar"] svg').getAttribute('viewBox'),
+    cropOwl: document.querySelector('#shopGrid .sh-item[data-code="tophat"] svg').getAttribute('viewBox'),
+    coins: [...document.querySelectorAll('#shopGrid .sh-item')].every(b => /🪙|Куплено/.test(b.querySelector('.sh-price').textContent)),
+    aura: document.querySelector('#shopGrid .sh-item[data-code="aura_star"] .sh-price').textContent }));
+  check('вещей и аур 29: сначала «Для всех питомцев» (корона и четыре ауры), потом у каждого свои; крупный план по росту',
+    gear.n === 29 && gear.heads === 'Для всех питомцев|Барсук Очкарик|Филин Монокль|Тукан Панама|Хамелеон Очки|Краб Матрос|Пингвин Капитан' &&
+    gear.all === 'crown,aura_fire,aura_ice,aura_storm,aura_star' && gear.onBadger === 9 && gear.onOwl === 4 && gear.crop === '35 4 170 170' &&
+    gear.cropOwl === '35 10 170 170' && gear.coins && gear.aura === '900 🪙', JSON.stringify(gear));
+  await page.click('#shopGrid .sh-item[data-code="mortar"]');
+  await page.waitForTimeout(150);
+  const gc = await page.evaluate(() => document.getElementById('siNote').textContent + '|' + document.getElementById('siKind').textContent + '|' +
+    document.getElementById('siBuy').textContent);
+  check('карточка вещи: куда надевается и чья', gc === 'Надевается на питомца: Голова. Для питомца: Барсук Очкарик.|Вещь для питомца · Редкий|Надеть', gc);
   await page.click('#siBuy');
   await page.waitForTimeout(300);
   const worn = await page.evaluate(() => ({ gear: JSON.stringify(petLook.gear), btn: document.getElementById('siBuy').textContent,
-    card: !!document.querySelector('#petCard .g-eyes') }));
-  check('очки куплены и надеты — и на питомце в меню, кнопка «Снять»', worn.gear === '{"eyes":"shades"}' && worn.btn === 'Снять' && worn.card,
+    card: !!document.querySelector('#petCard .g-head'), art: !!document.querySelector('#siArt .g-head') }));
+  check('шапочка надета — и на питомце в меню, кнопка «Снять»', worn.gear === '{"badger":{"skin":"honey","head":"mortar"}}' && worn.btn === 'Снять' && worn.card && worn.art,
     JSON.stringify(worn));
+  await page.evaluate(() => closeShopItem());
+  const crownCard = await page.evaluate(() => { openShopItem('gear', 'crown'); return document.getElementById('siNote').textContent; });
+  check('корона подходит всем питомцам', crownCard === 'Надевается на питомца: Голова. Подходит всем питомцам.', crownCard);
   await page.evaluate(() => { closeShopItem(); closeShop(); });
   // Карточка в меню: имя, уровень, что дальше
   const card = await page.evaluate(() => { const c = document.getElementById('petCard');
-    return { text: c.textContent, pet: !!c.querySelector('.pc-pet svg.pet-fox'), bar: c.querySelector('.pc-bar i').style.width }; });
-  check('в меню — Огнелис, уровень 1, «Ур. 3: Стихия»', card.pet && /Огнелис/.test(card.text) && /Уровень 1/.test(card.text) &&
+    return { text: c.textContent, pet: !!c.querySelector('.pc-pet svg.pet-badger'), bar: c.querySelector('.pc-bar i').style.width }; });
+  check('в меню — Барсук Очкарик, уровень 1, «Ур. 3: Стихия»', card.pet && /Барсук Очкарик/.test(card.text) && /Уровень 1/.test(card.text) &&
     /Ур\. 3: Стихия/.test(card.text) && card.bar === '0%', JSON.stringify(card));
-  // Нажатие на самого питомца — прыжок, на карточку — его экран
+  // Нажатие на самого питомца — сальто, на карточку — его экран
   await page.click('#petCard .pc-pet');
   await page.waitForTimeout(100);
-  const jump = await page.evaluate(() => ({ r: document.querySelector('#petCard svg.pet').classList.contains('r-jump'),
-    modal: !document.getElementById('petModal').classList.contains('hidden') }));
-  check('нажал на питомца — подпрыгнул, экран не открылся', jump.r && !jump.modal, JSON.stringify(jump));
+  const flip = await page.evaluate(() => ({ r: document.querySelector('#petCard svg.pet').classList.contains('r-flip'),
+    e: document.querySelector('#petCard svg.pet').classList.contains('e-happy'), modal: !document.getElementById('petModal').classList.contains('hidden') }));
+  check('нажал на питомца — сальто с радостью, экран не открылся', flip.r && flip.e && !flip.modal, JSON.stringify(flip));
   await page.click('#petCard .pc-text');
   await page.waitForTimeout(200);
   const pm = await page.evaluate(() => ({ name: document.getElementById('pmName').textContent, rar: document.getElementById('pmRar').textContent,
+    who: document.getElementById('pmWho').textContent,
     level: document.getElementById('pmLevel').textContent, xp: document.getElementById('pmXp').textContent,
-    tricks: [...document.querySelectorAll('#pmTricks .pm-trick')].map(b => (b.disabled ? '🔒' : '') + (b.dataset.trick || 'gold')).join(),
+    tricks: [...document.querySelectorAll('#pmTricks .pm-trick')].map(b => (b.disabled ? '🔒' : '') + b.dataset.trick).join(),
+    skins: [...document.querySelectorAll('#pmSkins .pm-trick')].map(b => (b.disabled ? '🔒' : '') + (b.getAttribute('aria-pressed') === 'true' ? '*' : '') + (b.dataset.skin || 'plain')).join(),
+    skinShop: !!document.querySelector('#pmSkins [data-shop="skin"]'),
     gear: [...document.querySelectorAll('#pmGear .pm-slot')].map(s => s.textContent).join('|'),
     on: [...document.querySelectorAll('#pmGear .pm-gear.on')].map(b => b.dataset.code).join(),
     pets: [...document.querySelectorAll('#pmPets .pm-pick')].map(b => b.textContent).join('|'),
     go: document.getElementById('pmGo').textContent, goOff: document.getElementById('pmGo').disabled }));
-  check('экран питомца: имя, редкость, уровень 1, 0 из 60 опыта', pm.name === 'Огнелис' && pm.rar === 'Эпический' && pm.level === 'Уровень 1' &&
-    /0 из 60 опыта/.test(pm.xp) && /до 200 в день/.test(pm.xp), JSON.stringify(pm));
-  check('трюки: на 1-м уровне — прыжок, остальное и золото — под замком', pm.tricks === 'jump,🔒element,🔒roar,🔒win,🔒gold', pm.tricks);
-  check('вещи по местам: очки на глазах, пустые места — прочерк', pm.gear === 'Голова—|ГлазаТёмные очки|Шея—|Спина—|Аура—' &&
-    pm.on === 'shades', JSON.stringify(pm));
-  check('питомцы: Огнелис с вами, волк и дракон — с ценой', pm.pets === 'ОгнелисС вами ✓|Ледяной волк450 🪙|Грозовой дракон30 💎' &&
+  check('экран питомца: имя, редкость, герой Волшебного леса, уровень 1, 0 из 60 опыта', pm.name === 'Барсук Очкарик' && pm.rar === 'Эпический' &&
+    /Герой мира «Волшебный лес»\. Умник/.test(pm.who) && pm.level === 'Уровень 1' && /0 из 60 опыта/.test(pm.xp) && /до 200 в день/.test(pm.xp), JSON.stringify(pm));
+  check('трюки: на 1-м уровне — сальто, остальное под замком', pm.tricks === 'flip,🔒element,🔒roar,🔒win', pm.tricks);
+  check('облики: обычный, медовый (надет), звёздный под замком до 10-го уровня, остальные — в магазине', pm.skins === 'plain,*honey,🔒star' && pm.skinShop,
+    JSON.stringify(pm));
+  check('вещи по местам: шапочка на голове, очки-звёзды есть; пустых мест нет', pm.gear === 'ГоловаШапочка учёного|ГлазаОчки-звёзды' && pm.on === 'mortar',
+    JSON.stringify(pm));
+  check('питомцы: Барсук с вами, остальные пять — с ценой',
+    pm.pets === 'Барсук ОчкарикС вами ✓|Филин Монокль500 🪙|Тукан Панама450 🪙|Хамелеон Очки550 🪙|Краб Матрос500 🪙|Пингвин Капитан550 🪙' &&
     pm.go === 'С вами ✓' && pm.goOff, JSON.stringify(pm));
-  // Трюк — питомец его показывает; очки снимаются нажатием
-  await page.click('#pmTricks [data-trick="jump"]');
-  const trick = await page.evaluate(() => document.querySelector('#pmStage svg.pet').classList.contains('r-jump'));
-  await page.click('#pmGear .pm-gear[data-code="shades"]');
+  // Трюк — питомец его показывает; шапочка снимается нажатием, очки надеваются
+  await page.click('#pmTricks [data-trick="flip"]');
+  const trick = await page.evaluate(() => document.querySelector('#pmStage svg.pet').classList.contains('r-flip'));
+  await page.click('#pmGear .pm-gear[data-code="mortar"]');
   await page.waitForTimeout(200);
-  const off = await page.evaluate(() => ({ gear: JSON.stringify(petLook.gear), stage: !!document.querySelector('#pmStage .g-eyes'),
-    sent: window.__look.gear.eyes || null }));
-  check('трюк «прыжок» показывается; очки сняты — и в базе', trick && off.gear === '{}' && !off.stage && off.sent === null, JSON.stringify(off));
+  await page.click('#pmGear .pm-gear[data-code="starglasses"]');
+  await page.waitForTimeout(200);
+  const off = await page.evaluate(() => ({ gear: JSON.stringify(petLook.gear), head: !!document.querySelector('#pmStage .g-head'), eyes: !!document.querySelector('#pmStage .g-eyes'),
+    noGlasses: document.querySelector('#pmStage svg.pet').classList.contains('sig-eyes-off'), sent: JSON.stringify(window.__look.gear.badger) }));
+  check('трюк «сальто» показывается; шапочка снята, очки-звёзды надеты вместо своих очков — и в базе', trick &&
+    off.gear === '{"badger":{"skin":"honey","eyes":"starglasses"}}' && !off.head && off.eyes && off.noGlasses && off.sent === JSON.stringify(JSON.parse(off.gear).badger), JSON.stringify(off));
   // Чужой питомец: «Купить за…» ведёт в магазин
-  await page.click('#pmPets [data-pet="wolf"]');
+  await page.click('#pmPets [data-pet="owl"]');
   await page.waitForTimeout(100);
-  const wolf = await page.evaluate(() => ({ name: document.getElementById('pmName').textContent, go: document.getElementById('pmGo').textContent,
-    level: document.getElementById('pmLevel').textContent, gear: document.getElementById('pmGear').textContent }));
-  check('волк не куплен: «Купить за 450 🪙», без уровня и вещей', wolf.name === 'Ледяной волк' && wolf.go === 'Купить за 450 🪙' && !wolf.level && !wolf.gear,
-    JSON.stringify(wolf));
-  // Опыт: уровень 10 — все трюки и золотой облик (включён сам)
-  await page.evaluate(async () => { window.__look.xp = { fox: 2700 }; petModalKind = 'fox'; await loadLook(); });
+  const owl = await page.evaluate(() => ({ name: document.getElementById('pmName').textContent, go: document.getElementById('pmGo').textContent,
+    level: document.getElementById('pmLevel').textContent, gear: document.getElementById('pmGear').textContent, skins: document.getElementById('pmSkins').textContent }));
+  check('филин не куплен: «Купить за 500 🪙», без уровня, обликов и вещей', owl.name === 'Филин Монокль' && owl.go === 'Купить за 500 🪙' && !owl.level && !owl.gear && !owl.skins,
+    JSON.stringify(owl));
+  // Опыт: уровень 10 — все трюки и звёздный облик
+  await page.evaluate(async () => { window.__look.xp = { badger: 2700 }; petModalKind = 'badger'; await loadLook(); });
   await page.waitForTimeout(100);
   const top = await page.evaluate(() => ({ level: document.getElementById('pmLevel').textContent, xp: document.getElementById('pmXp').textContent,
     tricks: [...document.querySelectorAll('#pmTricks .pm-trick')].filter(b => !b.disabled).length,
-    gold: document.querySelector('#pmStage svg.pet').classList.contains('gold'), card: !!document.querySelector('#petCard svg.pet.gold') }));
-  check('2700 опыта — уровень 10: все трюки, золотой облик и в меню', top.level === 'Уровень 10' && /Высший уровень/.test(top.xp) && top.tricks === 5 &&
-    top.gold && top.card, JSON.stringify(top));
-  await page.click('#pmTricks [data-gold]');
-  await page.waitForTimeout(100);
-  const plain = await page.evaluate(() => ({ stage: document.querySelector('#pmStage svg.pet').classList.contains('gold'),
-    mem: localStorage.getItem('hc_pet_gold_fox') }));
-  check('золотой облик выключается и это запоминается', !plain.stage && plain.mem === '0', JSON.stringify(plain));
-  await page.evaluate(() => { localStorage.removeItem('hc_pet_gold_fox'); window.__look.xp = { fox: 0 }; closePetModal(); });
+    star: !document.querySelector('#pmSkins [data-skin="star"]').disabled }));
+  check('2700 опыта — уровень 10: все трюки и звёздный облик открыты', top.level === 'Уровень 10' && /Высший уровень/.test(top.xp) && top.tricks === 4 && top.star,
+    JSON.stringify(top));
+  await page.click('#pmSkins [data-skin="star"]');
+  await page.waitForTimeout(200);
+  const star = await page.evaluate(() => ({ stage: document.querySelector('#pmStage svg.pet').classList.contains('skin-star'),
+    stars: document.querySelectorAll('#pmStage .pt-star').length, card: !!document.querySelector('#petCard svg.pet.skin-star'), skin: petLook.gear.badger.skin }));
+  check('звёздный облик надет: перекрашен, со звёздами, и в меню', star.stage && star.stars === 8 && star.card && star.skin === 'star', JSON.stringify(star));
+  await page.click('#pmSkins [data-skin=""]');
+  await page.waitForTimeout(200);
+  const plain = await page.evaluate(() => ({ stage: document.querySelector('#pmStage svg.pet').className.baseVal, skin: petLook.gear.badger.skin || null }));
+  check('«Обычный» снимает облик', !/skin-/.test(plain.stage) && plain.skin === null, JSON.stringify(plain));
+  await page.evaluate(() => { window.__look.xp = { badger: 0 }; closePetModal(); });
   await page.evaluate(async () => { await loadLook(); });
-  // Эффект победы — посмотреть в магазине, купить: надевается сам
+  // Эффект победы — посмотреть в магазине, купить: надевается сам; градусник — тоже
   await page.evaluate(async () => { window.__wallet.coins = 1000; await openShop('winfx'); openShopItem('winfx', 'fireworks'); });
   await page.waitForTimeout(300);
   await page.click('#siPreview');
@@ -6964,27 +7035,31 @@ async function testPets(browser) {
   await page.click('#siBuy');
   await page.waitForTimeout(300);
   check('первый эффект победы надевается сам', await page.evaluate(() => myWinFx()) === 'fireworks');
+  await page.evaluate(async () => { closeShopItem(); openShopItem('thermo', 'lava'); await shopBuy('thermo', 'lava'); });
+  check('первый градусник надевается сам', await page.evaluate(() => petLook.thermo) === 'lava');
   await page.evaluate(() => { closeShopItem(); closeShop(); });
   // Партия: питомец справа над полем ввода, градусник — лавовый
   await page.click('#tModeSolo');
   await page.click('#tStartMatch');
   await page.waitForTimeout(300);
   const inGame = await page.evaluate(() => { const b = document.getElementById('gamePet');
-    return { shown: !b.classList.contains('hidden'), fox: !!b.querySelector('svg.pet-fox'), skin: document.getElementById('thermoWrap').className,
-      bottom: parseInt(b.style.bottom, 10) }; });
-  check('в партии питомец рядом, градусник — лавовый', inGame.shown && inGame.fox && /\bsk-lava\b/.test(inGame.skin) && inGame.bottom > 12, JSON.stringify(inGame));
-  // «Горячо» — разгорается, «холодно» — никнет
+    return { shown: !b.classList.contains('hidden'), badger: !!b.querySelector('svg.pet-badger'), eyes: !!b.querySelector('svg.pet-badger .g-eyes'),
+      skin: document.getElementById('thermoWrap').className, bottom: parseInt(b.style.bottom, 10) }; });
+  check('в партии питомец рядом в своём наряде, градусник — лавовый', inGame.shown && inGame.badger && inGame.eyes && /\bsk-lava\b/.test(inGame.skin) && inGame.bottom > 12,
+    JSON.stringify(inGame));
+  // «Горячо» — радуется, «холодно» — мёрзнет
   const { sec, near, far } = await page.evaluate(() => ({ sec: secret, near: secret > RANGE_MIN ? secret - 1 : secret + 1,
     far: secret - RANGE_MIN > RANGE_MAX - secret ? RANGE_MIN : RANGE_MAX }));
   await page.fill('#guessInput', String(near));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(150);
-  const hot = await page.evaluate(() => document.querySelector('#gamePet svg.pet').classList.contains('r-hot'));
+  const hot = await page.evaluate(() => document.querySelector('#gamePet svg.pet').className.baseVal);
   await page.fill('#guessInput', String(far));
   await page.click('#tSubmitGuess');
   await page.waitForTimeout(150);
-  const cold = await page.evaluate(() => document.querySelector('#gamePet svg.pet').classList.contains('r-cold'));
-  check('на «горячо» питомец разгорается, на «холодно» никнет', hot && cold, JSON.stringify({ hot, cold }));
+  const cold = await page.evaluate(() => document.querySelector('#gamePet svg.pet').className.baseVal);
+  check('на «горячо» барсук радуется, на «холодно» мёрзнет', /\br-hot\b/.test(hot) && /\be-joy\b/.test(hot) && /\br-cold\b/.test(cold) && /\be-cold\b/.test(cold),
+    JSON.stringify({ hot, cold }));
   // Спрятать питомца из меню вида и вернуть
   const viz = await page.evaluate(() => { renderVizToggles(); const b = document.getElementById('togglePetBtn');
     const r = { shown: !b.classList.contains('hidden'), name: b.textContent, on: b.classList.contains('on') };
@@ -7002,14 +7077,14 @@ async function testPets(browser) {
   check('победа: питомец танцует, вместо салюта — свой «Салют»', win.r && win.fx === 1 && win.confetti === 0, JSON.stringify(win));
   // Опыт — за любую игру: база начисляет, игра перечитывает
   await page.waitForTimeout(300);
-  const xp = await page.evaluate(() => ({ xp: petXpOf('fox'), sent: (window.__localDone || []).join() }));
+  const xp = await page.evaluate(() => ({ xp: petXpOf('badger'), sent: (window.__localDone || []).join() }));
   check('за партию питомцу пришёл опыт', xp.xp === 10 && /solo/.test(xp.sent), JSON.stringify(xp));
   // В меню и в уроках питомца на поле нет
   await page.click('#screenGame >> text=В меню');
   await page.waitForTimeout(200);
   check('вне партии питомца на поле нет', await page.evaluate(() => document.getElementById('gamePet').classList.contains('hidden')));
   await page.context().close();
-  // Рисунки и тексты: у всех питомцев, вещей, градусников и эффектов
+  // Рисунки и тексты: у всех питомцев, обликов, вещей, градусников и эффектов
   const p2 = await newGame(browser, {});
   const art = await p2.evaluate(() => {
     // Облик меняет трубку и шарик градусника: с ним вид другой, чем без него
@@ -7021,24 +7096,33 @@ async function testPets(browser) {
     const base = look('');
     const skins = THERMO_SKINS.filter(s => look('sk-' + s) === base);
     test.remove();
-    return { pets: PETS.filter(k => !PET_ART[k] || !PET_ART[k + '_gold']).length,
+    const skinItems = shopCodes('skin');
+    return { pets: PETS.filter(k => !PET_ART[k] || !PET_SKIN_COLORS[k] || PET_SKINS[k].length !== 5 || !PET_SKIN_COLORS[k].star).length,
+      // Облик перекрашивает: рисунок с ним отличается от обычного, у каждого питомца по пять в магазине
+      skinArt: PETS.filter(k => PET_SKINS[k].some(sk => petSvg(k, { skin: sk }).replace(/id="[^"]+"|url\(#[^)]+\)/g, '') === petSvg(k).replace(/id="[^"]+"|url\(#[^)]+\)/g, ''))).length,
+      skinItems: PETS.filter(k => skinItems.filter(c => c.startsWith(k + '_')).length !== 5 || PET_SKINS[k].some(sk => !skinItems.includes(k + '_' + sk))).length,
       gear: shopCodes('gear').filter(c => !PET_GEAR[c]).length, slots: shopCodes('gear').filter(c => !PET_SLOTS.includes(PET_GEAR[c].slot)).length,
+      // У вещи общего пользования рисунок для всех шести, у вещи питомца — для него
+      fits: shopCodes('gear').filter(c => PET_GEAR[c].pet ? !PET_GEAR[c].art[PET_GEAR[c].pet] : PETS.some(k => !PET_GEAR[c].art[k])).length,
+      drawn: shopCodes('gear').filter(c => { const k = PET_GEAR[c].pet || 'owl'; return !petSvg(k, { gear: [c] }).includes('class="pt-gear g-' + PET_GEAR[c].slot + '"'); }).length,
       thermo: shopCodes('thermo').filter(c => !THERMO_SKINS.includes(c)).length, skins: skins.length,
       winfx: shopCodes('winfx').filter(c => !WINFX[c]).length,
       ids: PETS.every(k => { const a = petSvg(k), b = petSvg(k); return a.match(/id="([^"]+)"/)[1] !== b.match(/id="([^"]+)"/)[1]; }) };
   });
-  check('у каждого питомца есть рисунок и золотой облик, у вещей — место, у градусников и эффектов — вид',
-    !art.pets && !art.gear && !art.slots && !art.thermo && !art.skins && !art.winfx && art.ids, JSON.stringify(art));
+  check('у каждого питомца есть рисунок, пять обликов и звёздный, у вещей — место и рисунок на своём питомце, у градусников и эффектов — вид',
+    !art.pets && !art.skinArt && !art.skinItems && !art.gear && !art.slots && !art.fits && !art.drawn && !art.thermo && !art.skins && !art.winfx && art.ids, JSON.stringify(art));
   const tr = await p2.evaluate(() => {
     const ru = i18n.ru;
     const ph = s => (String(s).match(/\{\w+\}/g) || []).sort().join();
     return ['en', 'fr', 'de', 'ru'].map(l => {
       const P = i18n[l].pets, S = i18n[l].shop;
-      const keys = ['level', 'lv', 'xp', 'xpHow', 'maxLevel', 'tricksHead', 'gold', 'gearHead', 'gearShop', 'gearNone', 'withYou', 'takeWith',
-        'cardNone', 'cardNoneSub', 'cardNext', 'vizPet'];
+      const keys = ['level', 'lv', 'xp', 'xpHow', 'maxLevel', 'tricksHead', 'star', 'skinsHead', 'skinPlain', 'skinShop', 'hero', 'gearHead', 'gearShop',
+        'gearNone', 'withYou', 'takeWith', 'cardNone', 'cardNoneSub', 'cardNext', 'vizPet'];
       const bad = keys.filter(k => !P[k] || ph(P[k]) !== ph(ru.pets[k])).length +
         PETS.filter(k => !P.names[k] || !P.who[k]).length + PET_TRICKS.filter(x => !P.tricks[x.code]).length +
-        ['dealsLeft', 'hm', 'mins', 'bundleHint', 'buyBundle', 'gearHint'].filter(k => ph(S[k]) !== ph(ru.shop[k])).length;
+        PETS.filter(k => PET_SKINS[k].some(sk => !P.skins[sk])).length + shopCodes('gear').filter(c => !S.gear[c]).length +
+        PET_SLOTS.filter(k => !S.slots[k]).length +
+        ['dealsLeft', 'hm', 'mins', 'bundleHint', 'buyBundle', 'gearHint', 'gearFor', 'skinHint', 'petFirst'].filter(k => ph(S[k]) !== ph(ru.shop[k])).length;
       return l + ':' + bad;
     }).join();
   });

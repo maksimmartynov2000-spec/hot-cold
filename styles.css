@@ -2706,104 +2706,319 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
 .st-shop { margin-top: 4px; }
 .av-shop { grid-column: 1 / -1; margin-top: 6px; }
 
-/* ================= Питомцы ================= */
-/* Части рисунка крутятся вокруг своих точек (transform-origin задан в рисунке
-   в координатах 240×240) — для этого отсчёт от рамки рисунка, а не от части */
+/* ================= Питомцы: Барсук, Филин, Тукан, Хамелеон, Краб, Пингвин ================= */
+/* Части крутятся вокруг своих точек в координатах рисунка 240×240 */
 .pet { display: block; overflow: visible; }
-.pet g, .pet path, .pet ellipse { transform-box: view-box; }
-.pet .pt-mouth-open { display: none; }
+.pet g, .pet path, .pet ellipse, .pet circle, .pet rect { transform-box: view-box; }
+.pet .pt-m { display: none; }
+.pet .pt-m-smile { display: inline; }
+.pet .pt-eye-shut { visibility: hidden; }
+.pet .pt-cheer path { opacity: 0; transform-box: fill-box; transform-origin: 50% 50%; }
+.pet .pt-breath { opacity: 0; }
+.pet .pt-arc { opacity: 0; }
+.pet :is(.pt-dirt, .pt-hoot, .pt-wave, .pt-snap, .pt-tongue, .pt-glint) { opacity: 0; }
+.pet .pt-glint { transition: opacity 0.2s; }
 
-/* Покой: дышит, поводит головой, моргает, шевелит ушами и хвостом */
-.pet .pt-body { animation: ptBreath 3.2s ease-in-out infinite; }
-.pet .pt-head { animation: ptHead 5.2s ease-in-out infinite; }
-.pet .pt-eyes { animation: ptBlink 4.7s infinite; }
-.pet .pt-ear.l { animation: ptEarL 7.3s infinite; }
-.pet .pt-ear.r { animation: ptEarR 9.1s infinite; }
-.pet .pt-tail { animation: ptTail 3.8s ease-in-out infinite; }
-.pet .pt-glow { animation: ptGlow 2.8s ease-in-out infinite; }
-.pet .pt-fx { animation: ptTwinkle 2.3s ease-in-out infinite; }
-.pet .pt-flame { transform-origin: 96px 206px; animation: ptFlame 0.45s ease-in-out infinite alternate; }
-.pet .pt-wing.l { animation: ptWingL 2.6s ease-in-out infinite; }
-.pet .pt-wing.r { animation: ptWingR 2.6s ease-in-out infinite; }
-.pet .g-aura { animation: ptSpin 18s linear infinite; }
-@keyframes ptBreath { 50% { transform: scale(1.012, 1.03); } }
-@keyframes ptHead { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2.2deg) translateY(1px); } }
-@keyframes ptBlink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.08); } }
-@keyframes ptEarL { 0%, 86%, 100% { transform: rotate(0); } 89% { transform: rotate(-14deg); } 93% { transform: rotate(5deg); } }
-@keyframes ptEarR { 0%, 84%, 100% { transform: rotate(0); } 87% { transform: rotate(14deg); } 91% { transform: rotate(-5deg); } }
-@keyframes ptTail { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(5deg); } }
-@keyframes ptGlow { 50% { opacity: 0.6; } }
-@keyframes ptTwinkle { 50% { opacity: 0.3; } }
-@keyframes ptFlame { from { transform: scale(1, 1) skewX(0deg); } to { transform: scale(1.04, 1.09) skewX(-3deg); } }
-@keyframes ptWingL { 50% { transform: rotate(-9deg); } }
-@keyframes ptWingR { 50% { transform: rotate(9deg); } }
-@keyframes ptSpin { to { transform: rotate(360deg); } }
+/* Поза (эмоция) переводится плавно; покой крутится во вложенной группе и не рвётся */
+.pet :is(.pt-head-pose, .pt-ear-pose, .pt-tail-pose, .pt-wing-pose, .pt-lid, .pt-brow, .pt-pupil-size) {
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.pet :is(.pt-glow, .pt-fx, .pt-ice, .pt-arc) { transition: opacity 0.35s; }
 
-/* Прыжок: присел — взлетел — приземлился */
-.pet.r-jump .pt-all, .pet.r-win .pt-all { animation: ptJump 0.75s cubic-bezier(0.3, 0.6, 0.4, 1) 1; }
-.pet.r-win .pt-all { animation-iteration-count: 2; }
-@keyframes ptJump {
-  0% { transform: none; } 15% { transform: scale(1.08, 0.9); } 45% { transform: translateY(-28px) scale(0.95, 1.06); }
-  75% { transform: scale(1.06, 0.92); } 100% { transform: none; }
-}
-/* Победа и рык: пасть открыта, свечение ярче */
-.pet.r-win .pt-mouth, .pet.r-roar .pt-mouth { display: none; }
-.pet.r-win .pt-mouth-open, .pet.r-roar .pt-mouth-open { display: inline; }
-.pet.r-win .pt-glow, .pet.r-element .pt-glow { animation: ptBurst 0.7s ease-out 2; }
-@keyframes ptBurst { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 1; transform: scale(1.25); } 100% { opacity: 0.8; transform: scale(1); } }
-.pet.r-roar .pt-head { animation: ptRoar 1.2s ease-out 1; }
-@keyframes ptRoar { 0% { transform: none; } 15% { transform: rotate(-6deg) translateY(-4px) scale(1.06); }
-  25%, 45%, 65% { transform: rotate(-4deg) translateY(-4px) scale(1.06) translateX(-2px); }
-  35%, 55% { transform: rotate(-4deg) translateY(-4px) scale(1.06) translateX(2px); } 100% { transform: none; } }
+/* ---------- покой ---------- */
+.pet .pt-body { animation: p3Breath 3.4s ease-in-out infinite; }
+.pet .pt-head { animation: p3Head 6.1s ease-in-out infinite; }
+.pet .pt-ear.l { animation: p3EarL 7.3s ease-in-out infinite; }
+.pet .pt-ear.r { animation: p3EarR 9.1s ease-in-out infinite; }
+.pet .pt-tail { animation: p3Tail 3.8s ease-in-out infinite; }
+/* Кончик хвоста отстаёт от основания на треть секунды — хвост идёт волной */
+.pet .pt-tail-tip { animation: p3TailTip 3.8s ease-in-out -3.45s infinite; }
+.pet .pt-pupil { animation: p3Look 9s ease-in-out infinite; }
+.pet .pt-lid-blink { animation: p3Blink 10.4s linear infinite; }
+.pet .pt-eye.r .pt-lid-blink { animation-delay: 0.02s; }
+.pet .pt-glow { animation: p3Glow 2.8s ease-in-out infinite; }
+.pet .pt-fx { animation: p3Twinkle 2.3s ease-in-out infinite; }
+.pet .pt-shadow { animation: p3Shadow 3.4s ease-in-out infinite; }
+.pet .pt-flame-1 { animation: p3Flame 0.5s ease-in-out infinite alternate; }
+.pet .pt-flame-2 { animation: p3Flame 0.37s ease-in-out -0.2s infinite alternate; }
+.pet .pt-flame-3 { animation: p3Flame 0.61s ease-in-out -0.4s infinite alternate; }
+.pet .pt-ember { animation: p3Ember 2.6s ease-out infinite; }
+.pet .pt-wing { animation: p3Wing 2.8s ease-in-out infinite; }
+.pet .pt-wing.r { animation-direction: reverse; animation-delay: -1.4s; }
+.pet .pt-arc { animation: p3Arc 4.2s linear infinite; }
+.pet .pt-aura-spin { animation: p3Spin 18s linear infinite; }
+.pet .pt-ice path { transition: filter 0.3s; }
+@keyframes p3Breath { 50% { transform: scale(1.01, 1.028); } }
+@keyframes p3Shadow { 50% { transform: scale(1.025, 1); opacity: 0.26; } }
+@keyframes p3Head { 0%, 100% { transform: rotate(-1.8deg); } 50% { transform: rotate(2deg) translateY(1px); } }
+@keyframes p3EarL { 0%, 84%, 100% { transform: rotate(0); } 87% { transform: rotate(-12deg); } 90% { transform: rotate(5deg); } 93% { transform: rotate(-3deg); } }
+@keyframes p3EarR { 0%, 80%, 100% { transform: rotate(0); } 83% { transform: rotate(12deg); } 86% { transform: rotate(-5deg); } 89% { transform: rotate(3deg); } }
+@keyframes p3Tail { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(5deg); } }
+@keyframes p3TailTip { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(6deg); } }
+@keyframes p3Look { 0%, 28%, 46%, 68%, 84%, 100% { transform: none; } 32%, 42% { transform: translate(3px, 0.6px); } 72%, 80% { transform: translate(-2.6px, -0.4px); } }
+@keyframes p3Blink { 0%, 44%, 46.4%, 90%, 91.9%, 92.7%, 94.6%, 100% { transform: none; }
+  44.7%, 45.7% { transform: translateY(24px); } 90.7%, 91.4% { transform: translateY(24px); } 93.3%, 94% { transform: translateY(24px); } }
+@keyframes p3Glow { 50% { opacity: 0.62; } }
+@keyframes p3Twinkle { 50% { opacity: 0.3; } }
+@keyframes p3Flame { from { transform: scale(1, 1) skewX(0deg); } to { transform: scale(1.04, 1.09) skewX(-3deg); } }
+@keyframes p3Ember { 0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(-6px, -46px); opacity: 0; } }
+@keyframes p3Wing { 50% { transform: rotate(-7deg); } }
+@keyframes p3Arc { 0%, 88%, 100% { opacity: 0; } 90%, 92% { opacity: 1; } 91% { opacity: 0.3; } 94% { opacity: 0.8; } 96% { opacity: 0; } }
+@keyframes p3Breath8 { 0%, 75%, 100% { opacity: 0; transform: translate(0, 0) scale(0.6); } 80% { opacity: 0.9; } 92% { opacity: 0; transform: translate(-16px, -12px) scale(1.2); } }
+@keyframes p3Spin { to { transform: rotate(360deg); } }
+
+/* ---------- эмоции ---------- */
+/* радость: глаза-дужки, рот открыт, уши вперёд, хвост вверх */
+.pet.e-happy .pt-eye-open, .pet.e-howl .pt-eye-open { visibility: hidden; }
+.pet.e-happy .pt-eye-shut, .pet.e-howl .pt-eye-shut { visibility: visible; }
+.pet.e-happy .pt-m, .pet.e-joy .pt-m, .pet.e-pant .pt-m, .pet.e-sad .pt-m, .pet.e-wow .pt-m, .pet.e-fierce .pt-m, .pet.e-cold .pt-m, .pet.e-howl .pt-m { display: none; }
+.pet.e-happy .pt-m-happy, .pet.e-joy .pt-m-happy, .pet.e-pant .pt-m-happy { display: inline; }
+.pet.e-sad .pt-m-sad { display: inline; }
+.pet.e-wow .pt-m-o, .pet.e-howl .pt-m-o { display: inline; }
+.pet.e-fierce .pt-m-grin { display: inline; }
+.pet.e-cold .pt-m-chatter { display: inline; }
+.pet.e-happy .pt-brow.l, .pet.e-joy .pt-brow.l { transform: translateY(-3px) rotate(4deg); }
+.pet.e-happy .pt-brow.r, .pet.e-joy .pt-brow.r { transform: translateY(-3px) rotate(-4deg); }
+.pet.e-happy .pt-ear-pose.l, .pet.e-joy .pt-ear-pose.l, .pet.e-wow .pt-ear-pose.l { transform: rotate(6deg); }
+.pet.e-happy .pt-ear-pose.r, .pet.e-joy .pt-ear-pose.r, .pet.e-wow .pt-ear-pose.r { transform: rotate(-6deg); }
+/* восторг: глаза широко, зрачки крупнее */
+.pet.e-joy .pt-pupil-size { transform: scale(1.3); }
+.pet.e-joy .pt-lid { transform: translateY(-2px); }
+/* удивление: брови вверх, зрачки точками, рот колечком */
+.pet.e-wow .pt-brow.l { transform: translateY(-6px) rotate(-3deg); }
+.pet.e-wow .pt-brow.r { transform: translateY(-6px) rotate(3deg); }
+.pet.e-wow .pt-pupil-size { transform: scale(0.62); }
+.pet.e-wow .pt-head-pose { transform: translateY(-2px); }
+/* грусть: веки приспущены и внешний угол вниз, брови домиком, уши и хвост вниз */
+.pet.e-sad .pt-lid, .pet.e-cold .pt-lid { transform: translateY(6px); }
+.pet.e-sad .pt-eye.l .pt-lid { transform: translateY(6px) rotate(-9deg); }
+.pet.e-sad .pt-eye.r .pt-lid { transform: translateY(6px) rotate(9deg); }
+.pet.e-sad .pt-brow.l, .pet.e-cold .pt-brow.l, .pet.e-pant .pt-brow.l { transform: translateY(1px) rotate(-12deg); }
+.pet.e-sad .pt-brow.r, .pet.e-cold .pt-brow.r, .pet.e-pant .pt-brow.r { transform: translateY(1px) rotate(12deg); }
+.pet.e-sad .pt-ear-pose.l, .pet.e-cold .pt-ear-pose.l { transform: rotate(-22deg); }
+.pet.e-sad .pt-ear-pose.r, .pet.e-cold .pt-ear-pose.r { transform: rotate(22deg); }
+.pet.e-sad .pt-head-pose { transform: translateY(5px) rotate(4deg); }
+.pet.e-sad .pt-glow, .pet.e-sad .pt-fx, .pet.e-cold .pt-glow, .pet.e-sleepy .pt-glow { opacity: 0.3; }
+/* ярость: брови углом, веки прищурены, зрачки щёлочкой, оскал, уши назад */
+.pet.e-fierce .pt-brow.l { transform: translateY(2px) rotate(14deg); }
+.pet.e-fierce .pt-brow.r { transform: translateY(2px) rotate(-14deg); }
+.pet.e-fierce .pt-lid { transform: translateY(4px); }
+.pet.e-fierce .pt-pupil-size { transform: scale(0.7, 1); }
+.pet.e-fierce .pt-ear-pose.l { transform: rotate(-14deg); }
+.pet.e-fierce .pt-ear-pose.r { transform: rotate(14deg); }
+/* дремота: веки на две трети, голова клонится */
+.pet.e-sleepy .pt-lid { transform: translateY(11px); }
+.pet.e-sleepy .pt-brow.l { transform: translateY(-1px) rotate(-4deg); }
+.pet.e-sleepy .pt-brow.r { transform: translateY(-1px) rotate(4deg); }
+.pet.e-sleepy .pt-head-pose { transform: translateY(3px) rotate(3deg); }
+.pet.e-sleepy .pt-ear-pose.l { transform: rotate(-10deg); }
+.pet.e-sleepy .pt-ear-pose.r { transform: rotate(10deg); }
+.pet.e-sleepy .pt-pupil { animation: none; }
+/* жарко (волк): язык наружу, веки прикрыты, уши назад */
+.pet.e-pant .pt-lid { transform: translateY(5px); }
+.pet.e-pant .pt-ear-pose.l { transform: rotate(-12deg); }
+.pet.e-pant .pt-ear-pose.r { transform: rotate(12deg); }
+.pet.e-pant .pt-glow, .pet.e-pant .pt-ice { opacity: 0.35; }
+/* вой: голова вверх, глаза закрыты, рот колечком */
+.pet.e-howl .pt-head-pose { transform: translateY(-8px) rotate(-10deg); }
+.pet.e-howl .pt-brow.l { transform: translateY(-4px); }
+.pet.e-howl .pt-brow.r { transform: translateY(-4px); }
+/* хвост: у Огнелиса слева (поднять — по часовой), у волка и дракона справа */
+/* крылья дракона: ёжится — прижимает, радуется и злится — раскрывает */
+
+/* ---------- реакции (движение; эмоцию добавляет pet2React) ---------- */
+/* Сальто: присел — взлетел — перевернулся в воздухе — приземлился; тень сжимается, уши отстают */
+.pet.r-flip .pt-all { animation: p3FlipUp 1.15s cubic-bezier(0.3, 0.6, 0.35, 1) 1; }
+.pet.r-flip .pt-flip { animation: p3FlipSpin 1.15s cubic-bezier(0.45, 0.05, 0.3, 1) 1; }
+.pet.r-flip .pt-shadow { animation: p3ShadowFlip 1.15s ease-in-out 1; }
+.pet.r-flip .pt-ear-pose.l { animation: p3EarFlipL 1.15s ease-in-out 1; }
+.pet.r-flip .pt-ear-pose.r { animation: p3EarFlipR 1.15s ease-in-out 1; }
+@keyframes p3FlipUp { 0% { transform: none; } 12% { transform: scale(1.1, 0.84); } 22% { transform: translateY(-14px) scale(0.96, 1.06); }
+  50% { transform: translateY(-52px) scale(0.98, 1.02); } 76% { transform: translateY(-6px) scale(1, 1); } 82% { transform: translateY(0) scale(1.1, 0.88); } 92% { transform: scale(0.98, 1.03); } 100% { transform: none; } }
+@keyframes p3FlipSpin { 0%, 20% { transform: rotate(0); } 78%, 100% { transform: rotate(-360deg); } }
+@keyframes p3ShadowFlip { 50% { transform: scale(0.6, 0.7); opacity: 0.12; } }
+@keyframes p3EarFlipL { 0%, 100% { transform: none; } 18% { transform: rotate(-14deg); } 86% { transform: rotate(10deg); } }
+@keyframes p3EarFlipR { 0%, 100% { transform: none; } 18% { transform: rotate(14deg); } 86% { transform: rotate(-10deg); } }
+/* Победа: танец — покачивается и подпрыгивает в такт, хвост виляет, вокруг звёзды */
+.pet.r-win .pt-all { animation: p3Dance 2.2s ease-in-out 1; }
+.pet.r-win .pt-shadow { animation: p3ShadowDance 0.55s ease-in-out 4; }
+.pet.r-win .pt-tail { animation: p3Wag 0.32s ease-in-out 7; }
+.pet.r-win .pt-cheer path { animation: p3Star 1.1s ease-out 2; }
+.pet.r-win .pt-glow, .pet.r-element .pt-glow { animation: p3Burst 0.7s ease-out 2; }
+@keyframes p3Dance { 0%, 100% { transform: none; }
+  12% { transform: translateY(-16px) rotate(-7deg) scale(0.97, 1.05); } 25% { transform: translateY(0) rotate(-3deg) scale(1.06, 0.94); }
+  37% { transform: translateY(-16px) rotate(7deg) scale(0.97, 1.05); } 50% { transform: translateY(0) rotate(3deg) scale(1.06, 0.94); }
+  62% { transform: translateY(-16px) rotate(-7deg) scale(0.97, 1.05); } 75% { transform: translateY(0) rotate(-3deg) scale(1.06, 0.94); }
+  87% { transform: translateY(-16px) rotate(7deg) scale(0.97, 1.05); } }
+@keyframes p3ShadowDance { 50% { transform: scale(0.82, 0.9); opacity: 0.18; } }
+@keyframes p3Wag { 50% { transform: rotate(14deg); } }
+@keyframes p3Star { 0% { opacity: 0; transform: scale(0.2) rotate(0); } 25% { opacity: 1; transform: scale(1.15) rotate(20deg); } 100% { opacity: 0; transform: scale(0.6) rotate(60deg) translateY(-10px); } }
+@keyframes p3Burst { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 1; transform: scale(1.3); } 100% { opacity: 0.8; transform: scale(1); } }
+/* Проигрыш: оседает и чуть покачивается */
+.pet.r-lose .pt-all { animation: p3Slump 2.2s ease-in-out 1; }
+@keyframes p3Slump { 0%, 100% { transform: none; } 20%, 80% { transform: translateY(3px) scale(1.02, 0.96); } 40% { transform: translateY(3px) scale(1.02, 0.96) rotate(-1.5deg); } 60% { transform: translateY(3px) scale(1.02, 0.96) rotate(1.5deg); } }
+/* Рык: голова вперёд и трясётся */
+.pet.r-roar .pt-head-pose { animation: p3Roar 1.3s ease-out 1; }
+.pet.r-roar .pt-all { animation: p3Lean 1.3s ease-out 1; }
+@keyframes p3Roar { 0% { transform: none; } 15% { transform: rotate(-7deg) translateY(-6px) scale(1.08); }
+  25%, 45%, 65% { transform: rotate(-5deg) translateY(-6px) scale(1.08) translateX(-2px); } 35%, 55% { transform: rotate(-5deg) translateY(-6px) scale(1.08) translateX(2px); } 100% { transform: none; } }
+@keyframes p3Lean { 0%, 100% { transform: none; } 12% { transform: scale(1.04, 0.95); } 25%, 70% { transform: translateY(-3px) scale(0.98, 1.04); } }
 /* Стихия: всплеск у каждого свой */
-.pet.r-element .pt-fx { animation: ptStrobe 0.18s steps(2) 7; }
-@keyframes ptStrobe { 50% { opacity: 0.1; } }
-.pet-fox.r-element .pt-tail, .pet-fox.r-hot .pt-tail { animation: ptFlare 1.3s ease-out 1; }
-@keyframes ptFlare { 0% { transform: none; } 30% { transform: scale(1.2) rotate(-4deg); } 60% { transform: scale(1.12) rotate(3deg); } 100% { transform: none; } }
-.pet-wolf.r-element .pt-ice, .pet-wolf.r-cold .pt-ice { animation: ptIce 1.3s ease-out 1; }
-@keyframes ptIce { 30% { transform: scale(1.12); filter: drop-shadow(0 0 6px #9fe8ff); } }
-.pet-drake.r-element .pt-wing.l, .pet-drake.r-win .pt-wing.l { animation: ptFlapL 0.35s ease-in-out 4; }
-.pet-drake.r-element .pt-wing.r, .pet-drake.r-win .pt-wing.r { animation: ptFlapR 0.35s ease-in-out 4; }
-@keyframes ptFlapL { 50% { transform: rotate(-22deg) scale(1.05); } }
-@keyframes ptFlapR { 50% { transform: rotate(22deg) scale(1.05); } }
+.pet.r-element .pt-fx { animation: p3Strobe 0.18s steps(2) 7; }
+@keyframes p3Strobe { 50% { opacity: 0.1; } }
+@keyframes p3Flare { 0% { transform: none; } 30% { transform: scale(1.22) rotate(-4deg); } 60% { transform: scale(1.12) rotate(3deg); } 100% { transform: none; } }
+@keyframes p3FlareTip { 0% { transform: none; } 35% { transform: scale(1.18, 1.3) rotate(-6deg); } 100% { transform: none; } }
+@keyframes p3Ice { 30% { transform: scale(1.18); filter: drop-shadow(0 0 7px #9fe8ff); } }
+@keyframes p3Flap { 50% { transform: rotate(-24deg) scale(1.05); } }
+@keyframes p3ArcFast { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+/* «Горячо»: Огнелису в радость (подскоки), волку жарко (трясёт головой), дракон искрит */
+@keyframes p3Hop { 0%, 100% { transform: none; } 20% { transform: scale(1.05, 0.93); } 60% { transform: translateY(-12px) scale(0.98, 1.04); } }
+@keyframes p3No { 25% { transform: rotate(-7deg); } 75% { transform: rotate(7deg); } }
+/* «Холодно»: Огнелис и дракон дрожат, Огнелис меньше горит, волк воет на мороз */
+@keyframes p3Shiver { 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
+@keyframes p3Shrink { 20%, 80% { transform: scale(0.8, 0.7); } }
+@keyframes p3Howl { 0%, 20% { opacity: 0; transform: scale(0.5); } 35% { opacity: 0.95; transform: scale(1); } 100% { opacity: 0; transform: translate(-22px, -26px) scale(1.5); } }
 
-/* «Горячо»: Огнелису в радость (подскоки, хвост вспыхивает), волку жарко (трясёт
-   головой, иней тускнеет), дракон искрит */
-.pet-fox.r-hot .pt-all { animation: ptHop 0.5s ease-in-out 3; }
-@keyframes ptHop { 50% { transform: translateY(-10px); } }
-.pet-wolf.r-hot .pt-head { animation: ptNo 0.5s ease-in-out 3; }
-@keyframes ptNo { 25% { transform: rotate(-7deg); } 75% { transform: rotate(7deg); } }
-.pet-wolf.r-hot .pt-glow, .pet-wolf.r-hot .pt-ice { opacity: 0.35; transition: opacity 0.3s; }
-.pet-drake.r-hot .pt-fx { animation: ptStrobe 0.16s steps(2) 8; }
-.pet-drake.r-hot .pt-all { animation: ptHop 0.5s ease-in-out 2; }
-
-/* «Холодно»: Огнелис дрожит и пламя никнет, волку в радость (воет), дракон ёжится */
-.pet-fox.r-cold .pt-all, .pet-drake.r-cold .pt-all { animation: ptShiver 0.09s linear 16; }
-@keyframes ptShiver { 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
-.pet-fox.r-cold .pt-flame { animation: ptShrink 1.5s ease-in-out 1; }
-@keyframes ptShrink { 20%, 80% { transform: scale(0.82, 0.72); } }
-.pet-fox.r-cold .pt-ear.l, .pet-drake.r-cold .pt-ear.l { animation: none; transform: rotate(-18deg); transition: transform 0.2s; }
-.pet-fox.r-cold .pt-ear.r, .pet-drake.r-cold .pt-ear.r { animation: none; transform: rotate(18deg); transition: transform 0.2s; }
-.pet-wolf.r-cold .pt-head { animation: ptHowl 1.6s ease-in-out 1; }
-.pet-wolf.r-cold .pt-mouth { display: none; }
-.pet-wolf.r-cold .pt-mouth-open { display: inline; }
-@keyframes ptHowl { 0% { transform: none; } 25%, 75% { transform: rotate(-10deg) translateY(-6px); } 100% { transform: none; } }
-
-/* Проигрыш: голова вниз, уши в стороны, свечение тускнеет */
-.pet.r-lose .pt-head { animation: none; transform: rotate(5deg) translateY(6px); transition: transform 0.35s; }
-.pet.r-lose .pt-ear.l { animation: none; transform: rotate(-24deg); transition: transform 0.35s; }
-.pet.r-lose .pt-ear.r { animation: none; transform: rotate(24deg); transition: transform 0.35s; }
-.pet.r-lose .pt-eyes { animation: none; transform: scaleY(0.55); }
-.pet.r-lose .pt-glow, .pet.r-lose .pt-fx { opacity: 0.25; transition: opacity 0.35s; }
-.pet.r-lose .pt-tail { animation: none; transform: rotate(-10deg); transition: transform 0.35s; }
-
-/* Золотой облик (10-й уровень): своя золотая раскраска, переливается */
-.pet.gold { animation: ptGold 2.6s ease-in-out infinite; }
-@keyframes ptGold { 0%, 100% { filter: brightness(1) drop-shadow(0 0 0 rgba(255, 214, 90, 0)); }
-  50% { filter: brightness(1.14) drop-shadow(0 0 8px rgba(255, 214, 90, 0.55)); } }
+/* Облики: «Звёздный» (10-й уровень) мерцает звёздами и чуть светится */
+.pet.skin-star { animation: p3StarGlow 3s ease-in-out infinite; }
+@keyframes p3StarGlow { 0%, 100% { filter: drop-shadow(0 0 0 rgba(140, 170, 255, 0)); } 50% { filter: drop-shadow(0 0 7px rgba(140, 170, 255, 0.6)); } }
+.pet .pt-star { animation: p3Star3 2.6s ease-in-out infinite; }
+@keyframes p3Star3 { 0%, 100% { opacity: 0.25; transform: scale(0.6); } 50% { opacity: 1; transform: scale(1.15); } }
+/* Аура звёзд: звёздочки мерцают по кругу */
+.pet .pt-aura-star { animation: p3Star3 2.2s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .pet *, .pet.gold { animation: none !important; }
+  .pet *, .pet.skin-star { animation: none !important; transition: none !important; }
+}
+
+/* Дремота: над головой уплывают «z» */
+.pet .pt-zzz { opacity: 0; transition: opacity 0.3s; }
+.pet.e-sleepy .pt-zzz { opacity: 1; }
+.pet .pt-zzz > g { transform-box: fill-box; transform-origin: 50% 50%; animation: p3Zzz 2.4s ease-in-out infinite; }
+@keyframes p3Zzz { 0% { opacity: 0; transform: translate(0, 6px) scale(0.6); } 30%, 70% { opacity: 1; transform: translate(2px, 0) scale(1); } 100% { opacity: 0; transform: translate(6px, -10px) scale(1.1); } }
+
+/* Свои ауры: огни плавают, снежинки дрожат, сияние колышется, молнии мигают */
+.pet .pt-aura-wisp { animation: p3Wisp 1.4s ease-in-out infinite alternate; }
+@keyframes p3Wisp { from { transform: translateY(0) scale(1); } to { transform: translateY(-6px) scale(1.12, 1.2); } }
+.pet .pt-aura-flake { animation: p3Flake 3s ease-in-out infinite; }
+@keyframes p3Flake { 0%, 100% { transform: rotate(0) translateY(0); opacity: 1; } 50% { transform: rotate(60deg) translateY(4px); opacity: 0.6; } }
+.pet .pt-aura-ribbon { animation: p3Ribbon 4s ease-in-out infinite alternate; }
+@keyframes p3Ribbon { from { transform: translateX(-6px) scaleY(1); opacity: 0.3; } to { transform: translateX(6px) scaleY(1.12); opacity: 0.5; } }
+.pet .pt-aura-bolt { animation: p3Bolt 1.7s steps(1) infinite; }
+@keyframes p3Bolt { 0%, 70%, 100% { opacity: 0; } 72%, 76% { opacity: 1; } 74% { opacity: 0.3; } }
+
+/* ---------- особенности каждого ---------- */
+/* Покой: у всех блик на очках/монокле пробегает раз в 7 с; у краба клешни пощёлкивают, стебельки качаются;
+   у хамелеона бабочки порхают; у пингвина переваливание; у филина голова крутится сильнее */
+.pet .pt-glint { animation: p3Glint 7s linear infinite; }
+@keyframes p3Glint { 0%, 86%, 100% { opacity: 0; } 90% { opacity: 1; } 94% { opacity: 0; } }
+.pet.pet-owl .pt-head { animation: p3OwlHead 7.5s ease-in-out infinite; }
+@keyframes p3OwlHead { 0%, 100% { transform: rotate(-3deg); } 30% { transform: rotate(4deg); } 55% { transform: rotate(-1deg) translateY(1px); } 70% { transform: rotate(5deg); } }
+.pet.pet-owl .pt-lid-blink { animation-duration: 12s; }
+.pet.pet-crab .pt-claw { animation: p3Claw 6.3s ease-in-out infinite; }
+.pet.pet-crab .pt-claw.r { animation-delay: -3.1s; }
+@keyframes p3Claw { 0%, 80%, 100% { transform: rotate(0); } 84% { transform: rotate(-9deg); } 88% { transform: rotate(5deg); } 92% { transform: rotate(-3deg); } }
+.pet.pet-crab .pt-stalk { animation: p3Stalk 3.6s ease-in-out infinite; }
+.pet.pet-crab .pt-stalk.r { animation-delay: -1.8s; }
+@keyframes p3Stalk { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(5deg); } }
+.pet.pet-crab .pt-bubble { animation: p3Bubble 3.2s ease-out infinite; }
+@keyframes p3Bubble { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-40px); opacity: 0; } }
+.pet.pet-cham .pt-butter { animation: p3Butter 1.1s ease-in-out infinite alternate; }
+@keyframes p3Butter { from { transform: scaleX(1) translateY(0); } to { transform: scaleX(0.4) translateY(-4px); } }
+.pet.pet-cham .pt-color { transition: filter 0.6s ease; }
+.pet.pet-penguin .pt-all { animation: p3Waddle 4.4s ease-in-out infinite; }
+@keyframes p3Waddle { 0%, 100% { transform: rotate(-1.4deg); } 50% { transform: rotate(1.4deg); } }
+.pet.pet-penguin .pt-flake { animation: p3Flake 4s ease-in-out infinite; }
+@keyframes p3Flake { 0%, 100% { transform: rotate(0) translateY(0); opacity: 0.9; } 50% { transform: rotate(60deg) translateY(5px); opacity: 0.5; } }
+.pet.pet-toucan .pt-hat, .pet.pet-penguin .pt-cap, .pet.pet-crab .pt-cap { transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.pet.pet-toucan.e-happy .pt-hat, .pet.pet-toucan.e-joy .pt-hat { transform: translateY(-3px) rotate(-5deg); }
+/* Хамелеон меняет цвет: восторг — красный, холод — синий, грусть — серый, победа — радуга */
+.pet.pet-cham.e-joy .pt-color { filter: hue-rotate(-95deg) saturate(1.3); }
+.pet.pet-cham.e-cold .pt-color { filter: hue-rotate(95deg); }
+.pet.pet-cham.e-sad .pt-color, .pet.pet-cham.e-sleepy .pt-color { filter: saturate(0.25) brightness(0.9); }
+.pet.pet-cham.e-fierce .pt-color { filter: hue-rotate(-60deg) saturate(1.4) contrast(1.1); }
+.pet.pet-cham.r-win .pt-color { animation: p3Rainbow 2.2s linear 1; }
+@keyframes p3Rainbow { to { filter: hue-rotate(360deg); } }
+/* Стихии и рык */
+.pet.pet-badger.r-element .pt-all { animation: p3Dig 1.4s ease-in-out 1; }
+@keyframes p3Dig { 0%, 100% { transform: none; } 15%, 45%, 75% { transform: translateY(4px) scale(1.04, 0.94); } 30%, 60%, 90% { transform: translateY(-3px) scale(0.98, 1.03); } }
+.pet.pet-badger.r-element .pt-dirt { opacity: 1; }
+.pet.pet-badger.r-element .pt-clod { animation: p3Clod 0.7s ease-out 2; }
+@keyframes p3Clod { 0% { transform: translate(0, 0); opacity: 1; } 100% { transform: translate(var(--dx, -10px), -46px); opacity: 0; } }
+.pet.pet-badger.r-element .pt-glint, .pet.pet-badger.r-hot .pt-glint, .pet.pet-owl.r-element .pt-glint, .pet.pet-cham.r-hot .pt-glint { animation: p3GlintFast 0.5s linear 3; }
+@keyframes p3GlintFast { 50% { opacity: 1; } }
+.pet.pet-badger.e-cold .pt-lens { opacity: 0.75; }
+.pet .pt-lens { transition: opacity 0.3s; }
+.pet.pet-owl.r-roar .pt-hoot, .pet.pet-owl.r-element .pt-hoot, .pet.pet-toucan.r-roar .pt-hoot, .pet.pet-toucan.r-element .pt-hoot, .pet.pet-penguin.r-roar .pt-hoot { opacity: 1; }
+.pet .pt-ring { transform-box: fill-box; transform-origin: 50% 50%; opacity: 0; }
+.pet.r-roar .pt-ring, .pet.r-element .pt-ring { animation: p3Ring 0.9s ease-out 2; }
+@keyframes p3Ring { 0% { transform: scale(0.4); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }
+.pet.pet-owl.r-element .pt-wing, .pet.pet-owl.r-hot .pt-wing, .pet.pet-toucan.r-element .pt-wing, .pet.pet-penguin.r-element .pt-wing, .pet.pet-penguin.r-cold .pt-wing, .pet.pet-toucan.r-win .pt-wing, .pet.pet-owl.r-win .pt-wing, .pet.pet-penguin.r-win .pt-wing { animation: p3Flap 0.32s ease-in-out 5; }
+.pet .pt-wing.r { animation-direction: reverse; }
+@keyframes p3Flap { 50% { transform: rotate(-26deg) scale(1.04); } }
+.pet.pet-penguin.r-hot .pt-wing-pose.r { animation: p3Fan 0.5s ease-in-out 3; }
+@keyframes p3Fan { 50% { transform: rotate(40deg) translateX(-6px); } }
+.pet.pet-cham.r-element .pt-color { animation: p3Camo 1.4s ease-in-out 1; }
+@keyframes p3Camo { 0%, 100% { opacity: 1; } 35%, 65% { opacity: 0.18; } }
+.pet.pet-cham.r-roar .pt-tongue { opacity: 1; animation: p3Tongue 1.3s cubic-bezier(0.2, 0.9, 0.3, 1) 1; }
+@keyframes p3Tongue { 0% { transform: scaleY(0); } 25%, 55% { transform: scaleY(1); } 100% { transform: scaleY(0); } }
+.pet.pet-crab.r-roar .pt-claw-pose, .pet.pet-crab.r-element .pt-claw-pose { animation: p3Snap 0.3s ease-in-out 4; }
+.pet.pet-crab .pt-claw-pose.r { animation-direction: reverse; }
+@keyframes p3Snap { 50% { transform: rotate(-22deg); } }
+.pet.pet-crab.r-roar .pt-snap { animation: p3Strobe 0.16s steps(2) 8; opacity: 1; }
+.pet.pet-crab.r-element .pt-wave { animation: p3Wave 1.4s ease-in-out 1; }
+@keyframes p3Wave { 0% { opacity: 0; transform: translateY(20px); } 25%, 75% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(14px); } }
+.pet.pet-crab.r-element .pt-bubble, .pet.pet-crab.r-hot .pt-bubble { animation-duration: 1s; }
+.pet.pet-crab.r-win .pt-claw-pose.l { animation: p3ClawDanceL 0.55s ease-in-out 4; }
+.pet.pet-crab.r-win .pt-claw-pose.r { animation: p3ClawDanceR 0.55s ease-in-out 4; animation-direction: normal; }
+@keyframes p3ClawDanceL { 50% { transform: rotate(-35deg) translateY(-6px); } }
+@keyframes p3ClawDanceR { 50% { transform: rotate(35deg) translateY(-6px); } }
+.pet.pet-crab.e-joy .pt-claw-pose.l, .pet.pet-crab.e-happy .pt-claw-pose.l { transform: rotate(-28deg); }
+.pet.pet-crab.e-joy .pt-claw-pose.r, .pet.pet-crab.e-happy .pt-claw-pose.r { transform: rotate(28deg); }
+.pet.pet-crab.e-cold .pt-claw-pose.l, .pet.pet-crab.e-sad .pt-claw-pose.l { transform: rotate(14deg) scale(0.92); }
+.pet.pet-crab.e-cold .pt-claw-pose.r, .pet.pet-crab.e-sad .pt-claw-pose.r { transform: rotate(-14deg) scale(0.92); }
+.pet.pet-crab.e-sad .pt-stalk-pose.l { transform: rotate(-16deg); }
+.pet.pet-crab.e-sad .pt-stalk-pose.r { transform: rotate(16deg); }
+.pet .pt-stalk-pose, .pet .pt-claw-pose { transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* Крылья: радость и злость — в стороны, холод — прижаты (у пингвина холод — радость) */
+.pet.e-cold .pt-wing-pose.l, .pet.e-sad .pt-wing-pose.l { transform: rotate(10deg) scale(0.94); }
+.pet.e-cold .pt-wing-pose.r, .pet.e-sad .pt-wing-pose.r { transform: rotate(-10deg) scale(0.94); }
+.pet.e-joy .pt-wing-pose.l, .pet.e-fierce .pt-wing-pose.l, .pet.pet-penguin.e-happy .pt-wing-pose.l { transform: rotate(-22deg); }
+.pet.e-joy .pt-wing-pose.r, .pet.e-fierce .pt-wing-pose.r, .pet.pet-penguin.e-happy .pt-wing-pose.r { transform: rotate(22deg); }
+/* «Горячо» и «холодно»: кто как */
+.pet.pet-badger.r-hot .pt-all, .pet.pet-toucan.r-hot .pt-all, .pet.pet-cham.r-hot .pt-all, .pet.pet-crab.r-hot .pt-all { animation: p3Hop 0.46s ease-in-out 3; }
+.pet.pet-badger.r-hot .pt-shadow, .pet.pet-toucan.r-hot .pt-shadow, .pet.pet-cham.r-hot .pt-shadow, .pet.pet-crab.r-hot .pt-shadow { animation: p3ShadowDance 0.46s ease-in-out 3; }
+.pet.pet-penguin.r-cold .pt-all { animation: p3Hop 0.46s ease-in-out 3; }
+.pet.pet-penguin.r-cold .pt-shadow { animation: p3ShadowDance 0.46s ease-in-out 3; }
+.pet.pet-penguin.r-cold .pt-flake { animation-duration: 0.9s; }
+.pet.pet-owl.r-hot .pt-head-pose { animation: p3No 0.5s ease-in-out 3; }
+.pet.pet-badger.r-cold .pt-all, .pet.pet-toucan.r-cold .pt-all, .pet.pet-cham.r-cold .pt-all, .pet.pet-crab.r-cold .pt-all { animation: p3Shiver 0.085s linear 18; }
+.pet.pet-owl.r-cold .pt-body { animation: p3Fluff 1.6s ease-in-out 1; }
+@keyframes p3Fluff { 25%, 75% { transform: scale(1.1, 0.96); } }
+.pet.pet-owl.r-cold .pt-all { animation: p3Shiver 0.085s linear 18; }
+.pet.pet-penguin.r-hot .pt-all { animation: p3Slump 1.5s ease-in-out 1; }
+/* Покой у тех, у кого нет ушей, хвоста и т. п. — просто нечему двигаться */
+
+/* Вещь на глаза заменяет свои очки */
+.pet.sig-eyes-off .pt-sig.pt-glasses { display: none; }
+/* Свои ауры: огни/фрукты/перья плавают, бабочки машут, светлячки мигают, снег падает, пузыри всплывают, сияние колышется */
+.pet .pt-aura-wisp { animation: p3Wisp 1.4s ease-in-out infinite alternate; }
+@keyframes p3Wisp { from { transform: translateY(0) scale(1); } to { transform: translateY(-6px) scale(1.08); } }
+.pet .pt-aura-butter { animation: p3Butter2 0.9s ease-in-out infinite alternate; }
+@keyframes p3Butter2 { from { transform: scaleX(1); } to { transform: scaleX(0.45) translateY(-3px); } }
+.pet .pt-firefly { animation: p3Firefly 2.8s ease-in-out infinite; }
+@keyframes p3Firefly { 0%, 100% { opacity: 0.45; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-5px); } }
+.pet .pt-aura-snow { animation: p3Snow 3.4s linear infinite; }
+@keyframes p3Snow { 0% { transform: translateY(-14px) rotate(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(26px) rotate(90deg); opacity: 0; } }
+.pet .pt-aura-bubble { animation: p3Bubble2 3.6s ease-out infinite; }
+@keyframes p3Bubble2 { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-36px); opacity: 0; } }
+.pet .pt-aura-ribbon { animation: p3Ribbon 3s ease-in-out infinite alternate; }
+@keyframes p3Ribbon { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
+.pet .pt-aura-star { animation: p3Star3 2.6s ease-in-out infinite; }
+@keyframes p3Star3 { 0%, 100% { opacity: 0.25; transform: scale(0.6); } 50% { opacity: 1; transform: scale(1.15); } }
+.pet .pt-aura-spin { animation: p3Spin 18s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pet * { animation: none !important; transition: none !important; }
 }
 
 /* ---- Питомец в меню ---- */
@@ -2846,6 +3061,7 @@ body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forward
 .pm-trick.locked { opacity: 0.55; cursor: default; }
 .pm-trick small { font-size: 11px; color: var(--muted); }
 .pm-trick[aria-pressed="true"], .pm-gear.on { background: #5b50f0; color: #fff; box-shadow: 0 3px 0 #3730a3; }
+.pm-trick.star[aria-pressed="true"] { background: linear-gradient(135deg, #5b50f0, #a855f7); }
 .pm-gear.none { color: var(--muted); }
 .pm-slot { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .pm-slot-name { min-width: 64px; text-align: left; font-size: 12.5px; font-weight: 800; color: var(--muted); }
@@ -2875,6 +3091,8 @@ body.kb-open .game-pet { display: none; }
 .sh-item.own { box-shadow: inset 0 0 0 2px #34d399; }
 .sh-item.worn { box-shadow: inset 0 0 0 2px var(--gold); }
 .sh-item.deal { box-shadow: inset 0 0 0 2px #ff5d73; }
+.sh-item.locked .sh-art { filter: grayscale(0.6) brightness(0.8); }
+.sh-item.locked .sh-price { color: var(--muted); }
 .sh-off { position: absolute; top: 5px; left: 5px; z-index: 1; padding: 2px 6px; border-radius: 8px; background: #ff3b5c; color: #fff;
   font-size: 11px; font-weight: 900; }
 .sh-price s, .si-price s, .sb-price s { color: var(--muted); font-weight: 700; font-size: 0.85em; margin-right: 2px; }
