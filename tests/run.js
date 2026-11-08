@@ -5907,9 +5907,12 @@ async function testAdventure(browser) {
     map.paths === nWorlds && map.tiles === nWorlds * 10, JSON.stringify(map).slice(0, 300));
   check('открыт только первый, остальные — загадка «?», боссы видны под замком', map.next.join() === '0' &&
     map.locked === nWorlds * 10 - 1 && map.q === nWorlds * 9 - 1 && map.buttons === 1, JSON.stringify(map).slice(0, 300));
-  check('портреты — у следующего соперника и у боссов всех миров', map.art.length === nWorlds + 1 && map.art[0] === '0' &&
-    map.art.slice(1).join() === Array.from({ length: nWorlds }, (_, w) => w * 10 + 9).join(), map.art.join());
-  check('десятый в каждом мире — босс', map.bosses.join() === Array.from({ length: nWorlds }, (_, w) => w * 10 + 9).join(), map.bosses.join());
+  // Тропа снизу вверх: в разметке первым идёт самый дальний мир, мир 1 — последним
+  const bossesDown = Array.from({ length: nWorlds }, (_, w) => (nWorlds - 1 - w) * 10 + 9).join();
+  // В мире 1 первым в разметке идёт следующий соперник (0), потом его босс (9)
+  check('портреты — у следующего соперника и у боссов всех миров; мир 1 — внизу', map.art.length === nWorlds + 1 &&
+    map.art.join() === bossesDown.split(',').slice(0, -1).concat(['0', '9']).join(), map.art.join());
+  check('десятый в каждом мире — босс', map.bosses.join() === bossesDown, map.bosses.join());
   check('сложность по умолчанию — нормальная', map.diff === 'normal');
 
   // Будущий соперник и будущий босс не нажимаются: кто там — загадка
@@ -6181,7 +6184,8 @@ async function testAdventureBonus(browser) {
     localStorage.setItem('hc_advs_максим', '3333333333' + '3333332111');
     progressInfo = Object.assign({ quests: [], achievements: [] }, progressInfo || {}, { stats: { advGold: 1 } });
     openAdventure();
-    const goals = [...document.querySelectorAll('#advMap .aw-goal')].map(e => e.textContent);
+    // Цели миров — от мира 1: тропа снизу вверх, в разметке он последний
+    const goals = [...document.querySelectorAll('#advMap .aw-goal')].map(e => e.textContent).reverse();
     openLogoutModal(); showAvatarPicker(true); renderAvatarGrid();
     const tiles = [...document.querySelectorAll('#avGrid .av-tile.adv-icon')];
     const r = { goals, n: tiles.length, open: tiles.filter(x => !x.classList.contains('locked')).map(x => x.dataset.icon),
