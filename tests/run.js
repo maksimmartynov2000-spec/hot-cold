@@ -5909,8 +5909,9 @@ async function testAdventure(browser) {
     map.locked === nWorlds * 10 - 1 && map.q === nWorlds * 9 - 1 && map.buttons === 1, JSON.stringify(map).slice(0, 300));
   // Тропа снизу вверх: в разметке первым идёт самый дальний мир, мир 1 — последним
   const bossesDown = Array.from({ length: nWorlds }, (_, w) => (nWorlds - 1 - w) * 10 + 9).join();
-  check('портреты — у следующего соперника и у боссов всех миров; мир 1 — внизу', map.art.length === nWorlds + 1 && map.art[nWorlds] === '0' &&
-    map.art.slice(0, nWorlds).join() === bossesDown, map.art.join());
+  // В мире 1 первым в разметке идёт следующий соперник (0), потом его босс (9)
+  check('портреты — у следующего соперника и у боссов всех миров; мир 1 — внизу', map.art.length === nWorlds + 1 &&
+    map.art.join() === bossesDown.split(',').slice(0, -1).concat(['0', '9']).join(), map.art.join());
   check('десятый в каждом мире — босс', map.bosses.join() === bossesDown, map.bosses.join());
   check('сложность по умолчанию — нормальная', map.diff === 'normal');
 
