@@ -1870,10 +1870,11 @@ body.on-game #guessInput, body.on-game #tSubmitGuess { min-height: 56px; }
 .ad-btn.on { background: var(--accent); color: #fff; box-shadow: 0 3px 0 var(--accent-depth); }
 .adv-diff-hint { font-size: 13px; color: var(--muted); text-align: center; margin: 6px 0 14px; }
 /* ---- Путь Приключения ----
-   Миры — одной тропой сверху вниз, как уроки в Duolingo. Шапка мира — цветная
-   плашка; под ней кружки соперников змейкой и линия к следующему. Координаты
-   кружка — от середины тропы (--x) и от её верха (--y), в пикселях: те же
-   числа рисуют линию в SVG, поэтому кружки всегда сидят на ней */
+   Миры — одной тропой снизу вверх, как карта уровней: мир 1 внизу. Шапка мира —
+   цветная плашка под его тропой (вход в мир); над ней кружки соперников змейкой
+   и линия к следующему, босс наверху. Координаты кружка — от середины тропы
+   (--x) и от её верха (--y), в пикселях: те же числа рисуют линию в SVG,
+   поэтому кружки всегда сидят на ней */
 .adv-world { margin-bottom: 22px; }
 .aw-banner { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 20px; color: #fff;
   background: linear-gradient(135deg, color-mix(in srgb, var(--wc) 62%, #1d1650), color-mix(in srgb, var(--wc) 30%, #1d1650));
@@ -1882,7 +1883,7 @@ body.on-game #guessInput, body.on-game #tSubmitGuess { min-height: 56px; }
 .aw-no { font-size: 12px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
 .aw-name { font-size: 19px; font-weight: 900; }
 .aw-count { font-size: 13px; font-weight: 800; color: rgb(255 255 255 / 0.85); }
-.aw-path { position: relative; height: calc(var(--ph) * 1px); max-width: 360px; margin: 6px auto 0; }
+.aw-path { position: relative; height: calc(var(--ph) * 1px); max-width: 360px; margin: 0 auto 6px; }
 .aw-line { position: absolute; left: 50%; top: 0; width: 300px; height: 100%; margin-left: -150px; overflow: visible; pointer-events: none; }
 .aw-line path { fill: none; stroke-width: 9; stroke-linecap: round; }
 .aw-line .todo { stroke: rgb(var(--ink) / 0.16); stroke-dasharray: 1 16; }
@@ -2202,8 +2203,8 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .pf-avatar[data-frame="platinum"] { --fr: conic-gradient(from 20deg, #2dd4bf, #e0fffa, #5eead4, #e0fffa, #2dd4bf); --fr-glow: rgba(94, 234, 212, 0.65); }
 .pf-avatar[data-frame="diamond"] { --fr: conic-gradient(from 20deg, #93c5fd, #ffffff, #c4b5fd, #ffffff, #60a5fa, #93c5fd); --fr-glow: rgba(147, 197, 253, 0.8); }
 .pf-avatar[data-frame="legend"] { --fr: conic-gradient(#ff6b6b, #ffd166, #6ee7b7, #60a5fa, #c084fc, #ff6b6b); --fr-glow: rgba(192, 132, 252, 0.8); }
-.aw-goal { margin-top: 10px; font-size: 12px; font-weight: 800; color: var(--muted); text-align: center; }
-.aw-goal.got { color: var(--gold); }
+.aw-goal { margin-top: 2px; font-size: 12px; font-weight: 800; color: rgb(255 255 255 / 0.78); }
+.aw-goal.got { color: #ffe27a; }
 .adv-card .ac-gold { flex-basis: 100%; font-size: 12px; color: var(--muted); line-height: 1.35; }
 .av-head { grid-column: 1 / -1; text-align: left; font-size: 13px; font-weight: 900; margin: 8px 0 0; color: var(--gold); }
 .av-tile.adv-icon { padding: 3px !important; }

@@ -1418,17 +1418,19 @@ function openAdventure() {
 }
 
 // ---------- путь ----------
-// Миры идут одной тропой сверху вниз, как уроки в Duolingo: кружок на каждого
-// соперника, змейкой, линия ведёт к следующему. Пройденные — с портретом и
-// звёздами, следующий подсвечен «В бой!», дальше — загадка «?». Боссы видны у
-// всех миров заранее, но нажать на будущего нельзя: кто ждёт внутри мира —
-// узнаёте, когда дойдёте
+// Миры идут одной тропой снизу вверх, как карта уровней: мир 1 — в самом
+// низу, новые соперники открываются выше. Кружок на каждого соперника,
+// змейкой, линия ведёт к следующему; шапка мира — под его тропой, как вход,
+// босс — наверху. Пройденные — с портретом и звёздами, следующий подсвечен
+// «В бой!», дальше — загадка «?». Боссы видны у всех миров заранее, но нажать
+// на будущего нельзя: кто ждёт внутри мира — узнаёте, когда дойдёте
 const ADV_PATH_DX = [0, 52, 84, 64, 14, -46, -82, -66, -24, 0];
-const ADV_PATH_STEP = 78, ADV_PATH_TOP = 48, ADV_PATH_BOSS_GAP = 16;
+const ADV_PATH_STEP = 78, ADV_PATH_BOTTOM = 48, ADV_PATH_BOSS_GAP = 16;
+const ADV_PATH_H = ADV_PATH_BOTTOM + (ADV_PER_WORLD - 1) * ADV_PATH_STEP + ADV_PATH_BOSS_GAP + 74;
 function advPathPoint(w, i) {
-  return [ADV_PATH_DX[i] * (w % 2 ? -1 : 1), ADV_PATH_TOP + i * ADV_PATH_STEP + (i === ADV_PER_WORLD - 1 ? ADV_PATH_BOSS_GAP : 0)];
+  return [ADV_PATH_DX[i] * (w % 2 ? -1 : 1), ADV_PATH_H - ADV_PATH_BOTTOM - i * ADV_PATH_STEP - (i === ADV_PER_WORLD - 1 ? ADV_PATH_BOSS_GAP : 0)];
 }
-function advPathHeight() { return advPathPoint(0, ADV_PER_WORLD - 1)[1] + 74; }
+function advPathHeight() { return ADV_PATH_H; }
 // Линия через центры кружков — плавная кривая: куски Catmull-Rom как кубические Безье
 function advPathSegs(pts) {
   const r = v => Math.round(v * 10) / 10;
@@ -1519,27 +1521,31 @@ function renderAdventure(scroll) {
       (open ? '<span class="aw-count">' + A.progress.replace('{n}', beaten) +
         ' · <span class="aw-stars">⭐ ' + advWorldStars(w) + '/' + ADV_PER_WORLD * 3 + '</span></span>'
         : '<span class="aw-gate">' + escapeHtml(advGateText(w)) + '</span>') + '</span>';
-    sec.appendChild(head);
-    sec.appendChild(advWorldPath(w, open));
-    // Цель мира: ★★★ у всех — их иконки в профиль. У закрытого мира не видна
-    const goal = document.createElement('div');
+    // Цель мира: ★★★ у всех — их иконки в профиль. Строкой в шапке; у закрытого мира не видна
+    const goal = document.createElement('span');
     goal.className = 'aw-goal' + (advWorldGold(w) ? ' got' : '') + (open ? '' : ' hidden');
     goal.textContent = advWorldGold(w) ? A.goldDone : A.goldGoal.replace('{n}', advWorldThree(w));
-    sec.appendChild(goal);
+    head.querySelector('.aw-title').appendChild(goal);
+    // Снизу вверх: тропа, а шапка под ней — вход в мир
+    sec.appendChild(advWorldPath(w, open));
+    sec.appendChild(head);
     return sec;
   });
-  // Миры выходят партиями: сколько ещё впереди
+  // Миры выходят партиями: сколько ещё впереди — над самым верхним
   if (ADV_WORLDS.length < ADV_WORLD_MAX) {
     const soon = document.createElement('div');
     soon.className = 'adv-soon';
     soon.textContent = A.soon.replace('{n}', ADV_WORLD_MAX - ADV_WORLDS.length);
     worlds.push(soon);
   }
+  // Мир 1 — внизу страницы, дальние миры — выше
+  worlds.reverse();
   document.getElementById('advMap').replaceChildren(...worlds);
   if (!scroll) return;
+  // Экран встаёт на следующем сопернике: и новичку (он в самом низу), и тому, кто далеко
   const next = document.querySelector('#advMap .adv-tile.next') ||
     document.querySelector('#advMap .adv-world[data-w="' + advCurrentWorld() + '"]');
-  if (next && next.scrollIntoView && done > 0) next.scrollIntoView({ block: 'center' });
+  if (next && next.scrollIntoView) next.scrollIntoView({ block: 'center' });
 }
 
 // Сложность в карточке: кнопки и у кого сколько «⚡ +1 ход» с этим соперником —
