@@ -2,8 +2,9 @@
 // Голоса и звуки синтезируются на лету (Web Audio), как ноты ходов в
 // js/game.js: файлов нет, весят ноль, работают без сети, лицензий не нужно.
 // Выключаются той же кнопкой «Звук». Музыка — файлами music/*.m4a
-// (MUSIC_TRACKS), у неё свой выключатель «Музыка»; пока файлов нет
-// (MUSIC_READY = false), выключателя не видно и ничего не грузится.
+// (MUSIC_TRACKS: треки Gemini, вырезанные в бесшовные петли), у неё свой
+// выключатель «Музыка». MUSIC_READY = false прячет выключатель и не грузит
+// ничего — на случай, если музыку надо будет убрать.
 
 // ---------- кирпичики ----------
 function sndCtx() {
@@ -185,9 +186,9 @@ document.addEventListener('click', e => {
 }, true);
 
 // ---------- музыка ----------
-// Файлы появятся позже (подсказки для Gemini — у автора). Громкость — тихо
+// Громкость — тихо
 // в меню и Приключении, совсем тихо в партии: дети считают
-const MUSIC_READY = false;
+const MUSIC_READY = true;
 const MUSIC_TRACKS = { menu: 'music/menu.m4a', adventure: 'music/adventure.m4a', game: 'music/game.m4a' };
 const MUSIC_VOL = { menu: 0.35, adventure: 0.35, game: 0.12 };
 const MUSIC_KEY = 'hc_music';

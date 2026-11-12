@@ -7165,6 +7165,33 @@ async function testPets(browser) {
 }
 
 
+// Голоса питомцев и звуки (js/sound.js): у каждого питомца голос на каждую
+// реакцию, звуки игры; музыка — свой трек на экран, свой выключатель
+async function testSound(browser) {
+  console.log('\nЗвуки и музыка');
+  const fs = require('fs'), path = require('path');
+  const page = await newGame(browser, {});
+  const r = await page.evaluate(() => ({
+    voices: PETS.filter(k => !PET_CALL[k]).length, moods: Object.keys(PET_REACT).filter(n => !PET_VOICE[n]).join(),
+    sfx: ['tap', 'buy', 'equip', 'chest', 'level'].filter(n => !SFX[n]).join(),
+    tracks: Object.values(MUSIC_TRACKS), ready: MUSIC_READY,
+    menu: musicTrackFor('mode'), adv: musicTrackFor('adventure'), game: musicTrackFor('game'), quiet: MUSIC_VOL.game < MUSIC_VOL.menu }));
+  check('голос у каждого питомца на каждую реакцию, звуки игры на месте', !r.voices && !r.moods && !r.sfx, JSON.stringify(r));
+  const absent = r.tracks.filter(f => !fs.existsSync(path.join(__dirname, '..', f)));
+  check('музыка: три трека есть, в партии — тише', r.ready && r.tracks.length === 3 && !absent.length && r.menu === 'menu' && r.adv === 'adventure' &&
+    r.game === 'game' && r.quiet, JSON.stringify(r) + ' нет: ' + absent.join());
+  // Голос и звуки не ломаются и без звука, и со звуком (браузер без колонок тоже)
+  const ok = await page.evaluate(() => { try { soundOn = true; PETS.forEach(k => Object.keys(PET_VOICE).forEach(n => { petVoiceAt = 0; petVoice(k, n); })); ['tap', 'buy', 'equip', 'chest', 'level'].forEach(sfx); soundOn = false; petVoice('owl', 'win'); return true; } catch (e) { return e.message; } });
+  check('все голоса и звуки играются без ошибок', ok === true, String(ok));
+  // Выключатель в профиле: виден, переключает и помнит выбор
+  const tg = await page.evaluate(() => { renderMusicToggles(); const row = document.getElementById('pfMusicRow');
+    const a = { shown: !row.classList.contains('hidden'), label: document.getElementById('tMusicLabel').textContent, icon: document.getElementById('musicBtn').textContent };
+    toggleMusic(); a.off = !musicOn && localStorage.getItem('hc_music') === '0' && document.getElementById('musicBtn').textContent === '🔕';
+    toggleMusic(); a.back = musicOn; return a; });
+  check('в профиле — «Музыка»: выключается, выбор запоминается', tg.shown && tg.label === 'Музыка' && tg.icon === '🎵' && tg.off && tg.back, JSON.stringify(tg));
+  await page.context().close();
+}
+
 // Разбор «понятно ли ребёнку»: главное — на первом экране, слова — одни и те же
 async function testKidClarity(browser) {
   console.log('\nПонятно ребёнку: кнопки на виду, слова одни');
@@ -9106,6 +9133,7 @@ async function testKeyPage(browser) {
     await testDailyCard(browser);
     await testShop(browser);
     await testPets(browser);
+    await testSound(browser);
     await testKidClarity(browser);
     await testOnlineAdvBonuses(browser);
     await testLocalAdvBonuses(browser);
