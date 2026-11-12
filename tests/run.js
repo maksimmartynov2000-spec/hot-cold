@@ -1874,8 +1874,9 @@ async function testScaleMemory(browser) {
     !(await tp.locator('#toggleThermoBtn').isVisible()) && await tp.locator('#vizBtn').isVisible());
   await tp.click('#vizBtn');
   const rows = await tp.evaluate(() => [...document.querySelectorAll('#vizPanel .viz-row:not(.hidden)')].map(r => r.textContent.trim()));
-  // В тренировке пятый — «Где может быть число». Шестой — питомец, только у кого он есть
-  check('в меню — пять подписанных переключателей', rows.length === 5 && rows.every(r => r.length > 3), rows.join(' | '));
+  // В тренировке — «Где может быть число»; шестой — «Музыка». Седьмой — питомец, только у кого он есть
+  check('в меню — шесть подписанных переключателей, последний — «Музыка»', rows.length === 6 && rows.every(r => r.length > 3) &&
+    /Музыка/.test(rows[5]), rows.join(' | '));
   await tp.click('#toggleThermoBtn');
   check('меню не закрывается от переключения', await tp.locator('#vizPanel').isVisible() &&
     !(await tp.evaluate(() => showThermo)));
