@@ -39,6 +39,15 @@ try { localStorage.removeItem('hc_run_state'); } catch (e) {}
 // Подписи на прямой расставляются по ширине экрана, поэтому поворот телефона
 // или смена размера окна требуют пересчёта
 window.addEventListener('resize', () => { if (screen === 'game') renderNumberLine(); });
+// Прямая могла нарисоваться, пока её ещё не было видно (ширина 0 — считали по
+// 320 px, и часть подписей пряталась зря): появилась настоящая ширина — заново
+if (window.ResizeObserver) {
+  let nlW = 0;
+  new ResizeObserver(es => {
+    const w = Math.round(es[0].contentRect.width);
+    if (w && w !== nlW) { nlW = w; if (screen === 'game') renderNumberLine(); }
+  }).observe(document.getElementById('numLineSvg'));
+}
 
 // Шкала расстояний раньше помнила, раскрыта ли она, и считала сыгранные
 // партии. Теперь она окном по кнопке — эти записи больше ни к чему

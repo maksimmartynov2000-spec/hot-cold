@@ -204,7 +204,8 @@ function musicFor(scr) {
   if (want === musicName && musicEl) { musicVolume(MUSIC_VOL[want] || 0.3); return; }
   musicName = want;
   const old = musicEl;
-  if (old) musicFadeTo(old, 0, () => old.pause());
+  // Прежний трек затихает за ~0,4 с и останавливается; новый вступает следом
+  if (old) musicFadeTo(old, 0, () => { old.pause(); old.removeAttribute('src'); old.load(); });
   musicEl = null;
   if (!want) return;
   const a = new Audio(MUSIC_TRACKS[want]);
@@ -227,8 +228,11 @@ function musicPlay() {
   const a = musicEl;
   const p = a.play();
   // iOS не даёт начать без касания: начнём с первого же
-  if (p && p.catch) p.then(() => musicFadeTo(a, MUSIC_VOL[musicName] || 0.3)).catch(() => {});
-  else musicFadeTo(a, MUSIC_VOL[musicName] || 0.3);
+  // play() отвечает не сразу (файл грузится): если за это время экран сменился,
+  // этот трек уже уходит — громкость ему не поднимаем, а останавливаем
+  const up = () => { if (musicEl === a) musicFadeTo(a, MUSIC_VOL[musicName] || 0.3); else a.pause(); };
+  if (p && p.catch) p.then(up).catch(() => {});
+  else up();
 }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => {
   if (!musicUnlocked) { musicUnlocked = true; musicFor(typeof screen !== 'undefined' ? screen : 'mode'); return; }

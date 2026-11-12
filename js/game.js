@@ -1778,7 +1778,6 @@ function renderNumberLine() {
   const w = svg.clientWidth || 320;
   const fs = w < 520 ? 12 : 11;
   const labelPx = Math.max(formatNum(RANGE_MIN).length, formatNum(RANGE_MAX).length) * fs * 0.62 + 9;
-  const labelPct = (labelPx / w) * 100;
   // Считаем по той длине, что прямая занимает на самом деле, а не по всей ширине
   const labelRoom = w * (NL.right - NL.left) / 100;
   const labelStep = nlStep(span, Math.max(2, Math.floor(labelRoom / labelPx)));
@@ -1792,8 +1791,12 @@ function renderNumberLine() {
   for (let v = Math.ceil(RANGE_MIN / labelStep) * labelStep; v <= RANGE_MAX; v += labelStep) {
     if (v === 0 && RANGE_MIN < 0) continue;
     const p = nlPos(v);
-    // пропускаем только те, что реально налезли бы на подписи границ
-    if (Math.abs(p - NL.left) < labelPct || Math.abs(p - NL.right) < labelPct) continue;
+    // Пропускаем только те, что правда налезли бы на подписи границ: по
+    // настоящей ширине обеих подписей (а не самой длинной), с зазором 6 px.
+    // Так «5» рядом с «1» на прямой 1–50 остаётся
+    const txt = n => formatNum(n).length * fs * 0.62;
+    const roomPx = (a, b) => (txt(a) + txt(b)) / 2 + 6;
+    if (Math.abs(p - NL.left) * w / 100 < roomPx(v, RANGE_MIN) || Math.abs(p - NL.right) * w / 100 < roomPx(v, RANGE_MAX)) continue;
     out += nlTick(v, NL.axisY + 3, NL.axisY + 9, 'rgb(var(--ink) / 0.35)', 1.5);
     out += nlText(p, NL.baseY, 'middle', fs, 'rgb(var(--ink) / 0.5)', 400, formatNum(v));
   }
