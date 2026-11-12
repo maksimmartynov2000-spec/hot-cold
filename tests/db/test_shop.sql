@@ -24,11 +24,11 @@ do $$ begin
 end $$;
 \echo ok
 
-\echo === 1. товары: 127, цена одна (монеты или кристаллы), в игре и в базе одинаково, награды не продаются
+\echo === 1. товары: 114, цена одна (монеты или кристаллы), в игре и в базе одинаково, награды не продаются
 create temp table js_shop(kind text, code text, coins int, gems int);
 \copy js_shop from 'shop_js.csv' with (format csv, header true)
 do $$ begin
-  if (select count(*) from shop_items()) <> 127 then raise exception 'ОШИБКА: товаров %', (select count(*) from shop_items()); end if;
+  if (select count(*) from shop_items()) <> 114 then raise exception 'ОШИБКА: товаров %', (select count(*) from shop_items()); end if;
   if exists (select 1 from shop_items() i where (i.coins > 0) = (i.gems > 0) or i.coins < 0 or i.gems < 0) then
     raise exception 'ОШИБКА: у товара две цены или ни одной';
   end if;
@@ -38,7 +38,7 @@ do $$ begin
                 except select i.kind, i.code, i.coins, i.gems from shop_items() i) then
     raise exception 'ОШИБКА: товары в игре и в базе разные';
   end if;
-  if (select count(*) from js_shop) <> 127 then raise exception 'ОШИБКА: в игре товаров %', (select count(*) from js_shop); end if;
+  if (select count(*) from js_shop) <> 114 then raise exception 'ОШИБКА: в игре товаров %', (select count(*) from js_shop); end if;
   -- Коды не совпадают ни с чем, что уже есть: награды и трофеи не продаются
   if shop_codes('icon') && (avatar_choices() || reward_icons() || tutorial_icon() || quest_icons() || adventure_icons()
                             || adventure_char_icons() || pass_icons()) then

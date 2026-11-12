@@ -2,14 +2,15 @@
 // Монеты 🪙 и кристаллы 💎 копит база (миграции 061 и 062): за звёзды
 // Приключения, партии с другом, Испытание и «Испытание выходных».
 // Купленное ложится к наградам пути (cosmetics). Иконки, рамки, фоны и
-// титулы надеваются в профиле; питомцы, вещи для них, градусники и эффекты
-// победы (миграция 063) — здесь же и на экране питомца.
+// титулы надеваются в профиле; питомцы, их облики и ауры, градусники и эффекты
+// победы (миграции 063–065) — здесь же и на экране питомца.
 // Без входа витрину видно, а купить нельзя; без миграции — «скоро откроется».
 
-// Товары — копия из базы (shop_catalog, миграция 064), сверяется тестом.
+// Товары — копия из базы (shop_catalog, миграция 065), сверяется тестом.
 // Цена — либо в монетах, либо в кристаллах; редкость: common, rare, epic, legend.
-// Облик (skin) — <питомец>_<облик>; вещь одного питомца (PET_GEAR[code].pet)
-// и облик продаются только тому, у кого этот питомец есть
+// Облик (skin) — <питомец>_<облик>; ауры лежат в разделе gear: своя аура
+// питомца (PET_AURAS[code].pet) и облик продаются только тому, у кого этот
+// питомец есть
 const SHOP_ITEMS = [
   // Иконки «Стихии»
   { kind: 'icon', code: 'shop-01', coins: 90, rar: 'common' }, { kind: 'icon', code: 'shop-02', coins: 100, rar: 'common' },
@@ -63,14 +64,6 @@ const SHOP_ITEMS = [
   { kind: 'skin', code: 'crab_deep', gems: 12, rar: 'epic' }, { kind: 'skin', code: 'penguin_emperor', gems: 12, rar: 'epic' },
   { kind: 'skin', code: 'penguin_night', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'penguin_snowy', gems: 8, rar: 'rare' },
   { kind: 'skin', code: 'penguin_rose', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'penguin_sunny', gems: 8, rar: 'rare' },
-  // Вещи: корона — всем, остальные — одному питомцу
-  { kind: 'gear', code: 'crown', coins: 450, rar: 'epic' }, { kind: 'gear', code: 'mortar', coins: 250, rar: 'rare' },
-  { kind: 'gear', code: 'starglasses', coins: 200, rar: 'rare' }, { kind: 'gear', code: 'tophat', coins: 250, rar: 'rare' },
-  { kind: 'gear', code: 'argyle', coins: 150, rar: 'common' }, { kind: 'gear', code: 'lei', coins: 150, rar: 'common' },
-  { kind: 'gear', code: 'sunglasses', coins: 200, rar: 'rare' }, { kind: 'gear', code: 'cap', coins: 150, rar: 'common' },
-  { kind: 'gear', code: 'safari', coins: 250, rar: 'rare' }, { kind: 'gear', code: 'lifebuoy', coins: 250, rar: 'rare' },
-  { kind: 'gear', code: 'striped', coins: 150, rar: 'common' }, { kind: 'gear', code: 'jacket', coins: 300, rar: 'rare' },
-  { kind: 'gear', code: 'binoculars', coins: 200, rar: 'rare' },
   // Ауры: четыре общие (стихии и звёзды) и по две своих у каждого
   { kind: 'gear', code: 'aura_fire', coins: 700, rar: 'epic' }, { kind: 'gear', code: 'aura_ice', coins: 700, rar: 'epic' },
   { kind: 'gear', code: 'aura_storm', coins: 700, rar: 'epic' }, { kind: 'gear', code: 'aura_star', coins: 900, rar: 'legend' },
@@ -87,15 +80,15 @@ const SHOP_ITEMS = [
   { kind: 'winfx', code: 'confetti', coins: 120, rar: 'common' }, { kind: 'winfx', code: 'fireworks', coins: 240, rar: 'rare' },
   { kind: 'winfx', code: 'lightning', coins: 400, rar: 'epic' }, { kind: 'winfx', code: 'meteors', gems: 18, rar: 'legend' }
 ];
-// Наборы — копия из базы (shop_bundles): питомец и две его вещи, за монеты.
+// Наборы — копия из базы (shop_bundles): питомец и две его ауры, за монеты.
 // Цена — за то, чего у игрока ещё нет, со скидкой набора
 const SHOP_BUNDLES = [
-  { code: 'set_badger', currency: 'coins', pct: 20, items: ['pet:badger', 'gear:mortar', 'gear:starglasses'] },
-  { code: 'set_owl', currency: 'coins', pct: 20, items: ['pet:owl', 'gear:tophat', 'gear:argyle'] },
-  { code: 'set_toucan', currency: 'coins', pct: 20, items: ['pet:toucan', 'gear:lei', 'gear:sunglasses'] },
-  { code: 'set_cham', currency: 'coins', pct: 20, items: ['pet:cham', 'gear:cap', 'gear:safari'] },
-  { code: 'set_crab', currency: 'coins', pct: 20, items: ['pet:crab', 'gear:lifebuoy', 'gear:striped'] },
-  { code: 'set_penguin', currency: 'coins', pct: 20, items: ['pet:penguin', 'gear:jacket', 'gear:binoculars'] }
+  { code: 'set_badger', currency: 'coins', pct: 20, items: ['pet:badger', 'gear:aura_leaves', 'gear:aura_fireflies'] },
+  { code: 'set_owl', currency: 'coins', pct: 20, items: ['pet:owl', 'gear:aura_moon', 'gear:aura_feathers'] },
+  { code: 'set_toucan', currency: 'coins', pct: 20, items: ['pet:toucan', 'gear:aura_tropics', 'gear:aura_fruit'] },
+  { code: 'set_cham', currency: 'coins', pct: 20, items: ['pet:cham', 'gear:aura_rainbow', 'gear:aura_butterflies'] },
+  { code: 'set_crab', currency: 'coins', pct: 20, items: ['pet:crab', 'gear:aura_bubbles', 'gear:aura_seabed'] },
+  { code: 'set_penguin', currency: 'coins', pct: 20, items: ['pet:penguin', 'gear:aura_snow', 'gear:aura_fish'] }
 ];
 // Разделы витрины по порядку. Первый — «Витрина»: товары дня и наборы
 const SHOP_KINDS = ['deals', 'pet', 'skin', 'gear', 'icon', 'frame', 'color', 'title', 'phrase', 'thermo', 'winfx'];
@@ -285,7 +278,7 @@ function renderShop() {
   document.getElementById('shopOk').textContent = S.close;
 }
 
-// Вещь или облик чужого питомца: купить нельзя, пока его нет
+// Аура или облик чужого питомца: купить нельзя, пока его нет
 function shopPetLocked(kind, code) {
   const who = typeof petItemFor === 'function' ? petItemFor(kind, code) : null;
   return !!who && !shopOwned('pet', who);
@@ -312,8 +305,8 @@ function shopHead(text, sub) {
   h.innerHTML = '<b>' + escapeHtml(text) + '</b>' + (sub ? '<span>' + escapeHtml(sub) + '</span>' : '');
   return h;
 }
-// Облики и вещи — по питомцам: сначала то, что подходит всем (корона, ауры
-// стихий), потом у каждого своё. Чужого питомца — с замком
+// Облики и ауры — по питомцам: сначала то, что подходит всем (ауры стихий и
+// звёзд), потом у каждого своё. Чужого питомца — с замком
 function renderShopByPet(grid, kind) {
   const S = t().shop, parts = [];
   const items = SHOP_ITEMS.filter(i => i.kind === kind);
@@ -365,11 +358,11 @@ function shopWorn(kind, code) {
   if (kind === 'icon') return typeof myAvatar === 'function' && myAvatar() === code;
   if (kind === 'color') return typeof myColor === 'function' && myColor() === code;
   if (kind === 'frame' || kind === 'title') return !!onlineInfo && onlineInfo[kind] === code;
-  // Питомец, вещи на нём, градусник и эффект победы (миграция 063)
+  // Питомец, аура и облик на нём, градусник и эффект победы (миграции 063–065)
   if (typeof petLook === 'undefined' || !petLook) return false;
   if (kind === 'pet') return petLook.pet === code;
   const p = typeof myPet === 'function' ? myPet() : null;
-  if (kind === 'gear') return !!p && !!PET_GEAR[code] && petOutfit(p)[PET_GEAR[code].slot] === code;
+  if (kind === 'gear') return !!p && petOutfit(p).aura === code;
   if (kind === 'skin') return !!p && petItemFor('skin', code) === p && petOutfit(p).skin === shopSkinOf(code);
   if (kind === 'thermo' || kind === 'winfx') return petLook[kind] === code;
   return false;
@@ -399,22 +392,12 @@ function shopBg() {
 // цвета, табличка титула, облачко фразы
 // Облик из кода товара: badger_honey → honey
 function shopSkinOf(code) { return code.slice(code.indexOf('_') + 1); }
-// Вещь питомца крупным планом: голова и глаза — голова, шея — грудь, тело и
-// аура — целиком. Макушка, глаза и шея у каждого питомца на своей высоте
-const PET_VIEW_Y = { badger: { head: 54, eyes: 90, neck: 124 }, owl: { head: 60, eyes: 100, neck: 150 }, toucan: { head: 58, eyes: 94, neck: 124 },
-  cham: { head: 56, eyes: 86, neck: 130 }, crab: { head: 98, eyes: 72, neck: 150 }, penguin: { head: 62, eyes: 92, neck: 130 } };
-function shopGearView(kind, slot) {
-  const y = PET_VIEW_Y[kind] || PET_VIEW_Y.badger;
-  if (slot === 'head') return '35 ' + Math.max(0, y.head - 50) + ' 170 170';
-  if (slot === 'eyes') return '45 ' + Math.max(0, y.eyes - 60) + ' 150 150';
-  if (slot === 'neck') return '30 ' + Math.max(0, y.neck - 74) + ' 180 180';
-  return '0 0 240 240';
-}
-function shopGearArt(code, petFor) {
-  const g = PET_GEAR[code];
-  const kind = g.pet || petFor || (typeof myPet === 'function' && myPet()) || PETS[0];
-  // Крупный план обрезан: что за краем кадра, не вылезает на подписи рядом
-  return '<span class="sha-pet sha-crop">' + petSvg(kind, { gear: [code] }).replace('viewBox="0 0 240 240"', 'viewBox="' + shopGearView(kind, g.slot) + '"') + '</span>';
+// Аура — на питомце: на своём, если он есть, иначе на том, чья она, или на
+// питомце набора
+function shopAuraArt(code, petFor) {
+  const a = PET_AURAS[code];
+  const kind = a.pet || petFor || (typeof myPet === 'function' && myPet()) || PETS[0];
+  return '<span class="sha-pet">' + petHtml(kind, { auras: [code] }) + '</span>';
 }
 function shopArtHtml(kind, code, petFor) {
   const bg = shopBg();
@@ -434,10 +417,10 @@ function shopArtHtml(kind, code, petFor) {
       (isShinyBg(bg) ? ' shine' : '') + '" style="background:' + avatarBgCss(bg) + '">' + face + '</span></span>';
   }
   if (kind === 'title') return '<span class="sha-title">' + escapeHtml(shopName(kind, code)) + '</span>';
-  // Питомец — сам (свой — в наряде), облик — на своём питомце, вещь — на том, чья она
-  if (kind === 'pet') return '<span class="sha-pet">' + (shopOwned('pet', code) ? myPetSvg(code) : petSvg(code)) + '</span>';
-  if (kind === 'skin') return '<span class="sha-pet">' + petSvg(petItemFor('skin', code), { skin: shopSkinOf(code) }) + '</span>';
-  if (kind === 'gear') return shopGearArt(code, petFor);
+  // Питомец — сам (свой — в наряде), облик — на своём питомце, аура — на том, чья она
+  if (kind === 'pet') return '<span class="sha-pet">' + (shopOwned('pet', code) ? myPetHtml(code) : petHtml(code)) + '</span>';
+  if (kind === 'skin') return '<span class="sha-pet">' + petHtml(petItemFor('skin', code), { skin: shopSkinOf(code) }) + '</span>';
+  if (kind === 'gear') return shopAuraArt(code, petFor);
   if (kind === 'thermo') return thermoMiniHtml(code);
   if (kind === 'winfx') return '<span class="sha-fx">' + WINFX[code] + '</span>';
   return '<span class="sha-phrase">' + escapeHtml(shopName(kind, code)) + '</span>';
@@ -459,14 +442,14 @@ function closeShopItem() {
   if (m) m.classList.add('hidden');
   shopOpenItem = null;
 }
-// Что вещь даёт и где видна: питомец — характер, вещь — на какое место, и т. п.
+// Что вещь даёт и где видна: питомец — характер, аура — чья, и т. п.
 function shopItemAbout(kind, code) {
   const S = t().shop;
   if (kind === 'phrase') return S.phraseHint;
   if (kind === 'pet') return petHeroText(code) + ' ' + t().pets.who[code];
   if (kind === 'gear') {
     const who = petItemFor('gear', code);
-    return S.gearHint.replace('{slot}', S.slots[PET_GEAR[code].slot]) + ' ' + (who ? S.gearFor.replace('{pet}', petName(who)) : S.gearAll);
+    return S.gearHint + ' ' + (who ? S.gearFor.replace('{pet}', petName(who)) : S.gearAll);
   }
   if (kind === 'skin') return S.skinHint.replace('{pet}', petName(petItemFor('skin', code)));
   if (kind === 'thermo') return S.thermoHint;
@@ -505,7 +488,7 @@ function renderShopItem() {
   btn.classList.remove('hidden');
   if (own) {
     if (kind === 'phrase') btn.classList.add('hidden');
-    // Вещь питомца, облик, градусник и эффект победы снимаются той же кнопкой
+    // Аура, облик, градусник и эффект победы снимаются той же кнопкой
     const canOff = kind === 'gear' || kind === 'skin' || kind === 'thermo' || kind === 'winfx';
     btn.textContent = worn ? (canOff ? S.unwear : kind === 'pet' ? t().pets.withYou : S.wornBtn) : kind === 'pet' ? t().pets.takeWith : S.wear;
     btn.disabled = worn && !canOff;
@@ -515,7 +498,7 @@ function renderShopItem() {
       note.textContent = S.gearNoPet;
     }
   } else if (shopPetLocked(kind, code)) {
-    // Вещь или облик питомца, которого ещё нет: сначала он
+    // Аура или облик питомца, которого ещё нет: сначала он
     btn.textContent = S.buyFor.replace('{p}', shopPriceText(it));
     btn.disabled = true;
     note.className = 'si-note warn';
@@ -638,9 +621,9 @@ async function shopBuyBundle(code) {
 }
 
 // Надеть купленное: иконка, фон, рамка, титул — тем же путём, что и награды в
-// профиле; питомец, его вещи и облики, градусник и эффект победы — своими
-// запросами. Вещь или облик другого своего питомца сначала зовёт его.
-// Надетые вещь, облик, градусник и эффект той же кнопкой снимаются
+// профиле; питомец, его ауры и облики, градусник и эффект победы — своими
+// запросами. Аура или облик другого своего питомца сначала зовёт его.
+// Надетые аура, облик, градусник и эффект той же кнопкой снимаются
 async function shopWear(kind, code, off) {
   try {
     if (kind === 'icon') await chooseAvatar(code);
@@ -650,7 +633,7 @@ async function shopWear(kind, code, off) {
     else if (kind === 'gear' || kind === 'skin') {
       const who = petItemFor(kind, code);
       if (who && who !== myPet()) await petChoose(who);
-      if (kind === 'gear') await petWearGear(PET_GEAR[code].slot, off ? null : code);
+      if (kind === 'gear') await petWearGear('aura', off ? null : code);
       else await petWearGear('skin', off ? null : shopSkinOf(code));
     }
     else if (kind === 'thermo' || kind === 'winfx') {
