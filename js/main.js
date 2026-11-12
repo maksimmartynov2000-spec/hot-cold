@@ -70,6 +70,7 @@ applyTranslations();
 showScreen('mode');
 // Первый экран нарисован — показать (до этого видна только заставка-фон)
 document.body.classList.remove('booting');
+runSplash();
 // Подтянуть свою иконку и проверить, что сохранённый вход ещё наш
 if (runAuth()) { syncProfile(); startSignals(); startSeen(); }
 // Вернулся в игру — сразу отметиться «я здесь», не дожидаясь минуты
@@ -81,3 +82,47 @@ setInterval(checkRemoteConfig, 60000);
 // Тексты миров 6+ на своём языке — заранее, когда игра уже нарисовалась:
 // service worker положит их в кеш, и Приключение откроется и без сети
 setTimeout(() => advLoadPack(), 3000);
+
+// ================= ЗАСТАВКА =================
+// Логотип и градусник: ртуть поднимается по мере того, как готово меню —
+// шрифты, картинки меню и питомца, данные из базы (профиль, монеты, питомец).
+// Около двух секунд всегда, как у приложения; дольше 2,6 с не ждёт: что не
+// успело, дорисуется в меню. Без входа и без сети данных не ждём. Под
+// автотестами заставки нет (navigator.webdriver), кроме теста самой заставки
+const SPLASH_MIN = 2000, SPLASH_MAX = 2600;
+function runSplash() {
+  const sp = document.getElementById('splash');
+  if (!sp) return;
+  if (navigator.webdriver && !window.__splash) { sp.remove(); return; }
+  sp.classList.add('js');
+  const tips = t().splashTips || [];
+  const tip = document.getElementById('spTip');
+  if (tips.length) { tip.textContent = tips[Math.floor(Math.random() * tips.length)]; requestAnimationFrame(() => tip.classList.add('show')); }
+  const fill = document.getElementById('spFill');
+  // Время — от начала загрузки страницы, а не от запуска скрипта
+  const now = () => (window.performance && performance.now ? performance.now() : Date.now() - splashT0);
+  let fonts = false;
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(() => { fonts = true; });
+  const auth = typeof runAuth === 'function' && runAuth() && typeof sb !== 'undefined' && !!sb;
+  const imgsReady = () => {
+    const imgs = [...document.querySelectorAll('#screenMode img, #petCard img')].filter(i => i.offsetParent);
+    return !imgs.length ? 1 : imgs.filter(i => i.complete).length / imgs.length;
+  };
+  const dataReady = () => !auth ? 1 :
+    ((typeof onlineInfoAt !== 'undefined' && onlineInfoAt ? 1 : 0) + (typeof shopWalletAt !== 'undefined' && shopWalletAt ? 1 : 0) +
+     (typeof petLookAt !== 'undefined' && petLookAt ? 1 : 0)) / 3;
+  const done = () => {
+    clearInterval(timer);
+    fill.style.setProperty('--p', 1);
+    sp.classList.add('hot');
+    setTimeout(() => { sp.classList.add('gone'); setTimeout(() => sp.remove(), 500); }, 280);
+  };
+  const timer = setInterval(() => {
+    const el = now();
+    const real = 0.15 * (fonts ? 1 : 0) + 0.25 * imgsReady() + 0.6 * dataReady();
+    // Ртуть не обгоняет ни настоящую готовность, ни часы: к двум секундам — вверху
+    fill.style.setProperty('--p', Math.max(0.3, Math.min(real, el / SPLASH_MIN)).toFixed(3));
+    if ((el >= SPLASH_MIN && real >= 0.999) || el >= SPLASH_MAX) done();
+  }, 100);
+}
+const splashT0 = Date.now();

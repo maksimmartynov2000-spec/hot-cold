@@ -520,8 +520,18 @@ async function testPauseAndGiveUp(browser) {
   const info = await page.locator('#unfinishedInfo').textContent();
   check('в карточке видно раунд и очки', /Раунд\s*2/.test(info), info.trim());
 
+  // Игра в тестах открыта как файл (file://), и под нагрузкой всего прогона
+  // Chromium иногда теряет localStorage такой страницы при перезагрузке — ещё
+  // до запуска её скриптов. По https у игроков этого нет. Потерял — кладём
+  // запись обратно и перезагружаем снова: проверяется, что игра её поднимает
+  const keep = await page.evaluate(() => localStorage.getItem('hc_trial_state'));
   await page.reload();
   await page.waitForTimeout(400);
+  if (keep && !(await page.evaluate(() => localStorage.getItem('hc_trial_state')))) {
+    await page.evaluate(v => localStorage.setItem('hc_trial_state', v), keep);
+    await page.reload();
+    await page.waitForTimeout(400);
+  }
   await page.click('#tModeRun');
   const survived = await page.locator('#unfinishedBox').waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
   check('игра переживает перезагрузку страницы', survived);
@@ -7193,6 +7203,32 @@ async function testSound(browser) {
   await page.context().close();
 }
 
+// Заставка при запуске: логотип, градусник наполняется, совет; около двух
+// секунд, потом меню. Под автотестами её нет — здесь включаем нарочно
+async function testSplash(browser) {
+  console.log('\nЗаставка');
+  const context = await browser.newContext({ viewport: PHONE });
+  const page = await context.newPage();
+  page.on('pageerror', e => check('без ошибок JS', false, e.message));
+  await page.addInitScript(() => { window.__splash = true; });
+  await applyStub(page, { user: 'Максим' });
+  await page.goto(GAME_URL);
+  await page.waitForTimeout(500);
+  const early = await page.evaluate(() => { const sp = document.getElementById('splash');
+    return { shown: !!sp && getComputedStyle(sp).opacity === '1', logo: sp && sp.querySelector('.sp-logo').textContent, tip: document.getElementById('spTip').textContent,
+      inTips: i18n.ru.splashTips.includes(document.getElementById('spTip').textContent), p: +getComputedStyle(document.getElementById('spFill')).getPropertyValue('--p') }; });
+  check('при запуске — заставка: логотип, градусник, совет', early.shown && early.logo === 'Hot or Cold' && early.inTips && early.p >= 0.3, JSON.stringify(early));
+  await page.waitForTimeout(1000);
+  const mid = await page.evaluate(() => { const sp = document.getElementById('splash'); return sp ? +getComputedStyle(document.getElementById('spFill')).getPropertyValue('--p') : -1; });
+  check('ртуть поднимается', mid > early.p && mid < 1, String(mid));
+  await page.waitForTimeout(2300);
+  const after = await page.evaluate(() => ({ gone: !document.getElementById('splash'), menu: !document.getElementById('screenMode').classList.contains('hidden') }));
+  check('к трём секундам заставки нет, открыто меню', after.gone && after.menu, JSON.stringify(after));
+  const tr = await page.evaluate(() => ['en', 'fr', 'de', 'ru'].map(l => l + ':' + ((i18n[l].splashTips || []).length === 12 ? 0 : 1)).join());
+  check('советы заставки на 4 языках, по 12', tr === 'en:0,fr:0,de:0,ru:0', tr);
+  await context.close();
+}
+
 // Разбор «понятно ли ребёнку»: главное — на первом экране, слова — одни и те же
 async function testKidClarity(browser) {
   console.log('\nПонятно ребёнку: кнопки на виду, слова одни');
@@ -9135,6 +9171,7 @@ async function testKeyPage(browser) {
     await testShop(browser);
     await testPets(browser);
     await testSound(browser);
+    await testSplash(browser);
     await testKidClarity(browser);
     await testOnlineAdvBonuses(browser);
     await testLocalAdvBonuses(browser);

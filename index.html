@@ -27,6 +27,14 @@
 <!-- booting: пока скрипты не нарисовали первый экран, заготовку не видно —
      иначе на слабом телефоне мелькали пустые карточки и английские подписи -->
 <body class="booting">
+<!-- Заставка (js/main.js): логотип и градусник, который наполняется по мере
+     загрузки — шрифты, картинки меню, данные из базы; около двух секунд.
+     Видна сразу, ещё до скриптов: стили — в styles.css, он грузится первым -->
+<div class="splash" id="splash" aria-hidden="true">
+  <div class="sp-logo">Hot or Cold</div>
+  <div class="sp-thermo"><div class="sp-tube"><div class="sp-fill" id="spFill"></div></div><div class="sp-bulb"></div></div>
+  <div class="sp-tip" id="spTip"></div>
+</div>
 <div class="card" id="card">
   <div id="updateBanner" class="hidden"></div>
   <div class="top-controls">
