@@ -191,7 +191,12 @@ function stubSupabase(opts) {
             if (!O.played) return { data: null, error: { message: 'chest_locked' } };
             if (O.chestOpened) return { data: Object.assign({ already: true }, O.chest), error: null };
             O.streak = (O.streak || 0) + 1; O.chestOpened = true; O.xp += 30;
-            O.chest = { xp: 30, streak: O.streak, froze: false, surprise: window.__chestSurprise || null, streakReward: null };
+            // Награда за день серии (066) — как в базе; window.__noPay — база без 066
+            const pay = window.__noPay ? null : streakDayPay(O.streak);
+            O.chest = { xp: 30, streak: O.streak, froze: false, surprise: window.__chestSurprise || null, streakReward: null,
+              pay: pay && { coins: pay.coins, gems: pay.gems, icon: pay.chest ? 'shop-07' : null } };
+            if (pay && window.__wallet) { window.__wallet.coins += pay.coins; window.__wallet.gems += pay.gems; }
+            if (pay && pay.chest) O.owned.push({ kind: 'icon', code: 'shop-07' });
             if (O.chest.surprise) O.owned.push(O.chest.surprise);
             return { data: O.chest, error: null };
           }

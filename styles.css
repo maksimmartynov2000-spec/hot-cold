@@ -3038,3 +3038,7 @@ body.kb-open .game-pet { display: none; }
 @keyframes spCreep { from { height: 0; } to { height: 30%; } }
 @keyframes spBulb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 @media (prefers-reduced-motion: reduce) { .splash, .splash * { animation: none !important; transition: none !important; } }
+
+/* Сундук дня: награда за день серии (066) и что будет завтра */
+.ch-pay { flex: none; min-width: 64px; font-size: 18px; font-weight: 900; color: var(--gold); text-align: center; }
+.ch-next { margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--muted); text-align: center; }

@@ -274,7 +274,8 @@ function renderShop() {
   else note.textContent = shopWallet ? S.today.replace('{n}', shopWallet.today).replace('{m}', shopWallet.cap) : '';
   document.getElementById('shopEarnHead').textContent = S.earnHead;
   // Задания дня спрятаны (DAILY_EXTRAS) — и строки про них нет
-  const earn = DAILY_EXTRAS ? S.earn.slice(0, 5).concat([S.earnQuest], S.earn.slice(5)) : S.earn;
+  // Первая строка — серия дней (066); задание дня — после Испытания
+  const earn = DAILY_EXTRAS ? S.earn.slice(0, 6).concat([S.earnQuest], S.earn.slice(6)) : S.earn;
   document.getElementById('shopEarn').innerHTML = earn.map(x => '<div class="sh-earn-row">' + escapeHtml(x) + '</div>').join('');
   document.getElementById('shopTrophy').textContent = S.trophy;
   document.getElementById('shopOk').textContent = S.close;
