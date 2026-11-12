@@ -520,8 +520,18 @@ async function testPauseAndGiveUp(browser) {
   const info = await page.locator('#unfinishedInfo').textContent();
   check('в карточке видно раунд и очки', /Раунд\s*2/.test(info), info.trim());
 
+  // Игра в тестах открыта как файл (file://), и под нагрузкой всего прогона
+  // Chromium иногда теряет localStorage такой страницы при перезагрузке — ещё
+  // до запуска её скриптов. По https у игроков этого нет. Потерял — кладём
+  // запись обратно и перезагружаем снова: проверяется, что игра её поднимает
+  const keep = await page.evaluate(() => localStorage.getItem('hc_trial_state'));
   await page.reload();
   await page.waitForTimeout(400);
+  if (keep && !(await page.evaluate(() => localStorage.getItem('hc_trial_state')))) {
+    await page.evaluate(v => localStorage.setItem('hc_trial_state', v), keep);
+    await page.reload();
+    await page.waitForTimeout(400);
+  }
   await page.click('#tModeRun');
   const survived = await page.locator('#unfinishedBox').waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
   check('игра переживает перезагрузку страницы', survived);
