@@ -44,16 +44,23 @@ function petSkinOk(kind, skin) { return skin === PET_STAR || (PET_SKINS[kind] ||
 // Питомец разметкой: <span class="pet pet-<вид> [skin-<облик>]"> аура позади,
 // картинка, аура спереди, слой частиц </span>. opts: skin — облик (своя
 // картинка), auras — ауры (по слоям)
+let petSeq = 0;
 function petHtml(kind, opts) {
   opts = opts || {};
   if (PETS.indexOf(kind) < 0) return '';
   const skin = opts.skin && petSkinOk(kind, opts.skin) ? opts.skin : null;
   let back = '', front = '';
+  // Свои id градиентов у каждого экземпляра: один питомец бывает на странице
+  // несколько раз, и градиент из спрятанной копии браузер не рисует
+  const n = ++petSeq;
+  const own = s => s.replace(/(id="|url\(#)au-/g, '$1au' + n + '-');
   (opts.auras || []).forEach(code => {
     const a = PET_AURAS[code];
     if (!a || !a.art[kind]) return;
-    const g = '<g class="pt-gear g-aura g-' + code + '">' + a.art[kind] + '</g>';
+    const g = '<g class="pt-gear g-aura g-' + code + '">' + own(a.art[kind]) + '</g>';
     if (a.layer === 'front') front += g; else back += g;
+    // Общие ауры — в два слоя: свечение позади, частицы перед питомцем
+    if (a.front && a.front[kind]) front += '<g class="pt-gear g-aura g-' + code + '-front">' + own(a.front[kind]) + '</g>';
   });
   const svg = (s, cls) => s ? '<svg class="pet-aura ' + cls + '" viewBox="0 0 240 240" aria-hidden="true">' + s + '</svg>' : '';
   return '<span class="pet pet-' + kind + (skin ? ' skin-' + skin : '') + '" data-pet="' + kind + '"' + (skin ? ' data-skin="' + skin + '"' : '') + '>' +

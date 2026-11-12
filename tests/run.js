@@ -7136,7 +7136,8 @@ async function testPets(browser) {
     const skins = THERMO_SKINS.filter(s => look('sk-' + s) === base);
     test.remove();
     const skinItems = shopCodes('skin');
-    const strip = s => s.replace(/style="[^"]*"/g, '');
+    // Номер экземпляра в id градиентов (au<n>-) у каждого свой — нарочно
+    const strip = s => s.replace(/style="[^"]*"/g, '').replace(/au\d+-/g, 'au-');
     return { pets: PETS.filter(k => PET_SKINS[k].length !== 5).length,
       // Каждому питомцу — картинки покоя, пяти эмоций, пяти обликов и звёздного
       files: PETS.flatMap(k => PET_STATES.concat(PET_SKINS[k], [PET_STAR]).map(s => petImg(k, s))),
@@ -7149,12 +7150,15 @@ async function testPets(browser) {
       drawn: shopCodes('gear').filter(c => { const k = PET_AURAS[c].pet || 'owl'; return !petHtml(k, { auras: [c] }).includes('class="pt-gear g-aura g-' + c + '"'); }).length,
       // Две одинаковые ауры в одной разметке не плодят случайностей: частицы кладёт только реакция
       same: PETS.every(k => strip(petHtml(k, { auras: ['aura_fire'] })) === strip(petHtml(k, { auras: ['aura_fire'] }))),
+      // Общие ауры — в два слоя, и у каждого экземпляра свои id градиентов
+      layers: shopCodes('gear').filter(c => !PET_AURAS[c].pet).every(c => { const h = petHtml('owl', { auras: [c] }); return h.includes('pa-back') && h.includes('pa-front'); }),
+      ids: (() => { const a = petHtml('owl', { auras: ['aura_fire'] }), b = petHtml('owl', { auras: ['aura_fire'] }); return a.match(/id="(au\d+-[^"]+)"/)[1] !== b.match(/id="(au\d+-[^"]+)"/)[1]; })(),
       thermo: shopCodes('thermo').filter(c => !THERMO_SKINS.includes(c)).length, skins: skins.length,
       winfx: shopCodes('winfx').filter(c => !WINFX[c]).length };
   });
   const absent = art.files.filter(f => !fs.existsSync(path.join(__dirname, '..', f)));
   check('у каждого питомца есть 12 картинок (72 в icons/pets), пять обликов и звёздный, у аур — рисунок на своём питомце, у градусников и эффектов — вид',
-    !art.pets && art.files.length === 72 && !absent.length && !art.skinArt && !art.skinItems && !art.auras && !art.slots && !art.fits && !art.drawn && art.same &&
+    !art.pets && art.files.length === 72 && !absent.length && !art.skinArt && !art.skinItems && !art.auras && !art.slots && !art.fits && !art.drawn && art.same && art.layers && art.ids &&
     !art.thermo && !art.skins && !art.winfx, JSON.stringify(art).slice(0, 400) + ' нет: ' + absent.join(' '));
   const tr = await p2.evaluate(() => {
     const ru = i18n.ru;
