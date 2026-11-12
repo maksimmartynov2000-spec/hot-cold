@@ -193,10 +193,13 @@ const MUSIC_TRACKS = { menu: 'music/menu.m4a', adventure: 'music/adventure.m4a',
 const MUSIC_VOL = { menu: 0.35, adventure: 0.35, game: 0.12 };
 const MUSIC_KEY = 'hc_music';
 let musicOn = (() => { try { return localStorage.getItem(MUSIC_KEY) !== '0'; } catch (e) { return true; } })();
-let musicEl = null, musicName = null, musicFade = null;
+let musicEl = null, musicName = null;
+// До первого касания музыку не грузим: играть она всё равно не может (iOS),
+// а полтора мегабайта при запуске замедляют открытие игры
+let musicUnlocked = false;
 function musicTrackFor(scr) { return scr === 'adventure' ? 'adventure' : scr === 'game' ? 'game' : 'menu'; }
 function musicFor(scr) {
-  if (!MUSIC_READY) return;
+  if (!MUSIC_READY || !musicUnlocked) return;
   const want = musicOn ? musicTrackFor(scr) : null;
   if (want === musicName && musicEl) { musicVolume(MUSIC_VOL[want] || 0.3); return; }
   musicName = want;
@@ -227,7 +230,10 @@ function musicPlay() {
   if (p && p.catch) p.then(() => musicFadeTo(a, MUSIC_VOL[musicName] || 0.3)).catch(() => {});
   else musicFadeTo(a, MUSIC_VOL[musicName] || 0.3);
 }
-['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if (musicEl && musicEl.paused && !document.hidden) musicPlay(); }, { passive: true }));
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => {
+  if (!musicUnlocked) { musicUnlocked = true; musicFor(typeof screen !== 'undefined' ? screen : 'mode'); return; }
+  if (musicEl && musicEl.paused && !document.hidden) musicPlay();
+}, { passive: true }));
 // Свернули игру — музыка молчит
 document.addEventListener('visibilitychange', () => {
   if (!musicEl) return;
