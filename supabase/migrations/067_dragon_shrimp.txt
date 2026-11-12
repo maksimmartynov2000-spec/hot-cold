@@ -1,0 +1,110 @@
+-- Два новых питомца: Дракон Пилот и Креветка Ныряльщица. Применять в Supabase:
+-- SQL Editor → вставить целиком → Run. Применить ДО мёржа. Повторный запуск
+-- ничего не ломает.
+--
+-- • Дракон Пилот — герой мира «Огненная земля», 600 🪙; Креветка Ныряльщица —
+--   герой «Морской глубины», 450 🪙.
+-- • У каждого пять обликов за кристаллы и звёздный на 10-м уровне, две свои
+--   ауры (дракон — угольки и небо, креветка — коралловый риф и медузы) и набор
+--   «питомец + две ауры» со скидкой 20 %.
+-- Всё считает база: цену, скидку и опыт из игры не прислать.
+
+-- ============ 1. Товары ============
+-- Копия — в js/shop.js (SHOP_ITEMS), сверяется тестом
+create or replace function shop_catalog()
+returns table(kind text, code text, coins int, gems int, rarity text)
+language sql immutable as $$
+  values
+    -- Иконки «Стихии»
+    ('icon', 'shop-01', 90, 0, 'common'), ('icon', 'shop-02', 100, 0, 'common'), ('icon', 'shop-03', 110, 0, 'common'),
+    ('icon', 'shop-04', 120, 0, 'common'), ('icon', 'shop-05', 160, 0, 'rare'), ('icon', 'shop-06', 170, 0, 'rare'),
+    ('icon', 'shop-07', 180, 0, 'rare'), ('icon', 'shop-08', 200, 0, 'rare'), ('icon', 'shop-09', 220, 0, 'rare'),
+    ('icon', 'shop-10', 260, 0, 'epic'), ('icon', 'shop-11', 0, 12, 'epic'), ('icon', 'shop-12', 0, 14, 'epic'),
+    ('icon', 'shop-13', 0, 14, 'epic'), ('icon', 'shop-14', 0, 16, 'epic'), ('icon', 'shop-15', 0, 16, 'epic'),
+    ('icon', 'shop-16', 0, 20, 'legend'), ('icon', 'shop-17', 0, 22, 'legend'), ('icon', 'shop-18', 0, 22, 'legend'),
+    ('icon', 'shop-19', 0, 24, 'legend'), ('icon', 'shop-20', 0, 25, 'legend'),
+    -- Рамки
+    ('frame', 'leaf', 100, 0, 'common'), ('frame', 'ocean', 180, 0, 'rare'), ('frame', 'coral', 200, 0, 'rare'),
+    ('frame', 'ember', 220, 0, 'rare'), ('frame', 'night', 300, 0, 'epic'), ('frame', 'galaxy', 0, 14, 'epic'),
+    ('frame', 'aurora', 0, 18, 'legend'), ('frame', 'prism', 0, 20, 'legend'),
+    -- Фоны кружка
+    ('color', 'grad-mint', 80, 0, 'common'), ('color', 'grad-peach', 80, 0, 'common'), ('color', 'grad-sky', 90, 0, 'common'),
+    ('color', 'grad-violet', 140, 0, 'rare'), ('color', 'grad-sand', 120, 0, 'rare'), ('color', 'grad-galaxy', 0, 10, 'epic'),
+    ('color', 'grad-rainbow', 0, 14, 'legend'), ('color', 'grad-sun', 0, 12, 'epic'),
+    -- Титулы
+    ('title', 'thinker', 90, 0, 'common'), ('title', 'explorer', 100, 0, 'common'), ('title', 'lucky', 150, 0, 'rare'),
+    ('title', 'strategist', 180, 0, 'rare'), ('title', 'speedy', 160, 0, 'rare'), ('title', 'calm', 110, 0, 'common'),
+    ('title', 'sleuth', 170, 0, 'rare'), ('title', 'friend', 80, 0, 'common'), ('title', 'legend', 0, 15, 'legend'),
+    ('title', 'genius', 0, 12, 'epic'),
+    -- Фразы для чата в партии
+    ('phrase', 'bingo', 60, 0, 'common'), ('phrase', 'respect', 70, 0, 'common'), ('phrase', 'brain', 80, 0, 'common'),
+    ('phrase', 'whatluck', 120, 0, 'rare'), ('phrase', 'thanks', 60, 0, 'common'), ('phrase', 'math', 100, 0, 'rare'),
+    ('phrase', 'comeback', 140, 0, 'rare'), ('phrase', 'bravo', 70, 0, 'common'),
+    -- Питомцы: все восемь покупаются
+    ('pet', 'badger', 450, 0, 'epic'), ('pet', 'owl', 500, 0, 'epic'), ('pet', 'toucan', 450, 0, 'epic'),
+    ('pet', 'cham', 550, 0, 'epic'), ('pet', 'crab', 500, 0, 'epic'), ('pet', 'penguin', 550, 0, 'epic'),
+    ('pet', 'dragon', 600, 0, 'epic'), ('pet', 'shrimp', 450, 0, 'epic'),
+    -- Облики питомцев (кристаллы): <питомец>_<облик>; звёздный — не товар, он за 10-й уровень
+    ('skin', 'badger_honey', 0, 8, 'rare'), ('skin', 'badger_midnight', 0, 12, 'epic'), ('skin', 'badger_snow', 0, 8, 'rare'),
+    ('skin', 'badger_autumn', 0, 10, 'rare'), ('skin', 'badger_mint', 0, 10, 'rare'), ('skin', 'owl_snowy', 0, 8, 'rare'),
+    ('skin', 'owl_night', 0, 12, 'epic'), ('skin', 'owl_ruby', 0, 10, 'rare'), ('skin', 'owl_ash', 0, 8, 'rare'),
+    ('skin', 'owl_moon', 0, 12, 'epic'), ('skin', 'toucan_sunset', 0, 10, 'rare'), ('skin', 'toucan_lime', 0, 8, 'rare'),
+    ('skin', 'toucan_arctic', 0, 10, 'rare'), ('skin', 'toucan_neon', 0, 12, 'epic'), ('skin', 'toucan_cherry', 0, 8, 'rare'),
+    ('skin', 'cham_lava', 0, 12, 'epic'), ('skin', 'cham_ocean', 0, 10, 'rare'), ('skin', 'cham_lemon', 0, 8, 'rare'),
+    ('skin', 'cham_berry', 0, 10, 'rare'), ('skin', 'cham_midnight', 0, 12, 'epic'), ('skin', 'crab_blue', 0, 8, 'rare'),
+    ('skin', 'crab_sand', 0, 8, 'rare'), ('skin', 'crab_neon', 0, 12, 'epic'), ('skin', 'crab_sunny', 0, 10, 'rare'),
+    ('skin', 'crab_deep', 0, 12, 'epic'), ('skin', 'penguin_emperor', 0, 12, 'epic'), ('skin', 'penguin_night', 0, 10, 'rare'),
+    ('skin', 'penguin_snowy', 0, 8, 'rare'), ('skin', 'penguin_rose', 0, 10, 'rare'), ('skin', 'penguin_sunny', 0, 8, 'rare'),
+    ('skin', 'dragon_emerald', 0, 8, 'rare'), ('skin', 'dragon_frost', 0, 10, 'rare'), ('skin', 'dragon_gold', 0, 10, 'rare'),
+    ('skin', 'dragon_amethyst', 0, 10, 'rare'), ('skin', 'dragon_obsidian', 0, 12, 'epic'), ('skin', 'shrimp_neon', 0, 12, 'epic'),
+    ('skin', 'shrimp_gold', 0, 10, 'rare'), ('skin', 'shrimp_mint', 0, 8, 'rare'), ('skin', 'shrimp_lilac', 0, 8, 'rare'),
+    ('skin', 'shrimp_crimson', 0, 10, 'rare'),
+    -- Ауры: четыре общие (стихии и звёзды) и по две своих у каждого
+    ('gear', 'aura_fire', 700, 0, 'epic'), ('gear', 'aura_ice', 700, 0, 'epic'), ('gear', 'aura_storm', 700, 0, 'epic'),
+    ('gear', 'aura_star', 900, 0, 'legend'), ('gear', 'aura_leaves', 500, 0, 'epic'), ('gear', 'aura_fireflies', 500, 0, 'epic'),
+    ('gear', 'aura_moon', 500, 0, 'epic'), ('gear', 'aura_feathers', 500, 0, 'epic'), ('gear', 'aura_tropics', 500, 0, 'epic'),
+    ('gear', 'aura_fruit', 500, 0, 'epic'), ('gear', 'aura_rainbow', 500, 0, 'epic'), ('gear', 'aura_butterflies', 500, 0, 'epic'),
+    ('gear', 'aura_bubbles', 500, 0, 'epic'), ('gear', 'aura_seabed', 500, 0, 'epic'), ('gear', 'aura_snow', 500, 0, 'epic'),
+    ('gear', 'aura_fish', 500, 0, 'epic'), ('gear', 'aura_embers', 500, 0, 'epic'), ('gear', 'aura_clouds', 500, 0, 'epic'),
+    ('gear', 'aura_coral', 500, 0, 'epic'), ('gear', 'aura_jelly', 500, 0, 'epic'),
+    -- Облики градусника
+    ('thermo', 'ice', 200, 0, 'rare'), ('thermo', 'lava', 200, 0, 'rare'), ('thermo', 'neon', 350, 0, 'epic'),
+    ('thermo', 'space', 0, 15, 'legend'),
+    -- Эффекты победы
+    ('winfx', 'confetti', 120, 0, 'common'), ('winfx', 'fireworks', 240, 0, 'rare'), ('winfx', 'lightning', 400, 0, 'epic'),
+    ('winfx', 'meteors', 0, 18, 'legend');
+$$;
+
+-- Чья вещь: облик и своя аура питомца — его код; ауры стихий и звёзд — всем (null)
+create or replace function pet_item_for(p_kind text, p_code text)
+returns text language sql immutable as $$
+  select case
+    when p_kind = 'skin' then split_part(p_code, '_', 1)
+    when p_kind = 'gear' then case
+      when p_code in ('aura_leaves', 'aura_fireflies') then 'badger'
+      when p_code in ('aura_moon', 'aura_feathers') then 'owl'
+      when p_code in ('aura_tropics', 'aura_fruit') then 'toucan'
+      when p_code in ('aura_rainbow', 'aura_butterflies') then 'cham'
+      when p_code in ('aura_bubbles', 'aura_seabed') then 'crab'
+      when p_code in ('aura_snow', 'aura_fish') then 'penguin'
+      when p_code in ('aura_embers', 'aura_clouds') then 'dragon'
+      when p_code in ('aura_coral', 'aura_jelly') then 'shrimp'
+    end
+  end;
+$$;
+
+-- ============ 2. Наборы ============
+-- Копия — в js/shop.js (SHOP_BUNDLES). Набор — питомец и две его ауры
+create or replace function shop_bundles()
+returns table(code text, currency text, pct int, items text[])
+language sql immutable as $$
+  values
+    ('set_badger', 'coins', 20, array['pet:badger', 'gear:aura_leaves', 'gear:aura_fireflies']),
+    ('set_owl', 'coins', 20, array['pet:owl', 'gear:aura_moon', 'gear:aura_feathers']),
+    ('set_toucan', 'coins', 20, array['pet:toucan', 'gear:aura_tropics', 'gear:aura_fruit']),
+    ('set_cham', 'coins', 20, array['pet:cham', 'gear:aura_rainbow', 'gear:aura_butterflies']),
+    ('set_crab', 'coins', 20, array['pet:crab', 'gear:aura_bubbles', 'gear:aura_seabed']),
+    ('set_penguin', 'coins', 20, array['pet:penguin', 'gear:aura_snow', 'gear:aura_fish']),
+    ('set_dragon', 'coins', 20, array['pet:dragon', 'gear:aura_embers', 'gear:aura_clouds']),
+    ('set_shrimp', 'coins', 20, array['pet:shrimp', 'gear:aura_coral', 'gear:aura_jelly']);
+$$;

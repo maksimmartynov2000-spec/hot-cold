@@ -4709,7 +4709,9 @@ async function testQuitConfirm(browser) {
   await page.evaluate(() => openSetup('duel', true));
   await page.waitForTimeout(150);
   await page.selectOption('#rangeMax', '100');
-  await page.evaluate(() => { BOT_SPEED = 0; });
+  // Бот думает долго: иначе он изредка угадывал с первого хода, партия
+  // кончалась, и вопроса не было. Заодно видно, что выход снимает его таймер
+  await page.evaluate(() => { BOT_SPEED = 100000; });
   await page.click('#tStartMatch');
   await page.waitForTimeout(200);
   await page.evaluate(() => { secret = 77; });
@@ -6660,9 +6662,9 @@ async function testShop(browser) {
     sel: document.querySelector('#shopTabs .sh-tab.sel').textContent, bundles: document.querySelectorAll('#shopGrid .sh-bundle').length,
     heads: [...document.querySelectorAll('#shopGrid .sh-head b')].map(h => h.textContent).join('|'),
     empty: document.querySelectorAll('#shopGrid .sh-empty').length }));
-  check('одиннадцать разделов, открыта «Витрина»: шесть наборов, товаров дня без базы 063 нет',
+  check('одиннадцать разделов, открыта «Витрина»: восемь наборов, товаров дня без базы 063 нет',
     front.tabs === 'Витрина|Питомцы|Облики|Ауры|Иконки|Рамки|Фоны|Титулы|Фразы|Градусники|Победа' && front.sel === 'Витрина' &&
-    front.bundles === 6 && front.heads === '🎁 Наборы' && !front.empty, JSON.stringify(front));
+    front.bundles === 8 && front.heads === '🎁 Наборы' && !front.empty, JSON.stringify(front));
   await page.click('#shopTabs .sh-tab:nth-child(5)');
   await page.waitForTimeout(150);
   const shop = await page.evaluate(() => ({ shown: !document.getElementById('shopModal').classList.contains('hidden'),
@@ -6779,7 +6781,7 @@ async function testShop(browser) {
     return { note: document.getElementById('shopNote').textContent, btn: document.getElementById('siBuy').textContent,
       off: document.getElementById('siBuy').disabled, login: !!document.querySelector('#shopNote .btn'), deals, bundles }; });
   check('без входа: витрина видна, купить — после входа', /после входа/.test(g.note) && g.btn === 'Войти' && !g.off && g.login, JSON.stringify(g));
-  check('без входа: товары дня — «после входа», наборы видны', /после входа/.test(g.deals) && g.bundles === 6, JSON.stringify(g));
+  check('без входа: товары дня — «после входа», наборы видны', /после входа/.test(g.deals) && g.bundles === 8, JSON.stringify(g));
   await guest.context().close();
   // Тексты на всех языках, рисунки, рамки, фоны
   const p2 = await newGame(browser, {});
@@ -6852,9 +6854,9 @@ async function testPets(browser) {
     items: [...document.querySelectorAll('#shopGrid .sh-item')].map(b => b.dataset.code + ':' + b.className.match(/rar-(\w+)/)[1] + ':' +
       b.querySelector('.sh-price').textContent).join('|'), art: document.querySelectorAll('#shopGrid .sh-item .pet .pet-img').length,
     names: [...document.querySelectorAll('#shopGrid .sh-name')].map(x => x.textContent).join('|') }));
-  check('карточка ведёт в магазин к питомцам: шесть героев Приключения, эпические, за монеты',
-    pets.sel === 'Питомцы' && pets.items === 'badger:epic:450 🪙|owl:epic:500 🪙|toucan:epic:450 🪙|cham:epic:550 🪙|crab:epic:500 🪙|penguin:epic:550 🪙' &&
-    pets.art === 6 && pets.names === 'Барсук Очкарик|Филин Монокль|Тукан Панама|Хамелеон Очки|Краб Матрос|Пингвин Капитан', JSON.stringify(pets));
+  check('карточка ведёт в магазин к питомцам: восемь героев Приключения, эпические, за монеты',
+    pets.sel === 'Питомцы' && pets.items === 'badger:epic:450 🪙|owl:epic:500 🪙|toucan:epic:450 🪙|cham:epic:550 🪙|crab:epic:500 🪙|penguin:epic:550 🪙|dragon:epic:600 🪙|shrimp:epic:450 🪙' &&
+    pets.art === 8 && pets.names === 'Барсук Очкарик|Филин Монокль|Тукан Панама|Хамелеон Очки|Краб Матрос|Пингвин Капитан|Дракон Пилот|Креветка Ныряльщица', JSON.stringify(pets));
   // Карточка питомца: герой какого мира и характер
   await page.click('#shopGrid .sh-item[data-code="penguin"]');
   await page.waitForTimeout(150);
@@ -6874,13 +6876,13 @@ async function testPets(browser) {
   check('товары дня: −40 %, −25 %, −15 %, старая цена зачёркнута, «новые через 5 ч 12 мин»',
     front.deals === 'shop-05:−40%:160 🪙 96 🪙|aura_star:−25%:900 🪙 675 🪙|lucky:−15%:150 🪙 128 🪙' &&
     front.heads === '🔥 Товары дняновые через 5 ч 12 мин|🎁 Наборыдешевле, чем по отдельности', JSON.stringify(front));
-  check('наборы: питомец и две его ауры со скидкой 20 % (как в базе: 1160, 1200, 1160, 1240, 1200, 1240)',
-    front.bundles === 'set_badger:1450 🪙1160 🪙|set_owl:1500 🪙1200 🪙|set_toucan:1450 🪙1160 🪙|set_cham:1550 🪙1240 🪙|set_crab:1500 🪙1200 🪙|set_penguin:1550 🪙1240 🪙',
+  check('наборы: питомец и две его ауры со скидкой 20 % (как в базе: 1160, 1200, 1160, 1240, 1200, 1240, 1280, 1160)',
+    front.bundles === 'set_badger:1450 🪙1160 🪙|set_owl:1500 🪙1200 🪙|set_toucan:1450 🪙1160 🪙|set_cham:1550 🪙1240 🪙|set_crab:1500 🪙1200 🪙|set_penguin:1550 🪙1240 🪙|set_dragon:1600 🪙1280 🪙|set_shrimp:1450 🪙1160 🪙',
     front.bundles);
   // Без цены от базы магазин считает так же
   const fallback = await page.evaluate(() => { const saved = petLook.bundles; petLook.bundles = null;
     const r = SHOP_BUNDLES.map(b => shopBundlePrice(b)).join(); petLook.bundles = saved; return r; });
-  check('цена набора в игре считается так же, как в базе', fallback === '1160,1200,1160,1240,1200,1240', fallback);
+  check('цена набора в игре считается так же, как в базе', fallback === '1160,1200,1160,1240,1200,1240,1280,1160', fallback);
   // Товар дня — со скидкой
   await page.click('#shopGrid .sh-item[data-code="shop-05"]');
   await page.waitForTimeout(150);
@@ -6921,9 +6923,9 @@ async function testPets(browser) {
     img: document.querySelector('#shopGrid .sh-item[data-code="badger_honey"] .pet-img').getAttribute('src'),
     price: document.querySelector('#shopGrid .sh-item[data-code="owl_night"] .sh-price').textContent,
     gems: [...document.querySelectorAll('#shopGrid .sh-item')].every(b => /💎/.test(b.querySelector('.sh-price').textContent)) }));
-  check('обликов 30 по шести питомцам, все за 💎, каждый — своей картинкой; у чужих питомцев — с замком, свои — без', skins.n === 30 && skins.gems &&
-    skins.heads === 'Барсук Очкарик|Филин Монокльсначала сам питомец|Тукан Панамасначала сам питомец|Хамелеон Очкисначала сам питомец|Краб Матроссначала сам питомец|Пингвин Капитансначала сам питомец' &&
-    skins.locked === 25 && skins.lockedBadger === 0 && skins.onBadger === 1 && skins.img === 'icons/pets/badger_honey.webp' && skins.price === '🔒 12 💎', JSON.stringify(skins));
+  check('обликов 40 по восьми питомцам, все за 💎, каждый — своей картинкой; у чужих питомцев — с замком, свои — без', skins.n === 40 && skins.gems &&
+    skins.heads === 'Барсук Очкарик|Филин Монокльсначала сам питомец|Тукан Панамасначала сам питомец|Хамелеон Очкисначала сам питомец|Краб Матроссначала сам питомец|Пингвин Капитансначала сам питомец|Дракон Пилотсначала сам питомец|Креветка Ныряльщицасначала сам питомец' &&
+    skins.locked === 35 && skins.lockedBadger === 0 && skins.onBadger === 1 && skins.img === 'icons/pets/badger_honey.webp' && skins.price === '🔒 12 💎', JSON.stringify(skins));
   await page.click('#shopGrid .sh-item[data-code="owl_night"]');
   await page.waitForTimeout(150);
   const lockedCard = await page.evaluate(() => ({ note: document.getElementById('siNote').textContent, off: document.getElementById('siBuy').disabled,
@@ -6957,9 +6959,9 @@ async function testPets(browser) {
     coins: [...document.querySelectorAll('#shopGrid .sh-item')].every(b => /🪙|Куплено/.test(b.querySelector('.sh-price').textContent)),
     own: [...document.querySelectorAll('#shopGrid .sh-item.own')].map(b => b.dataset.code).join(),
     fire: document.querySelector('#shopGrid .sh-item[data-code="aura_fire"] .sh-price').textContent }));
-  check('аур 16: сначала «Для всех питомцев» (пламя, иней, гроза, звёзды на своём барсуке), потом у каждого свои; у каждой — рисунок',
-    gear.n === 16 && gear.heads === 'Для всех питомцев|Барсук Очкарик|Филин Монокль|Тукан Панама|Хамелеон Очки|Краб Матрос|Пингвин Капитан' &&
-    gear.all === 'aura_fire,aura_ice,aura_storm,aura_star' && gear.onBadger === 6 && gear.onOwl === 2 && gear.drawn === 16 && gear.coins &&
+  check('аур 20: сначала «Для всех питомцев» (пламя, иней, гроза, звёзды на своём барсуке), потом у каждого свои; у каждой — рисунок',
+    gear.n === 20 && gear.heads === 'Для всех питомцев|Барсук Очкарик|Филин Монокль|Тукан Панама|Хамелеон Очки|Краб Матрос|Пингвин Капитан|Дракон Пилот|Креветка Ныряльщица' &&
+    gear.all === 'aura_fire,aura_ice,aura_storm,aura_star' && gear.onBadger === 6 && gear.onOwl === 2 && gear.drawn === 20 && gear.coins &&
     gear.own === 'aura_leaves,aura_fireflies' && gear.fire === '700 🪙', JSON.stringify(gear));
   await page.click('#shopGrid .sh-item[data-code="aura_leaves"]');
   await page.waitForTimeout(150);
@@ -7007,8 +7009,8 @@ async function testPets(browser) {
   check('облики: обычный, медовый (надет), звёздный под замком до 10-го уровня, остальные — в магазине', pm.skins === 'plain,*honey,🔒star' && pm.skinShop,
     JSON.stringify(pm));
   check('ауры: листопад надет, светлячки есть; подписи места нет — оно одно', pm.gear === 'ЛистопадСветлячки' && pm.on === 'aura_leaves', JSON.stringify(pm));
-  check('питомцы: Барсук с вами, остальные пять — с ценой',
-    pm.pets === 'Барсук ОчкарикС вами ✓|Филин Монокль500 🪙|Тукан Панама450 🪙|Хамелеон Очки550 🪙|Краб Матрос500 🪙|Пингвин Капитан550 🪙' &&
+  check('питомцы: Барсук с вами, остальные семь — с ценой',
+    pm.pets === 'Барсук ОчкарикС вами ✓|Филин Монокль500 🪙|Тукан Панама450 🪙|Хамелеон Очки550 🪙|Краб Матрос500 🪙|Пингвин Капитан550 🪙|Дракон Пилот600 🪙|Креветка Ныряльщица450 🪙' &&
     pm.go === 'С вами ✓' && pm.goOff, JSON.stringify(pm));
   // Трюк — питомец его показывает; листопад снимается нажатием, светлячки надеваются
   await page.click('#pmTricks [data-trick="flip"]');
@@ -7157,8 +7159,8 @@ async function testPets(browser) {
       winfx: shopCodes('winfx').filter(c => !WINFX[c]).length };
   });
   const absent = art.files.filter(f => !fs.existsSync(path.join(__dirname, '..', f)));
-  check('у каждого питомца есть 12 картинок (72 в icons/pets), пять обликов и звёздный, у аур — рисунок на своём питомце, у градусников и эффектов — вид',
-    !art.pets && art.files.length === 72 && !absent.length && !art.skinArt && !art.skinItems && !art.auras && !art.slots && !art.fits && !art.drawn && art.same && art.layers && art.ids &&
+  check('у каждого питомца есть 12 картинок (96 в icons/pets), пять обликов и звёздный, у аур — рисунок на своём питомце, у градусников и эффектов — вид',
+    !art.pets && art.files.length === 96 && !absent.length && !art.skinArt && !art.skinItems && !art.auras && !art.slots && !art.fits && !art.drawn && art.same && art.layers && art.ids &&
     !art.thermo && !art.skins && !art.winfx, JSON.stringify(art).slice(0, 400) + ' нет: ' + absent.join(' '));
   const tr = await p2.evaluate(() => {
     const ru = i18n.ru;

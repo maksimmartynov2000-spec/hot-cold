@@ -22,7 +22,7 @@ def ell(cx, cy, rx, ry, fill, stroke=None, w=2.4, extra=''):
     s = ' stroke="%s" stroke-width="%s"' % (stroke, w) if stroke else ''
     return '<ellipse cx="%g" cy="%g" rx="%g" ry="%g" fill="%s"%s%s/>' % (cx, cy, rx, ry, fill, s, extra)
 
-KINDS = ['badger', 'owl', 'toucan', 'cham', 'crab', 'penguin']
+KINDS = ['badger', 'owl', 'toucan', 'cham', 'crab', 'penguin', 'dragon', 'shrimp']
 # Центр и радиус ауры вокруг растрового питомца в поле 240×240: питомец стоит на
 # низу холста ростом ~200, кольцо охватывает тело
 RIG = {
@@ -32,6 +32,8 @@ RIG = {
     'cham':    dict(aura=(120, 140), ar=86),
     'crab':    dict(aura=(120, 150), ar=84),
     'penguin': dict(aura=(120, 140), ar=88),
+    'dragon':  dict(aura=(120, 140), ar=90),
+    'shrimp':  dict(aura=(120, 140), ar=86),
 }
 # ---------- общие ауры: мягкие, без обводок ----------
 # Свечение позади питомца (soft_back) и живые частицы перед ним (soft_front):
@@ -103,6 +105,40 @@ def soft_front(k, which):
         s += sparkle(x, y, 1.3 if i % 2 else .9, '#fff3b0', i * .35)
     s += '</g>'
     return s + sparkle(56, 64, 1.1, '#ffffff', .2) + sparkle(190, 84, .9, '#ffe9a8', 1.3)
+
+# ---------- свои ауры дракона и креветки: мягкие, как общие ----------
+def soft_own(k, which):
+    if which == 'embers':        # Угольки: тёплое свечение и рой искр вверх
+        s = ''
+        for i, (x, y) in enumerate([(36, 210), (58, 180), (80, 214), (104, 200), (136, 210), (160, 186), (184, 214), (206, 196), (120, 226), (70, 150), (176, 150)]):
+            s += '<circle class="pt-ember" style="animation-delay:%gs" cx="%g" cy="%g" r="%g" fill="%s"/>' % (i * .27, x, y, 2 + (i % 3) * .8, ['#ff9a3c', '#ffd166', '#fff1b0'][i % 3])
+        return s + sparkle(44, 120, .8, '#ffd166', .5) + sparkle(200, 104, .7, '#ffb02e', 1.4)
+    if which == 'clouds':        # Небо: облачка плывут вокруг
+        cl = lambda x, y, kk, d: ('<g class="pt-aura-wisp" style="animation-delay:%gs;transform-origin:%gpx %gpx" opacity=".92">' % (d, x, y) +
+            ''.join('<circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (x + dx * kk, y + dy * kk, r * kk, c) for dx, dy, r, c in
+                    [(-13, 3, 10, '#e9f3ff'), (0, -4, 13, '#ffffff'), (13, 2, 10, '#e9f3ff'), (-3, 7, 11, '#d7e7fb'), (9, 7, 9, '#d7e7fb')]) + '</g>')
+        s = glow('au-sky', 120, 150, 112, 106, [(0, '#bfe6ff', .4), (.6, '#7cc4ff', .2), (1, '#4aa8ff', 0)])
+        return s + cl(40, 60, 1, 0) + cl(200, 76, .9, .7) + cl(26, 170, .8, 1.4) + cl(214, 184, .85, 2.1)
+    if which == 'coral':         # Коралловый риф: кораллы у ног, морское свечение, пузырьки
+        s = glow('au-reef', 120, 170, 114, 96, [(0, '#7fe0ff', .35), (.6, '#2fa8d8', .2), (1, '#1d6fd0', 0)])
+        def branch(x, base, h, c, flip):
+            d = 'M %g %g C %g %g %g %g %g %g M %g %g C %g %g %g %g %g %g M %g %g C %g %g %g %g %g %g' % (
+                x, base, x, base - h * .4, x - 6 * flip, base - h * .7, x - 4 * flip, base - h,
+                x, base - h * .45, x + 10 * flip, base - h * .55, x + 14 * flip, base - h * .8, x + 13 * flip, base - h * .95,
+                x - 2 * flip, base - h * .7, x - 14 * flip, base - h * .75, x - 18 * flip, base - h * .9, x - 18 * flip, base - h * .98)
+            return '<path d="%s" fill="none" stroke="%s" stroke-width="7" stroke-linecap="round" opacity=".95"/>' % (d, c)
+        s += branch(36, 232, 70, '#ff7aa8', 1) + branch(60, 232, 46, '#ffb36b', -1) + branch(204, 232, 74, '#ff8fc0', -1) + branch(182, 232, 48, '#ffa25a', 1)
+        for i, (x, y, r) in enumerate([(30, 150, 4), (46, 120, 3), (210, 140, 4.5), (196, 110, 3), (110, 40, 3.5)]):
+            s += '<circle class="pt-aura-bubble" style="animation-delay:%gs" cx="%g" cy="%g" r="%g" fill="none" stroke="#e8fbff" stroke-width="1.4" opacity=".85"/>' % (i * .6, x, y, r)
+        return s
+    if which == 'jelly':         # Медузы: три полупрозрачные медузки покачиваются вокруг
+        def jf(x, y, kk, c, d):
+            t = ''.join('<path d="M %g %g q %g %g 0 %g" fill="none" stroke="%s" stroke-width="%g" stroke-linecap="round" opacity=".8"/>' % (
+                x + dx * kk, y + 4 * kk, 4 * kk, 7 * kk, 16 * kk, c, 1.6 * kk) for dx in (-7, -2.5, 2.5, 7))
+            return ('<g class="pt-aura-wisp" style="animation-delay:%gs;transform-origin:%gpx %gpx">' % (d, x, y) + t +
+                    '<path d="M %g %g a %g %g 0 0 1 %g 0 q %g %g %g 0 z" fill="%s" opacity=".85"/>' % (x - 11 * kk, y + 4 * kk, 11 * kk, 11 * kk, 22 * kk, -11 * kk, 4 * kk, -22 * kk, c) +
+                    '<ellipse cx="%g" cy="%g" rx="%g" ry="%g" fill="#ffffff" opacity=".55"/>' % (x - 4 * kk, y - 2 * kk, 3 * kk, 2 * kk) + '</g>')
+        return jf(38, 70, 1.1, '#ff9ad1', 0) + jf(204, 92, 1, '#b79bff', .9) + jf(30, 176, .85, '#8fd8ff', 1.8)
 
 # ---------- ауры ----------
 def leaf(x, y, c, k=1, rot=0):
@@ -179,8 +215,10 @@ def own_aura(k, which):
 GEN_AURAS = {'aura_fire': 'fire', 'aura_ice': 'ice', 'aura_storm': 'storm', 'aura_star': 'star'}
 OWN = {'badger': {'aura_leaves': 'leaves', 'aura_fireflies': 'fireflies'}, 'owl': {'aura_moon': 'moon', 'aura_feathers': 'feathers'},
        'toucan': {'aura_tropics': 'tropics', 'aura_fruit': 'fruit'}, 'cham': {'aura_rainbow': 'rainbow', 'aura_butterflies': 'butterflies'},
-       'crab': {'aura_bubbles': 'bubbles', 'aura_seabed': 'seabed'}, 'penguin': {'aura_snow': 'snow', 'aura_fish': 'fish'}}
-FRONT = {'fireflies', 'feathers', 'fruit', 'butterflies', 'bubbles', 'snow', 'fish', 'leaves'}
+       'crab': {'aura_bubbles': 'bubbles', 'aura_seabed': 'seabed'}, 'penguin': {'aura_snow': 'snow', 'aura_fish': 'fish'},
+       'dragon': {'aura_embers': 'embers', 'aura_clouds': 'clouds'}, 'shrimp': {'aura_coral': 'coral', 'aura_jelly': 'jelly'}}
+SOFT_OWN = {'embers', 'clouds', 'coral', 'jelly'}
+FRONT = {'fireflies', 'feathers', 'fruit', 'butterflies', 'bubbles', 'snow', 'fish', 'leaves', 'embers', 'jelly'}
 
 
 # slot — место в базе (aura), layer — слой: aura позади питомца, front — перед ним
@@ -190,7 +228,8 @@ for code, which in GEN_AURAS.items():
     PET_AURA_ART[code] = {'slot': 'aura', 'layer': 'aura', 'pet': None, 'art': {k: soft_back(k, which) for k in KINDS},
                           'front': {k: soft_front(k, which) for k in KINDS}}
 for k, own in OWN.items():
-    for code, which in own.items(): PET_AURA_ART[code] = {'slot': 'aura', 'layer': 'front' if which in FRONT else 'aura', 'pet': k, 'art': {k: own_aura(k, which)}}
+    for code, which in own.items(): PET_AURA_ART[code] = {'slot': 'aura', 'layer': 'front' if which in FRONT else 'aura', 'pet': k,
+                                                     'art': {k: (soft_own if which in SOFT_OWN else own_aura)(k, which)}}
 
 if OUT:
     for code, A in PET_AURA_ART.items():

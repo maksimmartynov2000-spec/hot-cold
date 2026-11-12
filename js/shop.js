@@ -6,7 +6,7 @@
 // победы (миграции 063–065) — здесь же и на экране питомца.
 // Без входа витрину видно, а купить нельзя; без миграции — «скоро откроется».
 
-// Товары — копия из базы (shop_catalog, миграция 065), сверяется тестом.
+// Товары — копия из базы (shop_catalog, миграция 067), сверяется тестом.
 // Цена — либо в монетах, либо в кристаллах; редкость: common, rare, epic, legend.
 // Облик (skin) — <питомец>_<облик>; ауры лежат в разделе gear: своя аура
 // питомца (PET_AURAS[code].pet) и облик продаются только тому, у кого этот
@@ -44,10 +44,11 @@ const SHOP_ITEMS = [
   { kind: 'phrase', code: 'brain', coins: 80, rar: 'common' }, { kind: 'phrase', code: 'whatluck', coins: 120, rar: 'rare' },
   { kind: 'phrase', code: 'thanks', coins: 60, rar: 'common' }, { kind: 'phrase', code: 'math', coins: 100, rar: 'rare' },
   { kind: 'phrase', code: 'comeback', coins: 140, rar: 'rare' }, { kind: 'phrase', code: 'bravo', coins: 70, rar: 'common' },
-  // Питомцы: все шесть покупаются
+  // Питомцы: все восемь покупаются
   { kind: 'pet', code: 'badger', coins: 450, rar: 'epic' }, { kind: 'pet', code: 'owl', coins: 500, rar: 'epic' },
   { kind: 'pet', code: 'toucan', coins: 450, rar: 'epic' }, { kind: 'pet', code: 'cham', coins: 550, rar: 'epic' },
   { kind: 'pet', code: 'crab', coins: 500, rar: 'epic' }, { kind: 'pet', code: 'penguin', coins: 550, rar: 'epic' },
+  { kind: 'pet', code: 'dragon', coins: 600, rar: 'epic' }, { kind: 'pet', code: 'shrimp', coins: 450, rar: 'epic' },
   // Облики питомцев (кристаллы): <питомец>_<облик>; звёздный — не товар, он за 10-й уровень
   { kind: 'skin', code: 'badger_honey', gems: 8, rar: 'rare' }, { kind: 'skin', code: 'badger_midnight', gems: 12, rar: 'epic' },
   { kind: 'skin', code: 'badger_snow', gems: 8, rar: 'rare' }, { kind: 'skin', code: 'badger_autumn', gems: 10, rar: 'rare' },
@@ -64,6 +65,11 @@ const SHOP_ITEMS = [
   { kind: 'skin', code: 'crab_deep', gems: 12, rar: 'epic' }, { kind: 'skin', code: 'penguin_emperor', gems: 12, rar: 'epic' },
   { kind: 'skin', code: 'penguin_night', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'penguin_snowy', gems: 8, rar: 'rare' },
   { kind: 'skin', code: 'penguin_rose', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'penguin_sunny', gems: 8, rar: 'rare' },
+  { kind: 'skin', code: 'dragon_emerald', gems: 8, rar: 'rare' }, { kind: 'skin', code: 'dragon_frost', gems: 10, rar: 'rare' },
+  { kind: 'skin', code: 'dragon_gold', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'dragon_amethyst', gems: 10, rar: 'rare' },
+  { kind: 'skin', code: 'dragon_obsidian', gems: 12, rar: 'epic' }, { kind: 'skin', code: 'shrimp_neon', gems: 12, rar: 'epic' },
+  { kind: 'skin', code: 'shrimp_gold', gems: 10, rar: 'rare' }, { kind: 'skin', code: 'shrimp_mint', gems: 8, rar: 'rare' },
+  { kind: 'skin', code: 'shrimp_lilac', gems: 8, rar: 'rare' }, { kind: 'skin', code: 'shrimp_crimson', gems: 10, rar: 'rare' },
   // Ауры: четыре общие (стихии и звёзды) и по две своих у каждого
   { kind: 'gear', code: 'aura_fire', coins: 700, rar: 'epic' }, { kind: 'gear', code: 'aura_ice', coins: 700, rar: 'epic' },
   { kind: 'gear', code: 'aura_storm', coins: 700, rar: 'epic' }, { kind: 'gear', code: 'aura_star', coins: 900, rar: 'legend' },
@@ -73,6 +79,8 @@ const SHOP_ITEMS = [
   { kind: 'gear', code: 'aura_rainbow', coins: 500, rar: 'epic' }, { kind: 'gear', code: 'aura_butterflies', coins: 500, rar: 'epic' },
   { kind: 'gear', code: 'aura_bubbles', coins: 500, rar: 'epic' }, { kind: 'gear', code: 'aura_seabed', coins: 500, rar: 'epic' },
   { kind: 'gear', code: 'aura_snow', coins: 500, rar: 'epic' }, { kind: 'gear', code: 'aura_fish', coins: 500, rar: 'epic' },
+  { kind: 'gear', code: 'aura_embers', coins: 500, rar: 'epic' }, { kind: 'gear', code: 'aura_clouds', coins: 500, rar: 'epic' },
+  { kind: 'gear', code: 'aura_coral', coins: 500, rar: 'epic' }, { kind: 'gear', code: 'aura_jelly', coins: 500, rar: 'epic' },
   // Облики градусника
   { kind: 'thermo', code: 'ice', coins: 200, rar: 'rare' }, { kind: 'thermo', code: 'lava', coins: 200, rar: 'rare' },
   { kind: 'thermo', code: 'neon', coins: 350, rar: 'epic' }, { kind: 'thermo', code: 'space', gems: 15, rar: 'legend' },
@@ -88,7 +96,9 @@ const SHOP_BUNDLES = [
   { code: 'set_toucan', currency: 'coins', pct: 20, items: ['pet:toucan', 'gear:aura_tropics', 'gear:aura_fruit'] },
   { code: 'set_cham', currency: 'coins', pct: 20, items: ['pet:cham', 'gear:aura_rainbow', 'gear:aura_butterflies'] },
   { code: 'set_crab', currency: 'coins', pct: 20, items: ['pet:crab', 'gear:aura_bubbles', 'gear:aura_seabed'] },
-  { code: 'set_penguin', currency: 'coins', pct: 20, items: ['pet:penguin', 'gear:aura_snow', 'gear:aura_fish'] }
+  { code: 'set_penguin', currency: 'coins', pct: 20, items: ['pet:penguin', 'gear:aura_snow', 'gear:aura_fish'] },
+  { code: 'set_dragon', currency: 'coins', pct: 20, items: ['pet:dragon', 'gear:aura_embers', 'gear:aura_clouds'] },
+  { code: 'set_shrimp', currency: 'coins', pct: 20, items: ['pet:shrimp', 'gear:aura_coral', 'gear:aura_jelly'] }
 ];
 // Разделы витрины по порядку. Первый — «Витрина»: товары дня и наборы
 const SHOP_KINDS = ['deals', 'pet', 'skin', 'gear', 'icon', 'frame', 'color', 'title', 'phrase', 'thermo', 'winfx'];

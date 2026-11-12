@@ -113,6 +113,15 @@ const PET_CALL = {
     }
     if (shape !== 'flat') sTone(c, { at: at + 0.15, dur: 0.14 * len, type: 'triangle', f: (shape === 'up' ? 520 : 420) * p, to: (shape === 'up' ? 700 : 280) * p, vol: 0.18 });
   },
+  // Дракон — тёплое урчание с «пыхом» пара, креветка — тоненькое щёлканье с писком
+  dragon(c, at, p, len, shape) {
+    sTone(c, { at, dur: 0.22 * len, type: 'sawtooth', f: 150 * p, to: (shape === 'up' ? 230 : shape === 'down' ? 110 : 160) * p, vol: 0.2, lp: 700, vib: 0.03, rate: 18 });
+    sNoise(c, { at: at + 0.12 * len, dur: 0.18, f: 1800, to: 700, vol: 0.12, q: 0.8, attack: 0.03 });
+  },
+  shrimp(c, at, p, len, shape) {
+    [0, 0.05].forEach(d => sNoise(c, { at: at + d, dur: 0.025, f: 4200 * p, vol: 0.3, q: 7, attack: 0.002 }));
+    sTone(c, { at: at + 0.1, dur: 0.1 * len, f: (shape === 'down' ? 1500 : 1100) * p, to: (shape === 'up' ? 1900 : shape === 'down' ? 800 : 1200) * p, vol: 0.16 });
+  },
   penguin(c, at, p, len, shape) {
     sTone(c, { at, dur: 0.17 * len, type: 'sawtooth', f: 520 * p, to: (shape === 'up' ? 640 : shape === 'down' ? 360 : 470) * p, vol: 0.26, bp: 1300 * p, q: 3 });
     sTone(c, { at, dur: 0.15 * len, type: 'square', f: 260 * p, to: (shape === 'up' ? 320 : 200) * p, vol: 0.06, lp: 1200 });
