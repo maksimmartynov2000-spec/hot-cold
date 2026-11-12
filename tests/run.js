@@ -4709,7 +4709,9 @@ async function testQuitConfirm(browser) {
   await page.evaluate(() => openSetup('duel', true));
   await page.waitForTimeout(150);
   await page.selectOption('#rangeMax', '100');
-  await page.evaluate(() => { BOT_SPEED = 0; });
+  // Бот думает долго: иначе он изредка угадывал с первого хода, партия
+  // кончалась, и вопроса не было. Заодно видно, что выход снимает его таймер
+  await page.evaluate(() => { BOT_SPEED = 100000; });
   await page.click('#tStartMatch');
   await page.waitForTimeout(200);
   await page.evaluate(() => { secret = 77; });
