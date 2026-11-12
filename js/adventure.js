@@ -1541,12 +1541,32 @@ function renderAdventure(scroll) {
   // Мир 1 — внизу страницы, дальние миры — выше
   worlds.reverse();
   document.getElementById('advMap').replaceChildren(...worlds);
-  if (!scroll) return;
-  // Экран встаёт на следующем сопернике: и новичку (он в самом низу), и тому, кто далеко
-  const next = document.querySelector('#advMap .adv-tile.next') ||
-    document.querySelector('#advMap .adv-world[data-w="' + advCurrentWorld() + '"]');
-  if (next && next.scrollIntoView) next.scrollIntoView({ block: 'center' });
+  if (scroll) advScrollNext(true);
+  else if (!advTouched) advScrollNext(false);
 }
+
+// Экран встаёт на следующем сопернике: и новичку (он в самом низу), и тому,
+// кто далеко. Сразу, на следующем кадре и после въезда экрана (0,25 с): iPhone
+// прокручивает раньше, чем экран показан, и позиция сбивалась на самый верх.
+// Перерисовка от базы (прогресс, тексты) возвращает туда же, пока игрок сам
+// не начал листать
+let advTouched = false;
+function advScrollNext(fresh) {
+  if (fresh) advTouched = false;
+  const go = () => {
+    if (advTouched || screen !== 'adventure') return;
+    const next = document.querySelector('#advMap .adv-tile.next') ||
+      document.querySelector('#advMap .adv-world[data-w="' + advCurrentWorld() + '"]');
+    if (!next) return;
+    const r = next.getBoundingClientRect();
+    window.scrollTo(0, Math.max(0, Math.round(window.scrollY + r.top + r.height / 2 - window.innerHeight / 2)));
+  };
+  go();
+  if (!fresh) return;
+  requestAnimationFrame(() => requestAnimationFrame(go));
+  setTimeout(go, 320);
+}
+['touchstart', 'wheel', 'keydown'].forEach(ev => window.addEventListener(ev, () => { if (screen === 'adventure') advTouched = true; }, { passive: true }));
 
 // Сложность в карточке: кнопки и у кого сколько «⚡ +1 ход» с этим соперником —
 // выбирают прямо перед боем и видят, что меняется
