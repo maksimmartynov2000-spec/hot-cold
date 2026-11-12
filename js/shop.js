@@ -586,6 +586,7 @@ async function shopAfterBuy() {
   const note = document.getElementById('siNote');
   note.className = 'si-note good';
   note.textContent = t().shop.bought;
+  if (typeof sfx === 'function') sfx('buy');
   if (typeof confettiBurst === 'function') confettiBurst();
   else if (typeof celebrate === 'function') celebrate('buy:' + Date.now(), ['✨', '⭐', '🎉'], false);
 }
@@ -647,6 +648,7 @@ async function shopWear(kind, code, off) {
     shopBuyError(e);
     return;
   }
+  if (!off && typeof sfx === 'function') sfx('equip');
   renderShop();
   renderShopItem();
 }

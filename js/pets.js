@@ -155,6 +155,8 @@ function petReact(el, name) {
   pet.classList.add('r-' + name, 'e-' + R.img);
   const fx = pet.querySelector('.pet-fx');
   if (fx && R.fx) fx.innerHTML = petFxHtml(kind, R.fx);
+  // Голос (js/sound.js): в партии — тише и вдогонку ноте хода
+  if (typeof petVoice === 'function') petVoice(kind, name, !!pet.closest('#gamePet'));
   clearTimeout(pet._petT);
   pet._petT = setTimeout(() => petClearReact(pet), R.ms);
 }

@@ -179,6 +179,7 @@ function renderVizToggles() {
     petBtn.classList.toggle('on', petInGame());
     petBtn.setAttribute('aria-pressed', petInGame() ? 'true' : 'false');
   }
+  if (typeof renderMusicToggles === 'function') renderMusicToggles();
   const snd = document.getElementById('vizSound');
   snd.classList.toggle('on', soundOn);
   snd.querySelector('.vr-ic').textContent = soundOn ? '🔊' : '🔇';
@@ -514,6 +515,7 @@ function applyTranslations() {
   document.getElementById('tNavFriends').textContent = L.navFriends;
   document.getElementById('tNavShop').textContent = L.navShop;
   document.getElementById('tSoundLabel').textContent = L.run.sound;
+  if (typeof renderMusicToggles === 'function') renderMusicToggles();
   document.getElementById('tLblBot').textContent = L.lblBot;
   // У каждого экрана своё название — с тем же значком, что в меню
   setTitle('tSetupScreen',
@@ -646,6 +648,7 @@ function showScreen(name) {
   // прижимают поле ввода к низу
   document.body.className = document.body.className.replace(/\bon-\S+/g, '').trim();
   document.body.classList.add('on-' + name);
+  if (typeof musicFor === 'function') musicFor(name);
   if (name === 'authChoice' && typeof renderAuthChoiceTitle === 'function') renderAuthChoiceTitle();
   document.getElementById('navPlay').classList.toggle('on', name === 'mode');
   document.getElementById('friendsBtn').classList.toggle('on', name === 'friends' || name === 'chat');
