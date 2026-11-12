@@ -228,6 +228,16 @@ async function openChest() {
 function openChestModal() {
   if (onlineInfo && onlineInfo.chest) showChest(onlineInfo.chest, false);
 }
+// Награда за день серии (миграция 066) — копия streak_day_pay из базы,
+// сверяется тестом: 1–4-й день — 10, 15, 20, 25 🪙; 5-й — 3 💎; 6–9-й — снова
+// монеты; 10-й — 5 💎 и иконка. Дальше по кругу
+function streakDayPay(s) {
+  const pos = ((Math.max(1, s) - 1) % 10) + 1;
+  return { coins: pos === 5 || pos === 10 ? 0 : [10, 15, 20, 25][(pos - 1) % 5], gems: pos === 5 ? 3 : pos === 10 ? 5 : 0, chest: pos === 10 };
+}
+function streakPayText(p) {
+  return [p.coins ? '+' + p.coins + ' 🪙' : '', p.gems ? '+' + p.gems + ' 💎' : ''].filter(Boolean).join(' ');
+}
 function showChest(r, fresh) {
   const P = t().pass;
   if (fresh && typeof sfx === 'function') sfx('chest');
@@ -236,6 +246,13 @@ function showChest(r, fresh) {
   items.push('<div class="ch-xp">+' + r.xp + ' <small>' + escapeHtml(P.xp) + '</small></div>');
   items.push('<div class="ch-streak">🔥 ' + escapeHtml(P.streakNow.replace('{n}', withPlural(r.streak, P.dayForms))) +
     (r.froze ? '<small>❄️ ' + escapeHtml(P.frozeUsed) + '</small>' : '') + '</div>');
+  // Награда за день серии и что будет завтра
+  if (r.pay) {
+    items.push('<div class="ch-item gold"><span class="ch-pay">' + escapeHtml(streakPayText(r.pay)) + '</span><span><b>' +
+      escapeHtml(P.payHead.replace('{n}', r.streak)) + '</b>' + (r.pay.icon ? escapeHtml(P.payIcon.replace('{name}', typeof shopName === 'function' ? shopName('icon', r.pay.icon) : r.pay.icon)) : '') + '</span></div>');
+    const next = streakDayPay(r.streak + 1);
+    items.push('<div class="ch-next">' + escapeHtml(P.payNext.replace('{p}', streakPayText(next) + (next.chest ? ' + 🎁' : ''))) + '</div>');
+  }
   if (r.streakReward) items.push('<div class="ch-item gold">' + passRewardArt(r.streakReward.kind, r.streakReward.code) +
     '<span><b>' + escapeHtml(P.streakGift.replace('{n}', r.streakReward.days)) + '</b>' +
     escapeHtml(passRewardName(r.streakReward.kind, r.streakReward.code)) + '</span></div>');

@@ -33,33 +33,78 @@ RIG = {
     'crab':    dict(aura=(120, 150), ar=84),
     'penguin': dict(aura=(120, 140), ar=88),
 }
-# ---------- ауры ----------
-def ring_aura(k, which):
-    cx, cy = RIG[k]['aura']; r = RIG[k]['ar']
-    s = g('pt-aura-spin', (cx, cy))
+# ---------- общие ауры: мягкие, без обводок ----------
+# Свечение позади питомца (soft_back) и живые частицы перед ним (soft_front):
+# пламя — языки огня и искры, иней — кристаллы и снежинки, гроза — тучки и
+# молнии, звёзды — ореол и звёзды. id градиентов — с префиксом au-, js/pets.js
+# делает их своими у каждого экземпляра. Питомец в поле 240×240 стоит на низу
+# (y≈234), ростом ~200, шириной ~145
+def sparkle(x, y, k, c, delay, cls='pt-twinkle'):
+    return '<g class="%s" style="animation-delay:%gs;transform-origin:%gpx %gpx">' % (cls, delay, x, y) + \
+        '<path d="M %g %g Q %g %g %g %g Q %g %g %g %g Q %g %g %g %g Q %g %g %g %g Z" fill="%s"/>' % (
+            x, y - 7 * k, x + 1.2 * k, y - 1.2 * k, x + 7 * k, y, x + 1.2 * k, y + 1.2 * k, x, y + 7 * k, x - 1.2 * k, y + 1.2 * k, x - 7 * k, y, x - 1.2 * k, y - 1.2 * k, x, y - 7 * k, c) + '</g>'
+def glow(gid, cx, cy, rx, ry, stops):
+    st = ''.join('<stop offset="%g" stop-color="%s" stop-opacity="%g"/>' % x for x in stops)
+    return '<defs><radialGradient id="%s">%s</radialGradient></defs><ellipse cx="%g" cy="%g" rx="%g" ry="%g" fill="url(#%s)"/>' % (gid, st, cx, cy, rx, ry, gid)
+def flake(x, y, k, delay):
+    arms = ''.join('<path d="M %g %g L %g %g" />' % (x, y, x + 6 * k * math.cos(math.radians(a)), y + 6 * k * math.sin(math.radians(a))) for a in range(0, 360, 60))
+    return '<g class="pt-aura-snow" style="animation-delay:%gs" stroke="#ffffff" stroke-width="%g" stroke-linecap="round" opacity=".9">%s</g>' % (delay, 1.3 * k, arms)
+def soft_back(k, which):
     if which == 'fire':
-        s += circ(cx, cy, r, 'none', '#ff6a1a', 5, ' opacity=".55"')
-        for i in range(12):
-            a = math.radians(i * 30); ca, sa = math.cos(a), math.sin(a)
-            T = lambda x, y: (cx + x * ca - y * sa, cy + x * sa + y * ca)
-            s += path('M %g %g C %g %g %g %g %g %g C %g %g %g %g %g %g Z' % (T(-8, -r) + T(-8, -r - 10) + T(-2, -r - 16) + T(0, -r - 26) + T(2, -r - 16) + T(8, -r - 10) + T(8, -r)), '#ff8a1a', '#1b1030', 2.4)
-            s += path('M %g %g C %g %g %g %g %g %g C %g %g %g %g %g %g Z' % (T(-4, -r - 2) + T(-4, -r - 8) + T(-1, -r - 12) + T(0, -r - 18) + T(1, -r - 12) + T(4, -r - 8) + T(4, -r - 2)), '#ffe27a')
-    elif which == 'ice':
-        s += circ(cx, cy, r + 2, 'none', '#8be3ff', 4, ' stroke-dasharray="2 10" opacity=".8"')
+        s = glow('au-fire', 120, 170, 116, 104, [(0, '#ffcf5a', .6), (.5, '#ff7a2e', .34), (1, '#ff4d1a', 0)])
+        # Языки пламени за спиной: по краям ниже, к центру выше, низ растворяется;
+        # чуть размыты — мягкие, как у картинок питомцев
+        defs = ('<defs><linearGradient id="au-flame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff3d00" stop-opacity="0"/>'
+                '<stop offset=".18" stop-color="#ff5a1f" stop-opacity=".9"/><stop offset=".6" stop-color="#ffb02e"/><stop offset="1" stop-color="#fff1a0" stop-opacity="0"/></linearGradient>'
+                '<linearGradient id="au-flame2" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffd166" stop-opacity="0"/><stop offset=".3" stop-color="#ffe27a"/>'
+                '<stop offset="1" stop-color="#fff8d6" stop-opacity="0"/></linearGradient><filter id="au-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.6"/></filter></defs>')
+        def tongue(x, base, h, w, d, grad, lean):
+            return ('<path class="pt-flame" style="animation-delay:%gs;transform-origin:%gpx %gpx" d="M %g %g C %g %g %g %g %g %g C %g %g %g %g %g %g Z" fill="url(#%s)"/>'
+                    % (d, x, base, x - w, base, x - w * 1.2, base - h * .45, x - w * .2 + lean * .5, base - h * .78, x + lean, base - h,
+                       x + w * .5 + lean * .3, base - h * .6, x + w * 1.2, base - h * .35, x + w, base, grad))
+        f = '<g filter="url(#au-soft)">'
+        for i, (x, base, h, w, lean) in enumerate([(30, 214, 70, 12, -6), (48, 222, 104, 15, -4), (70, 226, 128, 16, -2), (96, 228, 112, 14, 3),
+                                                   (144, 228, 112, 14, -3), (170, 226, 128, 16, 2), (192, 222, 104, 15, 4), (210, 214, 70, 12, 6)]):
+            f += tongue(x, base, h, w, i * .13, 'au-flame', lean)
+            f += tongue(x + lean * .3, base - 4, h * .62, w * .55, i * .13 + .3, 'au-flame2', lean * .6)
+        return s + defs + f + '</g>'
+    if which == 'ice':
+        s = glow('au-ice', 120, 160, 112, 104, [(0, '#e6fbff', .5), (.6, '#7fd8ff', .28), (1, '#4aa8ff', 0)])
+        cr = '<defs><linearGradient id="au-cr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#bff0ff"/><stop offset="1" stop-color="#5cc4ff"/></linearGradient></defs>'
+        ring = '<g class="pt-aura-spin" style="transform-origin:120px 150px">'
         for i in range(10):
-            s += '<g transform="rotate(%g %g %g)">' % (i * 36, cx, cy) + path('M %g %g L %g %g L %g %g Z' % (cx, cy - r - 26, cx + 7, cy - r - 4, cx, cy - r + 2), '#1d6fd0') + \
-                 path('M %g %g L %g %g L %g %g Z' % (cx, cy - r - 26, cx - 7, cy - r - 4, cx, cy - r + 2), '#c8f6ff') + path('M %g %g L %g %g L %g %g L %g %g Z' % (cx, cy - r - 26, cx + 7, cy - r - 4, cx, cy - r + 2, cx - 7, cy - r - 4), 'none', '#1b1030', 2.4) + '</g>'
-    elif which == 'storm':
-        s += circ(cx, cy, r + 4, 'none', '#7df9ff', 3, ' opacity=".6"') + circ(cx, cy, r - 4, 'none', '#8f7cff', 2, ' stroke-dasharray="6 8" opacity=".7"')
-        for i in range(8):
-            s += '<g transform="rotate(%g %g %g)">' % (i * 45 + 22, cx, cy) + path('M %g %g L %g %g L %g %g L %g %g' % (cx - 4, cy - r - 26, cx + 4, cy - r - 14, cx - 2, cy - r - 12, cx + 6, cy - r + 2), 'none', '#ffe14d', 3.4) + '</g>'
-    else:
-        s += circ(cx, cy, r + 2, 'none', '#ffe9a8', 3, ' stroke-dasharray="1 9" stroke-linecap="round" opacity=".85"') + circ(cx, cy, r + 14, 'none', '#ffd166', 1.2, ' opacity=".35"')
-        for i in range(7):
-            a = math.radians(i * 360 / 7); rr = r + 12 + (8 if i % 2 else 0); x, y = cx + rr * math.cos(a), cy + rr * math.sin(a); kk = 1.3 if i % 2 else 1.8
-            s += '<g class="pt-aura-star" style="animation-delay:%gs;transform-origin:%gpx %gpx">' % (i * .3, x, y) + path('M %g %g l %g %g l %g %g l %g %g l %g %g Z M %g %g l %g %g l %g %g l %g %g l %g %g Z' % (
-                x, y - 9 * kk, 2.6 * kk, 6.4 * kk, 6.4 * kk, 2.6 * kk, -6.4 * kk, 2.6 * kk, -2.6 * kk, 6.4 * kk, x, y - 9 * kk, -2.6 * kk, 6.4 * kk, -6.4 * kk, 2.6 * kk, 6.4 * kk, 2.6 * kk, 2.6 * kk, 6.4 * kk), '#fff3b0', '#1b1030', 1.6) + '</g>'
-    return s + '</g>'
+            ring += '<g transform="rotate(%g 120 150)"><path d="M 120 34 L 127 52 L 120 62 L 113 52 Z" fill="url(#au-cr)" opacity=".85"/></g>' % (i * 36)
+        return s + cr + ring + '</g>'
+    if which == 'storm':
+        s = glow('au-storm', 120, 160, 112, 104, [(0, '#c7b8ff', .45), (.6, '#7b6cff', .28), (1, '#3b2f9e', 0)])
+        cloud = lambda x, y, k: '<g opacity=".95">' + ''.join('<circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (x + dx * k, y + dy * k, r * k, c) for dx, dy, r, c in
+            [(-12, 2, 10, '#6f6a9e'), (0, -4, 13, '#7d78ad'), (13, 1, 10, '#6f6a9e'), (-4, 6, 10, '#5d588a'), (8, 7, 9, '#5d588a')]) + '</g>'
+        return s + cloud(52, 44, 1.1) + cloud(190, 52, 1.0)
+    # звёзды
+    s = glow('au-star', 120, 150, 112, 108, [(0, '#fff6d0', .32), (.55, '#ffe08a', .14), (1, '#ffd166', 0)])
+    s += '<circle cx="120" cy="140" r="98" fill="none" stroke="#ffe9a8" stroke-width="1.4" stroke-dasharray="1.5 7" stroke-linecap="round" opacity=".8"/>'
+    return s
+def soft_front(k, which):
+    if which == 'fire':
+        s = ''
+        for i, (x, y) in enumerate([(46, 200), (70, 214), (96, 196), (146, 206), (172, 192), (196, 210), (120, 220), (60, 176)]):
+            s += '<circle class="pt-ember" style="animation-delay:%gs" cx="%g" cy="%g" r="%g" fill="%s"/>' % (i * .37, x, y, 2.2 + (i % 3) * .7, ['#ffe27a', '#ffb02e', '#fff6c8'][i % 3])
+        return s
+    if which == 'ice':
+        s = ''.join(flake(x, y, kk, d) for x, y, kk, d in [(40, 70, 1.2, 0), (200, 60, 1, .8), (60, 150, .9, 1.6), (186, 140, 1.2, .4), (30, 190, 1, 2.2), (210, 196, .9, 1.2)])
+        s += sparkle(78, 52, 1, '#ffffff', .3) + sparkle(168, 92, .8, '#e6fbff', 1.1) + sparkle(208, 120, .7, '#ffffff', 1.9)
+        return s
+    if which == 'storm':
+        bolt = lambda pts, d: '<g class="pt-aura-bolt" style="animation-delay:%gs"><polyline points="%s" fill="none" stroke="#9df3ff" stroke-width="6" stroke-linejoin="round" opacity=".35"/><polyline points="%s" fill="none" stroke="#fffbd0" stroke-width="2.6" stroke-linejoin="round"/></g>' % (d, pts, pts)
+        return bolt('46,58 38,82 50,84 40,112', 0) + bolt('192,64 200,88 188,90 198,120', .85) + sparkle(30, 130, .8, '#fffbd0', .4) + sparkle(214, 150, .8, '#9df3ff', 1.2)
+    s = '<g class="pt-aura-spin" style="transform-origin:120px 140px">'
+    for i in range(6):
+        a = math.radians(i * 60 + 15); x, y = 120 + 100 * math.cos(a), 140 + 98 * math.sin(a)
+        s += sparkle(x, y, 1.3 if i % 2 else .9, '#fff3b0', i * .35)
+    s += '</g>'
+    return s + sparkle(56, 64, 1.1, '#ffffff', .2) + sparkle(190, 84, .9, '#ffe9a8', 1.3)
+
+# ---------- ауры ----------
 def leaf(x, y, c, k=1, rot=0):
     return '<g transform="rotate(%g %g %g)">' % (rot, x, y) + path('M %g %g c %g %g %g %g %g 0 c %g %g %g %g %g 0 Z' % (x - 10 * k, y, 6 * k, -12 * k, 16 * k, -12 * k, 20 * k, -4 * k, 12 * k, -16 * k, 10 * k, -20 * k), c, '#1b1030', 1.6) + \
            path('M %g %g L %g %g' % (x - 8 * k, y, x + 8 * k, y - 1 * k), 'none', '#1b1030', 1, ' opacity=".5"') + '</g>'
@@ -140,8 +185,10 @@ FRONT = {'fireflies', 'feathers', 'fruit', 'butterflies', 'bubbles', 'snow', 'fi
 
 # slot — место в базе (aura), layer — слой: aura позади питомца, front — перед ним
 PET_AURA_ART = {}
+# Общие ауры — в два слоя: свечение позади (art), частицы перед питомцем (front)
 for code, which in GEN_AURAS.items():
-    PET_AURA_ART[code] = {'slot': 'aura', 'layer': 'aura', 'pet': None, 'art': {k: ring_aura(k, which) for k in KINDS}}
+    PET_AURA_ART[code] = {'slot': 'aura', 'layer': 'aura', 'pet': None, 'art': {k: soft_back(k, which) for k in KINDS},
+                          'front': {k: soft_front(k, which) for k in KINDS}}
 for k, own in OWN.items():
     for code, which in own.items(): PET_AURA_ART[code] = {'slot': 'aura', 'layer': 'front' if which in FRONT else 'aura', 'pet': k, 'art': {k: own_aura(k, which)}}
 

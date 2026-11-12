@@ -6679,7 +6679,7 @@ async function testShop(browser) {
     JSON.stringify(shop));
   check('у товара имя и своя цена', /Листовой зайчик/.test(shop.first) && /90 🪙/.test(shop.first), shop.first);
   // Задания дня спрятаны (DAILY_EXTRAS) — строки про них нет
-  check('как копить — семь строк, без заданий дня, трофеи не продаются', shop.earn === 7 && !/Задание дня/.test(shop.earnText) &&
+  check('как копить — восемь строк (первая — серия дней), без заданий дня, трофеи не продаются', shop.earn === 8 && !/Задание дня/.test(shop.earnText) &&
     /не продаются/.test(shop.trophy), JSON.stringify(shop));
   // Онлайна со случайными соперниками нет (миграция 062): монеты — за игру с
   // другом, кристаллы — за «Испытание выходных»
@@ -6799,7 +6799,7 @@ async function testShop(browser) {
       petKeys.filter(k => !Pp[k]).length + PETS.filter(k => !Pp.names[k] || !Pp.who[k]).length + PET_TRICKS.filter(x => !Pp.tricks[x.code]).length +
       SHOP_RARS.filter(r => !S.rarity[r]).length + ['pet', 'skin', 'gear', 'thermo', 'winfx'].filter(k => !S.kindNames[k]).length +
       PET_SLOTS.filter(k => !S.slots[k]).length + SHOP_BUNDLES.filter(b => !S.bundleNames[b.code]).length +
-      (S.earn.length === 7 ? 0 : 1) + (i18n[l].navShop ? 0 : 1));
+      (S.earn.length === 8 ? 0 : 1) + (i18n[l].navShop ? 0 : 1));
   }).join());
   check('магазин переведён на 4 языка: разделы, товары, подсказки', tr === 'en:0,fr:0,de:0,ru:0', tr);
   const art = await p2.evaluate(() => {
@@ -7136,7 +7136,8 @@ async function testPets(browser) {
     const skins = THERMO_SKINS.filter(s => look('sk-' + s) === base);
     test.remove();
     const skinItems = shopCodes('skin');
-    const strip = s => s.replace(/style="[^"]*"/g, '');
+    // Номер экземпляра в id градиентов (au<n>-) у каждого свой — нарочно
+    const strip = s => s.replace(/style="[^"]*"/g, '').replace(/au\d+-/g, 'au-');
     return { pets: PETS.filter(k => PET_SKINS[k].length !== 5).length,
       // Каждому питомцу — картинки покоя, пяти эмоций, пяти обликов и звёздного
       files: PETS.flatMap(k => PET_STATES.concat(PET_SKINS[k], [PET_STAR]).map(s => petImg(k, s))),
@@ -7149,12 +7150,15 @@ async function testPets(browser) {
       drawn: shopCodes('gear').filter(c => { const k = PET_AURAS[c].pet || 'owl'; return !petHtml(k, { auras: [c] }).includes('class="pt-gear g-aura g-' + c + '"'); }).length,
       // Две одинаковые ауры в одной разметке не плодят случайностей: частицы кладёт только реакция
       same: PETS.every(k => strip(petHtml(k, { auras: ['aura_fire'] })) === strip(petHtml(k, { auras: ['aura_fire'] }))),
+      // Общие ауры — в два слоя, и у каждого экземпляра свои id градиентов
+      layers: shopCodes('gear').filter(c => !PET_AURAS[c].pet).every(c => { const h = petHtml('owl', { auras: [c] }); return h.includes('pa-back') && h.includes('pa-front'); }),
+      ids: (() => { const a = petHtml('owl', { auras: ['aura_fire'] }), b = petHtml('owl', { auras: ['aura_fire'] }); return a.match(/id="(au\d+-[^"]+)"/)[1] !== b.match(/id="(au\d+-[^"]+)"/)[1]; })(),
       thermo: shopCodes('thermo').filter(c => !THERMO_SKINS.includes(c)).length, skins: skins.length,
       winfx: shopCodes('winfx').filter(c => !WINFX[c]).length };
   });
   const absent = art.files.filter(f => !fs.existsSync(path.join(__dirname, '..', f)));
   check('у каждого питомца есть 12 картинок (72 в icons/pets), пять обликов и звёздный, у аур — рисунок на своём питомце, у градусников и эффектов — вид',
-    !art.pets && art.files.length === 72 && !absent.length && !art.skinArt && !art.skinItems && !art.auras && !art.slots && !art.fits && !art.drawn && art.same &&
+    !art.pets && art.files.length === 72 && !absent.length && !art.skinArt && !art.skinItems && !art.auras && !art.slots && !art.fits && !art.drawn && art.same && art.layers && art.ids &&
     !art.thermo && !art.skins && !art.winfx, JSON.stringify(art).slice(0, 400) + ' нет: ' + absent.join(' '));
   const tr = await p2.evaluate(() => {
     const ru = i18n.ru;
@@ -7227,6 +7231,31 @@ async function testSplash(browser) {
   const tr = await page.evaluate(() => ['en', 'fr', 'de', 'ru'].map(l => l + ':' + ((i18n[l].splashTips || []).length === 12 ? 0 : 1)).join());
   check('советы заставки на 4 языках, по 12', tr === 'en:0,fr:0,de:0,ru:0', tr);
   await context.close();
+}
+
+// Награда за день серии (миграция 066): в сундуке дня — монеты, на 5-й и
+// 10-й день — кристаллы, на 10-й ещё и иконка; под ней — что будет завтра
+async function testStreakPay(browser) {
+  console.log('\nНаграда за день серии');
+  const page = await newGame(browser, { user: 'Максим' });
+  const plan = await page.evaluate(() => [1, 2, 3, 4, 5, 6, 10, 11, 15, 20].map(d => { const p = streakDayPay(d); return d + ':' + p.coins + '/' + p.gems + (p.chest ? '+' : ''); }).join(' '));
+  check('расписание: 10, 15, 20, 25 🪙, 5-й — 3 💎, 10-й — 5 💎 и иконка, по кругу', plan === '1:10/0 2:15/0 3:20/0 4:25/0 5:0/3 6:10/0 10:0/5+ 11:10/0 15:0/3 20:0/5+', plan);
+  const shown = await page.evaluate(() => {
+    showChest({ xp: 30, streak: 4, froze: false, pay: { coins: 25, gems: 0, icon: null } }, false);
+    const a = document.getElementById('chestBody').textContent; closeChest();
+    showChest({ xp: 30, streak: 10, froze: false, pay: { coins: 0, gems: 5, icon: 'shop-07' } }, false);
+    const b = document.getElementById('chestBody').textContent; closeChest();
+    showChest({ xp: 30, streak: 2, froze: false }, false);
+    const c = document.getElementById('chestBody').textContent; closeChest();
+    return { a, b, c };
+  });
+  check('в сундуке 4-го дня: +25 🪙, «завтра: +3 💎»', /\+25 🪙/.test(shown.a) && /За 4-й день серии/.test(shown.a) && /Завтра: \+3 💎/.test(shown.a), shown.a);
+  check('в сундуке 10-го дня: +5 💎 и иконка', /\+5 💎/.test(shown.b) && /и иконка: Моховой лягушонок/.test(shown.b) && /Завтра: \+10 🪙/.test(shown.b), shown.b);
+  check('база без 066 — сундук как раньше, без награды за день', !/день серии|Завтра/.test(shown.c), shown.c);
+  const tr = await page.evaluate(() => ['en', 'fr', 'de', 'ru'].map(l => { const P = i18n[l].pass;
+    return l + ':' + (['payHead', 'payIcon', 'payNext'].filter(k => !P[k]).length + (/\{n\}/.test(P.payHead) && /\{name\}/.test(P.payIcon) && /\{p\}/.test(P.payNext) ? 0 : 1)); }).join());
+  check('тексты награды за день — на 4 языках, подстановки на месте', tr === 'en:0,fr:0,de:0,ru:0', tr);
+  await page.context().close();
 }
 
 // Разбор «понятно ли ребёнку»: главное — на первом экране, слова — одни и те же
@@ -9172,6 +9201,7 @@ async function testKeyPage(browser) {
     await testPets(browser);
     await testSound(browser);
     await testSplash(browser);
+    await testStreakPay(browser);
     await testKidClarity(browser);
     await testOnlineAdvBonuses(browser);
     await testLocalAdvBonuses(browser);

@@ -2721,7 +2721,7 @@ body.booting > *:not(.splash) { visibility: hidden; animation: hc-reveal 0s line
   user-select: none; -webkit-user-select: none; -webkit-user-drag: none; transform-origin: 50% 94%;
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25)); animation: petBreath 3.2s ease-in-out infinite; }
 .pet-aura { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.pet-aura.pa-back { z-index: 0; }
+.pet-aura.pa-back { z-index: 0; mix-blend-mode: screen; }   /* свечение добавляет свет, а не мутнеет на тёмном фоне */
 .pet-aura.pa-front { z-index: 2; }
 /* Тень на земле: сжимается, когда питомец в прыжке */
 .pet-shadow { position: absolute; z-index: 0; left: 24%; right: 24%; bottom: 0; height: 7%; border-radius: 50%;
@@ -2807,6 +2807,18 @@ body.booting > *:not(.splash) { visibility: hidden; animation: hc-reveal 0s line
 @keyframes fxRise { 0% { opacity: 0; transform: translateY(0) scale(0.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx, 0), -3.5em) scale(1.2); } }
 .pet-fx .fx-z { font-size: 1.1em; font-weight: 900; color: #dbe7ff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); animation: fxZ 2s ease-out forwards; }
 @keyframes fxZ { 0% { opacity: 0; transform: translate(0, 0) scale(0.6); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(1.2em, -2.2em) scale(1.4); } }
+
+/* Общие ауры (мягкие): языки пламени колышутся, искры летят вверх, звёзды и
+   блёстки мерцают, молнии вспыхивают */
+.pet .pt-flame { animation: auFlame 1.1s ease-in-out infinite alternate; }
+@keyframes auFlame { from { transform: scale(1, 0.92) skewX(-3deg); } to { transform: scale(0.94, 1.08) skewX(3deg); } }
+.pet .pt-ember { animation: auEmber 2.6s ease-out infinite; }
+@keyframes auEmber { 0% { opacity: 0; transform: translateY(0); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, -90px); } }
+.pet .pt-twinkle { animation: auTwinkle 2.2s ease-in-out infinite; }
+@keyframes auTwinkle { 0%, 100% { opacity: 0.2; transform: scale(0.5) rotate(0); } 50% { opacity: 1; transform: scale(1.15) rotate(45deg); } }
+.pet .pt-aura-bolt { opacity: 0; animation: auBolt 2.4s steps(1) infinite; }
+@keyframes auBolt { 0%, 62%, 100% { opacity: 0; } 64%, 70% { opacity: 1; } 67% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .pet .pt-flame, .pet .pt-ember, .pet .pt-twinkle, .pet .pt-aura-bolt { animation: none !important; } .pet .pt-aura-bolt { opacity: 1; } }
 
 /* Ауры (js/pet-art.js): кольцо крутится, звёзды и светлячки мерцают, частицы плывут */
 .pet .pt-aura-spin { animation: p3Spin 18s linear infinite; }
@@ -3026,3 +3038,7 @@ body.kb-open .game-pet { display: none; }
 @keyframes spCreep { from { height: 0; } to { height: 30%; } }
 @keyframes spBulb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 @media (prefers-reduced-motion: reduce) { .splash, .splash * { animation: none !important; transition: none !important; } }
+
+/* Сундук дня: награда за день серии (066) и что будет завтра */
+.ch-pay { flex: none; min-width: 64px; font-size: 18px; font-weight: 900; color: var(--gold); text-align: center; }
+.ch-next { margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--muted); text-align: center; }

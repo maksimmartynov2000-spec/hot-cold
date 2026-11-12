@@ -1,0 +1,84 @@
+-- Награда за каждый день серии. Применять в Supabase: SQL Editor → вставить
+-- целиком → Run. Применить ДО мёржа. Повторный запуск ничего не ломает и
+-- ничего не начисляет второй раз.
+--
+-- • День серии — как и раньше: сыграна хотя бы одна партия, открыт сундук дня.
+-- • В сундуке теперь ещё и монеты: 1-й день серии — 10 🪙, 2-й — 15, 3-й — 20,
+--   4-й — 25; 5-й — 3 💎; 6–9-й — снова 10, 15, 20, 25 🪙; 10-й — 5 💎 и
+--   иконка из магазина, которой у игрока нет (все есть — +50 🪙). Дальше по
+--   кругу: 15-й как 5-й, 20-й как 10-й.
+-- • Награды за 3, 7, 14 и 30 дней (фраза, титул, фон, рамка) остаются.
+-- • Начисляется без дневного предела в 300 🪙 и только раз в день: запись в
+--   wallet_log с ключом streak:<день>.
+
+-- ============ 1. Что даёт день серии ============
+-- Копия — в js/pass.js (streakDayPay), сверяется тестом
+create or replace function streak_day_pay(p_streak int, out coins int, out gems int, out chest boolean)
+language sql immutable as $$
+  select case when x.pos in (5, 10) then 0 else (array[10, 15, 20, 25])[((x.pos - 1) % 5) + 1] end,
+         case x.pos when 5 then 3 when 10 then 5 else 0 end,
+         x.pos = 10
+    from (select ((greatest(p_streak, 1) - 1) % 10) + 1 as pos) x;
+$$;
+
+-- ============ 2. Сундук дня: и награда за день серии ============
+create or replace function open_chest(p_username text, p_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare me text; d date; od online_days; st online_streak; s int; froze boolean := false;
+        wk text; xp int; sur record; got jsonb := null; sr record; srew jsonb := null; res jsonb;
+        pay record; icon text; pjson jsonb := null;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  d := player_day(me);
+  select * into od from online_days where username = me and day = d for update;
+  if od.username is null or not od.played then raise exception 'chest_locked'; end if;
+  if od.chest_at is not null then return od.chest || jsonb_build_object('already', true); end if;
+
+  insert into online_streak(username) values (me) on conflict do nothing;
+  select * into st from online_streak where username = me for update;
+  wk := to_char(d, 'IYYY-IW');
+  if st.last_day = d - 1 then s := st.streak + 1;
+  elsif st.last_day = d - 2 and coalesce(st.freeze_week, '') <> wk then s := st.streak + 1; froze := true;
+  else s := 1;
+  end if;
+  update online_streak set streak = s, best = greatest(best, s), last_day = d,
+                           freeze_week = case when froze then wk else freeze_week end
+  where username = me;
+
+  xp := 30 + 5 * least(s - 1, 10);
+  -- Сюрприз — примерно в каждом пятом сундуке, из того, чего ещё нет
+  if random() < 0.2 then
+    select c.* into sur from chest_surprises() c where not cosmetic_has(me, c.kind, c.code) order by random() limit 1;
+    if sur.kind is not null and cosmetic_grant(me, sur.kind, sur.code, 'chest') then
+      got := jsonb_build_object('kind', sur.kind, 'code', sur.code);
+    end if;
+  end if;
+  select r.* into sr from streak_rewards() r where r.days = s;
+  if sr.kind is not null and cosmetic_grant(me, sr.kind, sr.code, 'streak') then
+    srew := jsonb_build_object('kind', sr.kind, 'code', sr.code, 'days', s);
+  end if;
+  perform season_xp(me, xp);
+  -- Награда за день серии (066): монеты, на 5-й и 10-й день — кристаллы, на
+  -- 10-й ещё и иконка из магазина, которой нет. Без дневного предела, раз в день
+  select * into pay from streak_day_pay(s) x;
+  if pay.chest then
+    select c.code into icon from shop_catalog() c where c.kind = 'icon' and not cosmetic_has(me, 'icon', c.code) order by random() limit 1;
+    if icon is not null and cosmetic_grant(me, 'icon', icon, 'streak') then null; else icon := null; end if;
+  end if;
+  if wallet_add(me, pay.coins + case when pay.chest and icon is null then 50 else 0 end, pay.gems, 'streak', 'streak:' || d) then
+    pjson := jsonb_build_object('coins', pay.coins + case when pay.chest and icon is null then 50 else 0 end, 'gems', pay.gems, 'icon', icon);
+  end if;
+  res := jsonb_build_object('xp', xp, 'streak', s, 'froze', froze, 'surprise', got, 'streakReward', srew, 'pay', pjson);
+  update online_days set chest_at = now(), chest = res where username = me and day = d;
+  return res;
+end;
+$$;
+
+-- ============ 3. Права ============
+grant execute on function open_chest(text, text) to anon;
+grant execute on function streak_day_pay(int) to anon;
