@@ -249,6 +249,7 @@
             <button class="viz-row" id="toggleHintBtn" onclick="toggleHint()"><span class="vr-ic">💡</span><span class="vr-name" id="tVizHint"></span><span class="vr-sw"></span></button>
             <button class="viz-row" id="toggleKnownBtn" onclick="toggleKnown()"><span class="vr-ic">🔍</span><span class="vr-name" id="tVizKnown"></span><span class="vr-sw"></span></button>
             <button class="viz-row" id="vizSound" onclick="toggleSound()"><span class="vr-ic">🔊</span><span class="vr-name" id="tVizSound"></span><span class="vr-sw"></span></button>
+            <button class="viz-row hidden" id="vizMusic" onclick="toggleMusic()"><span class="vr-ic">🎵</span><span class="vr-name" id="tVizMusic"></span><span class="vr-sw"></span></button>
             <button class="viz-row hidden" id="togglePetBtn" onclick="togglePetInGame()"><span class="vr-ic">🐾</span><span class="vr-name" id="tVizPet"></span><span class="vr-sw"></span></button>
           </div>
           <!-- Сколько попыток потрачено — полосой: её видно краем глаза -->
@@ -806,6 +807,10 @@
       <span id="tSoundLabel"></span>
       <button class="icon-btn" id="soundBtn" onclick="toggleSound()" aria-label="Звук"></button>
     </div>
+    <div class="pf-row hidden" id="pfMusicRow">
+      <span id="tMusicLabel"></span>
+      <button class="icon-btn" id="musicBtn" onclick="toggleMusic()" aria-label="Музыка"></button>
+    </div>
 
     <button class="btn-ghost btn-block hidden" id="tSignIn" style="margin-top:14px"
             onclick="signInFromProfile()"></button>
@@ -989,6 +994,7 @@
 <script src="js/shop.js"></script>
 <script src="js/pet-art.js"></script>
 <script src="js/pets.js"></script>
+<script src="js/sound.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

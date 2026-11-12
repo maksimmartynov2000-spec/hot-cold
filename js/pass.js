@@ -228,6 +228,7 @@ function openChestModal() {
 }
 function showChest(r, fresh) {
   const P = t().pass;
+  if (fresh && typeof sfx === 'function') sfx('chest');
   const box = document.getElementById('chestBody');
   const items = [];
   items.push('<div class="ch-xp">+' + r.xp + ' <small>' + escapeHtml(P.xp) + '</small></div>');
