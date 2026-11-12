@@ -57,7 +57,8 @@ function petHtml(kind, opts) {
   });
   const svg = (s, cls) => s ? '<svg class="pet-aura ' + cls + '" viewBox="0 0 240 240" aria-hidden="true">' + s + '</svg>' : '';
   return '<span class="pet pet-' + kind + (skin ? ' skin-' + skin : '') + '" data-pet="' + kind + '"' + (skin ? ' data-skin="' + skin + '"' : '') + '>' +
-    svg(back, 'pa-back') + '<img class="pet-img" src="' + petImg(kind, skin || 'idle') + '" alt="" draggable="false">' +
+    '<span class="pet-shadow" aria-hidden="true"></span>' + svg(back, 'pa-back') +
+    '<span class="pet-body"><img class="pet-img" src="' + petImg(kind, skin || 'idle') + '" alt="" draggable="false"></span>' +
     svg(front, 'pa-front') + '<span class="pet-fx" aria-hidden="true"></span></span>';
 }
 // Картинки эмоций своего питомца — заранее в кеш, чтобы первая реакция не
@@ -73,34 +74,57 @@ function petWarm(kind) {
 // время; новая сменяет прежнюю. В облике картинка не меняется: движение и
 // частицы те же. Класс e-<эмоция> остаётся для стилей
 const PET_REACT = {
-  flip: { ms: 1150, img: 'happy' },
-  win: { ms: 2200, img: 'happy', fx: 'sparks' },
-  lose: { ms: 2300, img: 'sad' },
-  element: { ms: 1500, img: 'happy', fx: 'element' },
-  roar: { ms: 1300, img: 'happy', fx: 'rings' },
-  sleep: { ms: 2600, img: 'sleepy', fx: 'zzz' },
-  hot: { ms: 1500, img: 'hot' },
-  cold: { ms: 1800, img: 'cold' },
+  flip: { ms: 1450, img: 'happy' },
+  win: { ms: 2700, img: 'happy', fx: 'sparks' },
+  lose: { ms: 2600, img: 'sad', fx: 'drops' },
+  element: { ms: 1900, img: 'happy', fx: 'element' },
+  roar: { ms: 1500, img: 'happy', fx: 'rings' },
+  sleep: { ms: 3000, img: 'sleepy', fx: 'zzz' },
+  hot: { ms: 1900, img: 'hot', fx: 'steam' },
+  cold: { ms: 2200, img: 'cold', fx: 'flakes' },
 };
+// Частицы — нарисованные (SVG 24×24), а не эмодзи: на всех телефонах одинаково
+const PET_FX_ART = {
+  leaf: c => '<svg viewBox="0 0 24 24"><path d="M4 20C4 9 11 3 21 3c0 10-6 17-17 17Z" fill="' + c + '" stroke="#5a2a0a" stroke-width="1.4" stroke-linejoin="round"/>' +
+    '<path d="M5 19C9 14 13 10 18 6" stroke="#5a2a0a" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg>',
+  note: c => '<svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v12" stroke="#2b1550" stroke-width="2" fill="none" stroke-linejoin="round"/>' +
+    '<ellipse cx="6.5" cy="18" rx="3.6" ry="2.8" fill="' + c + '" stroke="#2b1550" stroke-width="1.4"/><ellipse cx="17.5" cy="15.5" rx="3.6" ry="2.8" fill="' + c + '" stroke="#2b1550" stroke-width="1.4"/></svg>',
+  spark: c => '<svg viewBox="0 0 24 24"><path d="M12 1.5l2.6 7.9 7.9 2.6-7.9 2.6L12 22.5l-2.6-7.9L1.5 12l7.9-2.6Z" fill="' + c + '" stroke="#fff" stroke-width="1" stroke-linejoin="round"/></svg>',
+  flake: c => '<svg viewBox="0 0 24 24" stroke="' + c + '" stroke-width="2.2" stroke-linecap="round" fill="none"><path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7"/>' +
+    '<path d="M9.5 3.8L12 6l2.5-2.2M9.5 20.2L12 18l2.5 2.2"/></svg>',
+  drop: c => '<svg viewBox="0 0 24 24"><path d="M12 2C9 8 6 11 6 15a6 6 0 0 0 12 0c0-4-3-7-6-13Z" fill="' + c + '" stroke="#1d3d7a" stroke-width="1.4"/>' +
+    '<ellipse cx="9.6" cy="14" rx="1.4" ry="2.4" fill="#fff" opacity=".7"/></svg>',
+  steam: c => '<svg viewBox="0 0 24 24" fill="none" stroke="' + c + '" stroke-width="2.4" stroke-linecap="round"><path d="M8 22c-3-4 3-6 0-10s3-6 0-10"/><path d="M16 22c-3-4 3-6 0-10s3-6 0-10"/></svg>',
+};
+const PET_RAINBOW = ['#ff5d73', '#ff9f1c', '#ffd166', '#06d6a0', '#4cc9f0', '#b388ff'];
 // Стихия у каждого своя: листья, круги звука, ноты, радуга, пузыри, снежинки
 const PET_ELEMENT = {
-  badger: { cls: 'fx-emo', ch: '🍂', n: 7 }, owl: { cls: 'fx-ring', n: 3 }, toucan: { cls: 'fx-emo', ch: '🎵', n: 6 },
-  cham: { cls: 'fx-emo', ch: '✨', n: 6 }, crab: { cls: 'fx-bubble', n: 8 }, penguin: { cls: 'fx-emo', ch: '❄️', n: 7 },
+  badger: { cls: 'fx-emo', art: 'leaf', colors: ['#e8742c', '#f2b134', '#c94a1e', '#e89a2c'], n: 7 }, owl: { cls: 'fx-ring', n: 3 },
+  toucan: { cls: 'fx-emo', art: 'note', colors: ['#ffd166', '#06d6a0', '#ff5d73', '#4cc9f0'], n: 6 },
+  cham: { cls: 'fx-emo', art: 'spark', colors: PET_RAINBOW, n: 6 }, crab: { cls: 'fx-bubble', n: 8 },
+  penguin: { cls: 'fx-emo', art: 'flake', colors: ['#e6f6ff', '#bfe6ff', '#ffffff'], n: 7 },
 };
 // Частицы поверх питомца: кто где начинает, куда сносит и с какой задержкой —
 // случайно, чтобы два раза подряд не было одинаково. Снос — в em: 1em слоя
 // частиц = 16 % ширины питомца (styles.css)
 function petFxHtml(kind, fx) {
   const R = (a, b) => a + Math.random() * (b - a);
-  const part = (cls, i, ch, left, top) => '<i class="' + cls + '" style="left:' + left.toFixed(0) + '%;top:' + top.toFixed(0) + '%;animation-delay:' +
-    (i * 0.11).toFixed(2) + 's;--dx:' + R(-1.8, 1.8).toFixed(1) + 'em;--r:' + R(-200, 200).toFixed(0) + 'deg">' + (ch || '') + '</i>';
+  const part = (cls, i, ch, left, top, step) => '<i class="' + cls + '" style="left:' + left.toFixed(0) + '%;top:' + top.toFixed(0) + '%;animation-delay:' +
+    (i * (step || 0.11)).toFixed(2) + 's;--dx:' + R(-1.8, 1.8).toFixed(1) + 'em;--r:' + R(-200, 200).toFixed(0) + 'deg;--s:' + R(0.75, 1.2).toFixed(2) + '">' + (ch || '') + '</i>';
+  const pick = a => a[Math.floor(Math.random() * a.length)];
   let html = '';
   if (fx === 'element') {
     const E = PET_ELEMENT[kind] || PET_ELEMENT.badger;
     for (let i = 0; i < E.n; i++) html += E.cls === 'fx-ring' ? '<i class="fx-ring" style="animation-delay:' + (i * 0.28).toFixed(2) + 's"></i>'
-      : part(E.cls, i, E.ch, R(8, 82), R(E.cls === 'fx-bubble' ? 45 : 30, 85));
+      : part(E.cls, i, E.art ? PET_FX_ART[E.art](E.art === 'spark' ? E.colors[i % E.colors.length] : pick(E.colors)) : '', R(8, 82), R(E.cls === 'fx-bubble' ? 45 : 30, 85));
   } else if (fx === 'sparks') {
-    for (let i = 0; i < 6; i++) html += part('fx-emo fx-spark', i, '✨', R(0, 85), R(5, 70));
+    for (let i = 0; i < 6; i++) html += part('fx-emo fx-spark', i, PET_FX_ART.spark(pick(['#ffd166', '#fff1a8', '#ffb703'])), R(0, 85), R(5, 70));
+  } else if (fx === 'drops') {
+    for (let i = 0; i < 2; i++) html += part('fx-emo fx-drop', i, PET_FX_ART.drop('#7cc4ff'), 36 + i * 22, 24, 0.7);
+  } else if (fx === 'steam') {
+    for (let i = 0; i < 3; i++) html += part('fx-emo fx-steam', i, PET_FX_ART.steam('rgba(255,255,255,.85)'), 24 + i * 22, R(4, 14), 0.25);
+  } else if (fx === 'flakes') {
+    for (let i = 0; i < 5; i++) html += part('fx-emo fx-flake', i, PET_FX_ART.flake(pick(['#e6f6ff', '#bfe6ff'])), R(2, 86), R(-8, 30), 0.2);
   } else if (fx === 'rings') {
     for (let i = 0; i < 3; i++) html += '<i class="fx-ring" style="animation-delay:' + (i * 0.22).toFixed(2) + 's"></i>';
   } else if (fx === 'zzz') {
@@ -111,6 +135,7 @@ function petFxHtml(kind, fx) {
 function petKindOf(pet) { return pet.dataset.pet; }
 function petClearReact(pet) {
   Object.keys(PET_REACT).forEach(k => pet.classList.remove('r-' + k));
+  PET_FIDGETS.forEach(f => pet.classList.remove(f));
   PET_STATES.forEach(e => pet.classList.remove('e-' + e));
   const img = pet.querySelector('.pet-img');
   if (img) { const want = petImg(petKindOf(pet), pet.dataset.skin || 'idle'); if (img.getAttribute('src') !== want) img.src = want; }
@@ -133,6 +158,22 @@ function petReact(el, name) {
   clearTimeout(pet._petT);
   pet._petT = setTimeout(() => petClearReact(pet), R.ms);
 }
+
+// Ужимки в покое: время от времени питомец сам подпрыгивает, оглядывается или
+// переминается — пока он на виду и ничем не занят. Только крупные питомцы (в
+// меню, на своём экране, в партии, в карточке товара), не вся витрина
+const PET_FIDGETS = ['f-hop', 'f-look', 'f-wiggle'];
+const PET_FIDGET_AT = '.pc-pet .pet, #pmStage .pet, #gamePet .pet, #siArt > .sha-pet .pet';
+setInterval(() => {
+  if (document.hidden) return;
+  try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) {}
+  document.querySelectorAll(PET_FIDGET_AT).forEach(pet => {
+    if (!pet.offsetParent || /\br-/.test(pet.className) || /\bf-/.test(pet.className) || Math.random() > 0.2) return;
+    const f = PET_FIDGETS[Math.floor(Math.random() * PET_FIDGETS.length)];
+    pet.classList.add(f);
+    setTimeout(() => pet.classList.remove(f), 1100);
+  });
+}, 1600);
 
 // Уровень по опыту: 1–10. Следующий уровень — на 60 опыта дороже прошлого
 function petLevel(xp) {

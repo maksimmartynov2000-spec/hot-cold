@@ -7044,7 +7044,7 @@ async function testPets(browser) {
   await page.waitForTimeout(200);
   // Без облика сальто уже меняет картинку на радостную; когда оно кончилось — покой
   const plainNow = await page.evaluate(() => document.querySelector('#pmStage .pet').className + ' ' + document.querySelector('#pmStage .pet-img').getAttribute('src'));
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(1600);
   const plain = await page.evaluate(() => ({ stage: document.querySelector('#pmStage .pet').className, img: document.querySelector('#pmStage .pet-img').getAttribute('src'),
     skin: petLook.gear.badger.skin || null }));
   check('«Обычный» снимает облик: сальто радостной картинкой, потом картинка покоя', /\br-flip\b.*badger_happy\.webp/.test(plainNow) && !/skin-|r-flip/.test(plain.stage) &&
