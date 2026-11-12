@@ -294,7 +294,7 @@ function renderPetModal() {
     skins.querySelectorAll('[data-skin]').forEach(b => { b.onclick = () => petWearGear('skin', b.dataset.skin || null); });
   }
   // Ауры: только подходящие этому питомцу; надетая — подсвечена, нажатие
-  // снимает или надевает
+  // снимает или надевает. Подпись места — только когда мест больше одного
   const gear = document.getElementById('pmGear');
   const ownAuras = Object.keys(PET_AURAS).filter(c => petAuraFits(c, kind) && petOwns('gear', c));
   const outfit = petOutfit(kind);
@@ -305,7 +305,7 @@ function renderPetModal() {
   } else {
     gear.innerHTML = '<b>' + escapeHtml(P.gearHead) + '</b>' + PET_SLOTS.filter(slot => ownAuras.some(c => PET_AURAS[c].slot === slot)).map(slot => {
       const codes = ownAuras.filter(c => PET_AURAS[c].slot === slot);
-      return '<div class="pm-slot"><span class="pm-slot-name">' + escapeHtml(S.slots[slot]) + '</span>' +
+      return '<div class="pm-slot">' + (PET_SLOTS.length > 1 ? '<span class="pm-slot-name">' + escapeHtml(S.slots[slot]) + '</span>' : '') +
         codes.map(c => '<button type="button" class="pm-gear' + (c === outfit[slot] ? ' on' : '') + '" data-slot="' + slot + '" data-code="' + c + '" aria-pressed="' +
           (c === outfit[slot]) + '">' + escapeHtml(S.gear[c]) + '</button>').join('') + '</div>';
     }).join('') + '<button type="button" class="pm-gear" data-shop="gear">🛍️ ' + escapeHtml(P.gearShop) + '</button>';
