@@ -15,15 +15,17 @@ const PASS_COLORS = ['grad-aurora', 'grad-lava', 'grad-night'];
 const PASS_KIND_ICON = { frame: '⭕', title: '🏷️', phrase: '💬', icon: '🖼️', color: '🎨' };
 
 let onlineInfo = null;
+let onlineInfoAt = 0;   // когда база ответила (или не ответила) — ждёт заставка
 
 async function loadOnlineInfo() {
-  if (!runAuth() || typeof sb === 'undefined' || !sb) { onlineInfo = null; return null; }
+  if (!runAuth() || typeof sb === 'undefined' || !sb) { onlineInfo = null; onlineInfoAt = Date.now(); return null; }
   try {
     const r = await friendRpc('my_online', {});
     onlineInfo = r && typeof r === 'object' && 'xp' in r ? r : null;
   } catch (e) {
     onlineInfo = null;
   }
+  onlineInfoAt = Date.now();
   renderOnlineDaily();
   if (typeof renderModeInfo === 'function') renderModeInfo();
   return onlineInfo;

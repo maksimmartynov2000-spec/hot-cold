@@ -2529,7 +2529,7 @@ select.field.chipped { position: absolute; width: 1px; height: 1px; opacity: 0; 
 .adv-world { content-visibility: auto; contain-intrinsic-size: auto 960px; }
 /* Запуск: до первого экрана видно только фон. Не сработал скрипт — через
    3 секунды показываем как есть, чтобы не остаться с пустым экраном */
-body.booting > * { visibility: hidden; animation: hc-reveal 0s linear 3s forwards; }
+body.booting > *:not(.splash) { visibility: hidden; animation: hc-reveal 0s linear 3s forwards; }
 @keyframes hc-reveal { to { visibility: visible; } }
 
 /* ---- Приключение: сложность в карточке соперника ----
@@ -2995,3 +2995,32 @@ body.kb-open .game-pet { display: none; }
 @keyframes wfTwinkle { 30% { opacity: 1; transform: scale(1.3); } 100% { opacity: 0; transform: scale(0.6); } }
 .pm-none { font-size: 12.5px; color: var(--muted); font-weight: 700; }
 .pm-gearbox > .pm-none { flex-basis: 100%; }
+
+/* ---- Заставка при запуске ----
+   Градусник наполняется снизу вверх от холодного к горячему. До скриптов
+   ртуть сама ползёт к трети (spCreep), дальше её ведёт js/main.js (--p) */
+.splash { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+  padding: 24px 24px calc(24px + env(safe-area-inset-bottom)); background-color: var(--bg); background-image: var(--bg-image); background-size: cover;
+  transition: opacity 0.45s ease, transform 0.45s ease; }
+.splash.gone { opacity: 0; transform: scale(1.04); pointer-events: none; }
+.sp-logo { font-size: clamp(38px, 12vw, 56px); font-weight: 900; letter-spacing: -0.5px; white-space: nowrap;
+  background: linear-gradient(90deg, #ff7a45, #ffd166 45%, #6fd8ff 60%, #8ea2ff); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35)); animation: spIn 0.6s ease-out both; }
+.sp-thermo { display: flex; flex-direction: column; align-items: center; animation: spIn 0.6s 0.1s ease-out both; }
+.sp-tube { position: relative; width: 26px; height: 150px; border-radius: 13px 13px 0 0; overflow: hidden;
+  background: rgba(255, 255, 255, 0.08); border: 3px solid rgba(255, 255, 255, 0.35); border-bottom: none; }
+.sp-fill { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--p, 0) * 100%);
+  background: linear-gradient(0deg, #4cc9f0, #6fd8ff 25%, #ffd166 60%, #ff7a45 85%, #ff3b5c) bottom / 100% 150px no-repeat;
+  transition: height 0.35s ease-out; animation: spCreep 1.6s ease-out both; }
+.splash.js .sp-fill { animation: none; }
+.sp-bulb { width: 54px; height: 54px; margin-top: -6px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.35);
+  background: radial-gradient(circle at 35% 35%, #bdf4ff, #4cc9f0 55%, #2a8fc4); box-shadow: 0 0 22px rgba(76, 201, 240, 0.55);
+  animation: spBulb 1.6s ease-in-out infinite; }
+.splash.hot .sp-bulb { background: radial-gradient(circle at 35% 35%, #ffe0a8, #ff7a45 55%, #d1452a); box-shadow: 0 0 26px rgba(255, 122, 69, 0.7); transition: all 0.4s; }
+.sp-tip { max-width: 320px; min-height: 2.8em; text-align: center; font-size: 15px; font-weight: 700; line-height: 1.4; color: rgba(255, 255, 255, 0.78);
+  opacity: 0; transition: opacity 0.4s; }
+.sp-tip.show { opacity: 1; }
+@keyframes spIn { from { opacity: 0; transform: translateY(12px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes spCreep { from { height: 0; } to { height: 30%; } }
+@keyframes spBulb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .splash, .splash * { animation: none !important; transition: none !important; } }

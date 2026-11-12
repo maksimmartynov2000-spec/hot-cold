@@ -95,6 +95,7 @@ const SHOP_KINDS = ['deals', 'pet', 'skin', 'gear', 'icon', 'frame', 'color', 't
 const SHOP_RARS = ['common', 'rare', 'epic', 'legend'];
 
 let shopWallet = null;   // { coins, gems, today, cap } — как сказала база
+let shopWalletAt = 0;    // когда база ответила (или не ответила) — ждёт заставка
 let shopKind = 'deals';  // открытый раздел
 let shopOpenItem = null; // { kind, code } или { bundle } в карточке товара
 let shopState = 'ok';    // 'ok' | 'guest' | 'off' (нет сети или миграции)
@@ -170,6 +171,7 @@ async function loadWallet() {
   } catch (e) {
     shopWallet = null;
   }
+  shopWalletAt = Date.now();
   renderShopWallet();
   return shopWallet;
 }
