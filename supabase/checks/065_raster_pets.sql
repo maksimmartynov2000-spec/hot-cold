@@ -10,11 +10,12 @@ with fn as (
 gone(code) as (values ('crown'), ('mortar'), ('starglasses'), ('tophat'), ('argyle'), ('lei'), ('sunglasses'), ('cap'), ('safari'),
                       ('lifebuoy'), ('striped'), ('jacket'), ('binoculars')),
 checks(nn, what, ok) as (values
-  (1, 'в магазине 114 товаров: 6 питомцев, 30 обликов, 16 аур; вещей (корона, шапочки, очки, одежда) нет',
-      (select count(*) from shop_catalog()) = 114
-      and (select count(*) from shop_catalog() where kind = 'pet') = 6
-      and (select count(*) from shop_catalog() where kind = 'skin') = 30
-      and (select count(*) from shop_catalog() where kind = 'gear') = 16
+  -- С 067 питомцев, обликов и аур больше — поэтому «не меньше»
+  (1, 'в магазине питомцы, облики и ауры; вещей (корона, шапочки, очки, одежда) нет',
+      (select count(*) from shop_catalog()) >= 114
+      and (select count(*) from shop_catalog() where kind = 'pet') >= 6
+      and (select count(*) from shop_catalog() where kind = 'skin') >= 30
+      and (select count(*) from shop_catalog() where kind = 'gear') >= 16
       and not exists (select 1 from shop_catalog() c where c.kind = 'gear' and c.code not like 'aura\_%')
       and not exists (select 1 from shop_catalog() c join gone g on g.code = c.code)),
   (2, 'у каждой ауры место — аура; своя аура питомца знает хозяина, ауры стихий и звёзд — всем',
@@ -22,8 +23,8 @@ checks(nn, what, ok) as (values
       and pet_item_for('gear', 'aura_fire') is null and pet_item_for('gear', 'aura_star') is null
       and pet_item_for('gear', 'aura_leaves') = 'badger' and pet_item_for('gear', 'aura_fish') = 'penguin'
       and pet_gear_slot('crown') is null),
-  (3, 'наборы: 6, в каждом питомец и две его ауры за монеты',
-      (select count(*) from shop_bundles()) = 6
+  (3, 'наборы: в каждом питомец и две его ауры за монеты',
+      (select count(*) from shop_bundles()) >= 6
       and not exists (select 1 from shop_bundles() b cross join lateral unnest(b.items) as it(item)
                         left join shop_catalog() c on c.kind || ':' || c.code = it.item
                        where c.kind is null or c.coins = 0)

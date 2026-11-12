@@ -22,13 +22,13 @@ do $$ begin
 end $$;
 \echo ok
 
-\echo === 1. каталог: 114 товаров, у каждого редкость; в игре и в базе одинаково; наборы — в одной валюте
+\echo === 1. каталог: 130 товаров, у каждого редкость; в игре и в базе одинаково; наборы — в одной валюте
 create temp table js_rar(kind text, code text, rarity text);
 \copy js_rar from 'shop_rar_js.csv' with (format csv, header true)
 create temp table js_bundles(code text, currency text, pct int, items text);
 \copy js_bundles from 'shop_bundles_js.csv' with (format csv, header true)
 do $$ begin
-  if (select count(*) from shop_catalog()) <> 114 then raise exception 'ОШИБКА: товаров %', (select count(*) from shop_catalog()); end if;
+  if (select count(*) from shop_catalog()) <> 130 then raise exception 'ОШИБКА: товаров %', (select count(*) from shop_catalog()); end if;
   if exists (select 1 from shop_catalog() c where c.rarity not in ('common', 'rare', 'epic', 'legend')) then raise exception 'ОШИБКА: редкость'; end if;
   if exists (select c.kind, c.code, c.rarity from shop_catalog() c except select j.kind, j.code, j.rarity from js_rar j)
      or exists (select j.kind, j.code, j.rarity from js_rar j except select c.kind, c.code, c.rarity from shop_catalog() c) then
@@ -47,8 +47,8 @@ do $$ begin
   end if;
   if exists (select 1 from shop_catalog() c where c.kind = 'gear' and pet_gear_slot(c.code) is null) then raise exception 'ОШИБКА: вещь без места'; end if;
   -- Шесть питомцев, по пять обликов у каждого за кристаллы; ауры — за монеты, других вещей нет (065)
-  if (select count(*) from shop_catalog() where kind = 'pet') <> 6 or (select count(*) from shop_catalog() where kind = 'skin') <> 30
-     or (select count(*) from shop_catalog() where kind = 'gear') <> 16 then raise exception 'ОШИБКА: состав разделов'; end if;
+  if (select count(*) from shop_catalog() where kind = 'pet') <> 8 or (select count(*) from shop_catalog() where kind = 'skin') <> 40
+     or (select count(*) from shop_catalog() where kind = 'gear') <> 20 then raise exception 'ОШИБКА: состав разделов'; end if;
   if exists (select 1 from shop_catalog() c where c.kind = 'gear' and c.code not like 'aura\_%') then raise exception 'ОШИБКА: вещь, а не аура'; end if;
   if exists (select 1 from shop_catalog() c where c.kind = 'skin' and (c.gems = 0 or pet_item_for('skin', c.code) not in (select p.code from shop_catalog() p where p.kind = 'pet'))) then
     raise exception 'ОШИБКА: облик не за кристаллы или без питомца';
@@ -56,7 +56,7 @@ do $$ begin
   if exists (select 1 from shop_catalog() c where c.kind in ('pet', 'gear') and c.coins = 0) then raise exception 'ОШИБКА: питомец или аура не за монеты'; end if;
   if (select count(*) from shop_catalog() c where c.kind = 'skin' and pet_item_for('skin', c.code) = 'badger') <> 5 then raise exception 'ОШИБКА: обликов у барсука'; end if;
   -- Прежние иконки, фразы и фоны по-прежнему разрешены: старый список — из нового
-  if (select count(*) from shop_items()) <> 114 or shop_codes('icon') <> (select array_agg(code order by code) from shop_catalog() where kind = 'icon') then
+  if (select count(*) from shop_items()) <> 130 or shop_codes('icon') <> (select array_agg(code order by code) from shop_catalog() where kind = 'icon') then
     raise exception 'ОШИБКА: shop_items не сходится с каталогом';
   end if;
 end $$;

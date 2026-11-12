@@ -11,8 +11,8 @@ checks(nn, what, ok) as (values
   -- Товаров было 127; с миграцией 065 вещи ушли, остались ауры — поэтому «не меньше»
   (1, 'в магазине 6 питомцев, 30 обликов и ауры; прежних питомцев и их вещей нет',
       (select count(*) from shop_catalog()) >= 114
-      and (select count(*) from shop_catalog() where kind = 'pet') = 6
-      and (select count(*) from shop_catalog() where kind = 'skin') = 30
+      and (select count(*) from shop_catalog() where kind = 'pet') >= 6
+      and (select count(*) from shop_catalog() where kind = 'skin') >= 30
       and (select count(*) from shop_catalog() where kind = 'gear') >= 16
       and not exists (select 1 from shop_catalog() where code in ('fox', 'wolf', 'drake', 'wizard', 'viking', 'shades', 'scarf', 'bowtie', 'cape'))),
   (2, 'облик — вид вещи за кристаллы; питомцы, вещи и ауры — за монеты',
@@ -24,8 +24,8 @@ checks(nn, what, ok) as (values
       and not exists (select 1 from shop_catalog() c where c.kind = 'skin'
                         and pet_item_for(c.kind, c.code) not in (select p.code from shop_catalog() p where p.kind = 'pet'))
       and pet_item_for('gear', 'aura_fire') is null and pet_item_for('gear', 'aura_leaves') = 'badger' and pet_gear_slot('aura_leaves') = 'aura'),
-  (4, 'наборы: 6, в каждом питомец и две его вещи за монеты',
-      (select count(*) from shop_bundles()) = 6
+  (4, 'наборы: в каждом питомец и две его вещи или ауры за монеты',
+      (select count(*) from shop_bundles()) >= 6
       and not exists (select 1 from shop_bundles() b cross join lateral unnest(b.items) as it(item)
                         left join shop_catalog() c on c.kind || ':' || c.code = it.item
                        where c.kind is null or c.coins = 0)),

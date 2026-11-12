@@ -10,9 +10,9 @@
 // Что у игрока (питомец, наряд каждого питомца, опыт, градусник, эффект победы,
 // товары дня) — из базы одним запросом my_look. Питомцев, облики и ауры
 // покупают в магазине; звёздный облик открывается на 10-м уровне.
-const PETS = ['badger', 'owl', 'toucan', 'cham', 'crab', 'penguin'];
+const PETS = ['badger', 'owl', 'toucan', 'cham', 'crab', 'penguin', 'dragon', 'shrimp'];
 // Из какого мира Приключения герой (номер в ADV_WORLDS)
-const PET_WORLD = { badger: 0, owl: 0, toucan: 1, cham: 1, crab: 2, penguin: 2 };
+const PET_WORLD = { badger: 0, owl: 0, toucan: 1, cham: 1, crab: 2, penguin: 2, shrimp: 2, dragon: 3 };
 // Три питомца на карточке в меню, пока своего нет: по одному из каждого мира
 const PET_CARD_TRIO = ['badger', 'cham', 'penguin'];
 
@@ -26,6 +26,7 @@ const PET_SKINS = {
   badger: ['honey', 'midnight', 'snow', 'autumn', 'mint'], owl: ['snowy', 'night', 'ruby', 'ash', 'moon'],
   toucan: ['sunset', 'lime', 'arctic', 'neon', 'cherry'], cham: ['lava', 'ocean', 'lemon', 'berry', 'midnight'],
   crab: ['blue', 'sand', 'neon', 'sunny', 'deep'], penguin: ['emperor', 'night', 'snowy', 'rose', 'sunny'],
+  dragon: ['emerald', 'frost', 'gold', 'amethyst', 'obsidian'], shrimp: ['neon', 'gold', 'mint', 'lilac', 'crimson'],
 };
 const PET_STAR = 'star';
 // Картинки эмоций: покой и пять настроений
@@ -110,6 +111,7 @@ const PET_ELEMENT = {
   toucan: { cls: 'fx-emo', art: 'note', colors: ['#ffd166', '#06d6a0', '#ff5d73', '#4cc9f0'], n: 6 },
   cham: { cls: 'fx-emo', art: 'spark', colors: PET_RAINBOW, n: 6 }, crab: { cls: 'fx-bubble', n: 8 },
   penguin: { cls: 'fx-emo', art: 'flake', colors: ['#e6f6ff', '#bfe6ff', '#ffffff'], n: 7 },
+  dragon: { cls: 'fx-emo', art: 'spark', colors: ['#ff7a2e', '#ffb02e', '#ffd166', '#ff5a1f'], n: 8 }, shrimp: { cls: 'fx-bubble', n: 9 },
 };
 // Частицы поверх питомца: кто где начинает, куда сносит и с какой задержкой —
 // случайно, чтобы два раза подряд не было одинаково. Снос — в em: 1em слоя
