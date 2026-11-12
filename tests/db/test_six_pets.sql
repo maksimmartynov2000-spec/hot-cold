@@ -3,7 +3,8 @@
 \pset tuples_only on
 
 -- Переход на шесть питомцев (миграция 064): прежние питомцы и вещи уходят,
--- монеты и кристаллы возвращаются, корона остаётся, наряд снимается.
+-- монеты и кристаллы возвращаются, корона остаётся (её заберёт уже 065),
+-- наряд снимается.
 -- Откатывается в конце
 begin;
 
@@ -25,7 +26,7 @@ do $$ begin
   update students set pet = 'badger', pet_gear = '{"badger": {"head": "crown"}}'::jsonb where username = 'Лев';
   insert into shop_deals(username, day, items)
   values ('Кира', player_day('Кира'), '[{"kind": "gear", "code": "shades", "pct": 40}]'::jsonb),
-         ('Лев', player_day('Лев'), '[{"kind": "gear", "code": "crown", "pct": 40}]'::jsonb);
+         ('Лев', player_day('Лев'), '[{"kind": "gear", "code": "aura_fire", "pct": 40}]'::jsonb);
 end $$;
 \echo ok
 
@@ -45,9 +46,10 @@ begin
     raise exception 'ОШИБКА: питомец или наряд не сняты';
   end if;
   if exists (select 1 from pet_xp where username = 'Кира') then raise exception 'ОШИБКА: опыт Огнелиса остался'; end if;
-  -- Товары дня с ушедшей вещью выбираются заново, с короной — остаются
+  -- Товары дня с ушедшей вещью выбираются заново, с аурой пламени — остаются
+  -- (корона была бы в каталоге до 065; теперь её нет, и такой товар дня тоже ушёл бы)
   if exists (select 1 from shop_deals where username = 'Кира') then raise exception 'ОШИБКА: товары дня с очками остались'; end if;
-  if not exists (select 1 from shop_deals where username = 'Лев') then raise exception 'ОШИБКА: товары дня с короной пропали'; end if;
+  if not exists (select 1 from shop_deals where username = 'Лев') then raise exception 'ОШИБКА: товары дня с аурой пропали'; end if;
   -- Новый наряд (по питомцам) уборка не трогает
   if (select pet from students where username = 'Лев') <> 'badger' or (select pet_gear from students where username = 'Лев') <> '{"badger": {"head": "crown"}}'::jsonb then
     raise exception 'ОШИБКА: наряд барсука тронут';

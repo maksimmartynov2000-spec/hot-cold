@@ -8,11 +8,12 @@ with fn as (
   where n.nspname = 'public'
 ),
 checks(nn, what, ok) as (values
-  (1, 'в магазине 127 товаров: 6 питомцев, 30 обликов, 29 вещей и аур; прежних питомцев и их вещей нет',
-      (select count(*) from shop_catalog()) = 127
+  -- Товаров было 127; с миграцией 065 вещи ушли, остались ауры — поэтому «не меньше»
+  (1, 'в магазине 6 питомцев, 30 обликов и ауры; прежних питомцев и их вещей нет',
+      (select count(*) from shop_catalog()) >= 114
       and (select count(*) from shop_catalog() where kind = 'pet') = 6
       and (select count(*) from shop_catalog() where kind = 'skin') = 30
-      and (select count(*) from shop_catalog() where kind = 'gear') = 29
+      and (select count(*) from shop_catalog() where kind = 'gear') >= 16
       and not exists (select 1 from shop_catalog() where code in ('fox', 'wolf', 'drake', 'wizard', 'viking', 'shades', 'scarf', 'bowtie', 'cape'))),
   (2, 'облик — вид вещи за кристаллы; питомцы, вещи и ауры — за монеты',
       exists (select 1 from pg_constraint where conname = 'cosmetic_kind' and pg_get_constraintdef(oid) like '%skin%')
@@ -22,14 +23,14 @@ checks(nn, what, ok) as (values
       not exists (select 1 from shop_catalog() c where c.kind = 'gear' and pet_gear_slot(c.code) is null)
       and not exists (select 1 from shop_catalog() c where c.kind = 'skin'
                         and pet_item_for(c.kind, c.code) not in (select p.code from shop_catalog() p where p.kind = 'pet'))
-      and pet_item_for('gear', 'crown') is null and pet_item_for('gear', 'mortar') = 'badger' and pet_gear_slot('jacket') = 'body'),
+      and pet_item_for('gear', 'aura_fire') is null and pet_item_for('gear', 'aura_leaves') = 'badger' and pet_gear_slot('aura_leaves') = 'aura'),
   (4, 'наборы: 6, в каждом питомец и две его вещи за монеты',
       (select count(*) from shop_bundles()) = 6
       and not exists (select 1 from shop_bundles() b cross join lateral unnest(b.items) as it(item)
                         left join shop_catalog() c on c.kind || ':' || c.code = it.item
                        where c.kind is null or c.coins = 0)),
-  (5, 'наряд на каждого питомца: голова, глаза, шея, тело, аура, облик; звёздный — с 2700 опыта',
-      exists (select 1 from fn where name = 'set_pet_gear' and src like '%''skin''%' and src like '%''body''%' and src like '%pet_star_xp%')
+  (5, 'наряд на каждого питомца: аура и облик; звёздный — с 2700 опыта',
+      exists (select 1 from fn where name = 'set_pet_gear' and src like '%''skin''%' and src like '%''aura''%' and src like '%pet_star_xp%')
       and pet_star_xp() = 2700),
   (6, 'вещь чужого питомца не продаётся и в товары дня не попадает',
       exists (select 1 from fn where name = 'shop_buy' and src like '%pet_locked%')

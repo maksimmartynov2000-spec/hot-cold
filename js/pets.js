@@ -1,11 +1,14 @@
 // ================= ПИТОМЦЫ =================
-// Шесть героев Приключения (миграция 064): Барсук Очкарик и Филин Монокль из
-// Волшебного леса, Тукан Панама и Хамелеон Очки из Джунглей, Краб Матрос и
-// Пингвин Капитан из Морской глубины. Рисунки — в js/pet-art.js (собирает
-// tools/pets/pets.py), анимации — классами в styles.css: покой идёт сам,
-// реакция — класс r-<имя> и эмоция e-<имя> на время.
+// Шесть героев Приключения: Барсук Очкарик и Филин Монокль из Волшебного леса,
+// Тукан Панама и Хамелеон Очки из Джунглей, Краб Матрос и Пингвин Капитан из
+// Морской глубины. Питомец — картинка (icons/pets/<питомец>_<вид>.webp,
+// нарезка листов нейросети, миграция 065): шесть эмоций и шесть обликов у
+// каждого. Реакция — картинка эмоции плюс движение классом r-<имя> и
+// частицы поверх; в облике картинка одна, и реакция — только движение и
+// частицы. Ауры — SVG из js/pet-art.js (собирает tools/pets/pets.py) позади
+// и перед картинкой, анимации — в styles.css.
 // Что у игрока (питомец, наряд каждого питомца, опыт, градусник, эффект победы,
-// товары дня) — из базы одним запросом my_look. Питомцев, облики и вещи
+// товары дня) — из базы одним запросом my_look. Питомцев, облики и ауры
 // покупают в магазине; звёздный облик открывается на 10-м уровне.
 const PETS = ['badger', 'owl', 'toucan', 'cham', 'crab', 'penguin'];
 // Из какого мира Приключения герой (номер в ADV_WORLDS)
@@ -13,85 +16,122 @@ const PET_WORLD = { badger: 0, owl: 0, toucan: 1, cham: 1, crab: 2, penguin: 2 }
 // Три питомца на карточке в меню, пока своего нет: по одному из каждого мира
 const PET_CARD_TRIO = ['badger', 'cham', 'penguin'];
 
-// Вещи: место (slot: голова, глаза, шея, тело, аура), слой рисунка (layer),
-// чья (pet: null — всем) и рисунок по питомцам. Облик — отдельное место skin
-const PET_GEAR = PET_GEAR_ART;
-const PET_SLOTS = ['head', 'eyes', 'neck', 'body', 'aura'];
-const PET_LAYERS = ['aura', 'back', 'neck', 'hair', 'eyes', 'head', 'front'];
+// Ауры: место (slot: aura), слой рисунка (layer: aura — позади питомца,
+// front — перед), чья (pet: null — всем) и рисунок по питомцам.
+// Облик — отдельное место skin
+const PET_AURAS = PET_AURA_ART;
+const PET_SLOTS = ['aura'];
 // Облики каждого питомца по порядку магазина; звёздный — не товар
-const PET_SKINS = {};
-PETS.forEach(k => { PET_SKINS[k] = Object.keys(PET_SKIN_COLORS[k]).filter(x => x !== 'star'); });
+const PET_SKINS = {
+  badger: ['honey', 'midnight', 'snow', 'autumn', 'mint'], owl: ['snowy', 'night', 'ruby', 'ash', 'moon'],
+  toucan: ['sunset', 'lime', 'arctic', 'neon', 'cherry'], cham: ['lava', 'ocean', 'lemon', 'berry', 'midnight'],
+  crab: ['blue', 'sand', 'neon', 'sunny', 'deep'], penguin: ['emperor', 'night', 'snowy', 'rose', 'sunny'],
+};
 const PET_STAR = 'star';
-// Вещь подходит питомцу: общая или его
-function petGearFits(code, kind) { const g = PET_GEAR[code]; return !!g && !!g.art[kind]; }
-// Чья вещь или облик: код питомца или null, если всем
+// Картинки эмоций: покой и пять настроений
+const PET_STATES = ['idle', 'happy', 'sad', 'cold', 'hot', 'sleepy'];
+function petImg(kind, state) { return 'icons/pets/' + kind + '_' + state + '.webp'; }
+// Аура подходит питомцу: общая или его
+function petAuraFits(code, kind) { const a = PET_AURAS[code]; return !!a && !!a.art[kind]; }
+// Чья аура или облик: код питомца или null, если всем
 function petItemFor(kind, code) {
   if (kind === 'skin') return code.split('_')[0];
-  if (kind === 'gear') return PET_GEAR[code] ? PET_GEAR[code].pet : null;
+  if (kind === 'gear') return PET_AURAS[code] ? PET_AURAS[code].pet : null;
   return null;
 }
+function petSkinOk(kind, skin) { return skin === PET_STAR || (PET_SKINS[kind] || []).indexOf(skin) >= 0; }
 
-let petSeq = 0;
-// Рисунок питомца строкой SVG. opts: skin — облик (перекраска по таблице
-// цветов, star — ещё и звёзды), gear — вещи (по слоям рисунка)
-function petSvg(kind, opts) {
+// Питомец разметкой: <span class="pet pet-<вид> [skin-<облик>]"> аура позади,
+// картинка, аура спереди, слой частиц </span>. opts: skin — облик (своя
+// картинка), auras — ауры (по слоям)
+function petHtml(kind, opts) {
   opts = opts || {};
-  if (!PET_ART[kind]) return '';
-  const n = ++petSeq;
-  let svg = PET_ART[kind];
-  const skin = opts.skin && PET_SKIN_COLORS[kind][opts.skin] ? opts.skin : null;
-  if (skin) {
-    const table = PET_SKIN_COLORS[kind][skin];
-    svg = svg.replace(/#[0-9a-f]{6}\b/gi, m => table[m.toLowerCase()] || m)
-      .replace('class="pet pet-' + kind + '"', 'class="pet pet-' + kind + ' skin-' + skin + '"');
-    if (skin === PET_STAR) svg = svg.replace('<g class="pt-skin-fx"></g>', '<g class="pt-skin-fx">' + PET_STAR_FX + '</g>');
-  }
-  // Свои id у каждого экземпляра: один питомец бывает на странице дважды,
-  // и градиенты из спрятанной копии в некоторых браузерах не рисуются
-  svg = svg.replace(new RegExp('(id="|url\\(#)' + kind + '-', 'g'), '$1' + kind + n + '-');
-  const by = {};
-  let eyesOff = false;
-  (opts.gear || []).forEach(code => {
-    const g = PET_GEAR[code];
-    if (!g || !g.art[kind]) return;
-    by[g.layer] = (by[g.layer] || '') + '<g class="pt-gear g-' + g.slot + '">' + g.art[kind] + '</g>';
-    if (g.slot === 'eyes') eyesOff = true;
+  if (PETS.indexOf(kind) < 0) return '';
+  const skin = opts.skin && petSkinOk(kind, opts.skin) ? opts.skin : null;
+  let back = '', front = '';
+  (opts.auras || []).forEach(code => {
+    const a = PET_AURAS[code];
+    if (!a || !a.art[kind]) return;
+    const g = '<g class="pt-gear g-aura g-' + code + '">' + a.art[kind] + '</g>';
+    if (a.layer === 'front') front += g; else back += g;
   });
-  PET_LAYERS.forEach(l => { svg = svg.replace('<g class="pt-gear-' + l + '"></g>', '<g class="pt-gear-' + l + '">' + (by[l] || '') + '</g>'); });
-  // Вещь на глаза заменяет свои очки
-  if (eyesOff) svg = svg.replace('class="pet ', 'class="pet sig-eyes-off ');
-  return svg;
+  const svg = (s, cls) => s ? '<svg class="pet-aura ' + cls + '" viewBox="0 0 240 240" aria-hidden="true">' + s + '</svg>' : '';
+  return '<span class="pet pet-' + kind + (skin ? ' skin-' + skin : '') + '" data-pet="' + kind + '"' + (skin ? ' data-skin="' + skin + '"' : '') + '>' +
+    svg(back, 'pa-back') + '<img class="pet-img" src="' + petImg(kind, skin || 'idle') + '" alt="" draggable="false">' +
+    svg(front, 'pa-front') + '<span class="pet-fx" aria-hidden="true"></span></span>';
+}
+// Картинки эмоций своего питомца — заранее в кеш, чтобы первая реакция не
+// ждала сети (дальше их держит service worker)
+const petWarmed = {};
+function petWarm(kind) {
+  if (!kind || petWarmed[kind] || typeof Image === 'undefined') return;
+  petWarmed[kind] = true;
+  PET_STATES.forEach(s => { const im = new Image(); im.src = petImg(kind, s); });
 }
 
-// Реакция = движение (r-<имя>) и эмоция (e-<имя>) на время; новая сменяет
-// прежнюю. «Горячо» и «холодно» — у каждого по характеру: пингвину холод в
-// радость, а жара — пыхтеть; филину жарко — пыхтит
-const PET_EMOTIONS = ['happy', 'joy', 'sad', 'wow', 'fierce', 'sleepy', 'pant', 'cold', 'howl'];
+// Реакция = картинка эмоции (img), движение классом r-<имя> и частицы (fx) на
+// время; новая сменяет прежнюю. В облике картинка не меняется: движение и
+// частицы те же. Класс e-<эмоция> остаётся для стилей
 const PET_REACT = {
-  flip: { ms: 1150, e: 'happy' },
-  win: { ms: 2200, e: 'happy' },
-  lose: { ms: 2300, e: 'sad' },
-  element: { ms: 1400, e: { badger: 'fierce', owl: 'wow', toucan: 'joy', cham: 'fierce', crab: 'joy', penguin: 'joy' } },
-  roar: { ms: 1300, e: 'fierce' },
-  hot: { ms: 1500, e: { badger: 'joy', owl: 'pant', toucan: 'joy', cham: 'joy', crab: 'joy', penguin: 'pant' } },
-  cold: { ms: 1800, e: { badger: 'cold', owl: 'cold', toucan: 'cold', cham: 'cold', crab: 'cold', penguin: 'happy' } },
+  flip: { ms: 1150, img: 'happy' },
+  win: { ms: 2200, img: 'happy', fx: 'sparks' },
+  lose: { ms: 2300, img: 'sad' },
+  element: { ms: 1500, img: 'happy', fx: 'element' },
+  roar: { ms: 1300, img: 'happy', fx: 'rings' },
+  sleep: { ms: 2600, img: 'sleepy', fx: 'zzz' },
+  hot: { ms: 1500, img: 'hot' },
+  cold: { ms: 1800, img: 'cold' },
 };
-function petKindOf(svg) { return PETS.find(k => svg.classList.contains('pet-' + k)); }
-function petClearReact(svg) {
-  Object.keys(PET_REACT).forEach(k => svg.classList.remove('r-' + k));
-  PET_EMOTIONS.forEach(e => svg.classList.remove('e-' + e));
+// Стихия у каждого своя: листья, круги звука, ноты, радуга, пузыри, снежинки
+const PET_ELEMENT = {
+  badger: { cls: 'fx-emo', ch: '🍂', n: 7 }, owl: { cls: 'fx-ring', n: 3 }, toucan: { cls: 'fx-emo', ch: '🎵', n: 6 },
+  cham: { cls: 'fx-emo', ch: '✨', n: 6 }, crab: { cls: 'fx-bubble', n: 8 }, penguin: { cls: 'fx-emo', ch: '❄️', n: 7 },
+};
+// Частицы поверх питомца: кто где начинает, куда сносит и с какой задержкой —
+// случайно, чтобы два раза подряд не было одинаково. Снос — в em: 1em слоя
+// частиц = 16 % ширины питомца (styles.css)
+function petFxHtml(kind, fx) {
+  const R = (a, b) => a + Math.random() * (b - a);
+  const part = (cls, i, ch, left, top) => '<i class="' + cls + '" style="left:' + left.toFixed(0) + '%;top:' + top.toFixed(0) + '%;animation-delay:' +
+    (i * 0.11).toFixed(2) + 's;--dx:' + R(-1.8, 1.8).toFixed(1) + 'em;--r:' + R(-200, 200).toFixed(0) + 'deg">' + (ch || '') + '</i>';
+  let html = '';
+  if (fx === 'element') {
+    const E = PET_ELEMENT[kind] || PET_ELEMENT.badger;
+    for (let i = 0; i < E.n; i++) html += E.cls === 'fx-ring' ? '<i class="fx-ring" style="animation-delay:' + (i * 0.28).toFixed(2) + 's"></i>'
+      : part(E.cls, i, E.ch, R(8, 82), R(E.cls === 'fx-bubble' ? 45 : 30, 85));
+  } else if (fx === 'sparks') {
+    for (let i = 0; i < 6; i++) html += part('fx-emo fx-spark', i, '✨', R(0, 85), R(5, 70));
+  } else if (fx === 'rings') {
+    for (let i = 0; i < 3; i++) html += '<i class="fx-ring" style="animation-delay:' + (i * 0.22).toFixed(2) + 's"></i>';
+  } else if (fx === 'zzz') {
+    for (let i = 0; i < 3; i++) html += '<i class="fx-z" style="left:' + (58 + i * 9) + '%;top:' + (22 - i * 7) + '%;animation-delay:' + (i * 0.5).toFixed(1) + 's">z</i>';
+  }
+  return html;
+}
+function petKindOf(pet) { return pet.dataset.pet; }
+function petClearReact(pet) {
+  Object.keys(PET_REACT).forEach(k => pet.classList.remove('r-' + k));
+  PET_STATES.forEach(e => pet.classList.remove('e-' + e));
+  const img = pet.querySelector('.pet-img');
+  if (img) { const want = petImg(petKindOf(pet), pet.dataset.skin || 'idle'); if (img.getAttribute('src') !== want) img.src = want; }
+  const fx = pet.querySelector('.pet-fx');
+  if (fx) fx.innerHTML = '';
 }
 function petReact(el, name) {
   const R = PET_REACT[name];
   if (!el || !R) return;
-  const svg = el.matches && el.matches('svg.pet') ? el : el.querySelector('svg.pet');
-  if (!svg) return;
-  petClearReact(svg);
-  void svg.getBoundingClientRect();
-  const e = typeof R.e === 'string' ? R.e : R.e[petKindOf(svg)];
-  svg.classList.add('r-' + name, 'e-' + e);
-  clearTimeout(svg._petT);
-  svg._petT = setTimeout(() => petClearReact(svg), R.ms);
+  const pet = el.matches && el.matches('.pet') ? el : el.querySelector('.pet');
+  if (!pet) return;
+  petClearReact(pet);
+  void pet.getBoundingClientRect();
+  const kind = petKindOf(pet);
+  const img = pet.querySelector('.pet-img');
+  if (img && !pet.dataset.skin) img.src = petImg(kind, R.img);
+  pet.classList.add('r-' + name, 'e-' + R.img);
+  const fx = pet.querySelector('.pet-fx');
+  if (fx && R.fx) fx.innerHTML = petFxHtml(kind, R.fx);
+  clearTimeout(pet._petT);
+  pet._petT = setTimeout(() => petClearReact(pet), R.ms);
 }
 
 // Уровень по опыту: 1–10. Следующий уровень — на 60 опыта дороже прошлого
@@ -101,11 +141,11 @@ function petLevel(xp) {
   return { lv, xp: left, need: lv < 10 ? need : 0 };
 }
 // Трюки по уровням; на 10-м — звёздный облик
-const PET_TRICKS = [{ code: 'flip', lv: 1 }, { code: 'element', lv: 3 }, { code: 'roar', lv: 5 }, { code: 'win', lv: 7 }];
+const PET_TRICKS = [{ code: 'flip', lv: 1 }, { code: 'element', lv: 3 }, { code: 'roar', lv: 5 }, { code: 'win', lv: 7 }, { code: 'sleep', lv: 9 }];
 const PET_STAR_LV = 10;
 
 // ---------- что у игрока ----------
-// { pet, gear: {питомец: {место: вещь, skin: облик}}, xp: {питомец: опыт}, thermo, winfx, deals, dealsLeft, bundles }
+// { pet, gear: {питомец: {aura: аура, skin: облик}}, xp: {питомец: опыт}, thermo, winfx, deals, dealsLeft, bundles }
 let petLook = null;
 let petLookAt = 0;
 async function loadLook() {
@@ -132,31 +172,31 @@ function myPet() {
   return petLook && petLook.pet && PETS.indexOf(petLook.pet) >= 0 && petOwns('pet', petLook.pet) ? petLook.pet : null;
 }
 function petXpOf(kind) { return petLook && petLook.xp ? petLook.xp[kind] || 0 : 0; }
-// Наряд питомца из базы: {место: вещь, skin: облик}
+// Наряд питомца из базы: {aura: аура, skin: облик}
 function petOutfit(kind) {
   const g = petLook && petLook.gear ? petLook.gear[kind] : null;
   return g && typeof g === 'object' ? g : {};
 }
-// Надетые вещи питомца — только свои и подходящие ему
-function petGearOn(kind) {
+// Надетые ауры питомца — только свои и подходящие ему
+function petAurasOn(kind) {
   kind = kind || myPet();
   if (!kind) return [];
   const o = petOutfit(kind);
-  return PET_SLOTS.map(s => o[s]).filter(c => c && petGearFits(c, kind) && petOwns('gear', c));
+  return PET_SLOTS.map(s => o[s]).filter(c => c && petAuraFits(c, kind) && petOwns('gear', c));
 }
 function petStarOpen(kind) { return petLevel(petXpOf(kind)).lv >= PET_STAR_LV; }
 // Надетый облик: купленный или звёздный с 10-го уровня
 function petSkinOn(kind) {
   kind = kind || myPet();
   const sk = kind ? petOutfit(kind).skin : null;
-  if (!sk || !PET_SKIN_COLORS[kind] || !PET_SKIN_COLORS[kind][sk]) return null;
+  if (!sk || !petSkinOk(kind, sk)) return null;
   if (sk === PET_STAR) return petStarOpen(kind) ? sk : null;
   return petOwns('skin', kind + '_' + sk) ? sk : null;
 }
-// Питомец в своём наряде — строкой SVG
-function myPetSvg(kind) {
+// Питомец в своём наряде — разметкой
+function myPetHtml(kind) {
   kind = kind || myPet();
-  return kind ? petSvg(kind, { gear: petGearOn(kind), skin: petSkinOn(kind) }) : '';
+  return kind ? petHtml(kind, { auras: petAurasOn(kind), skin: petSkinOn(kind) }) : '';
 }
 function petName(kind) { return (t().pets.names || {})[kind] || kind; }
 function petSkinName(code) { return code === PET_STAR ? t().pets.star : (t().pets.skins || {})[code] || code; }
@@ -180,17 +220,18 @@ function renderPetCard() {
   const kind = myPet();
   if (!kind) {
     box.className = 'pet-card none';
-    box.innerHTML = '<span class="pc-trio">' + PET_CARD_TRIO.map(k => '<span class="pc-mini">' + petSvg(k) + '</span>').join('') + '</span>' +
+    box.innerHTML = '<span class="pc-trio">' + PET_CARD_TRIO.map(k => '<span class="pc-mini">' + petHtml(k) + '</span>').join('') + '</span>' +
       '<span class="pc-text"><b>' + escapeHtml(P.cardNone) + '</b><span>' + escapeHtml(P.cardNoneSub) + '</span></span><span class="m-go">›</span>';
     box.onclick = () => openShop('pet');
     return;
   }
+  petWarm(kind);
   const L = petLevel(petXpOf(kind));
   const next = PET_TRICKS.find(x => x.lv > L.lv);
   const nextText = next ? P.cardNext.replace('{n}', next.lv).replace('{what}', P.tricks[next.code])
     : L.lv < PET_STAR_LV ? P.cardNext.replace('{n}', PET_STAR_LV).replace('{what}', P.star) : P.maxLevel;
   box.className = 'pet-card';
-  box.innerHTML = '<span class="pc-pet">' + myPetSvg(kind) + '</span>' +
+  box.innerHTML = '<span class="pc-pet">' + myPetHtml(kind) + '</span>' +
     '<span class="pc-text"><b>' + escapeHtml(petName(kind)) + ' <small>' + escapeHtml(P.level.replace('{n}', L.lv)) + '</small></b>' +
     '<span class="pc-bar"><i style="width:' + (L.need ? Math.round(100 * L.xp / L.need) : 100) + '%"></i></span>' +
     '<span class="pc-next">' + escapeHtml(nextText) + '</span></span><span class="m-go">›</span>';
@@ -217,12 +258,13 @@ function renderPetModal() {
   const own = petOwns('pet', kind), mine = myPet() === kind;
   const L = petLevel(petXpOf(kind));
   const it = typeof shopItem === 'function' ? shopItem('pet', kind) : null;
+  if (own) petWarm(kind);
   document.getElementById('pmName').textContent = petName(kind);
   document.getElementById('pmRar').textContent = it ? S.rarity[it.rar] : '';
   document.getElementById('pmRar').className = 'pm-rar rar-' + (it ? it.rar : 'common');
   document.getElementById('pmWho').textContent = petHeroText(kind) + ' ' + P.who[kind];
   const stage = document.getElementById('pmStage');
-  stage.innerHTML = own ? myPetSvg(kind) : petSvg(kind);
+  stage.innerHTML = own ? myPetHtml(kind) : petHtml(kind);
   stage.onclick = () => petReact(stage, 'flip');
   // Уровень и опыт
   document.getElementById('pmLevel').textContent = own ? P.level.replace('{n}', L.lv) : '';
@@ -251,18 +293,18 @@ function renderPetModal() {
       (ownSkins.length < PET_SKINS[kind].length ? '<button type="button" class="pm-gear" data-shop="skin">🛍️ ' + escapeHtml(P.skinShop) + '</button>' : '');
     skins.querySelectorAll('[data-skin]').forEach(b => { b.onclick = () => petWearGear('skin', b.dataset.skin || null); });
   }
-  // Вещи по местам: только подходящие этому питомцу; надетая — подсвечена,
-  // нажатие снимает или надевает
+  // Ауры: только подходящие этому питомцу; надетая — подсвечена, нажатие
+  // снимает или надевает
   const gear = document.getElementById('pmGear');
-  const ownGear = Object.keys(PET_GEAR).filter(c => petGearFits(c, kind) && petOwns('gear', c));
+  const ownAuras = Object.keys(PET_AURAS).filter(c => petAuraFits(c, kind) && petOwns('gear', c));
   const outfit = petOutfit(kind);
   if (!own) gear.innerHTML = '';
-  else if (!ownGear.length) {
+  else if (!ownAuras.length) {
     gear.innerHTML = '<b>' + escapeHtml(P.gearHead) + '</b><span class="pm-none">' + escapeHtml(P.gearNone) + '</span>' +
       '<button type="button" class="pm-gear" data-shop="gear">🛍️ ' + escapeHtml(P.gearShop) + '</button>';
   } else {
-    gear.innerHTML = '<b>' + escapeHtml(P.gearHead) + '</b>' + PET_SLOTS.filter(slot => ownGear.some(c => PET_GEAR[c].slot === slot)).map(slot => {
-      const codes = ownGear.filter(c => PET_GEAR[c].slot === slot);
+    gear.innerHTML = '<b>' + escapeHtml(P.gearHead) + '</b>' + PET_SLOTS.filter(slot => ownAuras.some(c => PET_AURAS[c].slot === slot)).map(slot => {
+      const codes = ownAuras.filter(c => PET_AURAS[c].slot === slot);
       return '<div class="pm-slot"><span class="pm-slot-name">' + escapeHtml(S.slots[slot]) + '</span>' +
         codes.map(c => '<button type="button" class="pm-gear' + (c === outfit[slot] ? ' on' : '') + '" data-slot="' + slot + '" data-code="' + c + '" aria-pressed="' +
           (c === outfit[slot]) + '">' + escapeHtml(S.gear[c]) + '</button>').join('') + '</div>';
@@ -274,7 +316,7 @@ function renderPetModal() {
   document.getElementById('pmPets').innerHTML = PETS.map(k => {
     const o = petOwns('pet', k), lv = petLevel(petXpOf(k)).lv;
     return '<button type="button" class="pm-pick' + (k === kind ? ' sel' : '') + (o ? '' : ' locked') + '" data-pet="' + k + '">' +
-      '<span class="pm-pick-art">' + (o ? myPetSvg(k) : petSvg(k)) + '</span><span>' + escapeHtml(petName(k)) + '</span><small>' +
+      '<span class="pm-pick-art">' + (o ? myPetHtml(k) : petHtml(k)) + '</span><span>' + escapeHtml(petName(k)) + '</span><small>' +
       escapeHtml(o ? (myPet() === k ? P.withYou : P.level.replace('{n}', lv)) : (shopItem('pet', k) ? shopPriceText(shopItem('pet', k)) : '')) + '</small></button>';
   }).join('');
   document.querySelectorAll('#pmPets [data-pet]').forEach(b => { b.onclick = () => { petModalKind = b.dataset.pet; renderPetModal(); }; });
@@ -293,8 +335,8 @@ async function petChoose(kind) {
   renderPetModal(); renderPetCard(); gamePetSync(true);
   petReact(document.getElementById('pmStage'), 'win');
 }
-// Надеть на своего питомца вещь (place: голова, глаза, шея, тело, аура) или
-// облик (skin); null — снять. База возвращает наряды всех питомцев
+// Надеть на своего питомца ауру (slot: aura) или облик (skin); null — снять.
+// База возвращает наряды всех питомцев
 async function petWearGear(slot, code) {
   let g;
   try { g = await friendRpc('set_pet_gear', { p_slot: slot, p_code: code || null }); } catch (e) { return; }
@@ -325,10 +367,11 @@ function gamePetSync(force) {
   const show = screen === 'game' && !!kind && petInGame() && !(typeof lesson !== 'undefined' && lesson);
   box.classList.toggle('hidden', !show);
   if (!show) return;
-  const key = kind + '|' + petGearOn(kind).join(',') + '|' + (petSkinOn(kind) || '');
+  petWarm(kind);
+  const key = kind + '|' + petAurasOn(kind).join(',') + '|' + (petSkinOn(kind) || '');
   if (force || key !== gamePetKey || !box.firstChild) {
     gamePetKey = key;
-    box.innerHTML = myPetSvg(kind);
+    box.innerHTML = myPetHtml(kind);
     box.onclick = () => petReact(box, 'flip');
   }
   gamePetPlace();

@@ -208,8 +208,8 @@ function stubSupabase(opts) {
             const it = SHOP_ITEMS.find(i => i.kind === args.p_kind && i.code === args.p_code);
             if (!it) return { data: null, error: { message: 'no_such_item' } };
             if (O.owned.some(o => o.kind === it.kind && o.code === it.code)) return { data: null, error: { message: 'already_owned' } };
-            // Вещь или облик одного питомца — только тому, у кого он есть (064)
-            const who = it.kind === 'skin' ? it.code.split('_')[0] : it.kind === 'gear' ? PET_GEAR[it.code].pet : null;
+            // Аура или облик одного питомца — только тому, у кого он есть (064, 065)
+            const who = it.kind === 'skin' ? it.code.split('_')[0] : it.kind === 'gear' ? PET_AURAS[it.code].pet : null;
             if (who && !O.owned.some(o => o.kind === 'pet' && o.code === who)) return { data: null, error: { message: 'pet_locked' } };
             const deal = L && (L.deals || []).find(d => d.kind === it.kind && d.code === it.code);
             const cut = v => v ? Math.max(1, Math.round(v * (100 - (deal ? deal.pct : 0)) / 100)) : 0;
@@ -253,12 +253,13 @@ function stubSupabase(opts) {
             return { data: { coins: W.coins, gems: W.gems, bundle: b.code, paid: price, got: miss }, error: null };
           }
           if (name === 'set_pet') { window.__look.pet = args.p_pet; return { data: args.p_pet, error: null }; }
-          // Наряд — на каждого питомца свой: {питомец: {место: вещь, skin: облик}} (064)
+          // Наряд — на каждого питомца свой: {питомец: {aura: аура, skin: облик}} (064, 065)
           if (name === 'set_pet_gear') {
             const L = window.__look, p = L.pet;
             if (!p) return { data: null, error: { message: 'no_pet' } };
+            if (args.p_slot !== 'skin' && args.p_slot !== 'aura') return { data: null, error: { message: 'bad_slot' } };
             const g = L.gear = L.gear || {}, o = g[p] = g[p] || {};
-            if (args.p_code && args.p_slot !== 'skin' && PET_GEAR[args.p_code].slot !== args.p_slot) return { data: null, error: { message: 'bad_slot' } };
+            if (args.p_code && args.p_slot === 'aura' && !PET_AURAS[args.p_code]) return { data: null, error: { message: 'bad_slot' } };
             if (args.p_code) o[args.p_slot] = args.p_code; else delete o[args.p_slot];
             return { data: JSON.parse(JSON.stringify(g)), error: null };
           }
