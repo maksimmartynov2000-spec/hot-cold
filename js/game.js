@@ -2304,7 +2304,10 @@ function renderHistory() {
   const list = document.getElementById('historyList');
   if (history.length === 0) { section.classList.add('hidden'); list.innerHTML = ''; return; }
   section.classList.remove('hidden');
-  list.innerHTML = '';
+  // Список собирается заново во временном блоке и меняется, только если
+  // что-то правда изменилось. В игре с другом всё перерисовывается на каждом
+  // опросе (раз в 2 с), и последний ход каждый раз заново «выпрыгивал»
+  const out = document.createElement('div');
 
   // Оценки ходов — только в разборе после партии: во время игры они отвлекают
   // от главного — горячо или холодно
@@ -2332,8 +2335,9 @@ function renderHistory() {
       : '<span class="h-num">#' + realIndex + '</span>' + who +
         '<span class="h-guess">' + h.guess + '</span>' +
         '<span class="h-label" style="color:' + h.meta.color + '">' + getFbHtml(h.meta) + '</span>';
-    list.appendChild(item);
+    out.appendChild(item);
   });
+  if (out.innerHTML !== list.innerHTML) list.replaceChildren(...out.childNodes);
 }
 
 // ================= РАЗБОР ПАРТИИ =================

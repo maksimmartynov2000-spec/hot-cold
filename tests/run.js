@@ -2601,6 +2601,25 @@ async function testOnlineClock(browser) {
   const after = await page.evaluate(() => document.getElementById('turnClock').textContent);
   check('секунды идут, не дожидаясь сервера', before !== after, before + ' → ' + after);
 
+  // Опрос базы (раз в 2 с) не трогает то, что не изменилось: строки ходов те же
+  // самые (не «выпрыгивают» заново), конец хода не прыгает от целых секунд
+  const steady = await page.evaluate(async () => {
+    history = [{ guess: 40, distance: null, p: 0, meta: FEEDBACK_META[3] }];
+    renderAll();
+    const row = document.querySelector('#historyList .history-item');
+    // Опрос приносит те же ходы новыми объектами и перерисовывает всё
+    history = [{ guess: 40, distance: null, p: 0, meta: FEEDBACK_META[3] }];
+    renderAll();
+    const same = document.querySelector('#historyList .history-item') === row;
+    // База прислала остаток целыми секундами (вниз) — тот же ход, конец не сдвигается
+    const before = online.deadlineAt;
+    const st = window.__matchState();
+    st.secondsLeft = Math.floor((online.deadlineAt - Date.now()) / 1000);
+    applyMatchState(st);
+    return { same, keep: online.deadlineAt === before };
+  });
+  check('опрос не перерисовывает ходы и не сдвигает конец хода', steady.same && steady.keep, JSON.stringify(steady));
+
   // Мало времени — цвет меняется. Опрос останавливаем: он вернул бы полные
   // тридцать секунд и перебил подставленный срок
   await page.evaluate(() => { stopMatchPoll(); online.deadlineAt = Date.now() + 5000; renderClock(); });

@@ -2567,8 +2567,16 @@ function applyMatchState(st) {
   online.forced = st.forced || null;
   online.turnSeconds = st.turnSeconds || 30;
   online.secondsLeft = st.secondsLeft;
-  online.deadlineAt = (st.secondsLeft === null || st.secondsLeft === undefined)
-    ? null : Date.now() + st.secondsLeft * 1000;
+  // Сервер присылает остаток целыми секундами (с округлением вниз), и каждый
+  // опрос сдвигал конец хода на долю секунды — цифра часов прыгала назад и
+  // вперёд. Тот же ход — конец хода остаётся прежним, если расхождение меньше
+  // полутора секунд; новый ход — считаем заново, с поправкой на половину
+  // отброшенной секунды
+  const turnKey = st.round + '|' + (st.moves || []).length + '|' + st.cur;
+  const fresh = (st.secondsLeft === null || st.secondsLeft === undefined) ? null : Date.now() + (st.secondsLeft + 0.5) * 1000;
+  online.deadlineAt = fresh === null ? null
+    : online.deadlineAt && online.turnKey === turnKey && Math.abs(fresh - online.deadlineAt) < 1500 ? online.deadlineAt : fresh;
+  online.turnKey = turnKey;
   applyChat(st.chat);
 
   // Расстояния сервер не присылает: пояс — это всё, что известно. Закрытый
