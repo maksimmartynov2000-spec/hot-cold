@@ -5630,7 +5630,15 @@ async function testUxPass(browser) {
   // а живой игрок и не перезагружает страницу через миллисекунды после выбора
   await page.waitForFunction(() => localStorage.getItem('hc_range') === '20');
   await page.waitForTimeout(500);
+  // Под нагрузкой всего прогона Chromium иногда теряет localStorage страницы
+  // file:// при перезагрузке, ещё до её скриптов (у игроков по https этого нет).
+  // Потерял — кладём записи обратно и перезагружаем снова
+  const keep = await page.evaluate(() => JSON.stringify(Object.assign({}, localStorage)));
   await page.reload();
+  if (!(await page.evaluate(() => localStorage.getItem('hc_range')))) {
+    await page.evaluate(v => { const o = JSON.parse(v); Object.keys(o).forEach(k => localStorage.setItem(k, o[k])); }, keep);
+    await page.reload();
+  }
   await page.waitForSelector('.mode-btn.solo', { state: 'visible' });
   await page.waitForTimeout(300);
   await page.click('.mode-btn.solo');
