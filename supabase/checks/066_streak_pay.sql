@@ -8,11 +8,13 @@ with fn as (
   where n.nspname = 'public'
 ),
 checks(nn, what, ok) as (values
-  (1, 'дни серии 1–4: 10, 15, 20, 25 🪙; 5-й: 3 💎; 10-й: 5 💎 и иконка; дальше по кругу',
-      (select array_agg(x.coins order by d) from generate_series(1, 4) d cross join lateral streak_day_pay(d) x) = array[10, 15, 20, 25]
+  -- Суммы монет с 068 — вдвое больше; здесь — что они растут и идут по кругу
+  (1, 'дни серии 1–4: монеты растут; 5-й: 3 💎; 10-й: 5 💎 и иконка; дальше по кругу',
+      (select bool_and(a.coins < b.coins) from generate_series(1, 3) d cross join lateral streak_day_pay(d) a cross join lateral streak_day_pay(d + 1) b)
+      and (select coins from streak_day_pay(1)) > 0
       and (select gems from streak_day_pay(5)) = 3 and (select coins from streak_day_pay(5)) = 0 and not (select chest from streak_day_pay(5))
       and (select gems from streak_day_pay(10)) = 5 and (select chest from streak_day_pay(10))
-      and (select coins from streak_day_pay(11)) = 10 and (select gems from streak_day_pay(15)) = 3 and (select chest from streak_day_pay(20))),
+      and (select coins from streak_day_pay(11)) = (select coins from streak_day_pay(1)) and (select gems from streak_day_pay(15)) = 3 and (select chest from streak_day_pay(20))),
   (2, 'сундук дня начисляет награду за день серии раз в день',
       exists (select 1 from fn where name = 'open_chest' and src like '%streak_day_pay%' and src like '%''streak:''%')),
   (3, 'из игры сундук открыть можно',

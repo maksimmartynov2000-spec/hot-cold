@@ -6705,7 +6705,7 @@ async function testShop(browser) {
   // Онлайна со случайными соперниками нет (миграция 062): монеты — за игру с
   // другом, кристаллы — за «Испытание выходных»
   check('как копить: игра с другом и «Испытание выходных», без онлайна и турнира',
-    /Игра с другом: победа — 15/.test(shop.earnText) && /Испытание выходных: 3 очка — 1 💎/.test(shop.earnText) &&
+    /Игра с другом: победа — 30/.test(shop.earnText) && /Испытание выходных: 3 очка — 1 💎/.test(shop.earnText) &&
     !/онлайн|турнир|режиме дня/i.test(shop.earnText + shop.note + shop.trophy), shop.earnText + ' | ' + shop.note);
   // Покупка за монеты, затем надеть
   await page.click('#shopGrid .sh-item[data-code="shop-01"]');
@@ -7260,7 +7260,7 @@ async function testStreakPay(browser) {
   console.log('\nНаграда за день серии');
   const page = await newGame(browser, { user: 'Максим' });
   const plan = await page.evaluate(() => [1, 2, 3, 4, 5, 6, 10, 11, 15, 20].map(d => { const p = streakDayPay(d); return d + ':' + p.coins + '/' + p.gems + (p.chest ? '+' : ''); }).join(' '));
-  check('расписание: 10, 15, 20, 25 🪙, 5-й — 3 💎, 10-й — 5 💎 и иконка, по кругу', plan === '1:10/0 2:15/0 3:20/0 4:25/0 5:0/3 6:10/0 10:0/5+ 11:10/0 15:0/3 20:0/5+', plan);
+  check('расписание (068): 20, 30, 40, 50 🪙, 5-й — 3 💎, 10-й — 5 💎 и иконка, по кругу', plan === '1:20/0 2:30/0 3:40/0 4:50/0 5:0/3 6:20/0 10:0/5+ 11:20/0 15:0/3 20:0/5+', plan);
   const shown = await page.evaluate(() => {
     showChest({ xp: 30, streak: 4, froze: false, pay: { coins: 25, gems: 0, icon: null } }, false);
     const a = document.getElementById('chestBody').textContent; closeChest();
@@ -7271,11 +7271,37 @@ async function testStreakPay(browser) {
     return { a, b, c };
   });
   check('в сундуке 4-го дня: +25 🪙, «завтра: +3 💎»', /\+25 🪙/.test(shown.a) && /За 4-й день серии/.test(shown.a) && /Завтра: \+3 💎/.test(shown.a), shown.a);
-  check('в сундуке 10-го дня: +5 💎 и иконка', /\+5 💎/.test(shown.b) && /и иконка: Моховой лягушонок/.test(shown.b) && /Завтра: \+10 🪙/.test(shown.b), shown.b);
+  check('в сундуке 10-го дня: +5 💎 и иконка', /\+5 💎/.test(shown.b) && /и иконка: Моховой лягушонок/.test(shown.b) && /Завтра: \+20 🪙/.test(shown.b), shown.b);
   check('база без 066 — сундук как раньше, без награды за день', !/день серии|Завтра/.test(shown.c), shown.c);
   const tr = await page.evaluate(() => ['en', 'fr', 'de', 'ru'].map(l => { const P = i18n[l].pass;
     return l + ':' + (['payHead', 'payIcon', 'payNext'].filter(k => !P[k]).length + (/\{n\}/.test(P.payHead) && /\{name\}/.test(P.payIcon) && /\{p\}/.test(P.payNext) ? 0 : 1)); }).join());
   check('тексты награды за день — на 4 языках, подстановки на месте', tr === 'en:0,fr:0,de:0,ru:0', tr);
+  await page.context().close();
+}
+
+// Подарок-перерасчёт (миграция 068): окно один раз, «Забрать!» — отметка в
+// базе, всплывашка и свежий кошелёк; второй раз не показывается
+async function testGift(browser) {
+  console.log('\nПодарок-перерасчёт');
+  const page = await newGame(browser, { user: 'Максим' });
+  await page.evaluate(async () => { window.__wallet = { coins: 100, gems: 2, today: 0, cap: 600 }; window.__gift = { code: 'econ2', coins: 340, gems: 7 };
+    giftShown = null; await checkGift(); });
+  await page.waitForTimeout(300);
+  const shown = await page.evaluate(() => ({ open: !document.getElementById('giftModal').classList.contains('hidden'),
+    title: document.getElementById('gfTitle').textContent, got: document.getElementById('gfGot').textContent, ok: document.getElementById('gfOk').textContent }));
+  check('окно подарка: «Подарок!», +340 🪙 +7 💎, «Забрать!»', shown.open && shown.title === 'Подарок!' && /\+340 🪙/.test(shown.got) && /\+7 💎/.test(shown.got) &&
+    shown.ok === 'Забрать!', JSON.stringify(shown));
+  await page.click('#gfOk');
+  await page.waitForTimeout(400);
+  const after = await page.evaluate(async () => { const r = { closed: document.getElementById('giftModal').classList.contains('hidden'), seen: window.__gift.seen,
+    toast: (document.getElementById('walletToast') || {}).textContent };
+    giftShown = null; await checkGift(); r.again = !document.getElementById('giftModal').classList.contains('hidden'); return r; });
+  check('забрал: окно закрыто, в базе отмечено, всплывашка «+340 🪙 +7 💎», второй раз не показывается', after.closed && after.seen && /\+340 🪙/.test(after.toast) &&
+    !after.again, JSON.stringify(after));
+  const nodb = await page.evaluate(async () => { window.__gift = undefined; giftShown = null; await checkGift(); return document.getElementById('giftModal').classList.contains('hidden'); });
+  check('база без 068 — окна нет, ошибок нет', nodb);
+  const tr = await page.evaluate(() => ['en', 'fr', 'de', 'ru'].map(l => l + ':' + ['title', 'lead', 'got', 'more', 'ok'].filter(k => !(i18n[l].shop.gift || {})[k]).length).join());
+  check('тексты подарка на 4 языках', tr === 'en:0,fr:0,de:0,ru:0', tr);
   await page.context().close();
 }
 
@@ -9223,6 +9249,7 @@ async function testKeyPage(browser) {
     await testSound(browser);
     await testSplash(browser);
     await testStreakPay(browser);
+    await testGift(browser);
     await testKidClarity(browser);
     await testOnlineAdvBonuses(browser);
     await testLocalAdvBonuses(browser);

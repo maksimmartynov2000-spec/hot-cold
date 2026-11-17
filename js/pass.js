@@ -228,12 +228,12 @@ async function openChest() {
 function openChestModal() {
   if (onlineInfo && onlineInfo.chest) showChest(onlineInfo.chest, false);
 }
-// Награда за день серии (миграция 066) — копия streak_day_pay из базы,
-// сверяется тестом: 1–4-й день — 10, 15, 20, 25 🪙; 5-й — 3 💎; 6–9-й — снова
+// Награда за день серии (миграции 066 и 068) — копия streak_day_pay из базы,
+// сверяется тестом: 1–4-й день — 20, 30, 40, 50 🪙; 5-й — 3 💎; 6–9-й — снова
 // монеты; 10-й — 5 💎 и иконка. Дальше по кругу
 function streakDayPay(s) {
   const pos = ((Math.max(1, s) - 1) % 10) + 1;
-  return { coins: pos === 5 || pos === 10 ? 0 : [10, 15, 20, 25][(pos - 1) % 5], gems: pos === 5 ? 3 : pos === 10 ? 5 : 0, chest: pos === 10 };
+  return { coins: pos === 5 || pos === 10 ? 0 : [20, 30, 40, 50][(pos - 1) % 5], gems: pos === 5 ? 3 : pos === 10 ? 5 : 0, chest: pos === 10 };
 }
 function streakPayText(p) {
   return [p.coins ? '+' + p.coins + ' 🪙' : '', p.gems ? '+' + p.gems + ' 💎' : ''].filter(Boolean).join(' ');

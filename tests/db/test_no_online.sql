@@ -97,7 +97,7 @@ begin
     raise exception 'ОШИБКА: конец партии %', row_to_json(m);
   end if;
   if coalesce((select sum(coins) from wallet_log where username = leaver and reason = 'online'), 0) <> 0
-     or (select sum(coins) from wallet_log where username = stay and reason = 'online') <> 15 then
+     or (select sum(coins) from wallet_log where username = stay and reason = 'online') <> 30 then
     raise exception 'ОШИБКА: монеты за сдачу';
   end if;
   st := match_state(leaver, case when leaver = 'Лев' then '1234' else '4321' end, mid);

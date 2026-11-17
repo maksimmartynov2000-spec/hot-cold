@@ -665,3 +665,35 @@ async function shopWear(kind, code, off) {
   renderShop();
   renderShopItem();
 }
+
+// ---------- подарок (миграция 068) ----------
+// Разовое начисление от базы — перерасчёт наград по новым ставкам. Показывается
+// один раз красивым окном; «Забрать!» отмечает его показанным, кошелёк
+// перечитывается, всплывает «+X 🪙 +Y 💎». База без 068 — молчим
+let giftShown = null;
+async function checkGift() {
+  if (!runAuth() || typeof sb === 'undefined' || !sb || giftShown) return;
+  let g = null;
+  try { g = await friendRpc('my_gift', {}); } catch (e) { return; }
+  if (!g || !g.code || giftShown) return;
+  giftShown = g;
+  const G = t().shop.gift;
+  document.getElementById('gfTitle').textContent = G.title;
+  document.getElementById('gfLead').textContent = G.lead;
+  document.getElementById('gfGot').innerHTML = '<small>' + escapeHtml(G.got) + '</small>' +
+    (g.coins ? '<b class="gf-coins">+' + g.coins + ' 🪙</b>' : '') + (g.gems ? '<b class="gf-gems">+' + g.gems + ' 💎</b>' : '');
+  document.getElementById('gfMore').textContent = G.more;
+  document.getElementById('gfOk').textContent = G.ok;
+  document.getElementById('giftModal').classList.remove('hidden');
+  if (typeof sfx === 'function') sfx('chest');
+}
+async function giftCollect() {
+  const g = giftShown;
+  document.getElementById('giftModal').classList.add('hidden');
+  if (!g) return;
+  try { await friendRpc('gift_seen', { p_code: g.code }); } catch (e) {}
+  if (typeof celebrate === 'function') celebrate('gift:' + g.code, ['🪙', '💎', '✨', '🎁'], true);
+  if (typeof sfx === 'function') sfx('buy');
+  walletToast(g.coins, g.gems);
+  if (typeof loadWallet === 'function') loadWallet();
+}
