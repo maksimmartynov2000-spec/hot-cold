@@ -102,7 +102,7 @@ const SPLASH_MIN = 2000, SPLASH_MAX = 2600;
 function runSplash() {
   const sp = document.getElementById('splash');
   if (!sp) return;
-  if (navigator.webdriver && !window.__splash) { sp.remove(); return; }
+  if (navigator.webdriver && !window.__splash) { sp.remove(); setTimeout(() => { if (typeof checkGift === 'function') checkGift(); }, 600); return; }
   sp.classList.add('js');
   const tips = t().splashTips || [];
   const tip = document.getElementById('spTip');
@@ -124,7 +124,7 @@ function runSplash() {
     clearInterval(timer);
     fill.style.setProperty('--p', 1);
     sp.classList.add('hot');
-    setTimeout(() => { sp.classList.add('gone'); setTimeout(() => sp.remove(), 500); }, 280);
+    setTimeout(() => { sp.classList.add('gone'); setTimeout(() => { sp.remove(); if (typeof checkGift === 'function') checkGift(); }, 500); }, 280);
   };
   const timer = setInterval(() => {
     const el = now();

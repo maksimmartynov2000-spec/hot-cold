@@ -1,0 +1,160 @@
+-- Экономика щедрее и подарок-перерасчёт. Применять в Supabase: SQL Editor →
+-- вставить целиком → Run. Применить ДО мёржа. Повторный запуск ничего не
+-- ломает и подарок второй раз не выдаёт.
+--
+-- • Монеты за игру — вдвое: Приключение 10 🪙 за звезду, игра с другом —
+--   победа 30, поражение 10, Испытание 4 🪙 за раунд (до 40 за заход), серия
+--   дней 20, 30, 40, 50 🪙. Предел за игры с другом и Испытание — 600 🪙 в день.
+-- • Кристаллы чаще: босс мира — 3 💎 (было 2), мир на ★★★ — 5 💎 (было 3).
+-- • Цены в магазине не меняются: купленное не дешевеет.
+-- • Подарок: всем, кто уже играл, — разница по новым ставкам за всё прошлое
+--   (монеты за Приключение, игры с другом, Испытание и серию — ещё столько
+--   же; +1 💎 за каждого побеждённого босса, +2 💎 за каждый мир на ★★★).
+--   Игра покажет его красивым окном один раз.
+
+-- ============ 1. Предел и монеты за партию с другом и Испытание ============
+create or replace function wallet_cap() returns int language sql immutable as $$ select 600; $$;
+
+create or replace function wallet_earn(p_username text, p_coins int, p_reason text, p_ref text)
+returns int
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare d date; today int; amt int; n int;
+begin
+  if not wallet_person(p_username) or coalesce(p_coins, 0) <= 0 then return 0; end if;
+  insert into wallet(username) values (p_username) on conflict do nothing;
+  perform 1 from wallet where username = p_username for update;
+  d := player_day(p_username);
+  select coalesce(sum(l.coins), 0) into today from wallet_log l
+   where l.username = p_username and l.day = d and l.reason in ('online', 'trial');
+  -- С 068 за партию с другом и Испытание — вдвое больше
+  amt := least(p_coins * 2, greatest(0, wallet_cap() - today));
+  if amt <= 0 then return 0; end if;
+  insert into wallet_log(username, coins, gems, reason, ref, day) values (p_username, amt, 0, p_reason, p_ref, d)
+  on conflict do nothing;
+  get diagnostics n = row_count;
+  if n = 0 then return 0; end if;
+  update wallet set coins = coins + amt, updated_at = now() where username = p_username;
+  return amt;
+end;
+$$;
+
+-- ============ 2. Приключение: 10 🪙 за звезду, 3 💎 за босса, 5 💎 за мир на ★★★ ============
+create or replace function adventure_wallet(p_username text)
+returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare s students; w wallet; st text; ap text; bp text; gp text; i int; nw int; cur int; paid int;
+        c int := 0; g int := 0;
+begin
+  if not wallet_person(p_username) then return jsonb_build_object('coins', 0, 'gems', 0); end if;
+  insert into wallet(username) values (p_username) on conflict do nothing;
+  select * into w from wallet where username = p_username for update;
+  select * into s from students where username = p_username;
+  st := coalesce(s.adventure_stars, '');
+  ap := rpad(w.adv_paid, greatest(length(w.adv_paid), length(st)), '0');
+  for i in 1 .. length(st) loop
+    cur := substr(st, i, 1)::int;
+    paid := substr(ap, i, 1)::int;
+    if cur > paid then
+      c := c + 10 * (cur - paid);
+      ap := overlay(ap placing cur::text from i for 1);
+    end if;
+  end loop;
+  bp := rpad(w.boss_paid, 50, '0');
+  gp := rpad(w.gold_paid, 50, '0');
+  for nw in 0 .. 49 loop
+    -- Босс — десятый в мире: пройден, если открыт следующий или у него есть звезда
+    if substr(bp, nw + 1, 1) = '0'
+       and (coalesce(s.adventure, 0) > nw * 10 + 9 or substr(st, nw * 10 + 10, 1) between '1' and '3') then
+      g := g + 3;
+      bp := overlay(bp placing '1' from nw + 1 for 1);
+    end if;
+    if substr(gp, nw + 1, 1) = '0' and substr(st, nw * 10 + 1, 10) = '3333333333' then
+      g := g + 5;
+      gp := overlay(gp placing '1' from nw + 1 for 1);
+    end if;
+  end loop;
+  if c > 0 or g > 0 then
+    update wallet set coins = coins + c, gems = gems + g, adv_paid = ap, boss_paid = bp, gold_paid = gp,
+                      updated_at = now()
+     where username = p_username;
+    insert into wallet_log(username, coins, gems, reason, ref, day)
+    values (p_username, c, g, 'adventure', null, player_day(p_username));
+  end if;
+  return jsonb_build_object('coins', c, 'gems', g);
+end;
+$$;
+
+-- ============ 3. Серия дней: 20, 30, 40, 50 🪙; 5-й — 3 💎; 10-й — 5 💎 и иконка ============
+-- Копия — в js/pass.js (streakDayPay), сверяется тестом
+create or replace function streak_day_pay(p_streak int, out coins int, out gems int, out chest boolean)
+language sql immutable as $$
+  select case when x.pos in (5, 10) then 0 else (array[20, 30, 40, 50])[((x.pos - 1) % 5) + 1] end,
+         case x.pos when 5 then 3 when 10 then 5 else 0 end,
+         x.pos = 10
+    from (select ((greatest(p_streak, 1) - 1) % 10) + 1 as pos) x;
+$$;
+
+-- ============ 4. Подарки: что выдано и показано ли ============
+create table if not exists gifts (
+  username text not null references students(username) on update cascade on delete cascade,
+  code text not null,
+  coins int not null default 0,
+  gems int not null default 0,
+  created_at timestamptz not null default now(),
+  seen_at timestamptz,
+  primary key (username, code)
+);
+alter table gifts enable row level security;
+
+-- Подарок-перерасчёт: разница по новым ставкам за всё, что уже заработано.
+-- Раз на игрока: ключ gift:econ2 в wallet_log и строка в gifts
+create or replace function econ2_gift()
+returns int language plpgsql security definer set search_path = public, pg_temp as $$
+declare r record; c int; g int; n int := 0;
+begin
+  for r in select w.username, w.boss_paid, w.gold_paid from wallet w where wallet_person(w.username) loop
+    select coalesce(sum(l.coins), 0) into c from wallet_log l
+     where l.username = r.username and l.reason in ('adventure', 'online', 'trial', 'streak') and l.coins > 0;
+    g := length(coalesce(r.boss_paid, '')) - length(replace(coalesce(r.boss_paid, ''), '1', ''))
+       + 2 * (length(coalesce(r.gold_paid, '')) - length(replace(coalesce(r.gold_paid, ''), '1', '')));
+    if (c > 0 or g > 0) and wallet_add(r.username, c, g, 'gift', 'gift:econ2') then
+      insert into gifts(username, code, coins, gems) values (r.username, 'econ2', c, g) on conflict do nothing;
+      n := n + 1;
+    end if;
+  end loop;
+  return n;
+end;
+$$;
+select econ2_gift();
+
+-- Невиданный подарок игрока (или null) и отметка «показан»
+create or replace function my_gift(p_username text, p_pin text)
+returns jsonb language plpgsql security definer set search_path = public, extensions, pg_temp as $$
+declare me text; g gifts;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  select * into g from gifts where username = me and seen_at is null order by created_at limit 1;
+  if g.username is null then return null; end if;
+  return jsonb_build_object('code', g.code, 'coins', g.coins, 'gems', g.gems);
+end;
+$$;
+create or replace function gift_seen(p_username text, p_pin text, p_code text)
+returns boolean language plpgsql security definer set search_path = public, extensions, pg_temp as $$
+declare me text;
+begin
+  me := check_student_pin(p_username, p_pin);
+  if me is null then raise exception 'auth_failed'; end if;
+  update gifts set seen_at = now() where username = me and code = p_code and seen_at is null;
+  return found;
+end;
+$$;
+
+-- ============ 5. Права ============
+revoke execute on function econ2_gift() from public, anon;
+revoke execute on function wallet_earn(text, int, text, text) from public, anon;
+revoke execute on function adventure_wallet(text) from public, anon;
+grant execute on function my_gift(text, text) to anon;
+grant execute on function gift_seen(text, text, text) to anon;
+grant execute on function streak_day_pay(int) to anon;
+grant execute on function wallet_cap() to anon;

@@ -58,14 +58,14 @@ do $$ begin
 end $$;
 \echo ok
 
-\echo === 2. Приключение: 5 🪙 за звезду, 2 💎 за босса, 3 💎 за мир на ★★★ — один раз
+\echo === 2. Приключение (068): 10 🪙 за звезду, 3 💎 за босса, 5 💎 за мир на ★★★ — один раз
 do $$
 declare r jsonb; i int;
 begin
   r := adventure_result('Лев', '1234', 0, 2);
-  if (r->>'coins')::int <> 10 or (r->>'gems')::int <> 0 then raise exception 'ОШИБКА: две звезды %', r; end if;
+  if (r->>'coins')::int <> 20 or (r->>'gems')::int <> 0 then raise exception 'ОШИБКА: две звезды %', r; end if;
   r := adventure_result('Лев', '1234', 0, 3);
-  if (r->>'coins')::int <> 5 then raise exception 'ОШИБКА: третья звезда %', r; end if;
+  if (r->>'coins')::int <> 10 then raise exception 'ОШИБКА: третья звезда %', r; end if;
   r := adventure_result('Лев', '1234', 0, 3);
   if (r->>'coins')::int <> 0 or (r->>'gems')::int <> 0 then raise exception 'ОШИБКА: повтор оплачен %', r; end if;
   -- Хуже прежнего — тоже ничего
@@ -73,27 +73,27 @@ begin
   if (r->>'coins')::int <> 0 then raise exception 'ОШИБКА: меньше звёзд оплачено %', r; end if;
   for i in 1 .. 8 loop
     r := adventure_result('Лев', '1234', i, 3);
-    if (r->>'coins')::int <> 15 or (r->>'gems')::int <> 0 then raise exception 'ОШИБКА: соперник % %', i, r; end if;
+    if (r->>'coins')::int <> 30 or (r->>'gems')::int <> 0 then raise exception 'ОШИБКА: соперник % %', i, r; end if;
   end loop;
   -- Босс мира: звёзды, кристаллы за босса и за мир на ★★★
   r := adventure_result('Лев', '1234', 9, 3);
-  if (r->>'coins')::int <> 15 or (r->>'gems')::int <> 5 then raise exception 'ОШИБКА: босс %', r; end if;
+  if (r->>'coins')::int <> 30 or (r->>'gems')::int <> 8 then raise exception 'ОШИБКА: босс %', r; end if;
   r := adventure_result('Лев', '1234', 9, 3);
   if (r->>'coins')::int <> 0 or (r->>'gems')::int <> 0 then raise exception 'ОШИБКА: босс второй раз %', r; end if;
-  if (select coins from wallet where username = 'Лев') <> 150 or (select gems from wallet where username = 'Лев') <> 5 then
+  if (select coins from wallet where username = 'Лев') <> 300 or (select gems from wallet where username = 'Лев') <> 8 then
     raise exception 'ОШИБКА: кошелёк % 🪙 / % 💎', (select coins from wallet where username = 'Лев'),
       (select gems from wallet where username = 'Лев');
   end if;
   -- С другого телефона: звезда у 11-го соперника
   r := adventure_sync('Лев', '1234', 11, '33333333331');
-  if (r->>'coins')::int <> 5 or (r->>'gems')::int <> 0 then raise exception 'ОШИБКА: синхронизация %', r; end if;
+  if (r->>'coins')::int <> 10 or (r->>'gems')::int <> 0 then raise exception 'ОШИБКА: синхронизация %', r; end if;
   -- Старая версия игры: босс второго мира пройден без звезды — кристаллы всё равно
   if adventure_save('Лев', '1234', 20) <> 20 then raise exception 'ОШИБКА: сохранение'; end if;
-  if (select gems from wallet where username = 'Лев') <> 7 then raise exception 'ОШИБКА: босс второго мира без кристаллов'; end if;
+  if (select gems from wallet where username = 'Лев') <> 11 then raise exception 'ОШИБКА: босс второго мира без кристаллов'; end if;
   r := adventure_sync('Лев', '1234', 20, '33333333331');
   if (r->>'coins')::int <> 0 or (r->>'gems')::int <> 0 then raise exception 'ОШИБКА: синхронизация повторно %', r; end if;
-  if (select sum(coins) from wallet_log where username = 'Лев' and reason = 'adventure') <> 155
-     or (select sum(gems) from wallet_log where username = 'Лев' and reason = 'adventure') <> 7 then
+  if (select sum(coins) from wallet_log where username = 'Лев' and reason = 'adventure') <> 310
+     or (select sum(gems) from wallet_log where username = 'Лев' and reason = 'adventure') <> 11 then
     raise exception 'ОШИБКА: журнал Приключения';
   end if;
 end $$;
@@ -105,7 +105,7 @@ declare r jsonb;
 begin
   update students set adventure = 30, adventure_stars = '3333333333' || '2222222222' || '1111111111' where username = 'Кира';
   r := adventure_wallet('Кира');
-  if (r->>'coins')::int <> 300 or (r->>'gems')::int <> 9 then raise exception 'ОШИБКА: прошлое %', r; end if;
+  if (r->>'coins')::int <> 600 or (r->>'gems')::int <> 14 then raise exception 'ОШИБКА: прошлое %', r; end if;
   r := adventure_wallet('Кира');
   if (r->>'coins')::int <> 0 or (r->>'gems')::int <> 0 then raise exception 'ОШИБКА: прошлое дважды %', r; end if;
   if wallet_person('#гость-1') or wallet_add('#гость-1', 10, 0, 'test', null) or wallet_person('@bot:owl') then
@@ -114,7 +114,7 @@ begin
 end $$;
 \echo ok
 
-\echo === 4. партия с другом: победа 15 🪙, поражение 5, сдавшемуся 0; партия платится один раз
+\echo === 4. партия с другом (068): победа 30 🪙, поражение 10, сдавшемуся 0; партия платится один раз
 do $$
 declare mid bigint; a0 int; b0 int;
 begin
@@ -123,48 +123,48 @@ begin
   insert into matches(p0, p1, status, range_min, range_max) values ('Лев', 'Кира', 'active', 1, 100)
   returning id into mid;
   update matches set wins = array[3, 0], match_over = true, status = 'finished' where id = mid;
-  if (select coins from wallet where username = 'Лев') <> a0 + 15 or (select coins from wallet where username = 'Кира') <> b0 + 5 then
+  if (select coins from wallet where username = 'Лев') <> a0 + 30 or (select coins from wallet where username = 'Кира') <> b0 + 10 then
     raise exception 'ОШИБКА: за партию % / %', (select coins from wallet where username = 'Лев') - a0,
       (select coins from wallet where username = 'Кира') - b0;
   end if;
   -- Та же партия «закончилась» ещё раз — второй раз не платится
   update matches set status = 'active' where id = mid;
   update matches set status = 'finished' where id = mid;
-  if (select coins from wallet where username = 'Лев') <> a0 + 15 then raise exception 'ОШИБКА: партия оплачена дважды'; end if;
+  if (select coins from wallet where username = 'Лев') <> a0 + 30 then raise exception 'ОШИБКА: партия оплачена дважды'; end if;
   -- Сдался — без монет, победителю — как за победу
   insert into matches(p0, p1, status, range_min, range_max) values ('Лев', 'Кира', 'active', 1, 100)
   returning id into mid;
   update matches set forfeit_by = 1, match_over = true, status = 'finished' where id = mid;
-  if (select coins from wallet where username = 'Лев') <> a0 + 30 or (select coins from wallet where username = 'Кира') <> b0 + 5 then
+  if (select coins from wallet where username = 'Лев') <> a0 + 60 or (select coins from wallet where username = 'Кира') <> b0 + 10 then
     raise exception 'ОШИБКА: сдача % / %', (select coins from wallet where username = 'Лев') - a0,
       (select coins from wallet where username = 'Кира') - b0;
   end if;
 end $$;
 \echo ok
 
-\echo === 5. Испытание: 2 🪙 за раунд, не больше 20 за заход
+\echo === 5. Испытание (068): 4 🪙 за раунд, не больше 40 за заход
 do $$
 declare r jsonb;
 begin
   r := run_report('Кира', '4321', 5, 2100);
-  if (r->>'coins')::int <> 10 then raise exception 'ОШИБКА: 5 раундов %', r; end if;
+  if (r->>'coins')::int <> 20 then raise exception 'ОШИБКА: 5 раундов %', r; end if;
   update run_sessions set updated_at = now() - interval '10 seconds' where username = 'Кира';
   r := run_report('Кира', '4321', 15, 2100);
-  if (r->>'coins')::int <> 20 then raise exception 'ОШИБКА: 15 раундов %', r; end if;
+  if (r->>'coins')::int <> 40 then raise exception 'ОШИБКА: 15 раундов %', r; end if;
   update run_sessions set updated_at = now() - interval '10 seconds' where username = 'Кира';
   r := run_report('Кира', '4321', 0, 0);
   if (r->>'coins')::int <> 0 then raise exception 'ОШИБКА: 0 раундов %', r; end if;
 end $$;
 \echo ok
 
-\echo === 6. игры с другом и Испытание — не больше 300 🪙 в день; задание дня — сверху; завтра — заново
+\echo === 6. игры с другом и Испытание — не больше 600 🪙 в день (068); задание дня — сверху; завтра — заново
 do $$
 declare mid bigint; a0 int; t int; r jsonb;
 begin
   select coalesce(sum(coins), 0) into t from wallet_log
    where username = 'Лев' and day = player_day('Лев') and reason in ('online', 'trial');
-  -- Сегодня уже 290
-  perform wallet_earn('Лев', 290 - t, 'online', 'test:cap');
+  -- Сегодня уже 590 (wallet_earn удваивает: прислать половину)
+  perform wallet_earn('Лев', (590 - t) / 2, 'online', 'test:cap');
   a0 := (select coins from wallet where username = 'Лев');
   insert into matches(p0, p1, status, range_min, range_max) values ('Лев', 'Кира', 'active', 1, 100)
   returning id into mid;
@@ -179,7 +179,7 @@ begin
   r := run_report('Лев', '1234', 5, 2100);
   if (r->>'coins')::int <> 0 then raise exception 'ОШИБКА: Испытание сверх предела %', r; end if;
   r := my_wallet('Лев', '1234');
-  if (r->>'today')::int <> 300 or (r->>'cap')::int <> 300 or (r->>'coins')::int <> a0 + 10 then
+  if (r->>'today')::int <> 600 or (r->>'cap')::int <> 600 or (r->>'coins')::int <> a0 + 10 then
     raise exception 'ОШИБКА: my_wallet %', r;
   end if;
   -- Задание дня в предел не входит: 20 🪙 сверху, и только один раз
@@ -194,10 +194,10 @@ begin
   insert into matches(p0, p1, status, range_min, range_max) values ('Лев', 'Кира', 'active', 1, 100)
   returning id into mid;
   update matches set wins = array[3, 0], match_over = true, status = 'finished' where id = mid;
-  if (select coalesce(sum(coins), 0) from wallet_log where username = 'Лев' and day = player_day('Лев') and reason = 'online') <> 15 then
+  if (select coalesce(sum(coins), 0) from wallet_log where username = 'Лев' and day = player_day('Лев') and reason = 'online') <> 30 then
     raise exception 'ОШИБКА: новый день без монет';
   end if;
-  if ((my_wallet('Лев', '1234'))->>'today')::int <> 15 then raise exception 'ОШИБКА: today нового дня'; end if;
+  if ((my_wallet('Лев', '1234'))->>'today')::int <> 30 then raise exception 'ОШИБКА: today нового дня'; end if;
 end $$;
 \echo ok
 
@@ -244,6 +244,8 @@ begin
   exception when others then if sqlerrm not like '%not_enough%' then raise; end if;
   end;
   perform wallet_add('Лев', 1000, 0, 'test', 'test:topup');
+  -- С 068 за Приключение кристаллов больше: на рамку за 14 💎 не должно хватать
+  update wallet set gems = 10 where username = 'Лев';
   c0 := (select coins from wallet where username = 'Лев');
   g0 := (select gems from wallet where username = 'Лев');
   r := shop_buy('Лев', '1234', 'icon', 'shop-01');

@@ -612,6 +612,19 @@
   </div>
 </div>
 
+<!-- Подарок (миграция 068): разовое начисление — перерасчёт наград по новым ставкам -->
+<div class="modal-backdrop hidden" id="giftModal">
+  <div class="modal-card gift-card">
+    <div class="gf-rays" aria-hidden="true"></div>
+    <div class="gf-icon">🎁</div>
+    <div class="gf-title" id="gfTitle"></div>
+    <p class="gf-lead" id="gfLead"></p>
+    <div class="gf-got" id="gfGot"></div>
+    <p class="gf-more" id="gfMore"></p>
+    <button class="btn btn-block" id="gfOk" onclick="giftCollect()"></button>
+  </div>
+</div>
+
 <div class="modal-backdrop hidden" id="passModal" onclick="if (event.target === this) closePassModal()">
   <div class="modal-card pass-card">
     <div class="ps-title" id="passTitle"></div>

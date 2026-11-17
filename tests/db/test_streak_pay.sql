@@ -21,15 +21,15 @@ begin
 end $$;
 \echo ok
 
-\echo === 1. первый день серии — 10 🪙, второй раз в тот же день — ничего
+\echo === 1. первый день серии — 20 🪙 (068), второй раз в тот же день — ничего
 do $$
 declare r jsonb;
 begin
   r := open_chest('Лев', '1234');
-  if (r->>'streak')::int <> 1 or (r->'pay'->>'coins')::int <> 10 or (r->'pay'->>'gems')::int <> 0 then raise exception 'ОШИБКА: день 1 %', r; end if;
-  if (select coins from wallet where username = 'Лев') <> 10 then raise exception 'ОШИБКА: монеты в кошельке'; end if;
+  if (r->>'streak')::int <> 1 or (r->'pay'->>'coins')::int <> 20 or (r->'pay'->>'gems')::int <> 0 then raise exception 'ОШИБКА: день 1 %', r; end if;
+  if (select coins from wallet where username = 'Лев') <> 20 then raise exception 'ОШИБКА: монеты в кошельке'; end if;
   r := open_chest('Лев', '1234');
-  if not (r->>'already')::boolean or (select coins from wallet where username = 'Лев') <> 10 then raise exception 'ОШИБКА: второй раз за день %', r; end if;
+  if not (r->>'already')::boolean or (select coins from wallet where username = 'Лев') <> 20 then raise exception 'ОШИБКА: второй раз за день %', r; end if;
 end $$;
 \echo ok
 
@@ -42,20 +42,20 @@ begin
   delete from wallet_log where username = 'Лев' and reason = 'streak';
 end $$;
 
-\echo === 2. дни 2–4: 15, 20, 25 🪙; 5-й — 3 💎
+\echo === 2. дни 2–4: 30, 40, 50 🪙; 5-й — 3 💎
 do $$
 declare r jsonb; c0 int;
 begin
   perform pg_temp.next_day(1); r := open_chest('Лев', '1234');
-  if (r->'pay'->>'coins')::int <> 15 then raise exception 'ОШИБКА: день 2 %', r; end if;
+  if (r->'pay'->>'coins')::int <> 30 then raise exception 'ОШИБКА: день 2 %', r; end if;
   perform pg_temp.next_day(3); r := open_chest('Лев', '1234');
-  if (r->'pay'->>'coins')::int <> 25 then raise exception 'ОШИБКА: день 4 %', r; end if;
+  if (r->'pay'->>'coins')::int <> 50 then raise exception 'ОШИБКА: день 4 %', r; end if;
   c0 := (select coins from wallet where username = 'Лев');
   perform pg_temp.next_day(4); r := open_chest('Лев', '1234');
   if (r->>'streak')::int <> 5 or (r->'pay'->>'gems')::int <> 3 or (r->'pay'->>'coins')::int <> 0 then raise exception 'ОШИБКА: день 5 %', r; end if;
   if (select gems from wallet where username = 'Лев') <> 3 or (select coins from wallet where username = 'Лев') <> c0 then raise exception 'ОШИБКА: кристаллы за 5-й день'; end if;
   perform pg_temp.next_day(5); r := open_chest('Лев', '1234');
-  if (r->'pay'->>'coins')::int <> 10 then raise exception 'ОШИБКА: день 6 — снова 10 %', r; end if;
+  if (r->'pay'->>'coins')::int <> 20 then raise exception 'ОШИБКА: день 6 — снова 20 %', r; end if;
 end $$;
 \echo ok
 

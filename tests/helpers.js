@@ -206,6 +206,13 @@ function stubSupabase(opts) {
             return { data: null, error: { message: 'Could not find the function public.' + name } };
           }
           if (name === 'my_wallet') return { data: JSON.parse(JSON.stringify(window.__wallet)), error: null };
+          // Подарок (068): window.__gift { code, coins, gems }; не задан — база без 068
+          if (name === 'my_gift' || name === 'gift_seen') {
+            if (window.__gift === undefined) return { data: null, error: { message: 'Could not find the function public.' + name } };
+            if (name === 'my_gift') return { data: window.__gift && !window.__gift.seen ? { code: window.__gift.code, coins: window.__gift.coins, gems: window.__gift.gems } : null, error: null };
+            if (window.__gift) { window.__gift.seen = true; if (window.__wallet) { window.__wallet.coins += window.__gift.coins; window.__wallet.gems += window.__gift.gems; } }
+            return { data: true, error: null };
+          }
           // Скидка дня и первый питомец, градусник, эффект победы — надеваются сами (063)
           if (name === 'shop_buy') {
             const W = window.__wallet, O = window.__online || { owned: [] }, L = window.__look;
